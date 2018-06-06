@@ -1,15 +1,18 @@
 # Cellular
 
-[![Build Status](https://travis-ci.org/rafaqz/Cellular.jl.svg?branch=master)](https://travis-ci.org/rafaqz/Cellular.jl)
-
-[![Coverage Status](https://coveralls.io/repos/rafaqz/Cellular.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/rafaqz/Cellular.jl?branch=master)
-
+[![Build Status](https://travis-ci.org/rafaqz/Cellular.jl.svg?branch=master)](https://travis-ci.org/rafaqz/Cellular.jl) 
+[![Coverage Status](https://coveralls.io/repos/rafaqz/Cellular.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/rafaqz/Cellular.jl?branch=master) 
 [![codecov.io](http://codecov.io/github/rafaqz/Cellular.jl/coverage.svg?branch=master)](http://codecov.io/github/rafaqz/Cellular.jl?branch=master)
 
 Cellular is a generalised, modular framework for cellular automata and other
 cellular models.
 
 It's currently under development, and likely to change regularly at this stage.
+Use this in the julia prompt to install:
+
+```julia
+Pkg.clone("https://github.com/rafaqz/Cellular.jl"
+```
 
 
 Running a dispersal simulation:
