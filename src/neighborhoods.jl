@@ -1,124 +1,97 @@
-abstract type Neighborhood end
-abstract type CustomNeighborhood <: Neighborhood end
-abstract type RadialNeighborhood <: Neighborhood end
-abstract type RadialNeighborhood2D <: RadialNeighborhood end
-abstract type AbstractDispersalNeighborhood <: Neighborhood end
+"""
+Checks all cells in neighborhood and sums them according
+to the particular neighborhood rule.
+"""
+function neighbors() end
 
-abstract type AbstractOverflow end
-struct Wrap <: AbstractOverflow end
-struct Skip <: AbstractOverflow end
-
-@mix @with_kw struct Rad{M}
-    radius::Int = 1
-    overflow::M = Skip()
-end
-
-@Rad struct RadialNeighborhood1D{} <: RadialNeighborhood end
-@Rad struct MooreNeighborhood{} <: RadialNeighborhood2D end
-@Rad struct VonNeumannNeighborhood{} <: RadialNeighborhood2D end
-@Rad struct RotVonNeumannNeighborhood{} <: RadialNeighborhood2D end
-
-@with_kw struct SingleCustomNeighborhood{H} <: CustomNeighborhood 
-    neighbors::H = ((-1, 0), (1, 0), (0, -1), (0, 1))
-end
-
-struct MultiCustomNeighborhood{H} <: CustomNeighborhood 
-    multineighbors::H
-    cc::Vector{Int8}
-end
-MultiCustomNeighborhood(mn) = MultiCustomNeighborhood(mn, zeros(Int8, length(mn)))
-
-@with_kw struct DispersalNeighborhood{DK,S} <: AbstractDispersalNeighborhood
-    dispkernel::DK = [0.5, 0.25, 0.125]
-    overflow::S = Skip()
-end
-
-neighbors(h::RadialNeighborhood1D, model, state, col, source, args...) = begin
+neighbors(h::RadialNeighborhood1D, state, index, source, args...) = begin
     width = size(source)
     r = h.radius
-    cc = -source[col]
-    for p = (col - r):(col + r)
+    cc = -source[index]
+    for p = (index - r):(index + r)
         p = bounded(p, width, n.overflow)
         cc += source[p]
     end
     cc
 end
 
-neighbors(h::RadialNeighborhood2D, model, state, ind, source, args...) = begin
+neighbors(h::RadialNeighborhood2D, state, index, source, args...) = begin
     height, width = size(source)
-    row, col = ind
+    row, col = index
     r = h.radius
     cc = -source[row, col]
     for q = (col - r):(col + r)
         for p = (row - r):(row + r)
-            inhood(n, p, q, row, col) || continue
-            bounded!((p, q), (height, width), n.overflow) || continue
+            inhood(h, p, q, row, col) || continue
+            p, q, inb = inbounds((p, q), (height, width), h.overflow) 
+            inb || continue
             cc += source[p, q]
         end
     end
     cc
 end
 
-@inline inhood(n::RadialNeighborhood2D, p, q, row, col) = true
-@inline inhood(n::VonNeumannNeighborhood, p, q, row, col) = 
-    (abs(p - row) + abs(q - col)) <= n.radius
-@inline inhood(n::RotVonNeumannNeighborhood, p, q, row, col) = 
-    (abs(p - row) + abs(q - col)) > n.radius
-
-neighbors(h::DispersalNeighborhood, model, state, ind, source, args...) = begin
+neighbors(h::DispersalNeighborhood, state, index, source, args...) = begin
     height, width = size(source)
-    row, col = ind
-    r = length(h.dispkernel)-1
-    cc = -source[row, col]
-    for b = -r:r
-        for a = -r:r
-            p = row + b; q = col + a
-            bounded!(p, height, h.overflow) || continue
-            bounded!(q, width, h.overflow) || continue
-            distance = round(Int, sqrt(a^2 + b^2))
-            distance == 0 && distance = 1
-            printlnt(distance)
-            cc += source[p, q] * h.dispkernel[distance] # * model.suitability[ind...] 
-            # source[p, q] > 0 && println("Colonize!!!")
+    row, col = index
+    r = div(size(h.dispkernel, 1) - 1, 2)
+    cc = 0.0
+    # loop over dispersal kernel grid dimensions
+    for a = -r:r 
+        for b = -r:r
+            # ignore the current cell?
+            a == 0 && b == 0 && continue
+            p, q, inb = inbounds((row + b, col + a), (height, width), h.overflow)
+            inb || continue
+            cc += source[p, q] * h.dispkernel[a + r + 1, b + r + 1]
         end
     end
     return cc
 end
 
-neighbors(h::SingleCustomNeighborhood, model, state, ind, source, args...) =
-    custom_neighbors(h.neighborhood, h, ind, source, args...)
+neighbors(h::SingleCustomNeighborhood, state, index, source, args...) =
+    custom_neighbors(h.neighborhood, h, index, source, args...)
 
-neighbors(h::MultiCustomNeighborhood, model, state, ind, source, args...) = begin
+neighbors(h::MultiCustomNeighborhood, state, index, source, args...) = begin
     for i = 1:length(h.multineighbors)
-        mn.cc[i] = custom_neighbors(h.multineighbors[i], h, ind, source)
+        mn.cc[i] = custom_neighbors(h.multineighbors[i], h, index, source)
     end
     mn.cc
 end
 
-custom_neighbors(n::AbstractArray, h, ind, source) = begin
+custom_neighbors(n::AbstractArray, h, index, source) = begin
     height, width = size(source)
-    row, col = ind
+    row, col = index
     cc = zero(eltype(source))
-    for (p, q) in n
-        p += row
-        q += col
-        bounded!((p, q), (height, width), n.overflow) || continue
+    for (a, b) in n
+        p, q = inbounds((a + row, b + col), (height, width), n.overflow) || continue
         cc += source[p, q]
     end
     cc
 end
 
+" Check radial neighborhood pattern, return a boolean "
+inhood(n::RadialNeighborhood2D, p, q, row, col) = true
+inhood(n::VonNeumannNeighborhood, p, q, row, col) = 
+    (abs(p - row) + abs(q - col)) <= n.radius
+inhood(n::RotVonNeumannNeighborhood, p, q, row, col) = 
+    (abs(p - row) + abs(q - col)) > n.radius
 
-bounded!(x, max, overflow::Wrap) = begin
+""" 
+Check grid boundaries. 
+returns a 3-tuple of coords and a boolean 
+"""
+inbounds(xs::Tuple, maxs::Tuple, overflow) = begin
+    a, inbounds_a = inbounds(xs[1], maxs[1], overflow)
+    b, inbounds_b = inbounds(xs[2], maxs[2], overflow)
+    a, b, inbounds_a && inbounds_b
+end
+inbounds(x::Number, max::Number, overflow::Skip) = x, x > 0 && x < max
+inbounds(x::Number, max::Number, overflow::Wrap) = begin
     if x < 1 
         x = max + x 
     elseif x > max 
         x = x - max 
     end
-    true
+    x, true
 end
-
-bounded!(x, max, overflow::Skip) = x > 0 && x < max 
-
-bounded!(xs::Tuple, maxs::Tuple, overflow::Skip) = 
-    bounded!(xs[1], maxs[1], n.overflow) && bounded!(xs[2], maxs[1], n.overflow)

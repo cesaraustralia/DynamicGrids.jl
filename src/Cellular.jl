@@ -4,18 +4,17 @@ import Base.show
 
 using Parameters, Mixers, Unitful, Requires
 
-include("neighborhoods.jl")
-include("output.jl")
-include("rules.jl")
+include("types.jl")
 include("framework.jl")
+include("rules.jl")
+include("neighborhoods.jl")
+include("dispersal.jl")
+include("output.jl")
 
-export rule, 
-       automate!,
-       generations,
-       rule,
+export automate!,
        sim!,
-       MixedDispersal,
-       update_view,
+       exponential,
+       # more dispersal kernel function here
        Neighborhood, Neighborhood1D, Neighborhood2D,
        RadialNeighborhood,
        MooreNeighborhood,
@@ -24,9 +23,14 @@ export rule,
        CustomNeighborhood,
        MultiNeighborhood,
        DispersalNeighborhood,
+       LongDispersal,
+       ShortDispersal,
+       Dispersal,
        Life,
        Skip,
        Wrap,
        TkOutput,
-       GIfOutput
+       GIfOutput,
+       PopSuitLayers,
+       SuitabilityLayer
 end

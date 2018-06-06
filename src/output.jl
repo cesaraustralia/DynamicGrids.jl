@@ -1,6 +1,15 @@
 abstract type AbstractOutput end 
 
-process(source, output) = convert(Array{UInt32, 2}, source) .* 0x00ffffff
+"""
+Converts an array to an image format.
+"""
+image_process(source, output) = convert(Array{UInt32, 2}, source) .* 0x00ffffff
+
+"""
+    update_output(output, source, t, pause)
+Called from the simulation to pass the next frame to the output 
+"""
+function update_output end
 
 @require Tk begin
 
@@ -26,7 +35,7 @@ process(source, output) = convert(Array{UInt32, 2}, source) .* 0x00ffffff
     end
 
     function update_output(output::TkOutput, source, t, pause)
-        img = process(source, output)
+        img = image_process(source, output)
         set_source_surface(output.cr, CairoRGBSurface(img), 0, 0)
         paint(output.cr)
         Tk.reveal(output.c)
@@ -44,12 +53,12 @@ end
     end
 
     GifOutput(source) = begin
-        img = process(source, GifOutput{Array{typeof(source)}}([]))
+        img = image_process(source, GifOutput{Array{typeof(source)}}([]))
         GifOutput{Array{typeof(img)}}(Array([img]))
     end
 
     function update_output(output::GifOutput, source, t, pause)
-        push!(output.frames, process(source, output))
+        push!(output.frames, image_process(source, output))
     end
 
     save(filename::AbstractString, output::GifOutput) = begin
@@ -57,41 +66,3 @@ end
     end
 
 end
-
-
-# function sim(source::Array{I,2}, rule) where I
-#     c = canvas(UserUnit)
-#     win = Window(c)
-
-#     zr = Signal(ZoomRegion(source))
-#     zoomsigs = init_zoom_scroll(c, zr)
-#     imgsig = map(zr) do r
-#         cv = r.currentview
-#         view(source, UnitRange{Int}(cv.y), UnitRange{Int}(cv.x))
-#     end
-#     redraw = draw(c, imgsig) do cnvs, image
-#         copy!(cnvs, image)
-#         # canvas adopts the indices of the zoom region. That way if we
-#         # zoom in further, we select the correct region.
-#         set_coordinates(cnvs, value(zr))
-#     end
-
-#     done = false
-#     last = time()
-#     f = 1
-#     dest = similar(source)
-#     showall(win)
-
-#     while !done
-#         t = time()
-#         if (t-last) > 2
-#             println("$(f/(t-last)) FPS")
-#             last = t; f = 0
-#         end
-#         automate!(dest, source, rule)
-#         source .= dest
-#         push!(zr, ZoomRegion(source))
-#         f += 1
-#         sleep(0.0001)
-#     end
-# end

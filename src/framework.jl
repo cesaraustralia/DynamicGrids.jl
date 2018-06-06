@@ -1,27 +1,45 @@
 
-sim!(source, model, output, timestep; pause=0.0) = begin
-    t = zero(timestep)
+""" 
+Runs the whole simulation, passing the destination aray to 
+the output for each time-step.
+"""
+sim!(source, model; output = TkOutput(source), time=1:10000, pause=0.0) = begin
     done = false
     dest = similar(source)
-    while !done
+    for t in time
+        # println(t)
         done = update_output(output, source, t, pause)
+        !done || break
+
         automate!(dest, source, model, t) 
         source .= dest
-        t = t + timestep
-        println(t)
     end
 end
 
+""" 
+Runs the model once for the whole grid.
+"""
 automate!(dest, source, model, args...) = begin
     width, height = size(source)
-    ind = collect((col,row) for col in 1:width, row in 1:height)
-    broadcast(prekernel, source, model, ind, (source,), args...)
-    broadcast!(kernel, dest, source, model, ind, (source,), args...)
+    index = collect((col,row) for col in 1:width, row in 1:height)
+    # Run the prekernel for every cell
+    broadcast(prekernel, model, source, index, (source,), args...)
+    # Run the kernel for every cell, the result sets the dest cell
+    broadcast!(kernel, dest, model, source, index, (source,), args...)
 end 
 
-kernel(state, model, args...) = begin
-    cc = neighbors(model.neighborhood, model, state, args...)
-    rule(model, state, cc, args...)
-end
+"""
+Runs before the main kernel. Modifies the source array
+that will be passed to kernel(). The return value is not used.
+"""
+function prekernel() end
 
-prekernel(model, state, ind, dest, args...) = nothing
+"No prekernel, Return nothing"
+prekernel(model, args...) = nothing
+
+" The main kernel. The return value is written to the destination array."
+function kernel() end
+
+"No kernel, return the existing state."
+kernel(model, args...) = state
+
