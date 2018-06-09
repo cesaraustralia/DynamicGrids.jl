@@ -50,6 +50,10 @@ abstract type AbstractLongDispersal end
 end
 
 
+# TODO a better way to do this.
+# Probably using traits. Which layers are included should be flixible
+# - you should be able to pass in any struct with the right field names and it 
+# will do all the right things. Single inheritance can't capture that.
 abstract type AbstractLayers end
 
 struct SuitabilityLayer{S} <: AbstractLayers
