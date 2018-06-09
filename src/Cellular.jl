@@ -2,7 +2,7 @@ module Cellular
 
 import Base.show
 
-using Parameters, Mixers, Unitful, Requires, Tk, Cairo
+using Parameters, Unitful, Requires, Tk, Cairo
 
 include("types.jl")
 include("framework.jl")
