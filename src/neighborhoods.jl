@@ -4,7 +4,7 @@ to the particular neighborhood rule.
 """
 function neighbors() end
 
-neighbors(h::RadialNeighborhood1D, state, index, source, args...) = begin
+neighbors(h::RadialNeighborhood{:onedim}, state, index, source, args...) = begin
     width = size(source)
     r = h.radius
     cc = -source[index]
@@ -15,7 +15,7 @@ neighbors(h::RadialNeighborhood1D, state, index, source, args...) = begin
     cc
 end
 
-neighbors(h::RadialNeighborhood2D, state, index, source, args...) = begin
+neighbors(h::RadialNeighborhood, state, index, source, args...) = begin
     height, width = size(source)
     row, col = index
     r = h.radius
@@ -71,10 +71,10 @@ custom_neighbors(n::AbstractArray, h, index, source) = begin
 end
 
 " Check radial neighborhood pattern, return a boolean "
-inhood(n::RadialNeighborhood2D, p, q, row, col) = true
-inhood(n::VonNeumannNeighborhood, p, q, row, col) = 
+inhood(n::RadialNeighborhood{:moore}, p, q, row, col) = true
+inhood(n::RadialNeighborhood{:vonneumann}, p, q, row, col) = 
     (abs(p - row) + abs(q - col)) <= n.radius
-inhood(n::RotVonNeumannNeighborhood, p, q, row, col) = 
+inhood(n::RadialNeighborhood{:rotvonneumann}, p, q, row, col) = 
     (abs(p - row) + abs(q - col)) > n.radius
 
 """ 

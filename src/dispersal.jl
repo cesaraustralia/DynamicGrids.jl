@@ -19,4 +19,3 @@ exponential(d, a) = e^-d * a
 
 # more dipersal kernel functions here
 
-

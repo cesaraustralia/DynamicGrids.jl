@@ -1,21 +1,17 @@
 abstract type Neighborhood end
 abstract type CustomNeighborhood <: Neighborhood end
-abstract type RadialNeighborhood <: Neighborhood end
-abstract type RadialNeighborhood2D <: RadialNeighborhood end
 abstract type AbstractDispersalNeighborhood <: Neighborhood end
 
-@mix @with_kw struct Rad{M}
-    radius::Int = 1
-    overflow::M = Skip()
+struct RadialNeighborhood{T,M} <: Neighborhood 
+    radius::Int
+    overflow::M
 end
 
-@Rad struct RadialNeighborhood1D{} <: RadialNeighborhood end
-@Rad struct MooreNeighborhood{} <: RadialNeighborhood2D end
-@Rad struct VonNeumannNeighborhood{} <: RadialNeighborhood2D end
-@Rad struct RotVonNeumannNeighborhood{} <: RadialNeighborhood2D end
+RadialNeighborhood{T}(; radius = 1, overflow = Skip()) where T =
+    RadialNeighborhood{T,typeof(overflow)}(radius, overflow)
 
-@with_kw struct SingleCustomNeighborhood{H} <: CustomNeighborhood 
-    neighbors::H = ((-1, 0), (1, 0), (0, -1), (0, 1))
+struct SingleCustomNeighborhood{H} <: CustomNeighborhood 
+    neighbors::H
 end
 
 struct MultiCustomNeighborhood{H} <: CustomNeighborhood 
@@ -77,7 +73,7 @@ abstract type AbstractDispersal <: AbstractCellular end
 end
 
 @with_kw struct Life{N} <: AbstractLife
-    neighborhood::N = MooreNeighborhood(overflow=Wrap())
+    neighborhood::N = RadialNeighborhood{:moore}(; overflow=Wrap())
     B::Array{Int,1} = [3]
     S::Array{Int,1} = [2,3]
 end
