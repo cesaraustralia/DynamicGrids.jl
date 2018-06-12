@@ -11,6 +11,7 @@ include("life.jl")
 
 export automate!, 
        sim!,
+       inbounds,
        AbstractOutput, 
        TkOutput, 
        GIfOutput,

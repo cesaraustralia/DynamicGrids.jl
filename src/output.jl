@@ -22,7 +22,7 @@ ArrayOutput(source) = ArrayOutput{typeof(source)}([])
 " Copies the current frame array unchanged to the stored array "
 update_output(output::ArrayOutput, frame, t, pause) = begin
     push!(output.frames, deepcopy(frame))
-    false
+    true
 end
 
 
@@ -33,19 +33,19 @@ end
         w::W
         c::C
         cr::CR
-        done::D
+        ok::D
     end
 
     TkOutput(frame; scaling = 2) = begin
         m, n = size(frame)
         w = Tk.Toplevel("Cellular Automata", n, m)
         c = Tk.Canvas(w)
-        done = [false]
+        ok = [true]
         Tk.pack(c, expand = true, fill = "both")
-        c.mouse.button1press = (c, x, y) -> (done[1] = true)
+        c.mouse.button1press = (c, x, y) -> (ok[1] = false)
         cr = getgc(c)
         scale(cr, scaling, scaling)
-        TkOutput(w, c, cr, done)
+        TkOutput(w, c, cr, ok)
     end
 
     function update_output(output::TkOutput, frame, t, pause)
@@ -54,8 +54,7 @@ end
         paint(output.cr)
         Tk.reveal(output.c)
         sleep(pause)
-        println(t)
-        output.done[1]
+        output.ok[1]
     end
 end
 
@@ -74,6 +73,7 @@ end
 
     function update_output(output::GifOutput, frame, t, pause)
         push!(output.frames, image_process(frame, output))
+        true
     end
 
     save(filename::AbstractString, output::GifOutput) = begin
