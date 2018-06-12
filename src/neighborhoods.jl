@@ -1,10 +1,32 @@
+abstract type AbstractNeighborhood end
+abstract type AbstractRadialNeighborhood{T} <: AbstractNeighborhood end
+abstract type AbstractCustomNeighborhood <: AbstractNeighborhood end
+
+struct RadialNeighborhood{T,M} <: AbstractRadialNeighborhood{T} 
+    radius::Int
+    overflow::M
+end
+
+RadialNeighborhood{T}(; radius = 1, overflow = Skip()) where T =
+    RadialNeighborhood{T,typeof(overflow)}(radius, overflow)
+
+struct CustomNeighborhood{H} <: AbstractCustomNeighborhood 
+    neighbors::H
+end
+
+struct MultiCustomNeighborhood{H} <: AbstractCustomNeighborhood 
+    multineighbors::H
+    cc::Vector{Int8}
+end
+MultiCustomNeighborhood(mn) = MultiCustomNeighborhood(mn, zeros(Int8, length(mn)))
+
 """
 Checks all cells in neighborhood and sums them according
 to the particular neighborhood rule.
 """
 function neighbors() end
 
-neighbors(h::RadialNeighborhood{:onedim}, state, index, source, args...) = begin
+neighbors(h::AbstractRadialNeighborhood{:onedim}, state, index, t, source, args...) = begin
     width = size(source)
     r = h.radius
     cc = -source[index]
@@ -15,7 +37,7 @@ neighbors(h::RadialNeighborhood{:onedim}, state, index, source, args...) = begin
     cc
 end
 
-neighbors(h::RadialNeighborhood, state, index, source, args...) = begin
+neighbors(h::AbstractRadialNeighborhood, state, index, t, source, args...) = begin
     height, width = size(source)
     row, col = index
     r = h.radius
@@ -31,35 +53,17 @@ neighbors(h::RadialNeighborhood, state, index, source, args...) = begin
     cc
 end
 
-neighbors(h::DispersalNeighborhood, state, index, source, args...) = begin
-    height, width = size(source)
-    row, col = index
-    r = div(size(h.dispkernel, 1) - 1, 2)
-    cc = 0.0
-    # loop over dispersal kernel grid dimensions
-    for a = -r:r 
-        for b = -r:r
-            # ignore the current cell?
-            a == 0 && b == 0 && continue
-            p, q, inb = inbounds((row + b, col + a), (height, width), h.overflow)
-            inb || continue
-            cc += source[p, q] * h.dispkernel[a + r + 1, b + r + 1]
-        end
-    end
-    return cc
-end
+neighbors(h::AbstractCustomNeighborhood, state, index, t, source, args...) =
+    custom_neighbors(h.neighborhood, h, index, t, source, args...)
 
-neighbors(h::SingleCustomNeighborhood, state, index, source, args...) =
-    custom_neighbors(h.neighborhood, h, index, source, args...)
-
-neighbors(h::MultiCustomNeighborhood, state, index, source, args...) = begin
+neighbors(h::MultiCustomNeighborhood, state, index, t, source, args...) = begin
     for i = 1:length(h.multineighbors)
-        mn.cc[i] = custom_neighbors(h.multineighbors[i], h, index, source)
+        mn.cc[i] = custom_neighbors(h.multineighbors[i], h, index, t, source)
     end
     mn.cc
 end
 
-custom_neighbors(n::AbstractArray, h, index, source) = begin
+custom_neighbors(n, h, index, t, source) = begin
     height, width = size(source)
     row, col = index
     cc = zero(eltype(source))
@@ -71,10 +75,10 @@ custom_neighbors(n::AbstractArray, h, index, source) = begin
 end
 
 " Check radial neighborhood pattern, return a boolean "
-inhood(n::RadialNeighborhood{:moore}, p, q, row, col) = true
-inhood(n::RadialNeighborhood{:vonneumann}, p, q, row, col) = 
+inhood(n::AbstractRadialNeighborhood{:moore}, p, q, row, col) = true
+inhood(n::AbstractRadialNeighborhood{:vonneumann}, p, q, row, col) = 
     (abs(p - row) + abs(q - col)) <= n.radius
-inhood(n::RadialNeighborhood{:rotvonneumann}, p, q, row, col) = 
+inhood(n::AbstractRadialNeighborhood{:rotvonneumann}, p, q, row, col) = 
     (abs(p - row) + abs(q - col)) > n.radius
 
 """ 

@@ -7,33 +7,11 @@
 Cellular is a generalised, modular framework for cellular automata and other
 cellular models.
 
-It's currently under development, and likely to change regularly at this stage.
-Use this in the julia prompt to install:
+This package is extended by [Dispersal.jl](https://github/rafaqz/Dispersal.jl)
+for modelling organism dispersal.
 
 ```julia
 Pkg.clone("https://github.com/rafaqz/Cellular.jl"
-```
-
-
-Running a dispersal simulation:
-
-```julia
-using Cellular
-using Tk
-
-growthlimits = your_2d_array
-
-# define the model
-model = Dispersal(layers=SuitabilityLayer(growthlimits))
-
-# define the source array
-source = zeros(Int8, size(growthlimits))
-
-# seed it
-source[24, 354] = 1
-
-# run the simulation
-sim!(source, model) 
 ```
 
 Running cellular automata:

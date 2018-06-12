@@ -1,45 +1,55 @@
+abstract type AbstractCellular end
+abstract type AbstractInPlaceCellular end
+
+abstract type AbstractOverflow end
+" Wrap cords that overflow to the opposite side "
+struct Wrap <: AbstractOverflow end
+" Skip coords that overflow boundaries "
+struct Skip <: AbstractOverflow end
+
 
 """ 
 Runs the whole simulation, passing the destination aray to 
-the output for each time-step.
+the passed in output for each time-step.
 """
-sim!(source, model; output = TkOutput(source), time=1:10000, pause=0.0) = begin
+sim!(source, model, output, args...; time=1:10000, pause=0.0) = begin
     done = false
     dest = similar(source)
     for t in time
-        # println(t)
-        done = update_output(output, source, t, pause)
+        update_output(output, source, t, pause)
         !done || break
-
-        automate!(dest, source, model, t) 
-        source .= dest
+        source, dest = automate!(dest, source, model, t, args...) 
     end
 end
 
 """ 
 Runs the model once for the whole grid.
+does not interact with neighborhoods, layers etc, just runs other methods.
 """
-automate!(dest, source, model, args...) = begin
+
+automate!(dest, source, models::Tuple, t, args...) = begin
     width, height = size(source)
     index = collect((col,row) for col in 1:width, row in 1:height)
-    # Run the prekernel for every cell
-    broadcast(prekernel, model, source, index, (source,), args...)
     # Run the kernel for every cell, the result sets the dest cell
-    broadcast!(kernel, dest, model, source, index, (source,), args...)
+    applyrules!(models, source, dest, index, t, args...)
 end 
+automate!(dest, source, model, args...) = automate!(dest, source, (model,), args...)
 
-"""
-Runs before the main kernel. Modifies the source array
-that will be passed to kernel(). The return value is not used.
-"""
-function prekernel() end
+" Type-stable recursive application of model rule "
+function applyrules!(models::Tuple{T,Vararg}, source, dest, index, t, args...) where {T<:AbstractCellular}
+    # Write output to dest array
+    broadcast!(rule, dest, models[1], source, index, t, (source,), (dest,), args...)
+    # Swap source and dest
+    applyrules!(Base.tail(models), dest, source, index, t, args...) 
+end
+function applyrules!(models::Tuple{T,Vararg}, source, dest, index, t, args...) where {T<:AbstractInPlaceCellular}
+    broadcast(rule, models[1], source, index, t, (source,), (dest,), args...)
+    applyrules!(Base.tail(models), source, dest, index, t, args...)
+end
+applyrules!(models::Tuple{}, source, dest, index, t, args...) = source, dest
 
-"No prekernel, Return nothing"
-prekernel(model, args...) = nothing
+" Rules for altering cell values "
+function rule() end
 
-" The main kernel. The return value is written to the destination array."
-function kernel() end
-
-"No kernel, return the existing state."
-kernel(model, args...) = state
-
+" Default is to do nothing "
+rule(model, args...) = nothing
