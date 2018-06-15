@@ -7,7 +7,7 @@
 Cellular is a generalised, modular framework for cellular automata and other
 cellular models.
 
-This package is extended by [Dispersal.jl](https://github/rafaqz/Dispersal.jl)
+This package is extended by [Dispersal.jl](https://github.com/rafaqz/Dispersal.jl)
 for modelling organism dispersal.
 
 ```julia
