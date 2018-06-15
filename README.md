@@ -17,12 +17,17 @@ Pkg.clone("https://github.com/rafaqz/Cellular.jl"
 Running cellular automata:
 
 ```julia
+using Cellular
+using Tk
 
-# build a random starting grid
+# Build a random starting grid
 source = round.(Int8, max.(0.0, rand(-4.0:0.1:1.0, 400,400)))
 
-# use the default game of life model
+# Use the default game of life model
 model = Life()
 
-sim!(source, model)
+# Choose Tk as the output
+output = TkOutput(source)
+
+sim!(source, model, output)
 ```
