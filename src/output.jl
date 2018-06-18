@@ -1,83 +1,147 @@
+"""
+$(TYPEDEF)
+Simulation outputs can be used interchangeably as they are decoupled 
+from the simulation behaviour. Outputs should inherit from AbstractOutput.
+
+All types extending AbstractOutput should have their own method of `update_output`.
+"""
 abstract type AbstractOutput end 
 
 """
-Converts an array to an image format.
+$(TYPEDEF)
+Output subtype for arrays
 """
-image_process(frame, output) = convert(Array{UInt32, 2}, frame) .* 0x00ffffff
+abstract type AbstractArrayOutput <: AbstractOutput end 
+
+(::Type{T})(init) where T <: AbstractArrayOutput = T{typeof(init)}([])
 
 """
+$(TYPEDEF)
+Simple array output: creates an array of frames.
+$(FIELDS)
+"""
+struct ArrayOutput{A} <: AbstractArrayOutput
+    frames::Array{A,1}
+end
+
+"""
+$(TYPEDEF)
+An array output that is printed as asccii blocks in the REPL.
+$(FIELDS)
+"""
+struct REPLOutput{A} <: AbstractArrayOutput
+    frames::Array{A,1}
+end
+
+"""
+$(SIGNATURES)
+Print the last frame of a simulation in the REPL.
+"""
+Base.show(io::IO, output::REPLOutput) = begin
+    println(io, typeof(output))
+
+    fr = frames(output)
+    length(fr) == 0 && return
+
+    lastframe = fr[end]
+    io2 = String("")
+    for i = 1:size(lastframe, 1)
+        io2 *= "\t"
+        for j = 1:size(lastframe, 2)
+            if lastframe[i,j] < 0.5
+                io2 *= " "
+            elseif lastframe[i,j] > 0.5
+                io2 *= "█"
+            end
+        end
+        io2 *= "\n"
+    end
+    io2 *= "\n\n"
+    println(io, io2)
+end
+
+""" 
     update_output(output, frame, t, pause)
-Called from the simulation to pass the next frame to the output 
+Methods that update the output with the current frame, for timestep t.
+$(METHODLIST)
 """
 function update_output end
 
+""" 
+$(SIGNATURES)
+Copies the current frame array unchanged to the stored array 
 """
-Simple array output: creates an array of frames.
-"""
-struct ArrayOutput{A} <: AbstractOutput
-    frames::Array{A,1}
-end
-ArrayOutput(source) = ArrayOutput{typeof(source)}([])
-
-" Copies the current frame array unchanged to the stored array "
-update_output(output::ArrayOutput, frame, t, pause) = begin
-    push!(output.frames, deepcopy(frame))
+update_output(output::AbstractArrayOutput, frame, t, pause) = begin
+    fr = frames(output)
+    push!(fr, deepcopy(frame))
     true
 end
+
+"""
+$(SIGNATURES)
+Converts an array to an image format.
+"""
+process_image(frame, output) = convert(Array{UInt32, 2}, frame) .* 0x00ffffff
 
 
 @require Tk begin
     using Cairo
 
+    """
+    $(TYPEDEF)
+    Plot output live to a Tk window.
+    Requires `using Tk` to be available. 
+    $(FIELDS)
+    """
     struct TkOutput{W,C,CR,D} <: AbstractOutput
-        w::W
-        c::C
+        window::W
+        canvas::C
         cr::CR
-        ok::D
+        run::D
     end
 
-    TkOutput(frame; scaling = 2) = begin
-        m, n = size(frame)
-        w = Tk.Toplevel("Cellular Automata", n, m)
-        c = Tk.Canvas(w)
+    """
+        TkOutput(frame; scaling = 2)
+    Constructor for TkOutput.
+    - `init::AbstractArray`: the `init` array that will also be passed to sim!()
+    """
+    TkOutput(init; scaling = 2) = begin
+        m, n = size(init)
+        window = Tk.Toplevel("Cellular Automata", n, m)
+        canvas = Tk.Canvas(window)
         ok = [true]
-        Tk.pack(c, expand = true, fill = "both")
-        c.mouse.button1press = (c, x, y) -> (ok[1] = false)
-        cr = getgc(c)
+        Tk.pack(canvas, expand = true, fill = "both")
+        canvas.mouse.button1press = (canvas, x, y) -> (run[1] = false)
+        cr = getgc(canvas)
         scale(cr, scaling, scaling)
-        TkOutput(w, c, cr, ok)
+        TkOutput(window, canvas, cr, run)
     end
 
+    """
+    $(SIGNATURES)
+    """
     function update_output(output::TkOutput, frame, t, pause)
-        img = image_process(frame, output)
+        img = process_image(frame, output)
         set_source_surface(output.cr, CairoRGBSurface(img), 0, 0)
         paint(output.cr)
-        Tk.reveal(output.c)
+        Tk.reveal(output.canvas)
         sleep(pause)
-        output.ok[1]
+        output.run[1]
     end
 end
 
+frames(output::AbstractArrayOutput) = output.frames
+
 @require FileIO begin
 
+    using FixedPointNumbers
+    using Colors
     import FileIO.save
 
-    struct GifOutput{A} <: AbstractOutput
-        frames::A
-    end
-
-    GifOutput(frame) = begin
-        img = image_process(frame, GifOutput{Array{typeof(frame)}}([]))
-        GifOutput{Array{typeof(img)}}(Array([img]))
-    end
-
-    function update_output(output::GifOutput, frame, t, pause)
-        push!(output.frames, image_process(frame, output))
-        true
-    end
-
-    save(filename::AbstractString, output::GifOutput) = begin
-        save(filname, output.frames)
+    save(filename::AbstractString, output::ArrayOutput; kwargs...) = begin
+        f = frames(output)
+        a = reshape(reduce(hcat, f), size(f[1])..., length(f))
+        save("test.gif", vcat(frames(output)))
     end
 
 end

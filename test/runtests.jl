@@ -16,26 +16,23 @@ end
 end
 
 @testset "life glider simulation" begin
-    source = zeros(Int8, 6, 6)
-    source[3, 3] = 1
-    source[3, 4] = 1
-    source[5, 4] = 1
-    source[3, 5] = 1
-    source[4, 5] = 1
-    source
 
-    test = zeros(Int8, 6, 6)
-    test[2, 4] = 1
-    test[3, 3] = 1
-    test[2, 5] = 1
-    test[3, 5] = 1
-    test[4, 5] = 1
-    test
+    init = [0 0 0 0 0 0;
+            0 0 0 0 0 0;
+            0 0 1 1 1 0;
+            0 0 0 0 1 0;
+            0 0 0 1 0 0;
+            0 0 0 0 0 0]
 
-    source
-    output = ArrayOutput(source)
-    output.frames
-    out = sim!(source, Life(), output; time = 1:3)
+    test = [0 0 0 0 0 0;
+            0 0 0 1 1 0;
+            0 0 1 0 1 0;
+            0 0 0 0 1 0;
+            0 0 0 0 0 0;
+            0 0 0 0 0 0]
+
+    output = ArrayOutput(init)
+    out = sim!(output, Life(), init;  time = 1:3)
 
     @test output.frames[3] == test
 end
