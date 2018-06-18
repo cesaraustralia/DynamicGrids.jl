@@ -99,8 +99,8 @@ AbstractOutput
 AbstractArrayOutput
 ArrayOutput
 REPLOutput
-TkOutput
 ```
+
 Custom show() methods are available for some outputs.
 
 ```@docs

@@ -1,4 +1,4 @@
-using Documenter, Tk, Cellular
+using Documenter, Cellular
 using Cellular: rule, broadcastrules!, neighbors, inhood, inbounds, process_image, 
                 update_output 
 
