@@ -14,20 +14,6 @@ for modelling organism dispersal.
 Pkg.clone("https://github.com/rafaqz/Cellular.jl"
 ```
 
-Running cellular automata:
+## Documentation
 
-```julia
-using Cellular
-using Tk
-
-# Build a random starting grid
-source = round.(Int8, max.(0.0, rand(-4.0:0.1:1.0, 400,400)))
-
-# Use the default game of life model
-model = Life()
-
-# Choose Tk as the output
-output = TkOutput(source)
-
-sim!(source, model, output)
-```
+- [**LATEST**](https://rafaqz.github.io/Cellular.jl/latest/) &mdash; *in-development version of the documentation.*
