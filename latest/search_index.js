@@ -165,7 +165,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Introduction",
     "title": "Cellular.sim!",
     "category": "function",
-    "text": "sim!(output, model, init, args; time, pause)\n\n\nRuns the whole simulation, passing the destination aray to  the passed in output for each time-step.\n\nArguments\n\nmodel: a single module or tuple of modules AbstractModel\n\n\n\n"
+    "text": "sim!(output, model, init, args; time, pause)\n\n\nRuns the whole simulation, passing the destination aray to  the passed in output for each time-step.\n\nArguments\n\noutput: Any AbstractOutput to save frames to or display on the screen.\nmodel: A single mode (AbstractModel) or a tuple of models.\ninit: Initialisation array. \n\nKeyword Arguments\n\ntime: Any Iterable of Number. Default is 1:1000\npause: A Number, pauses beteen frames. Default is 0.0.\n\n\n\n"
 },
 
 {
@@ -301,7 +301,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Introduction",
     "title": "Cellular.update_output",
     "category": "function",
-    "text": "update_output(output, frame, t, pause)\n\nMethods that update the output with the current frame, for timestep t.\n\nupdate_output(output, frame, t, pause)\n\ndefined at Cellular/src/output.jl:74.\n\n\n\n"
+    "text": "update_output(output, frame, t, pause)\n\nMethods that update the output with the current frame, for timestep t.\n\nupdate_output(output, frame, t, pause)\n\ndefined at Cellular/src/output.jl:39.\n\nupdate_output(output, frame, t, pause)\n\ndefined at Cellular/src/output.jl:55.\n\n\n\n"
 },
 
 {
