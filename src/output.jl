@@ -15,6 +15,14 @@ abstract type AbstractArrayOutput <: AbstractOutput end
 
 (::Type{T})(init) where T <: AbstractArrayOutput = T{typeof(init)}([])
 
+""" 
+    update_output(output, frame, t, pause)
+Methods that update the output with the current frame, for timestep t.
+$(METHODLIST)
+"""
+function update_output end
+
+
 """
 $(TYPEDEF)
 Simple array output: creates an array of frames.
@@ -24,6 +32,17 @@ struct ArrayOutput{A} <: AbstractArrayOutput
     frames::Array{A,1}
 end
 
+""" 
+$(SIGNATURES)
+Copies the current frame array unchanged to the stored array 
+"""
+update_output(output::AbstractArrayOutput, frame, t, pause) = begin
+    fr = frames(output)
+    push!(fr, deepcopy(frame))
+    true
+end
+
+
 """
 $(TYPEDEF)
 An array output that is printed as asccii blocks in the REPL.
@@ -31,6 +50,14 @@ $(FIELDS)
 """
 struct REPLOutput{A} <: AbstractArrayOutput
     frames::Array{A,1}
+end
+
+update_output(output::REPLOutput, frame, t, pause) = begin
+    fr = frames(output)
+    push!(fr, deepcopy(frame))
+    Terminal.put([1,1], repl_frame(fr[end]))
+    sleep(pause)
+    true
 end
 
 """
@@ -43,38 +70,26 @@ Base.show(io::IO, output::REPLOutput) = begin
     fr = frames(output)
     length(fr) == 0 && return
 
-    lastframe = fr[end]
-    io2 = String("")
-    for i = 1:size(lastframe, 1)
-        io2 *= "\t"
-        for j = 1:size(lastframe, 2)
-            if lastframe[i,j] < 0.5
-                io2 *= " "
-            elseif lastframe[i,j] > 0.5
-                io2 *= "█"
-            end
-        end
-        io2 *= "\n"
-    end
-    io2 *= "\n\n"
-    println(io, io2)
+    print(repl_frame(fr[end]))
 end
 
-""" 
-    update_output(output, frame, t, pause)
-Methods that update the output with the current frame, for timestep t.
-$(METHODLIST)
-"""
-function update_output end
-
-""" 
-$(SIGNATURES)
-Copies the current frame array unchanged to the stored array 
-"""
-update_output(output::AbstractArrayOutput, frame, t, pause) = begin
-    fr = frames(output)
-    push!(fr, deepcopy(frame))
-    true
+function repl_frame(frame)
+    io = String("")
+    for i = 1:2:size(frame, 1)
+        io *= "\t"
+        # Two line pers character
+        for j = 1:size(frame, 2)
+            top = frame[i,j] > 0.5
+            bottom = frame[i+1,j] > 0.5
+            if top 
+                io *= bottom ? "█" : "▀"
+            else
+                io *= bottom ? "▄" : " "
+            end
+        end
+        io *= "\n"
+    end
+    io *= "\n\n"
 end
 
 """

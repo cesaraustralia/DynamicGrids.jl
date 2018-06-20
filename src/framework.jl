@@ -39,9 +39,15 @@ Runs the whole simulation, passing the destination aray to
 the passed in output for each time-step.
 
 ### Arguments
-model: a single module or tuple of modules [`AbstractModel`](@ref)
+- output: Any [AbstractOutput](@ref) to save frames to or display on the screen.
+- model: A single mode ([`AbstractModel`](@ref)) or a tuple of models.
+- init: Initialisation array. 
+
+### Keyword Arguments
+- time: Any Iterable of Number. Default is 1:1000
+- pause: A Number, pauses beteen frames. Default is 0.0.
 """
-sim!(output, model, init, args...; time=1:10000, pause=0.0) = begin
+sim!(output, model, init, args...; time=1:1000, pause=0.0) = begin
     source = deepcopy(init)
     dest = deepcopy(init)
     for t in time

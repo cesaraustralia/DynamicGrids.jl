@@ -29,7 +29,7 @@ $(EXPORTS)
 """
 module Cellular
 
-using Parameters, Requires, DocStringExtensions
+using Parameters, Requires, DocStringExtensions, REPLTetris.Terminal
 import Base.show
 
 
