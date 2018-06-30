@@ -1,19 +1,10 @@
 """
-$(TYPEDEF)
 Simulation outputs can be used interchangeably as they are decoupled 
 from the simulation behaviour. Outputs should inherit from AbstractOutput.
 
 All types extending AbstractOutput should have their own method of `update_output`.
 """
 abstract type AbstractOutput end 
-
-"""
-$(TYPEDEF)
-Output subtype for arrays
-"""
-abstract type AbstractArrayOutput <: AbstractOutput end 
-
-(::Type{T})(init) where T <: AbstractArrayOutput = T{typeof(init)}([])
 
 """ 
     update_output(output, frame, t, pause)
@@ -22,74 +13,144 @@ $(METHODLIST)
 """
 function update_output end
 
+is_ok(output) = output.ok[1]
+set_ok(output, val) = output.ok[1] = val
 
 """
-$(TYPEDEF)
-Simple array output: creates an array of frames.
-$(FIELDS)
+Abstract type parent for array outputs.
+"""
+abstract type AbstractArrayOutput <: AbstractOutput end 
+
+"""
+A simple array output that stores each step of the simulation in an array of arrays.
 """
 struct ArrayOutput{A} <: AbstractArrayOutput
+    "An array that holds each frame of the simulation"
     frames::Array{A,1}
 end
+ArrayOutput(init) = ArrayOutput{typeof(init)}([])
 
 """ 
 $(SIGNATURES)
 Copies the current frame array unchanged to the stored array 
 """
 update_output(output::AbstractArrayOutput, frame, t, pause) = begin
-    fr = frames(output)
-    push!(fr, deepcopy(frame))
+    frames = get_frames(output)
+    push!(frames, deepcopy(frame))
     true
 end
 
+get_frames(output::AbstractArrayOutput) = output.frames
+
 
 """
-$(TYPEDEF)
-An array output that is printed as asccii blocks in the REPL.
-$(FIELDS)
+A wrapper for array output that prints as asccii blocks in the REPL.
 """
 struct REPLOutput{A} <: AbstractArrayOutput
-    frames::Array{A,1}
+    array_output::A
+end
+REPLOutput(init) = begin
+    array_output = ArrayOutput(init)
+    REPLOutput{typeof(array_output)}(array_output)
 end
 
 update_output(output::REPLOutput, frame, t, pause) = begin
-    fr = frames(output)
-    push!(fr, deepcopy(frame))
-    Terminal.put([1,1], repl_frame(fr[end]))
+    update_output(output.array_output, frame, t, pause)
+    Terminal.clear_screen()
+    Terminal.put([0,0], repl_frame(get_frames(output)[end]))
     sleep(pause)
     true
 end
 
+get_frames(output::REPLOutput) = get_frames(output.array_output)
+
 """
-$(SIGNATURES)
+    Base.show(io::IO, output::REPLOutput)
 Print the last frame of a simulation in the REPL.
 """
 Base.show(io::IO, output::REPLOutput) = begin
     println(io, typeof(output))
 
-    fr = frames(output)
-    length(fr) == 0 && return
+    frames = get_frames(output)
+    length(frames) == 0 && return
 
-    print(repl_frame(fr[end]))
+    print(repl_frame(frames[end]))
 end
 
 function repl_frame(frame)
-    io = String("")
-    for i = 1:2:size(frame, 1)
-        io *= "\t"
+    # Limit output area to available terminal size.
+    displayheight, displaywidth = displaysize(Base.STDOUT)
+    height, width = min.(size(frame), (displayheight*2, displaywidth-8))
+
+    out = String("")
+    for i = 1:2:height
+        out *= "\t"
         # Two line pers character
-        for j = 1:size(frame, 2)
+        for j = 1:width
             top = frame[i,j] > 0.5
             bottom = frame[i+1,j] > 0.5
             if top 
-                io *= bottom ? "█" : "▀"
+                out *= bottom ? "█" : "▀"
             else
-                io *= bottom ? "▄" : " "
+                out *= bottom ? "▄" : " "
             end
         end
-        io *= "\n"
+        out *= "\n"
     end
-    io *= "\n\n"
+    out *= "\n\n"
+end
+
+using Gtk, Graphics, Cairo
+
+"""
+Plot output live to a Gtk window.
+`using Gtk` must be called for this to be available. 
+"""
+struct GtkOutput{W,C,D} <: AbstractOutput
+    window::W
+    canvas::C
+    scaling::Int
+    ok::D
+end
+
+"""
+    Gtk(frame; scaling = 2)
+Constructor for GtkOutput.
+- `init::AbstractArray`: the same `init` array that will also be passed to sim!()
+"""
+GtkOutput(init; scaling = 2) = begin
+    canvas = @GtkCanvas()
+    @guarded draw(canvas) do widget
+        ctx = getgc(canvas)
+        scale(ctx, scaling, scaling)
+    end
+    window = GtkWindow(canvas, "Cellular Automata")
+    show(canvas)
+
+    ok = [true]
+    signal_connect(window, "mouse-down-event") do widget, event
+        ok[1] = false
+    end
+    # canvas.mouse.button1press = (canvas, x, y) -> (ok[1] = false)
+    GtkOutput(window, canvas, scaling, ok)
+end
+
+"""
+    update_output(output::GtkOutput, frame, t, pause)
+Send current frame to the canvas in a Gtk window.
+"""
+function update_output(output::GtkOutput, frame, t, pause)
+    img = process_image(frame, output)
+    canvas = output.canvas
+    @guarded draw(output.canvas) do widget
+        ctx = getgc(canvas)
+        set_source_surface(ctx, CairoRGBSurface(img), 0, 0)
+        paint(ctx)
+    end
+
+    println("frame", t)
+    sleep(pause)
+    is_ok(output)
 end
 
 """
@@ -97,55 +158,6 @@ $(SIGNATURES)
 Converts an array to an image format.
 """
 process_image(frame, output) = convert(Array{UInt32, 2}, frame) .* 0x00ffffff
-
-
-@require Tk begin
-    using Cairo
-
-    """
-    $(TYPEDEF)
-    Plot output live to a Tk window.
-    Requires `using Tk` to be available. 
-    $(FIELDS)
-    """
-    struct TkOutput{W,C,CR,D} <: AbstractOutput
-        window::W
-        canvas::C
-        cr::CR
-        run::D
-    end
-
-    """
-        TkOutput(frame; scaling = 2)
-    Constructor for TkOutput.
-    - `init::AbstractArray`: the `init` array that will also be passed to sim!()
-    """
-    TkOutput(init; scaling = 2) = begin
-        m, n = size(init)
-        window = Tk.Toplevel("Cellular Automata", n, m)
-        canvas = Tk.Canvas(window)
-        ok = [true]
-        Tk.pack(canvas, expand = true, fill = "both")
-        canvas.mouse.button1press = (canvas, x, y) -> (run[1] = false)
-        cr = getgc(canvas)
-        scale(cr, scaling, scaling)
-        TkOutput(window, canvas, cr, run)
-    end
-
-    """
-    $(SIGNATURES)
-    """
-    function update_output(output::TkOutput, frame, t, pause)
-        img = process_image(frame, output)
-        set_source_surface(output.cr, CairoRGBSurface(img), 0, 0)
-        paint(output.cr)
-        Tk.reveal(output.canvas)
-        sleep(pause)
-        output.run[1]
-    end
-end
-
-frames(output::AbstractArrayOutput) = output.frames
 
 @require FileIO begin
 
@@ -159,4 +171,37 @@ frames(output::AbstractArrayOutput) = output.frames
         save("test.gif", vcat(frames(output)))
     end
 
+end
+
+@require Plots begin
+    using Plots
+
+    """
+    A Plots.jl Output to plot cells as a heatmap in any Plots backend. Some backends 
+    (such as plotly) may be very slow to refresh. Others like gr() should be fine.
+    `using Plots` must be called for this to be available. 
+    """
+    struct PlotsOutput{P} <: AbstractOutput
+        plot::P
+    end
+
+    """
+        Plots(init; scaling = 2)
+    Constructor for GtkOutput.
+    - `init::AbstractArray`: the `init` array that will also be passed to sim!()
+    """
+    PlotsOutput(init) = begin
+        p = heatmap(init, aspect_ratio=:equal)
+        display(p)
+        PlotsOutput{typeof(p)}(p)
+    end
+
+    """
+    $(SIGNATURES)
+    """
+    function update_output(output::PlotsOutput, frame, t, pause)
+        heatmap!(output.plot, frame)  
+        display(output.plot)
+        true
+    end
 end

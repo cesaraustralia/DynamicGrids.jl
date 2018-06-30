@@ -1,4 +1,4 @@
-using Documenter, Cellular
+using Documenter, Cellular, Gtk, Plots, FileIO
 using Cellular: rule, broadcastrules!, neighbors, inhood, inbounds, process_image, 
                 update_output 
 
@@ -9,7 +9,7 @@ makedocs(
     sitename = "Cellular.jl",
     format = :html,
     pages = Any[
-        "Introduction" => "index.md",
+        "Cellular" => "index.md",
     ]
 )
 
