@@ -1,6 +1,5 @@
 using Documenter, Cellular, Gtk, Plots, FileIO
-using Cellular: rule, broadcastrules!, neighbors, inhood, inbounds, process_image, 
-                update_output 
+using Cellular: rule, broadcast_rules!, neighbors, inhood, inbounds, process_image, update_output 
 
 makedocs(
     modules = [Cellular],

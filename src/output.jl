@@ -1,15 +1,14 @@
 """
-Simulation outputs can be used interchangeably as they are decoupled 
-from the simulation behaviour. Outputs should inherit from AbstractOutput.
+Simulation outputs are decoupled from simulation behaviour and can be used interchangeably.
+These outputs inherit from AbstractOutput.
 
-All types extending AbstractOutput should have their own method of `update_output`.
+Types that extend AbstractOutput define their own method for [`update_output`](@ref).
 """
-abstract type AbstractOutput end 
+abstract type AbstractOutput end
 
-""" 
+"""
     update_output(output, frame, t, pause)
 Methods that update the output with the current frame, for timestep t.
-$(METHODLIST)
 """
 function update_output end
 
@@ -19,7 +18,7 @@ set_ok(output, val) = output.ok[1] = val
 """
 Abstract type parent for array outputs.
 """
-abstract type AbstractArrayOutput <: AbstractOutput end 
+abstract type AbstractArrayOutput <: AbstractOutput end
 
 """
 A simple array output that stores each step of the simulation in an array of arrays.
@@ -28,11 +27,17 @@ struct ArrayOutput{A} <: AbstractArrayOutput
     "An array that holds each frame of the simulation"
     frames::Array{A,1}
 end
+"""
+    ArrayOutput(init)
+Constructor for ArrayOutput
+### Arguments
+- init : the initialisation array
+"""
 ArrayOutput(init) = ArrayOutput{typeof(init)}([])
 
-""" 
-$(SIGNATURES)
-Copies the current frame array unchanged to the stored array 
+"""
+    update_output(output::AbstractArrayOutput, frame, t, pause)
+Copies the current frame unchanged to the storage array
 """
 update_output(output::AbstractArrayOutput, frame, t, pause) = begin
     frames = get_frames(output)
@@ -44,16 +49,27 @@ get_frames(output::AbstractArrayOutput) = output.frames
 
 
 """
-A wrapper for array output that prints as asccii blocks in the REPL.
+A wrapper for [`ArrayOutput`](@ref) that is displayed as asccii blocks in the REPL.
 """
 struct REPLOutput{A} <: AbstractArrayOutput
     array_output::A
 end
+
+"""
+    REPLOutput(init)
+Constructor for REPLOutput
+### Arguments
+- init: The initialisation array
+"""
 REPLOutput(init) = begin
     array_output = ArrayOutput(init)
     REPLOutput{typeof(array_output)}(array_output)
 end
 
+"""
+    update_output(output::REPLOutput, frame, t, pause)
+Extends update_output from [`ArrayOuput`](@ref) by also printing to the REPL.
+"""
 update_output(output::REPLOutput, frame, t, pause) = begin
     update_output(output.array_output, frame, t, pause)
     Terminal.clear_screen()
@@ -89,7 +105,7 @@ function repl_frame(frame)
         for j = 1:width
             top = frame[i,j] > 0.5
             bottom = frame[i+1,j] > 0.5
-            if top 
+            if top
                 out *= bottom ? "█" : "▀"
             else
                 out *= bottom ? "▄" : " "
@@ -100,61 +116,62 @@ function repl_frame(frame)
     out *= "\n\n"
 end
 
-using Gtk, Graphics, Cairo
+@require Gtk begin
+    using Cairo
+    """
+    Plot output live to a Gtk window. `using Gtk` is required for this to be
+    available, and both Gtk and Cario must be installed.
+    """
+    struct GtkOutput{W,C,D} <: AbstractOutput
+        window::W
+        canvas::C
+        scaling::Int
+        ok::D
+    end
 
-"""
-Plot output live to a Gtk window.
-`using Gtk` must be called for this to be available. 
-"""
-struct GtkOutput{W,C,D} <: AbstractOutput
-    window::W
-    canvas::C
-    scaling::Int
-    ok::D
+    """
+        GtkOutput(init; scaling = 2)
+    Constructor for GtkOutput.
+    - `init::AbstractArray`: the same `init` array that will also be passed to sim!()
+    """
+    GtkOutput(init; scaling = 2) = begin
+        canvas = @GtkCanvas()
+        @guarded draw(canvas) do widget
+            ctx = getgc(canvas)
+            scale(ctx, scaling, scaling)
+        end
+        window = GtkWindow(canvas, "Cellular Automata")
+        show(canvas)
+
+        ok = [true]
+        signal_connect(window, "mouse-down-event") do widget, event
+            ok[1] = false
+        end
+        # canvas.mouse.button1press = (canvas, x, y) -> (ok[1] = false)
+        GtkOutput(window, canvas, scaling, ok)
+    end
+
+    """
+        update_output(output::GtkOutput, frame, t, pause)
+    Send current frame to the canvas in a Gtk window.
+    """
+    function update_output(output::GtkOutput, frame, t, pause)
+        img = process_image(frame, output)
+        canvas = output.canvas
+        @guarded draw(output.canvas) do widget
+            ctx = getgc(canvas)
+            set_source_surface(ctx, CairoRGBSurface(img), 0, 0)
+            paint(ctx)
+        end
+
+        println("frame", t)
+        sleep(pause)
+        is_ok(output)
+    end
 end
 
 """
-    Gtk(frame; scaling = 2)
-Constructor for GtkOutput.
-- `init::AbstractArray`: the same `init` array that will also be passed to sim!()
-"""
-GtkOutput(init; scaling = 2) = begin
-    canvas = @GtkCanvas()
-    @guarded draw(canvas) do widget
-        ctx = getgc(canvas)
-        scale(ctx, scaling, scaling)
-    end
-    window = GtkWindow(canvas, "Cellular Automata")
-    show(canvas)
-
-    ok = [true]
-    signal_connect(window, "mouse-down-event") do widget, event
-        ok[1] = false
-    end
-    # canvas.mouse.button1press = (canvas, x, y) -> (ok[1] = false)
-    GtkOutput(window, canvas, scaling, ok)
-end
-
-"""
-    update_output(output::GtkOutput, frame, t, pause)
-Send current frame to the canvas in a Gtk window.
-"""
-function update_output(output::GtkOutput, frame, t, pause)
-    img = process_image(frame, output)
-    canvas = output.canvas
-    @guarded draw(output.canvas) do widget
-        ctx = getgc(canvas)
-        set_source_surface(ctx, CairoRGBSurface(img), 0, 0)
-        paint(ctx)
-    end
-
-    println("frame", t)
-    sleep(pause)
-    is_ok(output)
-end
-
-"""
-$(SIGNATURES)
+    process_image(frame, output)
 Converts an array to an image format.
 """
 process_image(frame, output) = convert(Array{UInt32, 2}, frame) .* 0x00ffffff
@@ -177,16 +194,16 @@ end
     using Plots
 
     """
-    A Plots.jl Output to plot cells as a heatmap in any Plots backend. Some backends 
+    A Plots.jl Output to plot cells as a heatmap in any Plots backend. Some backends
     (such as plotly) may be very slow to refresh. Others like gr() should be fine.
-    `using Plots` must be called for this to be available. 
+    `using Plots` must be called for this to be available.
     """
     struct PlotsOutput{P} <: AbstractOutput
         plot::P
     end
 
     """
-        Plots(init; scaling = 2)
+        Plots(init)
     Constructor for GtkOutput.
     - `init::AbstractArray`: the `init` array that will also be passed to sim!()
     """
@@ -197,10 +214,10 @@ end
     end
 
     """
-    $(SIGNATURES)
+        update_output(output::PlotsOutput, frame, t, pause)
     """
     function update_output(output::PlotsOutput, frame, t, pause)
-        heatmap!(output.plot, frame)  
+        heatmap!(output.plot, frame)
         display(output.plot)
         true
     end

@@ -1,16 +1,15 @@
-"""
-Neighborhoods define the behaviour towards the cells surrounding the current cell.
-"""
+"Abstract type to extend to a neighborhood"
 abstract type AbstractNeighborhood end
 
-"""
-Radial neighborhoods calculate the neighborood in a loop from simple rules
-base of the radius of cells around the central cell.
-"""
+"Abstract type to extend [`RadialNeighborhoods`](@ref)"
 abstract type AbstractRadialNeighborhood{T} <: AbstractNeighborhood end
 
 """
-Radial Neighborhoods
+Radial neighborhoods calculate the surrounding neighborood
+from the radius around the central cell, with a number of variants. 
+
+They can be constructed with: `RadialNeighborhood{:moore,Skip}(1,Skip())` but the keyword 
+constructor should be preferable.
 """
 struct RadialNeighborhood{T,O} <: AbstractRadialNeighborhood{T}
     """
@@ -23,10 +22,15 @@ struct RadialNeighborhood{T,O} <: AbstractRadialNeighborhood{T}
 end 
 """
     RadialNeighborhood(;typ = :moore, radius = 1, overflow = Skip)
-Radial neighborhood constructor with defaults.
+The radial neighborhood constructor with defaults.
 
-typ may be :onedim, :moore, :vonneumann or :rotvonneumann
-radius is an Int, and overflop is [`Skip`](@ref) or [`Wrap`](@ref).
+This neighborhood can be used for one-dimensional, Moore, von Neumann or 
+Rotated von Neumann neigborhoods, and may have a radius of any integer size.
+
+### Keyword Arguments
+- typ : A Symbol from :onedim, :moore, :vonneumann or :rotvonneumann. Default: :moore
+- radius: Int. Default: 1
+- overflow: [`AbstractOverflow`](@ref). Default: Skip()
 """
 RadialNeighborhood(; typ=:moore, radius=1, overflow=Skip()) =
     RadialNeighborhood{typ, typeof(overflow)}(radius, overflow)
@@ -73,7 +77,7 @@ MultiCustomNeighborhood(mn) = MultiCustomNeighborhood(mn, zeros(Int8, length(mn)
 Checks all cells in neighborhood and combines them according
 to the particular neighborhood type.
 """
-function neighbors end
+function neighbors() end
 
 """
     neighbors(hood::AbstractRadialNeighborhood{:onedim}, state, index, t, source, args...)

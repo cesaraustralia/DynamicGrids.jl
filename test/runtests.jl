@@ -7,17 +7,24 @@ else
 end
 
 @testset "inbounds checks" begin
-    @test Cellular.inbounds((1,1), (4, 5), Skip()) == (1,1,true)
-    @test Cellular.inbounds((2,3), (4, 5), Skip()) == (2,3,true)
-    @test Cellular.inbounds((4,5), (4, 5), Skip()) == (4,5,true)
+    @testset "Skip" begin
+        @test Cellular.inbounds((1,1), (4, 5), Skip()) == (1,1,true)
+        @test Cellular.inbounds((2,3), (4, 5), Skip()) == (2,3,true)
+        @test Cellular.inbounds((4,5), (4, 5), Skip()) == (4,5,true)
 
-    @test Cellular.inbounds((2,3), (3, 2), Skip()) == (2,3,false)
-    @test Cellular.inbounds((2,3), (1, 4), Skip()) == (2,3,false)
+        @test Cellular.inbounds((-3,-100), (4, 5), Skip()) == (-3,-100,false)
+        @test Cellular.inbounds((0,0), (4, 5), Skip()) == (0,0,false)
+        @test Cellular.inbounds((2,3), (3, 2), Skip()) == (2,3,false)
+        @test Cellular.inbounds((2,3), (1, 4), Skip()) == (2,3,false)
+        @test Cellular.inbounds((200,300), (2, 3), Skip()) == (200,300,false)
+    end
 
-    @test Cellular.inbounds((-2,3), (10, 10), Wrap()) == (8,3,true)
-    @test Cellular.inbounds((2,0), (10, 10), Wrap()) == (2,10,true)
-    @test Cellular.inbounds((22,0), (10, 10), Wrap()) == (2,10,true)
-    @test Cellular.inbounds((-22,0), (10, 10), Wrap()) == (8,10,true)
+    @testset "Wrap" begin
+        @test Cellular.inbounds((-2,3), (10, 10), Wrap()) == (8,3,true)
+        @test Cellular.inbounds((2,0), (10, 10), Wrap()) == (2,10,true)
+        @test Cellular.inbounds((22,0), (10, 10), Wrap()) == (2,10,true)
+        @test Cellular.inbounds((-22,0), (10, 10), Wrap()) == (8,10,true)
+    end
 end
 
 @testset "life glider simulation" begin
