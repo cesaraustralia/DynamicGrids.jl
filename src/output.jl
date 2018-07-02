@@ -10,7 +10,7 @@ abstract type AbstractOutput end
     update_output(output, frame, t, pause)
 Methods that update the output with the current frame, for timestep t.
 """
-function update_output end
+function update_output() end
 
 is_ok(output) = output.ok[1]
 set_ok(output, val) = output.ok[1] = val
@@ -199,7 +199,7 @@ end
     end
 
     """
-        Plots(init)
+        PlotsOutput(init)
     Constructor for GtkOutput.
     - `init::AbstractArray`: the `init` array that will also be passed to sim!()
     """

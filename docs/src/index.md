@@ -72,7 +72,6 @@ Life
 
 ```@docs
 rule
-rule(model::AbstractLife, state, args...)
 ```
 
 ## Neighborhoods
@@ -96,11 +95,7 @@ MultiCustomNeighborhood
 
 ```@docs
 neighbors
-neighbors(hood::AbstractRadialNeighborhood{:onedim}, state, index, t, source, args...)
-neighbors(hood::AbstractRadialNeighborhood, state, index, t, source, args...)
 inhood
-neighbors(hood::AbstractCustomNeighborhood, state, index, t, source, args...)
-neighbors(hood::MultiCustomNeighborhood, state, index, t, source, args...)
 ```
 
 ## Simulations
@@ -130,10 +125,6 @@ PlotsOutput(init)
 
 ```@docs
 update_output
-update_output(output::AbstractArrayOutput, frame, t, pause)
-update_output(output::REPLOutput, frame, t, pause)
-update_output(output::GtkOutput, frame, t, pause)
-update_output(output::PlotsOutput, frame, t, pause)
 ```
 
 ## Overflow
