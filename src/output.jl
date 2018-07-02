@@ -116,58 +116,54 @@ function repl_frame(frame)
     out *= "\n\n"
 end
 
-@require Gtk begin
-    using Cairo
-    """
-    Plot output live to a Gtk window. `using Gtk` is required for this to be
-    available, and both Gtk and Cario must be installed.
-    """
-    struct GtkOutput{W,C,D} <: AbstractOutput
-        window::W
-        canvas::C
-        scaling::Int
-        ok::D
+"""
+Plot output live to a Gtk window.
+"""
+struct GtkOutput{W,C,D} <: AbstractOutput
+    window::W
+    canvas::C
+    scaling::Int
+    ok::D
+end
+
+"""
+    GtkOutput(init; scaling = 2)
+Constructor for GtkOutput.
+- `init::AbstractArray`: the same `init` array that will also be passed to sim!()
+"""
+GtkOutput(init; scaling = 2) = begin
+    canvas = @GtkCanvas()
+    @guarded draw(canvas) do widget
+        ctx = getgc(canvas)
+        scale(ctx, scaling, scaling)
+    end
+    window = GtkWindow(canvas, "Cellular Automata")
+    show(canvas)
+
+    ok = [true]
+    signal_connect(window, "mouse-down-event") do widget, event
+        ok[1] = false
+    end
+    # canvas.mouse.button1press = (canvas, x, y) -> (ok[1] = false)
+    GtkOutput(window, canvas, scaling, ok)
+end
+
+"""
+    update_output(output::GtkOutput, frame, t, pause)
+Send current frame to the canvas in a Gtk window.
+"""
+function update_output(output::GtkOutput, frame, t, pause)
+    img = process_image(frame, output)
+    canvas = output.canvas
+    @guarded draw(output.canvas) do widget
+        ctx = getgc(canvas)
+        set_source_surface(ctx, CairoRGBSurface(img), 0, 0)
+        paint(ctx)
     end
 
-    """
-        GtkOutput(init; scaling = 2)
-    Constructor for GtkOutput.
-    - `init::AbstractArray`: the same `init` array that will also be passed to sim!()
-    """
-    GtkOutput(init; scaling = 2) = begin
-        canvas = @GtkCanvas()
-        @guarded draw(canvas) do widget
-            ctx = getgc(canvas)
-            scale(ctx, scaling, scaling)
-        end
-        window = GtkWindow(canvas, "Cellular Automata")
-        show(canvas)
-
-        ok = [true]
-        signal_connect(window, "mouse-down-event") do widget, event
-            ok[1] = false
-        end
-        # canvas.mouse.button1press = (canvas, x, y) -> (ok[1] = false)
-        GtkOutput(window, canvas, scaling, ok)
-    end
-
-    """
-        update_output(output::GtkOutput, frame, t, pause)
-    Send current frame to the canvas in a Gtk window.
-    """
-    function update_output(output::GtkOutput, frame, t, pause)
-        img = process_image(frame, output)
-        canvas = output.canvas
-        @guarded draw(output.canvas) do widget
-            ctx = getgc(canvas)
-            set_source_surface(ctx, CairoRGBSurface(img), 0, 0)
-            paint(ctx)
-        end
-
-        println("frame", t)
-        sleep(pause)
-        is_ok(output)
-    end
+    println("frame", t)
+    sleep(pause)
+    is_ok(output)
 end
 
 """

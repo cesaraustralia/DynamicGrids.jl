@@ -36,7 +36,7 @@ sim!(output, (model1, model2), init)
 """
 module Cellular
 
-using Parameters, Requires, DocStringExtensions, REPLTetris.Terminal
+using Parameters, Requires, DocStringExtensions, REPLTetris.Terminal, Gtk, Cairo
 import Base.show
 
 # Documentation templates

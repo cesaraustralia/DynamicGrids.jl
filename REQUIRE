@@ -3,3 +3,5 @@ Parameters
 Requires
 DocStringExtensions
 REPLTetris
+Gtk
+Cairo
