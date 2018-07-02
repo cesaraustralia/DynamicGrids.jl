@@ -89,19 +89,11 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "index.html#Cellular.rule-Tuple{Cellular.AbstractLife,Any,Vararg{Any,N} where N}",
-    "page": "Cellular",
-    "title": "Cellular.rule",
-    "category": "method",
-    "text": "rule(model::AbstractLife, state, args...)\n\nRule for game-of-life style cellular automata.\n\nThe cell becomes active if it is empty and the number of neightbors is a number in  the b array, and remains active the cell is active and the number of neightbors is  in the s array.\n\nReturns: boolean\n\n\n\n"
-},
-
-{
     "location": "index.html#Methods-1",
     "page": "Cellular",
     "title": "Methods",
     "category": "section",
-    "text": "rule\nrule(model::AbstractLife, state, args...)"
+    "text": "rule"
 },
 
 {
@@ -185,22 +177,6 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "index.html#Cellular.neighbors-Tuple{Cellular.AbstractRadialNeighborhood{:onedim},Any,Any,Any,Any,Vararg{Any,N} where N}",
-    "page": "Cellular",
-    "title": "Cellular.neighbors",
-    "category": "method",
-    "text": "neighbors(hood::AbstractRadialNeighborhood{:onedim}, state, index, t, source, args...)\n\nSums single dimension radial neighborhoods. Commonly used by Wolfram.\n\n\n\n"
-},
-
-{
-    "location": "index.html#Cellular.neighbors-Tuple{Cellular.AbstractRadialNeighborhood,Any,Any,Any,Any,Vararg{Any,N} where N}",
-    "page": "Cellular",
-    "title": "Cellular.neighbors",
-    "category": "method",
-    "text": "neighbors(hood::AbstractRadialNeighborhood, state, index, t, source, args...)\n\nSums 2-dimensional radial Nieghborhoods. Specific shapes like Moore and Von Neumann are determined by inhood, as this method is general.\n\n\n\n"
-},
-
-{
     "location": "index.html#Cellular.inhood",
     "page": "Cellular",
     "title": "Cellular.inhood",
@@ -209,27 +185,11 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "index.html#Cellular.neighbors-Tuple{Cellular.AbstractCustomNeighborhood,Any,Any,Any,Any,Vararg{Any,N} where N}",
-    "page": "Cellular",
-    "title": "Cellular.neighbors",
-    "category": "method",
-    "text": "neighbors(hood::AbstractCustomNeighborhood, state, index, t, source, args...)\n\nSum a single custom neighborhood.\n\n\n\n"
-},
-
-{
-    "location": "index.html#Cellular.neighbors-Tuple{Cellular.MultiCustomNeighborhood,Any,Any,Any,Any,Vararg{Any,N} where N}",
-    "page": "Cellular",
-    "title": "Cellular.neighbors",
-    "category": "method",
-    "text": "neighbors(hood::MultiCustomNeighborhood, state, index, t, source, args...)\n\nSum multiple custom neighborhoods separately.\n\n\n\n"
-},
-
-{
     "location": "index.html#Methods-2",
     "page": "Cellular",
     "title": "Methods",
     "category": "section",
-    "text": "neighbors\nneighbors(hood::AbstractRadialNeighborhood{:onedim}, state, index, t, source, args...)\nneighbors(hood::AbstractRadialNeighborhood, state, index, t, source, args...)\ninhood\nneighbors(hood::AbstractCustomNeighborhood, state, index, t, source, args...)\nneighbors(hood::MultiCustomNeighborhood, state, index, t, source, args...)"
+    "text": "neighbors\ninhood"
 },
 
 {
@@ -333,7 +293,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Cellular",
     "title": "Cellular.PlotsOutput",
     "category": "method",
-    "text": "Plots(init)\n\nConstructor for GtkOutput.\n\ninit::AbstractArray: the init array that will also be passed to sim!()\n\n\n\n"
+    "text": "PlotsOutput(init)\n\nConstructor for GtkOutput.\n\ninit::AbstractArray: the init array that will also be passed to sim!()\n\n\n\n"
 },
 
 {
@@ -349,39 +309,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Cellular",
     "title": "Cellular.update_output",
     "category": "function",
-    "text": "update_output(output, frame, t, pause)\n\nMethods that update the output with the current frame, for timestep t.\n\n\n\n"
-},
-
-{
-    "location": "index.html#Cellular.update_output-Tuple{Cellular.AbstractArrayOutput,Any,Any,Any}",
-    "page": "Cellular",
-    "title": "Cellular.update_output",
-    "category": "method",
-    "text": "update_output(output::AbstractArrayOutput, frame, t, pause)\n\nCopies the current frame unchanged to the storage array\n\n\n\n"
-},
-
-{
-    "location": "index.html#Cellular.update_output-Tuple{Cellular.REPLOutput,Any,Any,Any}",
-    "page": "Cellular",
-    "title": "Cellular.update_output",
-    "category": "method",
-    "text": "update_output(output::REPLOutput, frame, t, pause)\n\nExtends update_output from ArrayOuput by also printing to the REPL.\n\n\n\n"
-},
-
-{
-    "location": "index.html#Cellular.update_output-Tuple{Cellular.GtkOutput,Any,Any,Any}",
-    "page": "Cellular",
-    "title": "Cellular.update_output",
-    "category": "method",
-    "text": "update_output(output::GtkOutput, frame, t, pause)\n\nSend current frame to the canvas in a Gtk window.\n\n\n\n"
-},
-
-{
-    "location": "index.html#Cellular.update_output-Tuple{Cellular.PlotsOutput,Any,Any,Any}",
-    "page": "Cellular",
-    "title": "Cellular.update_output",
-    "category": "method",
-    "text": "update_output(output::PlotsOutput, frame, t, pause)\n\n\n\n"
+    "text": "update_output(output, frame, t, pause)\n\nMethods that update the output with the current frame, for timestep t.\n\n\n\nupdate_output(output::AbstractArrayOutput, frame, t, pause)\n\nCopies the current frame unchanged to the storage array\n\n\n\nupdate_output(output::REPLOutput, frame, t, pause)\n\nExtends update_output from ArrayOuput by also printing to the REPL.\n\n\n\nupdate_output(output::GtkOutput, frame, t, pause)\n\nSend current frame to the canvas in a Gtk window.\n\n\n\nupdate_output(output::PlotsOutput, frame, t, pause)\n\n\n\n"
 },
 
 {
@@ -389,7 +317,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Cellular",
     "title": "Methods",
     "category": "section",
-    "text": "update_output\nupdate_output(output::AbstractArrayOutput, frame, t, pause)\nupdate_output(output::REPLOutput, frame, t, pause)\nupdate_output(output::GtkOutput, frame, t, pause)\nupdate_output(output::PlotsOutput, frame, t, pause)"
+    "text": "update_output"
 },
 
 {
