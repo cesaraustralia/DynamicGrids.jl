@@ -2,30 +2,50 @@
 Simulation outputs are decoupled from simulation behaviour and can be used interchangeably.
 These outputs inherit from AbstractOutput.
 
-Types that extend AbstractOutput define their own method for [`update_output`](@ref).
+Types that extend AbstractOutput define their own method for [`show_frame`](@ref).
 """
 abstract type AbstractOutput end
 
 """
-    update_output(output, frame, t, pause)
-Methods that update the output with the current frame, for timestep t.
+    store_frame(output::AbstractOutput, frame, t, pause)
+Copies the current frame to the frames array.
 """
-function update_output() end
+store_frame(output::AbstractOutput, frame) = push!(output.frames, deepcopy(frame))
+
+"""
+    show_frame(output::AbstractOutput, t; pause=0.1)
+"""
+show_frame(output::AbstractOutput, t; pause=0.1) = true
+
+"""
+    replay(output::AbstractOutput; pause=0.1) = begin
+Show a simulation again.
+"""
+replay(output::AbstractOutput; pause=0.1) =
+    for (t, frame) in enumerate(output.frames)
+        show_frame(output, t; pause=pause)
+    end
+
+"""
+    (T::Type{AbstractOutput})(output::F; kwargs...)
+Constructor to swap output type for replays in a different mode
+"""
+(::Type{T})(output::AbstractOutput; kwargs...) where T <: AbstractOutput = begin
+    # length(output.frames) == 0 && return T(eltype(output.frames)([]); kwargs...)
+    new_output = T(output.frames[1]; kwargs...)
+    append!(new_output.frames, output.frames)
+    new_output
+end
 
 is_ok(output) = output.ok[1]
 set_ok(output, val) = output.ok[1] = val
 
 """
-Abstract type parent for array outputs.
-"""
-abstract type AbstractArrayOutput <: AbstractOutput end
-
-"""
 A simple array output that stores each step of the simulation in an array of arrays.
 """
-struct ArrayOutput{A} <: AbstractArrayOutput
+struct ArrayOutput{F} <: AbstractOutput
     "An array that holds each frame of the simulation"
-    frames::Array{A,1}
+    frames::Array{F,1}
 end
 """
     ArrayOutput(init)
@@ -33,26 +53,13 @@ Constructor for ArrayOutput
 ### Arguments
 - init : the initialisation array
 """
-ArrayOutput(init) = ArrayOutput{typeof(init)}([])
-
-"""
-    update_output(output::AbstractArrayOutput, frame, t, pause)
-Copies the current frame unchanged to the storage array
-"""
-update_output(output::AbstractArrayOutput, frame, t, pause) = begin
-    frames = get_frames(output)
-    push!(frames, deepcopy(frame))
-    true
-end
-
-get_frames(output::AbstractArrayOutput) = output.frames
-
+ArrayOutput(init::F) where F <: AbstractArray = ArrayOutput{F}([])
 
 """
 A wrapper for [`ArrayOutput`](@ref) that is displayed as asccii blocks in the REPL.
 """
-struct REPLOutput{A} <: AbstractArrayOutput
-    array_output::A
+struct REPLOutput{F} <: AbstractOutput
+    frames::Array{F,1}
 end
 
 """
@@ -61,24 +68,18 @@ Constructor for REPLOutput
 ### Arguments
 - init: The initialisation array
 """
-REPLOutput(init) = begin
-    array_output = ArrayOutput(init)
-    REPLOutput{typeof(array_output)}(array_output)
-end
+REPLOutput(init::F) where F <: AbstractArray = REPLOutput{F}([])
 
 """
-    update_output(output::REPLOutput, frame, t, pause)
-Extends update_output from [`ArrayOuput`](@ref) by also printing to the REPL.
+    show_frame(output::REPLOutput, t; pause=0.1)
+Extends show_frame from [`ArrayOuput`](@ref) by also printing to the REPL.
 """
-update_output(output::REPLOutput, frame, t, pause) = begin
-    update_output(output.array_output, frame, t, pause)
-    Terminal.clear_screen()
-    Terminal.put([0,0], repl_frame(get_frames(output)[end]))
+show_frame(output::REPLOutput, t; pause=0.1) = begin
+    # Print the frame to the REPL as blocks
+    Terminal.put([0,0], repl_frame(output.frames[t]))
     sleep(pause)
     true
 end
-
-get_frames(output::REPLOutput) = get_frames(output.array_output)
 
 """
     Base.show(io::IO, output::REPLOutput)
@@ -86,11 +87,7 @@ Print the last frame of a simulation in the REPL.
 """
 Base.show(io::IO, output::REPLOutput) = begin
     println(io, typeof(output))
-
-    frames = get_frames(output)
-    length(frames) == 0 && return
-
-    print(repl_frame(frames[end]))
+    length(output.frames) == 0 || print(repl_frame(output.frames[end]))
 end
 
 function repl_frame(frame)
@@ -119,7 +116,8 @@ end
 """
 Plot output live to a Gtk window.
 """
-struct GtkOutput{W,C,D} <: AbstractOutput
+struct GtkOutput{F,W,C,D} <: AbstractOutput
+    frames::Array{F,1}
     window::W
     canvas::C
     scaling::Int
@@ -131,7 +129,7 @@ end
 Constructor for GtkOutput.
 - `init::AbstractArray`: the same `init` array that will also be passed to sim!()
 """
-GtkOutput(init; scaling = 2) = begin
+GtkOutput(init::F; scaling = 2) where F <: AbstractArray = begin
     canvas = @GtkCanvas()
     @guarded draw(canvas) do widget
         ctx = getgc(canvas)
@@ -145,15 +143,15 @@ GtkOutput(init; scaling = 2) = begin
         ok[1] = false
     end
     # canvas.mouse.button1press = (canvas, x, y) -> (ok[1] = false)
-    GtkOutput(window, canvas, scaling, ok)
+    GtkOutput(F[], window, canvas, scaling, ok)
 end
 
 """
-    update_output(output::GtkOutput, frame, t, pause)
+    show_frame(output::GtkOutput, t; pause=0.1)
 Send current frame to the canvas in a Gtk window.
 """
-function update_output(output::GtkOutput, frame, t, pause)
-    img = process_image(frame, output)
+function show_frame(output::GtkOutput, t; pause=0.1)
+    img = process_image(output, output.frame[t])
     canvas = output.canvas
     @guarded draw(output.canvas) do widget
         ctx = getgc(canvas)
@@ -161,16 +159,15 @@ function update_output(output::GtkOutput, frame, t, pause)
         paint(ctx)
     end
 
-    println("frame", t)
     sleep(pause)
     is_ok(output)
 end
 
 """
-    process_image(frame, output)
+    process_image(output,  )
 Converts an array to an image format.
 """
-process_image(frame, output) = convert(Array{UInt32, 2}, frame) .* 0x00ffffff
+process_image(output, frame) = convert(Array{UInt32, 2}, frame) .* 0x00ffffff
 
 @require FileIO begin
 
@@ -179,9 +176,9 @@ process_image(frame, output) = convert(Array{UInt32, 2}, frame) .* 0x00ffffff
     import FileIO.save
 
     save(filename::AbstractString, output::ArrayOutput; kwargs...) = begin
-        f = frames(output)
+        f = output.frames
         a = reshape(reduce(hcat, f), size(f[1])..., length(f))
-        save("test.gif", vcat(frames(output)))
+        save("test.gif", vcat(output.frames))
     end
 
 end
@@ -194,8 +191,10 @@ end
     (such as plotly) may be very slow to refresh. Others like gr() should be fine.
     `using Plots` must be called for this to be available.
     """
-    struct PlotsOutput{P} <: AbstractOutput
+    struct PlotsOutput{F,P,T} <: AbstractOutput
+        frames::Array{F,1}
         plot::P
+        interval::T
     end
 
     """
@@ -203,17 +202,19 @@ end
     Constructor for GtkOutput.
     - `init::AbstractArray`: the `init` array that will also be passed to sim!()
     """
-    PlotsOutput(init) = begin
+    PlotsOutput(init::F; interval = 1) where F <: AbstractArray = begin
         p = heatmap(init, aspect_ratio=:equal)
         display(p)
-        PlotsOutput{typeof(p)}(p)
+        PlotsOutput(F[], p, interval)
     end
 
     """
-        update_output(output::PlotsOutput, frame, t, pause)
+        show_frame(output::PlotsOutput, t; pause=0.1)
+    Update plot for every specified interval
     """
-    function update_output(output::PlotsOutput, frame, t, pause)
-        heatmap!(output.plot, frame)
+    function show_frame(output::PlotsOutput, t; pause=0.1)
+        rem(t, output.interval) == 0 || return true
+        heatmap!(output.plot, output.frames[t])
         display(output.plot)
         true
     end
