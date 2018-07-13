@@ -36,8 +36,9 @@ sim!(output, (model1, model2), init)
 """
 module Cellular
 
-using Parameters, Requires, DocStringExtensions, REPLTetris.Terminal, Gtk, Cairo
-import Base.show
+using Parameters, Mixers, Requires, DocStringExtensions, REPLTetris.Terminal, Gtk, Cairo
+using FixedPointNumbers, Colors, FileIO
+import Base: show, getindex, setindex!, endof, size, length, push!, append!
 
 # Documentation templates
 @template TYPES =
@@ -55,7 +56,7 @@ include("life.jl")
 export sim!,
        replay,
        show_frame,
-       show,
+       show, getindex, setindex!, endof, size, length, push!, append!,
        AbstractModel,
        AbstractPartialModel,
        AbstractLife,

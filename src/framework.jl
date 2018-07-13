@@ -36,12 +36,13 @@ sim!(output, model, init, args...; time=1:1000, pause=0.0) = begin
     # Initialise arrays to the same type and values as the passed in initial array
     source = deepcopy(init)
     dest = deepcopy(init)
+    initialize(output)
 
     # Define the index coordinates. There might be a better way than this?
-    width, height = size(source)
+    width, height = size(init)
     index = collect((col,row) for col in 1:width, row in 1:height)
 
-    # Loop over the selected timespanb
+    # Loop over the selected timespan
     for t in time
         # Save the the current frame
         store_frame(output, source)
@@ -71,7 +72,7 @@ broadcast_rules!(models::Tuple{T,Vararg}, source, dest, index, t, args...) where
 end
 broadcast_rules!(models::Tuple{T,Vararg}, source, dest, index, t, args...) where {T<:AbstractPartialModel} = begin
     # Initialise the dest array
-    fill!(dest, zero(eltype(dest)))
+    dest .= source
     # The rule writes to the dest array manually where required
     broadcast(rule, models[1], source, index, t, (source,), (dest,), args...)
     # Swap source and dest for the next rule/iteration

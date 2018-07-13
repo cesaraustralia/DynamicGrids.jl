@@ -5,3 +5,6 @@ DocStringExtensions
 REPLTetris
 Gtk
 Cairo
+FixedPointNumbers 
+Colors
+FileIO

@@ -4,6 +4,11 @@ abstract type AbstractNeighborhood end
 "Abstract type to extend [`RadialNeighborhoods`](@ref)"
 abstract type AbstractRadialNeighborhood{T} <: AbstractNeighborhood end
 
+@mix struct Overflow{O}
+    "[`AbstractOverflow`](@ref). Determines how co-ordinates outside of the grid are handled"
+    overflow::O
+end
+
 """
 Radial neighborhoods calculate the surrounding neighborood
 from the radius around the central cell, with a number of variants. 
@@ -11,14 +16,12 @@ from the radius around the central cell, with a number of variants.
 They can be constructed with: `RadialNeighborhood{:moore,Skip}(1,Skip())` but the keyword 
 constructor should be preferable.
 """
-struct RadialNeighborhood{T,O} <: AbstractRadialNeighborhood{T}
+@Overflow struct RadialNeighborhood{T} <: AbstractRadialNeighborhood{T}
     """
     The 'radius' of the neighborhood is the distance to the edge
     from the center cell. A neighborhood with radius 1 is 3 cells wide.
     """
     radius::Int
-    "[`AbstractOverflow`](@ref). Determines how co-ordinates outside of the grid are handled"
-    overflow::O
 end 
 """
     RadialNeighborhood(;typ = :moore, radius = 1, overflow = Skip)
@@ -45,20 +48,18 @@ abstract type AbstractCustomNeighborhood <: AbstractNeighborhood end
 Allows completely arbitrary neighborhood shapes by specifying each coordinate
 specifically.
 """
-struct CustomNeighborhood{H,O} <: AbstractCustomNeighborhood
+@Overflow struct CustomNeighborhood{H} <: AbstractCustomNeighborhood
     """
     A tuple of tuples of Int (or an array of arrays of Int, etc),
     contains 2-D coordinates relative to the central point
     """
     neighbors::H
-    "[`AbstractOverflow`](@ref). Determines how co-ordinates outside of the grid are handled"
-    overflow::O
 end
 
 """
 Sets of custom neighborhoods that can have separate rules for each set.
 """
-struct MultiCustomNeighborhood{H,O} <: AbstractCustomNeighborhood
+@Overflow struct MultiCustomNeighborhood{H} <: AbstractCustomNeighborhood
     """
     A tuple of tuple of tuples of Int (or an array of arrays of arrays of Int, etc),
     contains 2-D coordinates relative to the central point.
@@ -66,10 +67,8 @@ struct MultiCustomNeighborhood{H,O} <: AbstractCustomNeighborhood
     multineighbors::H
     "A vector the length of the base multineighbors tuple, for intermediate storage"
     cc::Vector{Int8}
-    "[`AbstractOverflow`](@ref). Determines how co-ordinates outside of the grid are handled"
-    overflow::O
 end
-MultiCustomNeighborhood(mn) = MultiCustomNeighborhood(mn, zeros(Int8, length(mn)))
+MultiCustomNeighborhood(;multi=(), overflow=Wrap())=MultiCustomNeighborhood(multi, zeros(Int8, length(multi)), overflow)
 
 
 """
@@ -106,9 +105,10 @@ neighbors(hood::AbstractRadialNeighborhood, state, index, t, source, args...) = 
     row, col = index
     r = hood.radius
     # Initialise minus the current cell value, as it will be added back in the loop
-    cc = -source[row, col]
+    cc = 0
     # Sum active cells in the neighborhood
     for q = (col - r):(col + r), p = (row - r):(row + r)
+        ((p, q) == index) && continue
         p, q, is_inbounds = inbounds((p, q), (height, width), hood.overflow)
         is_inbounds && inhood(hood, p, q, row, col) || continue
         cc += source[p, q]
@@ -121,7 +121,7 @@ end
 Sum a single custom neighborhood.
 """
 neighbors(hood::AbstractCustomNeighborhood, state, index, t, source, args...) =
-    custom_neighbors(hood.neighborhood, hood, index, t, source, args...)
+    custom_neighbors(hood.neighbors, hood, index, t, source, args...)
 
 """
     neighbors(hood::MultiCustomNeighborhood, state, index, t, source, args...)
@@ -129,9 +129,9 @@ Sum multiple custom neighborhoods separately.
 """
 neighbors(hood::MultiCustomNeighborhood, state, index, t, source, args...) = begin
     for i = 1:length(hood.multineighbors)
-        mn.cc[i] = custom_neighbors(hood.multineighbors[i], hood, index, t, source)
+        hood.cc[i] = custom_neighbors(hood.multineighbors[i], hood, index, t, source)
     end
-    mn.cc
+    hood.cc
 end
 
 custom_neighbors(n, hood, index, t, source) = begin
@@ -147,6 +147,7 @@ custom_neighbors(n, hood, index, t, source) = begin
     end
     cc
 end
+
 
 """
     inhood(n::AbstractRadialNeighborhood{:moore}, p, q, row, col)

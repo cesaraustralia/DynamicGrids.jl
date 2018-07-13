@@ -4,13 +4,40 @@ These outputs inherit from AbstractOutput.
 
 Types that extend AbstractOutput define their own method for [`show_frame`](@ref).
 """
-abstract type AbstractOutput end
+abstract type AbstractOutput{T} <: AbstractVector{T} end
+
+"""
+    (T::Type{AbstractOutput})(output::T; kwargs...)
+Constructor to swap output type for replays in a different output mode.
+"""
+(::Type{T})(output::AbstractOutput, args...; kwargs...) where T <: AbstractOutput = begin
+    length(output) == 0 && return T(eltype(output)[], args...; kwargs...)
+    new_output = T(output.frames, args...; kwargs...)
+    new_output
+end
+
+(::Type{T})(init::I, args...; kwargs...) where T <: AbstractOutput where I <: AbstractMatrix =
+    T(I[], args...; kwargs...)
+
+length(o::AbstractOutput) = length(o.frames)
+size(o::AbstractOutput) = size(o.frames)
+endof(o::AbstractOutput) = endof(o.frames)
+getindex(o::AbstractOutput, i) = getindex(o.frames, i)
+setindex!(o::AbstractOutput, x, i) = setindex!(o.frames, x, i)
+push!(o::AbstractOutput, x) = push!(o.frames, x)
+append!(o::AbstractOutput, x) = append!(o.frames, x)
+
+savegif(filename, output::AbstractOutput; fps=30) = begin
+    # Merge vector of matrices into a 3 dim array and save
+    FileIO.save(filename, Gray.(cat(3, output...)); fps=fps)
+end
+initialize(output::AbstractOutput) = deleteat!(output.frames, 1:length(output))
 
 """
     store_frame(output::AbstractOutput, frame, t, pause)
 Copies the current frame to the frames array.
 """
-store_frame(output::AbstractOutput, frame) = push!(output.frames, deepcopy(frame))
+store_frame(output::AbstractOutput, frame) = push!(output, deepcopy(frame))
 
 """
     show_frame(output::AbstractOutput, t; pause=0.1)
@@ -22,53 +49,27 @@ show_frame(output::AbstractOutput, t; pause=0.1) = true
 Show a simulation again.
 """
 replay(output::AbstractOutput; pause=0.1) =
-    for (t, frame) in enumerate(output.frames)
+    for (t, frame) in enumerate(output)
         show_frame(output, t; pause=pause)
     end
-
-"""
-    (T::Type{AbstractOutput})(output::F; kwargs...)
-Constructor to swap output type for replays in a different mode
-"""
-(::Type{T})(output::AbstractOutput; kwargs...) where T <: AbstractOutput = begin
-    # length(output.frames) == 0 && return T(eltype(output.frames)([]); kwargs...)
-    new_output = T(output.frames[1]; kwargs...)
-    append!(new_output.frames, output.frames)
-    new_output
-end
 
 is_ok(output) = output.ok[1]
 set_ok(output, val) = output.ok[1] = val
 
+@premix struct Frames{T}
+    "An array that holds each frame of the simulation"
+    frames::Vector{T}
+end
+
 """
 A simple array output that stores each step of the simulation in an array of arrays.
 """
-struct ArrayOutput{F} <: AbstractOutput
-    "An array that holds each frame of the simulation"
-    frames::Array{F,1}
-end
-"""
-    ArrayOutput(init)
-Constructor for ArrayOutput
-### Arguments
-- init : the initialisation array
-"""
-ArrayOutput(init::F) where F <: AbstractArray = ArrayOutput{F}([])
+@Frames struct ArrayOutput{} <: AbstractOutput{T} end
 
 """
 A wrapper for [`ArrayOutput`](@ref) that is displayed as asccii blocks in the REPL.
 """
-struct REPLOutput{F} <: AbstractOutput
-    frames::Array{F,1}
-end
-
-"""
-    REPLOutput(init)
-Constructor for REPLOutput
-### Arguments
-- init: The initialisation array
-"""
-REPLOutput(init::F) where F <: AbstractArray = REPLOutput{F}([])
+@Frames struct REPLOutput{} <: AbstractOutput{T} end
 
 """
     show_frame(output::REPLOutput, t; pause=0.1)
@@ -76,7 +77,7 @@ Extends show_frame from [`ArrayOuput`](@ref) by also printing to the REPL.
 """
 show_frame(output::REPLOutput, t; pause=0.1) = begin
     # Print the frame to the REPL as blocks
-    Terminal.put([0,0], repl_frame(output.frames[t]))
+    Terminal.put([0,0], repl_frame(output[t]))
     sleep(pause)
     true
 end
@@ -87,7 +88,7 @@ Print the last frame of a simulation in the REPL.
 """
 Base.show(io::IO, output::REPLOutput) = begin
     println(io, typeof(output))
-    length(output.frames) == 0 || print(repl_frame(output.frames[end]))
+    length(output) == 0 || print(repl_frame(output[end]))
 end
 
 function repl_frame(frame)
@@ -116,8 +117,7 @@ end
 """
 Plot output live to a Gtk window.
 """
-struct GtkOutput{F,W,C,D} <: AbstractOutput
-    frames::Array{F,1}
+@Frames struct GtkOutput{W,C,D} <: AbstractOutput{T}
     window::W
     canvas::C
     scaling::Int
@@ -129,7 +129,7 @@ end
 Constructor for GtkOutput.
 - `init::AbstractArray`: the same `init` array that will also be passed to sim!()
 """
-GtkOutput(init::F; scaling = 2) where F <: AbstractArray = begin
+GtkOutput(frames::T; scaling = 2) where T <: AbstractVector = begin
     canvas = @GtkCanvas()
     @guarded draw(canvas) do widget
         ctx = getgc(canvas)
@@ -143,7 +143,7 @@ GtkOutput(init::F; scaling = 2) where F <: AbstractArray = begin
         ok[1] = false
     end
     # canvas.mouse.button1press = (canvas, x, y) -> (ok[1] = false)
-    GtkOutput(F[], window, canvas, scaling, ok)
+    GtkOutput(frames, window, canvas, scaling, ok)
 end
 
 """
@@ -151,7 +151,7 @@ end
 Send current frame to the canvas in a Gtk window.
 """
 function show_frame(output::GtkOutput, t; pause=0.1)
-    img = process_image(output, output.frame[t])
+    img = process_image(output, output[t])
     canvas = output.canvas
     @guarded draw(output.canvas) do widget
         ctx = getgc(canvas)
@@ -169,19 +169,6 @@ Converts an array to an image format.
 """
 process_image(output, frame) = convert(Array{UInt32, 2}, frame) .* 0x00ffffff
 
-@require FileIO begin
-
-    using FixedPointNumbers
-    using Colors
-    import FileIO.save
-
-    save(filename::AbstractString, output::ArrayOutput; kwargs...) = begin
-        f = output.frames
-        a = reshape(reduce(hcat, f), size(f[1])..., length(f))
-        save("test.gif", vcat(output.frames))
-    end
-
-end
 
 @require Plots begin
     using Plots
@@ -191,10 +178,9 @@ end
     (such as plotly) may be very slow to refresh. Others like gr() should be fine.
     `using Plots` must be called for this to be available.
     """
-    struct PlotsOutput{F,P,T} <: AbstractOutput
-        frames::Array{F,1}
+    @Frames struct PlotsOutput{P,T} <: AbstractOutput{T}
         plot::P
-        interval::T
+        interval::I
     end
 
     """
@@ -202,10 +188,10 @@ end
     Constructor for GtkOutput.
     - `init::AbstractArray`: the `init` array that will also be passed to sim!()
     """
-    PlotsOutput(init::F; interval = 1) where F <: AbstractArray = begin
+    PlotsOutput(frames::T; interval = 1) where T <: AbstractVector = begin
         p = heatmap(init, aspect_ratio=:equal)
         display(p)
-        PlotsOutput(F[], p, interval)
+        PlotsOutput(frames, p, interval)
     end
 
     """
@@ -214,7 +200,7 @@ end
     """
     function show_frame(output::PlotsOutput, t; pause=0.1)
         rem(t, output.interval) == 0 || return true
-        heatmap!(output.plot, output.frames[t])
+        heatmap!(output.plot, output[t])
         display(output.plot)
         true
     end
