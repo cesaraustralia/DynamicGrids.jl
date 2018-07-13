@@ -186,10 +186,15 @@ process_image(output, frame) = convert(Array{UInt32, 2}, frame) .* 0x00ffffff
     """
         PlotsOutput(init)
     Constructor for GtkOutput.
-    - `init::AbstractArray`: the `init` array that will also be passed to sim!()
+    ### Arguments
+    - `frames::AbstractArray`: the `init` array that will also be passed to sim!()
+
+    ### Keyword arguments
+    - `aspec_ratio` : passed to the plots heatmap, default is :equal.
+    - `kwargs` : extra keyword args to modify the heatmap
     """
-    PlotsOutput(frames::T; interval = 1) where T <: AbstractVector = begin
-        p = heatmap(init, aspect_ratio=:equal)
+    PlotsOutput(frames::T; interval=1, aspect_ratio=:equal, kwargs...) where T <: AbstractVector = begin
+        p = heatmap(init; aspect_ratio=aspect_ratio, kwargs...)
         display(p)
         PlotsOutput(frames, p, interval)
     end
