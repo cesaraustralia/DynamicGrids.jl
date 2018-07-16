@@ -42,7 +42,6 @@ init  = [0 1 1 0;
          0 1 1 0;
          0 1 1 0]
 
-
 @testset "a rule that returns zero gives zero outputs" begin
     final = [0 0 0 0;
              0 0 0 0;
@@ -133,21 +132,25 @@ end
             0 0 0 0 0 1;
             0 0 0 0 0 0]
 
-    output = ArrayOutput(init)
+    output = REPLOutput(init)
     sim!(output, Life(), init;  time = 1:5)
+    sleep(0.1)
 
     @testset "stored results match glider behaviour" begin
         @test output[3] == test
         @test output[5] == test2
     end
 
-
     @testset "converted results match glider behaviour" begin
-        output = REPLOutput(output)
+        output = ArrayOutput(output)
         @test output[3] == test
         @test output[5] == test2
         replay(output)
     end
+
+    # @testset "Gtk output also works" begin
+    #     output = GtkOutput(init)
+    # end
 end
 
 

@@ -33,12 +33,20 @@ the passed in output for each time-step.
 - `pause`: A Number that specifies the pause beteen frames in seconds. Default: 0.0
 """
 sim!(output, model, init, args...; time=1:1000, pause=0.0) = begin
-    # Initialise arrays to the same type and values as the passed in initial array
+    clear(output)
+    run(output, model, init, time, pause, args...)
+end
+
+resume!(output, model, args...; time=1:1000, pause=0.0) = begin
+    time = time.start + endof(output):time.stop + endof(output)
+    run(output, model, output[end], time, pause, args...)
+end
+
+run(output, model, init, time, pause, args...) = begin
+    # Define the index coordinates. There might be a better way than this?
+    initialize(output)
     source = deepcopy(init)
     dest = deepcopy(init)
-    initialize(output)
-
-    # Define the index coordinates. There might be a better way than this?
     width, height = size(init)
     index = collect((col,row) for col in 1:width, row in 1:height)
 
