@@ -148,9 +148,10 @@ end
         replay(output)
     end
 
-    # @testset "Gtk output also works" begin
-    #     output = GtkOutput(init)
-    # end
+    @testset "Gtk output also works" begin
+        output = GtkOutput(init)
+        sim!(output, Life(), init;  time = 1:5)
+    end
 end
 
 
