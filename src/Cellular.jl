@@ -54,7 +54,9 @@ include("neighborhoods.jl")
 include("life.jl")
 
 export sim!,
+       resume!,
        replay,
+       savegif,
        show_frame,
        show, getindex, setindex!, endof, size, length, push!, append!,
        AbstractModel,
