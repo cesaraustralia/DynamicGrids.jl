@@ -27,7 +27,12 @@ setindex!(o::AbstractOutput, x, i) = setindex!(o.frames, x, i)
 push!(o::AbstractOutput, x) = push!(o.frames, x)
 append!(o::AbstractOutput, x) = append!(o.frames, x)
 
-savegif(filename, output::AbstractOutput; fps=30) = begin
+""" 
+    savegif(filename::String, output::AbstractOutput; fps=30)
+Write the output array to a gif. 
+Saving very large gifs may trigger a bug in imagemagick.
+"""
+savegif(filename::String, output::AbstractOutput; fps=30) = begin
     # Merge vector of matrices into a 3 dim array and save
     FileIO.save(filename, Gray.(cat(3, output...)); fps=fps)
 end
@@ -47,7 +52,12 @@ show_frame(output::AbstractOutput, t; pause=0.1) = true
 
 """
     replay(output::AbstractOutput; pause=0.1) = begin
-Show a simulation again.
+Show the simulation again. You can also use this to show a sequence 
+run with a different output type.
+### Example
+```julia
+replay(REPLOutput(output); pause=0.1)
+```
 """
 replay(output::AbstractOutput; pause=0.1) = begin
     initialize(output)

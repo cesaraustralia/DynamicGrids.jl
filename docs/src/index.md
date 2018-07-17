@@ -102,6 +102,8 @@ inhood
 
 ```@docs
 sim!
+resume!
+replay
 ```
 
 ## Output
@@ -125,6 +127,7 @@ PlotsOutput(init)
 
 ```@docs
 update_output
+savegif
 ```
 
 ## Overflow

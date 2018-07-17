@@ -37,6 +37,10 @@ sim!(output, model, init, args...; time=1:1000, pause=0.0) = begin
     run(output, model, init, time, pause, args...)
 end
 
+"""
+    resume!(output, model, args...; time=1:1000, pause=0.0)
+Restart the simulation where you stopped last time.
+"""
 resume!(output, model, args...; time=1:1000, pause=0.0) = begin
     time = time.start + endof(output):time.stop + endof(output)
     run(output, model, output[end], time, pause, args...)
