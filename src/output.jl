@@ -218,7 +218,7 @@ function show_frame(output::GtkOutput, t; pause=0.1)
     canvas = output.canvas
     @guarded draw(output.canvas) do widget
         # canvas.draw.scaling == scaling || Cairo.scale(ctx, scaling, scaling)
-        ctx = getgc(canvas)
+        ctx = Gtk.getgc(canvas)
         set_source_surface(ctx, CairoRGBSurface(img), 0, 0)
         paint(ctx)
     end
