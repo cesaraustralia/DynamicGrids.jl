@@ -29,21 +29,23 @@ the passed in output for each time-step.
   [`neighbors`](@ref) methods.
 
 ### Keyword Arguments
-- `time`: Any Iterable of Number. Default: 1:1000
+- `time`: Any Iterable of Number. Default: 1:100
 - `pause`: A Number that specifies the pause beteen frames in seconds. Default: 0.0
 """
-sim!(output, model, init, args...; time=1:1000, pause=0.0) = begin
+sim!(output, model, init, args...; time=100, pause=0.0) = begin
     clear(output)
-    run(output, model, init, time, pause, args...)
+    store_frame(output, init)
+    show_frame(output, 1; pause=pause) || return output
+    run(output, model, init, 2:time, pause, args...)
 end
 
 """
-    resume!(output, model, args...; time=1:1000, pause=0.0)
+    resume!(output, model, args...; time=1:100, pause=0.0)
 Restart the simulation where you stopped last time.
 """
-resume!(output, model, args...; time=1:1000, pause=0.0) = begin
-    time = time.start + endof(output):time.stop + endof(output)
-    run(output, model, output[end], time, pause, args...)
+resume!(output, model, args...; time=100, pause=0.0) = begin
+    timespan = 1 + endof(output):endof(output) + time
+    run(output, model, output[end], timespan, pause, args...)
 end
 
 run(output, model, init, time, pause, args...) = begin
@@ -56,13 +58,13 @@ run(output, model, init, time, pause, args...) = begin
 
     # Loop over the selected timespan
     for t in time
+        # Run the automation on the source array, writing to the dest array and
+        # setting the source and dest arrays for the next iteration.
+        source, dest = broadcast_rules!(model, source, dest, index, t, args...)
         # Save the the current frame
         store_frame(output, source)
         # Display the current frame
         show_frame(output, t; pause=pause) || break
-        # Run the automation on the source array, writing to the dest array and
-        # setting the source and dest arrays for the next iteration.
-        source, dest = broadcast_rules!(model, source, dest, index, t, args...)
     end
     output
 end
@@ -143,12 +145,12 @@ inbounds(xs::Tuple, maxs::Tuple, overflow) = begin
     b, inbounds_b = inbounds(xs[2], maxs[2], overflow)
     a, b, inbounds_a && inbounds_b
 end
-inbounds(x::Number, max::Number, overflow::Skip) = x, x > 0 && x <= max
-inbounds(x::Number, max::Number, overflow::Wrap) = begin
-    if x < 1
-        x = max + rem(x, max)
+inbounds(x::Number, max::Number, overflow::Skip) = x, x > zero(x) && x <= max
+inbounds(x::Number, max::Number, overflow::Wrap) =
+    if x < oneunit(x)
+        max + rem(x, max), true
     elseif x > max
-        x = rem(x, max)
+        rem(x, max), true
+    else
+        x, true
     end
-    x, true
-end

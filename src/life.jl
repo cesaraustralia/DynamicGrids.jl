@@ -9,9 +9,9 @@ abstract type AbstractLife <: AbstractModel end
     # "An AbstractNeighborhood. RadialNeighborhood's are common for Cellular Automata."
     neighborhood::N = RadialNeighborhood(; typ=:moore, radius=1, overflow=Wrap())
     # "Array, Tuple or Iterable of integers to match neighbors when cell is empty."
-    b::B = [3]
+    b::B = (3)
     # "Array, Tuple or Iterable of integers to match neighbors cell is full."
-    s::S = [2,3]
+    s::S = (2,3)
 end
 
 """

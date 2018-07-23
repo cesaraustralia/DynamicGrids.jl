@@ -21,7 +21,7 @@ constructor should be preferable.
     The 'radius' of the neighborhood is the distance to the edge
     from the center cell. A neighborhood with radius 1 is 3 cells wide.
     """
-    radius::Int
+    radius::UInt32
 end 
 """
     RadialNeighborhood(;typ = :moore, radius = 1, overflow = Skip)
@@ -105,7 +105,7 @@ neighbors(hood::AbstractRadialNeighborhood, state, index, t, source, args...) = 
     row, col = index
     r = hood.radius
     # Initialise minus the current cell value, as it will be added back in the loop
-    cc = 0
+    cc = zero(state) 
     # Sum active cells in the neighborhood
     for q = (col - r):(col + r), p = (row - r):(row + r)
         ((p, q) == index) && continue
