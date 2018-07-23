@@ -17,7 +17,7 @@ abstract type AbstractPartialModel end
 
 
 """
-    sim!(output, model, init, args...; time=1:1000, pause=0.0)
+    sim!(output, model, init, args...; time=1000, pause=0.0)
 Runs the whole simulation, passing the destination aray to
 the passed in output for each time-step.
 
@@ -29,7 +29,7 @@ the passed in output for each time-step.
   [`neighbors`](@ref) methods.
 
 ### Keyword Arguments
-- `time`: Any Iterable of Number. Default: 1:100
+- `time`: Any Number. Default: 100
 - `pause`: A Number that specifies the pause beteen frames in seconds. Default: 0.0
 """
 sim!(output, model, init, args...; time=100, pause=0.0) = begin
@@ -41,7 +41,7 @@ sim!(output, model, init, args...; time=100, pause=0.0) = begin
 end
 
 """
-    resume!(output, model, args...; time=1:100, pause=0.0)
+    resume!(output, model, args...; time=100, pause=0.0)
 Restart the simulation where you stopped last time.
 """
 resume!(output, model, args...; time=100, pause=0.0) = begin
