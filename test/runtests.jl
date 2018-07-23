@@ -50,14 +50,14 @@ init  = [0 1 1 0;
 
     model = TestModel()
     output = ArrayOutput(init)
-    sim!(output, model, init; time=1:10)
+    sim!(output, model, init; time=10)
     @test output[10] == final
 end
 
 @testset "an partial rule that just returns zero does nothing" begin
     model = TestPartial()
     output = ArrayOutput(init)
-    sim!(output, model, init; time=1:10)
+    sim!(output, model, init; time=10)
     @test output[1] == init
     @test output[10] == init
 end
@@ -70,7 +70,7 @@ end
 
     model = TestPartialWrite()
     output = ArrayOutput(init)
-    sim!(output, model, init; time=1:10)
+    sim!(output, model, init; time=10)
     @test output[1] == init
     @test output[2] == final
     @test output[10] == final
@@ -132,9 +132,12 @@ end
             0 0 0 0 0 1;
             0 0 0 0 0 0]
 
-    output = REPLOutput(init)
-    sim!(output, Life(), init;  time = 1:5)
-    sleep(0.1)
+    model = Life()
+    output = ArrayOutput(init)
+    # Run half as sim
+    sim!(output, model, init; time=3)
+    # The resume for second half
+    resume!(output, model; time=3)
 
     @testset "stored results match glider behaviour" begin
         @test output[3] == test
@@ -148,11 +151,34 @@ end
         replay(output)
     end
 
-    @testset "Gtk output also works" begin
-        output = GtkOutput(init)
-        sim!(output, Life(), init;  time = 1:5)
+    @testset "REPL output works" begin
+        output = REPLOutput(init)
+        sim!(output, model, init; time=2)
+        resume!(output, model; time=5)
+        @test output[3] == test
+        @test output[5] == test2
+        replay(output)
     end
+
+    @testset "Gtk output works" begin
+        output = GtkOutput(init)
+        sim!(output, model, init; time=2)
+        resume!(output, model; time=5)
+        @test output[3] == test
+        @test output[5] == test2
+        replay(output)
+    end
+
+    # Works but not set up for travis yet
+    # @testset "Plots output works" begin
+    #     using Plots
+    #     plotlyjs()
+    #     output = PlotsOutput(init)
+    #     sim!(output, model, init; time=2)
+    #     resume!(output, model; time=5)
+    #     @test output[3] == test
+    #     @test output[5] == test2
+    #     replay(output)
+    # end
 end
 
-
-# TODO test outputs? how...

@@ -49,6 +49,8 @@ import Base: show, getindex, setindex!, endof, size, length, push!, append!
     """
 
 include("output.jl")
+include("outputs/repl.jl")
+include("outputs/gtk.jl")
 include("framework.jl")
 include("neighborhoods.jl")
 include("life.jl")
@@ -79,7 +81,8 @@ export sim!,
        REPLOutput
 
 @require Plots begin
-export PlotsOutput
+    include("outputs/plots.jl")
+    export PlotsOutput
 end
 
 end
