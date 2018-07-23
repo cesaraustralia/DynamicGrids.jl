@@ -34,6 +34,7 @@ the passed in output for each time-step.
 """
 sim!(output, model, init, args...; time=100, pause=0.0) = begin
     clear(output)
+    initialize(output)
     store_frame(output, init)
     show_frame(output, 1; pause=pause) || return output
     run(output, model, init, 2:time, pause, args...)
@@ -44,13 +45,13 @@ end
 Restart the simulation where you stopped last time.
 """
 resume!(output, model, args...; time=100, pause=0.0) = begin
+    initialize(output)
     timespan = 1 + endof(output):endof(output) + time
     run(output, model, output[end], timespan, pause, args...)
 end
 
 run(output, model, init, time, pause, args...) = begin
     # Define the index coordinates. There might be a better way than this?
-    initialize(output)
     source = deepcopy(init)
     dest = deepcopy(init)
     width, height = size(init)

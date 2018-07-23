@@ -22,10 +22,15 @@ append!(o::AbstractOutput, x) = append!(o.frames, x)
 clear(output::AbstractOutput) = deleteat!(output.frames, 1:length(output))
 initialize(output::AbstractOutput) = nothing
 store_frame(output::AbstractOutput, frame) = push!(output, deepcopy(frame))
-show_frame(output::AbstractOutput, t; pause=0.1) = true
 is_ok(output) = output.ok[1]
 set_ok(output, val) = output.ok[1] = val
 process_image(output, frame) = convert(Array{UInt32, 2}, frame) .* 0x00ffffff
+
+"""
+    show_frame(output::AbstractOutput, t; pause=0.1)
+Show a specific frame of the output.
+"""
+show_frame(output::AbstractOutput, t; pause=0.1) = true
 
 """ 
     savegif(filename::String, output::AbstractOutput; fps=30)
