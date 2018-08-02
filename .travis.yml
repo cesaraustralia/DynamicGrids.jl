@@ -28,6 +28,7 @@ script:
 - if [[ `uname` = "Linux" ]]; then TESTCMD="xvfb-run julia"; else TESTCMD="julia"; fi
 - $TESTCMD -e 'Pkg.clone(pwd()); 
                Pkg.build("Cellular"); 
+               Pkg.add("Blink"); 
                Pkg.build("Blink"); 
                using Blink;
                Blink.AtomShell.install();
