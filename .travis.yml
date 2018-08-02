@@ -28,7 +28,6 @@ script:
 - if [[ `uname` = "Linux" ]]; then TESTCMD="xvfb-run julia"; else TESTCMD="julia"; fi
 - $TESTCMD -e 'Pkg.clone(pwd()); 
                Pkg.build("Cellular"); 
-               Pkg.build("Gtk"); 
                Pkg.test("Cellular"; coverage=true)'
 
 after_success:
