@@ -161,6 +161,7 @@ end
     end
 
     @testset "Gtk output works" begin
+        using Gtk
         output = GtkOutput(init)
         sim!(output, model, init; time=2)
         resume!(output, model; time=5)

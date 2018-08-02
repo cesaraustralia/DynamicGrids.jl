@@ -17,7 +17,7 @@ abstract type AbstractPartialModel end
 
 
 """
-    sim!(output, model, init, args...; time=1000, pause=0.0)
+    sim!(output, model, init, args...; time=1000)
 Runs the whole simulation, passing the destination aray to
 the passed in output for each time-step.
 
@@ -30,27 +30,26 @@ the passed in output for each time-step.
 
 ### Keyword Arguments
 - `time`: Any Number. Default: 100
-- `pause`: A Number that specifies the pause beteen frames in seconds. Default: 0.0
 """
-sim!(output, model, init, args...; time=100, pause=0.0) = begin
+sim!(output, model, init, args...; time=100) = begin
     clear(output)
-    initialize(output)
     store_frame(output, init)
-    show_frame(output, 1; pause=pause) || return output
-    run(output, model, init, 2:time, pause, args...)
+    initialize(output, model, args...)
+    show_frame(output, 1) || return output
+    run(output, model, init, 2:time, args...)
 end
 
 """
-    resume!(output, model, args...; time=100, pause=0.0)
+    resume!(output, model, args...; time=100)
 Restart the simulation where you stopped last time.
 """
-resume!(output, model, args...; time=100, pause=0.0) = begin
+resume!(output, model, args...; time=100) = begin
     initialize(output)
     timespan = 1 + endof(output):endof(output) + time
-    run(output, model, output[end], timespan, pause, args...)
+    run(output, model, output[end], timespan, args...)
 end
 
-run(output, model, init, time, pause, args...) = begin
+run(output, model, init, time, args...) = begin
     # Define the index coordinates. There might be a better way than this?
     source = deepcopy(init)
     dest = deepcopy(init)
@@ -65,7 +64,7 @@ run(output, model, init, time, pause, args...) = begin
         # Save the the current frame
         store_frame(output, source)
         # Display the current frame
-        show_frame(output, t; pause=pause) || break
+        show_frame(output, t) || break
     end
     output
 end

@@ -126,8 +126,9 @@ PlotsOutput(init)
 ### Methods
 
 ```@docs
-update_output
 savegif
+replay
+show_frame
 ```
 
 ## Overflow
@@ -158,8 +159,5 @@ actually modify extend.
 ```@docs
 broadcast_rules!
 inbounds
-```
-
-```@docs
 process_image
 ```

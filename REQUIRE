@@ -3,9 +3,8 @@ Parameters
 Requires
 DocStringExtensions
 REPLTetris
-Gtk
-Cairo
 FixedPointNumbers 
 Colors
 FileIO
 Mixers
+Images

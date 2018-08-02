@@ -36,8 +36,7 @@ sim!(output, (model1, model2), init)
 """
 module Cellular
 
-using Parameters, Mixers, Requires, DocStringExtensions, REPLTetris.Terminal, Gtk, Cairo
-using FixedPointNumbers, Colors, FileIO
+using Parameters, Mixers, Requires, DocStringExtensions, REPLTetris.Terminal, Images, FileIO
 import Base: show, getindex, setindex!, endof, size, length, push!, append!
 
 # Documentation templates
@@ -48,9 +47,9 @@ import Base: show, getindex, setindex!, endof, size, length, push!, append!
     $(FIELDS)
     """
 
-include("output.jl")
+include("outputs/common.jl")
 include("outputs/repl.jl")
-include("outputs/gtk.jl")
+include("outputs/array.jl")
 include("framework.jl")
 include("neighborhoods.jl")
 include("life.jl")
@@ -77,12 +76,25 @@ export sim!,
        AbstractOutput,
        AbstractArrayOutput,
        ArrayOutput,
-       GtkOutput,
        REPLOutput
 
+@require Gtk begin
+    using Gtk, GtkUtilities
+    include("outputs/gtk.jl")
+    export GtkOutput
+end
+
 @require Plots begin
+    using Plots
     include("outputs/plots.jl")
     export PlotsOutput
 end
+
+@require Blink begin
+    using Blink, InteractBulma, InteractBase, WebIO, Observables, CSSUtil
+    include("outputs/web.jl")
+    export WebOutput
+end
+
 
 end

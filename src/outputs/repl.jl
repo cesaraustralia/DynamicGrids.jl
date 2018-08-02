@@ -1,8 +1,8 @@
 "A wrapper for [`ArrayOutput`](@ref) that is displayed as asccii blocks in the REPL."
-@Ok @Frames struct REPLOutput{} <: AbstractOutput{T} 
+@Ok @FPS @Frames mutable struct REPLOutput{} <: AbstractOutput{T} 
     displayoffset::Array{Int}
 end
-REPLOutput(frames::AbstractVector) = REPLOutput(frames[:], [true], [1,1])
+REPLOutput(frames::AbstractVector; fps=25) = REPLOutput(frames, fps, time(), [true], [1,1])
 
 
 initialize(output::REPLOutput) = begin
@@ -37,17 +37,17 @@ move_x!(output, n) = begin
 end
 
 """
-    show_frame(output::REPLOutput, t; pause=0.1)
+    show_frame(output::REPLOutput, t)
 Extends show_frame from [`ArrayOuput`](@ref) by also printing to the REPL.
 """
-show_frame(output::REPLOutput, t; pause=0.1) = begin
+show_frame(output::REPLOutput, t) = begin
     try
         Terminal.put([0,0], repl_frame(output, t))
     catch err
         set_ok(output, false)
         throw(err)
     end
-    sleep(pause)
+    delay(output)
     is_ok(output)
 end
 

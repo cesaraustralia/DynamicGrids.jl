@@ -1,29 +1,27 @@
-using Plots
-
 """
 A Plots.jl Output to plot cells as a heatmap in any Plots backend. Some backends
 (such as plotly) may be very slow to refresh. Others like gr() should be fine.
-`using Plots` must be called for this to be available.
+
+Only available after running `using Plots`
 """
-@Ok @Frames struct PlotsOutput{T,P,I} <: AbstractOutput{T}
+@Ok @FPS @Frames mutable struct PlotsOutput{T,P} <: AbstractOutput{T}
     plot::P
-    interval::I
 end
 
 """
     PlotsOutput(frames)
-Constructor for GtkOutput.
+Constructor for PlotsOutput.
 ### Arguments
-- `frames::AbstractArray`: vector of `frames` 
+- `frames::AbstractArray`: vector of matrices
 
 ### Keyword arguments
 - `aspec_ratio` : passed to the plots heatmap, default is :equal
 - `kwargs` : extra keyword args to modify the heatmap
 """
-PlotsOutput(frames::AbstractVector; interval=1, aspect_ratio=:equal, kwargs...) = begin
-    p = heatmap(; aspect_ratio=aspect_ratio, kwargs...)
+PlotsOutput(frames::AbstractVector; fps=25.0, aspect_ratio=:equal, kwargs...) = begin
+    plt = heatmap(; aspect_ratio=aspect_ratio, kwargs...)
     ok = [true]
-    PlotsOutput(frames[:], ok, p, interval)
+    PlotsOutput(frames, fps, time() ok, plt)
 end
 
 initialize(output::PlotsOutput) = begin
@@ -32,12 +30,13 @@ initialize(output::PlotsOutput) = begin
 end
 
 """
-    show_frame(output::PlotsOutput, t; pause=0.1)
+    show_frame(output::PlotsOutput, t)
 Update plot for every specified interval
 """
-function show_frame(output::PlotsOutput, t; pause=0.1)
+function show_frame(output::PlotsOutput, t)
     rem(t, output.interval) == 0 || return true
     heatmap!(output.plot, output[t])
     display(output.plot)
-    true
+    delay(output)
+    is_ok(output)
 end
