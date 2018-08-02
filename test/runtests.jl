@@ -162,12 +162,24 @@ end
 
     @testset "Gtk output works" begin
         using Gtk
-        output = GtkOutput(init)
-        sim!(output, model, init; time=2)
+        output = GtkOutput(init) 
+        sim!(output, model, init; time=2) 
         resume!(output, model; time=5)
         @test output[3] == test
         @test output[5] == test2
         replay(output)
+        destroy(output.window)
+    end
+
+    @testset "Web output works" begin
+        using Blink
+        output = WebOutput(init) 
+        sim!(output, model, init; time=2) 
+        resume!(output, model; time=5)
+        @test output[3] == test
+        @test output[5] == test2
+        replay(output)
+        close(output.window)
     end
 
     # Works but not set up for travis yet
