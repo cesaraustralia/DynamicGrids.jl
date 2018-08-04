@@ -36,7 +36,15 @@ sim!(output, (model1, model2), init)
 """
 module Cellular
 
-using Parameters, Mixers, Requires, DocStringExtensions, BraileGraphics, REPLTetris.Terminal, Images, FileIO
+using Parameters, 
+      Mixers, 
+      Requires, 
+      DocStringExtensions, 
+      TerminalGraphics, 
+      REPLTetris.Terminal, 
+      Images, 
+      FileIO
+
 import Base: show, getindex, setindex!, endof, size, length, push!, append!
 
 # Documentation templates
