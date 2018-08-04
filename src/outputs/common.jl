@@ -7,8 +7,8 @@ Types that extend AbstractOutput define their own method for [`show_frame`](@ref
 abstract type AbstractOutput{T} <: AbstractVector{T} end
 
 "Generic ouput constructor. Converts init array to vector of empty frames."
-(::Type{T})(init::I, args...; kwargs...) where T <: AbstractOutput where I <: AbstractMatrix =
-    T(I[init], args...; kwargs...)
+(::Type{F})(init::T, args...; kwargs...) where F <: AbstractOutput where T <: AbstractMatrix =
+    F(T[init], args...; kwargs...)
 
 length(o::AbstractOutput) = length(o.frames)
 size(o::AbstractOutput) = size(o.frames)
@@ -18,12 +18,14 @@ setindex!(o::AbstractOutput, x, i) = setindex!(o.frames, x, i)
 push!(o::AbstractOutput, x) = push!(o.frames, x)
 append!(o::AbstractOutput, x) = append!(o.frames, x)
 
-
-clear(output::AbstractOutput) = deleteat!(output.frames, 1:length(output))
-initialize(output::AbstractOutput, args...) = nothing
-store_frame(output::AbstractOutput, frame) = push!(output, deepcopy(frame))
-is_ok(output) = output.ok[1]
-set_ok(output, val) = output.ok[1] = val
+clear(o::AbstractOutput) = deleteat!(o.frames, 1:length(o))
+initialize(o::AbstractOutput, args...) = nothing
+finalize(o::AbstractOutput, args...) = nothing
+store_frame(o::AbstractOutput, frame) = push!(o, deepcopy(frame))
+is_ok(o::AbstractOutput) = o.ok[1]
+set_ok(o::AbstractOutput, val) = o.ok[1] = val
+is_running(o::AbstractOutput) = o.running[1]
+set_running(o::AbstractOutput, val) = o.running[1] = val
 # process_image(output, frame) = convert(Array{UInt32, 2}, frame) .* 0x00ffffff
 process_image(output, frame) = Images.Gray.(frame)
 
@@ -51,24 +53,6 @@ Saving very large gifs may trigger a bug in imagemagick.
 savegif(filename::String, output::AbstractOutput) = 
     FileIO.save(filename, Gray.(cat(3, output...)))
 
-"""
-    replay(output::AbstractOutput) = begin
-Show the simulation again. You can also use this to show a sequence 
-run with a different output type.
-
-### Example
-```julia
-replay(REPLOutput(output))
-```
-"""
-replay(output::AbstractOutput) = begin
-    initialize(output)
-    for (t, frame) in enumerate(output)
-        delay(output)
-        show_frame(output, t) || break
-    end
-end
-
 @premix struct Frames{T<:AbstractVector}
     "An array that holds each frame of the simulation"
     frames::T
@@ -81,4 +65,5 @@ end
 
 @premix struct Ok
     ok::Array{Bool}
+    running::Array{Bool}
 end

@@ -21,7 +21,8 @@ Constructor for PlotsOutput.
 PlotsOutput(frames::AbstractVector; fps=25.0, aspect_ratio=:equal, kwargs...) = begin
     plt = heatmap(; aspect_ratio=aspect_ratio, kwargs...)
     ok = [true]
-    PlotsOutput(frames, fps, time() ok, plt)
+    running = [false]
+    PlotsOutput(frames, fps, time() ok, running, plt)
 end
 
 initialize(output::PlotsOutput) = begin

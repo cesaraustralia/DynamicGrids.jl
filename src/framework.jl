@@ -32,11 +32,14 @@ the passed in output for each time-step.
 - `time`: Any Number. Default: 100
 """
 sim!(output, model, init, args...; time=100) = begin
+    is_running(output) && return
+    set_running(output, true)
+    set_ok(output, true)
     clear(output)
     store_frame(output, init)
-    initialize(output, model, args...)
-    show_frame(output, 1) || return output
-    run(output, model, init, 2:time, args...)
+    show_frame(output, 1) 
+    run!(output, model, init, 2:time, args...)
+    output
 end
 
 """
@@ -44,12 +47,37 @@ end
 Restart the simulation where you stopped last time.
 """
 resume!(output, model, args...; time=100) = begin
-    initialize(output)
+    is_running(output) && return
+    set_running(output, true)
+    set_ok(output, true)
     timespan = 1 + endof(output):endof(output) + time
-    run(output, model, output[end], timespan, args...)
+    run!(output, model, output[end], timespan, args...)
+    output
 end
 
-run(output, model, init, time, args...) = begin
+"""
+    replay(output::AbstractOutput) = begin
+Show the simulation again. You can also use this to show a sequence 
+run with a different output type.
+
+### Example
+```julia
+replay(REPLOutput(output))
+```
+"""
+replay(output::AbstractOutput) = begin
+    is_running(output) && return
+    initialize(output)
+    for (t, frame) in enumerate(output)
+        delay(output)
+        show_frame(output, t) || break
+    end
+    set_running(output, false)
+    nothing
+end
+
+run!(output, model, init, time, args...) = begin
+    initialize(output)
     # Define the index coordinates. There might be a better way than this?
     source = deepcopy(init)
     dest = deepcopy(init)
@@ -57,7 +85,7 @@ run(output, model, init, time, args...) = begin
     index = collect((col,row) for col in 1:width, row in 1:height)
 
     # Loop over the selected timespan
-    for t in time
+    @async for t in time
         # Run the automation on the source array, writing to the dest array and
         # setting the source and dest arrays for the next iteration.
         source, dest = broadcast_rules!(model, source, dest, index, t, args...)
@@ -65,8 +93,10 @@ run(output, model, init, time, args...) = begin
         store_frame(output, source)
         # Display the current frame
         show_frame(output, t) || break
+        yield()
     end
-    output
+    finalize(output)
+    set_running(output, false)
 end
 
 """

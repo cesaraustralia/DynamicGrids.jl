@@ -36,7 +36,7 @@ sim!(output, (model1, model2), init)
 """
 module Cellular
 
-using Parameters, Mixers, Requires, DocStringExtensions, REPLTetris.Terminal, Images, FileIO
+using Parameters, Mixers, Requires, DocStringExtensions, BraileGraphics, REPLTetris.Terminal, Images, FileIO
 import Base: show, getindex, setindex!, endof, size, length, push!, append!
 
 # Documentation templates
@@ -90,10 +90,18 @@ end
     export PlotsOutput
 end
 
-@require Blink begin
-    using Blink, InteractBulma, InteractBase, WebIO, Observables, CSSUtil
+# @require Blink begin
+    using Blink
+    export BlinkOutput
     include("outputs/web.jl")
-    export WebOutput
+    include("outputs/blink.jl")
+# end
+
+@require Mux begin
+    using Mux
+    export MuxOutput 
+    include("outputs/web.jl")
+    include("outputs/mux.jl")
 end
 
 

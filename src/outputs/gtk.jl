@@ -22,9 +22,10 @@ GtkOutput(frames::AbstractVector; fps=25.0) = begin
     window = GtkWindow(canvas, "Cellular Automata")
     show(canvas)
     ok = [true]
+    running = [false]
     canvas.mouse.button1press = (widget,event) -> ok[1] = false
 
-    GtkOutput(frames[:], fps, time(), ok, window, canvas)
+    GtkOutput(frames[:], fps, time(), ok, running, window, canvas)
 end
 
 """
