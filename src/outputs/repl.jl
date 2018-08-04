@@ -67,8 +67,8 @@ Base.show(io::IO, output::REPLOutput) = begin
     length(output) == 0 || print(repl_frame(output[end]))
 end
 
-replshow(output::REPLOutput{:braile}, t) = replframe(output, t, 4, 2, BraileGraphics.brailize) 
-replshow(output::REPLOutput{:block}, t) = replframe(output, t, 2, 1, BraileGraphics.blockize) 
+replshow(output::REPLOutput{:braile}, t) = replframe(output, t, 4, 2, brailize) 
+replshow(output::REPLOutput{:block}, t) = replframe(output, t, 2, 1, blockize) 
 
 function replframe(output, t, ystep, xstep, f)
     frame = output[t]
