@@ -17,6 +17,18 @@ abstract type AbstractPartialModel end
 
 
 """
+Singleton types for choosing the grid overflow rule used in
+[`inbounds`](@ref). These determine what is done when a neighborhood
+or jump extends outside of the grid.
+"""
+abstract type AbstractOverflow end
+"Wrap cords that overflow to the opposite side"
+struct Wrap <: AbstractOverflow end
+"Skip coords that overflow boundaries"
+struct Skip <: AbstractOverflow end
+
+
+"""
     sim!(output, model, init, args...; time=1000)
 Runs the whole simulation, passing the destination aray to
 the passed in output for each time-step.
@@ -85,7 +97,7 @@ run!(output, model, init, time, args...) = begin
     index = collect((col,row) for col in 1:width, row in 1:height)
 
     # Loop over the selected timespan
-    @async for t in time
+    mainloop() = for t in time
         # Run the automation on the source array, writing to the dest array and
         # setting the source and dest arrays for the next iteration.
         source, dest = broadcast_rules!(model, source, dest, index, t, args...)
@@ -94,6 +106,11 @@ run!(output, model, init, time, args...) = begin
         # Display the current frame
         show_frame(output, t) || break
         yield()
+    end
+    if is_async(output) 
+        shedule(Task(mainloop))
+    else
+        mainloop()
     end
     finalize(output)
     set_running(output, false)
@@ -144,18 +161,6 @@ These must write to the `dest` array directly.
 
 """
 function rule(model::Void, state, index, t, source, args...) end
-
-
-"""
-Singleton types for choosing the grid overflow rule used in
-[`inbounds`](@ref). These determine what is done when a neighborhood
-or jump extends outside of the grid.
-"""
-abstract type AbstractOverflow end
-"Wrap cords that overflow to the opposite side"
-struct Wrap <: AbstractOverflow end
-"Skip coords that overflow boundaries"
-struct Skip <: AbstractOverflow end
 
 """
     inbounds(x, max, overflow)

@@ -26,6 +26,7 @@ is_ok(o::AbstractOutput) = o.ok[1]
 set_ok(o::AbstractOutput, val) = o.ok[1] = val
 is_running(o::AbstractOutput) = o.running[1]
 set_running(o::AbstractOutput, val) = o.running[1] = val
+is_async(o::AbstractOutput) = false
 # process_image(output, frame) = convert(Array{UInt32, 2}, frame) .* 0x00ffffff
 process_image(output, frame) = Images.Gray.(frame)
 

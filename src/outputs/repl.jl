@@ -12,11 +12,11 @@ end
 
 initialize(output::REPLOutput, args...) = begin
     output.displayoffset .= (1, 1)
-    Terminal.enableRawMode()
+    # Terminal.enableRawMode()
     @async movedisplay(output)
 end
 
-finalize(output::REPLOutput, args...) = Terminal.disableRawMode()
+# finalize(output::REPLOutput, args...) = Terminal.disableRawMode()
 
 movedisplay(output) = begin
     while is_ok(output)

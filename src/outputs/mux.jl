@@ -1,5 +1,5 @@
 
-@Frames mutable struct MuxServer{F} <: AbstractOutput{T}
+@Frames mutable struct MuxServer{F} <: AbstractWebOutput{T}
     fps::F
     port::Int
 end

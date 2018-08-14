@@ -3,6 +3,7 @@ Parameters
 Requires
 DocStringExtensions
 REPLTetris
+TerminalGraphics
 FixedPointNumbers 
 Colors
 FileIO

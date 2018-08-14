@@ -50,14 +50,14 @@ init  = [0 1 1 0;
 
     model = TestModel()
     output = ArrayOutput(init)
-    sim!(output, model, init; time=10)
+    @sync sim!(output, model, init; time=10)
     @test output[10] == final
 end
 
 @testset "an partial rule that just returns zero does nothing" begin
     model = TestPartial()
     output = ArrayOutput(init)
-    sim!(output, model, init; time=10)
+    @sync sim!(output, model, init; time=10)
     @test output[1] == init
     @test output[10] == init
 end
@@ -70,7 +70,7 @@ end
 
     model = TestPartialWrite()
     output = ArrayOutput(init)
-    sim!(output, model, init; time=10)
+    @sync sim!(output, model, init; time=10)
     @test output[1] == init
     @test output[2] == final
     @test output[10] == final
@@ -135,9 +135,9 @@ end
     model = Life()
     output = ArrayOutput(init)
     # Run half as sim
-    sim!(output, model, init; time=3)
+    @sync sim!(output, model, init; time=3)
     # The resume for second half
-    resume!(output, model; time=3)
+    @sync resume!(output, model; time=3)
 
     @testset "stored results match glider behaviour" begin
         @test output[3] == test
@@ -151,35 +151,49 @@ end
         replay(output)
     end
 
-    @testset "REPL output works" begin
-        output = REPLOutput(init)
-        sim!(output, model, init; time=2)
-        resume!(output, model; time=5)
-        @test output[3] == test
-        @test output[5] == test2
-        replay(output)
-    end
-
-    @testset "Gtk output works" begin
-        using Gtk
-        output = GtkOutput(init) 
-        sim!(output, model, init; time=2) 
-        resume!(output, model; time=5)
-        @test output[3] == test
-        @test output[5] == test2
-        replay(output)
-        destroy(output.window)
-    end
-
-    @testset "Web output works" begin
+    @testset "BlinkOutput works" begin
         using Blink
-        output = WebOutput(init) 
-        sim!(output, model, init; time=2) 
-        resume!(output, model; time=5)
+        output = Cellular.BlinkOutput(init, model) 
+        @sync sim!(output, model, init; time=2) 
+        @sync resume!(output, model; time=5)
         @test output[3] == test
         @test output[5] == test2
         replay(output)
         close(output.window)
+    end
+
+    @testset "MuxServer works" begin
+        using Mux
+        # server = Cellular.MuxServer(init, model; port=rand(8000:9000)) 
+    end
+
+    @testset "REPLOutput{:braile} works" begin
+        output = REPLOutput{:braile}(init)
+        @sync sim!(output, model, init; time=2)
+        @sync resume!(output, model; time=5)
+        @test output[3] == test
+        @test output[5] == test2
+        replay(output)
+    end
+
+    @testset "REPLOutput{:block} works" begin
+        output = REPLOutput{:block}(init)
+        @sync sim!(output, model, init; time=2)
+        @sync resume!(output, model; time=5)
+        @test output[3] == test
+        @test output[5] == test2
+        replay(output)
+    end
+
+    @testset "GtkOutput works" begin
+        using Gtk
+        output = GtkOutput(init) 
+        @sync sim!(output, model, init; time=2) 
+        @sync resume!(output, model; time=5)
+        @test output[3] == test
+        @test output[5] == test2
+        replay(output)
+        destroy(output.window)
     end
 
     # Works but not set up for travis yet

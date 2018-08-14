@@ -1,5 +1,7 @@
 using InteractBulma, InteractBase, WebIO, Observables, CSSUtil
 
+abstract type AbstractWebOutput{T} <: AbstractOutput{T} end
+
 @Ok @FPS @Frames mutable struct WebInterface{P,Im,Ti} <: AbstractOutput{T}
     page::P
     image::Im
@@ -46,8 +48,6 @@ WebInterface(frames::AbstractVector, fps::Number, model) = begin
     interface
 end
 
-abstract type AbstractWebOutput{T} <: AbstractOutput{T} end
-
 length(o::AbstractWebOutput) = length(o.interface)
 size(o::AbstractWebOutput) = size(o.interface)
 endof(o::AbstractWebOutput) = endof(o.interface)
@@ -63,9 +63,13 @@ set_ok(o::AbstractWebOutput, x) = set_ok(o.interface, x)
 is_running(o::AbstractWebOutput) = is_running(o.interface)
 set_running(o::AbstractWebOutput, x) = set_running(o.interface, x) 
 set_time(o::AbstractWebOutput, t) = set_time(o.interface, t)
+set_time(o::AbstractWebOutput, t) = set_time(o.interface, t)
+is_async(o::AbstractWebOutput) = true
+
 
 set_time(o::WebInterface, t) = o.t[] = t
 initialize(o::WebInterface) = set_ok(o, true)
+is_async(o::WebInterface) = true
 
 delay(::HasFPS, output::WebInterface) = begin
     sleep(max(0.0, output.timestamp + 1/output.fps.val - time()))

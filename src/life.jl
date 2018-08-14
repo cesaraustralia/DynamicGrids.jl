@@ -26,7 +26,7 @@ Returns: boolean
 """
 rule(model::AbstractLife, state, args...) = begin
     # Sum neighborhood
-    cc = neighbors(model.neighborhood, state, args...)
+    cc = neighbors(model.neighborhood, model, state, args...)
     # Determine next state based on current state and neighborhood total
     (state == zero(state) && cc in model.b) || (state == one(state) && cc in model.s)
 end

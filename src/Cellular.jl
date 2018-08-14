@@ -98,12 +98,12 @@ end
     export PlotsOutput
 end
 
-# @require Blink begin
+@require Blink begin
     using Blink
     export BlinkOutput
     include("outputs/web.jl")
     include("outputs/blink.jl")
-# end
+end
 
 @require Mux begin
     using Mux

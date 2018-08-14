@@ -82,7 +82,7 @@ function neighbors() end
     neighbors(hood::AbstractRadialNeighborhood{:onedim}, state, index, t, source, args...)
 Sums single dimension radial neighborhoods. Commonly used by Wolfram.
 """
-neighbors(hood::AbstractRadialNeighborhood{:onedim}, state, index, t, source, args...) = begin
+neighbors(hood::AbstractRadialNeighborhood{:onedim}, model, state, index, t, source, args...) = begin
     width = size(source)
     r = hood.radius
     # Initialise minus the current cell value, as it will be added back in the loop
@@ -100,7 +100,7 @@ end
 Sums 2-dimensional radial Nieghborhoods. Specific shapes like Moore and Von Neumann
 are determined by [`inhood`](@ref), as this method is general.
 """
-neighbors(hood::AbstractRadialNeighborhood, state, index, t, source, args...) = begin
+neighbors(hood::AbstractRadialNeighborhood, model, state, index, t, source, args...) = begin
     height, width = size(source)
     row, col = index
     r = hood.radius
@@ -127,7 +127,7 @@ neighbors(hood::AbstractCustomNeighborhood, state, index, t, source, args...) =
     neighbors(hood::MultiCustomNeighborhood, state, index, t, source, args...)
 Sum multiple custom neighborhoods separately.
 """
-neighbors(hood::MultiCustomNeighborhood, state, index, t, source, args...) = begin
+neighbors(hood::MultiCustomNeighborhood, model, state, index, t, source, args...) = begin
     for i = 1:length(hood.multineighbors)
         hood.cc[i] = custom_neighbors(hood.multineighbors[i], hood, index, t, source)
     end
