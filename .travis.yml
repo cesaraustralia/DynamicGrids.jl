@@ -27,6 +27,8 @@ script:
 - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
 - if [[ `uname` = "Linux" ]]; then TESTCMD="xvfb-run julia"; else TESTCMD="julia"; fi
 - julia -e 'Pkg.clone("https://github.com/rafaqz/TerminalGraphics.jl.git"); Pkg.build("TerminalGraphics")'
+- julia -e 'Pkg.clone("https://github.com/rafaqz/MetaFields.jl.git"); Pkg.build("MetaFields")'
+- julia -e 'Pkg.clone("https://github.com/rafaqz/Flatten.jl.git"); Pkg.build("Flatten")'
 - $TESTCMD -e 'Pkg.clone(pwd()); 
                Pkg.build("Cellular"); 
                Pkg.add("Blink"); 
