@@ -27,6 +27,13 @@ struct Wrap <: AbstractOverflow end
 "Skip coords that overflow boundaries"
 struct Skip <: AbstractOverflow end
 
+mutable struct Models{M}
+    models::M
+end
+Models(args...) = Models{typeof(args)}(args)
+
+
+
 
 """
     sim!(output, model, init, args...; time=1000)
@@ -43,27 +50,27 @@ the passed in output for each time-step.
 ### Keyword Arguments
 - `time`: Any Number. Default: 100
 """
-sim!(output, model, init, args...; time=100) = begin
+sim!(output, models, init, args...; time=100) = begin
     is_running(output) && return
     set_running(output, true)
     set_ok(output, true)
     clear(output)
     store_frame(output, init)
     show_frame(output, 1) 
-    run!(output, model, init, 2:time, args...)
+    run!(output, models, init, 2:time, args...)
     output
 end
 
 """
-    resume!(output, model, args...; time=100)
+    resume!(output, models, args...; time=100)
 Restart the simulation where you stopped last time.
 """
-resume!(output, model, args...; time=100) = begin
+resume!(output, models, args...; time=100) = begin
     is_running(output) && return
     set_running(output, true)
     set_ok(output, true)
     timespan = 1 + endof(output):endof(output) + time
-    run!(output, model, output[end], timespan, args...)
+    run!(output, models, output[end], timespan, args...)
     output
 end
 
@@ -79,6 +86,7 @@ replay(REPLOutput(output))
 """
 replay(output::AbstractOutput) = begin
     is_running(output) && return
+    set_running(output, true)
     initialize(output)
     for (t, frame) in enumerate(output)
         delay(output)
@@ -88,7 +96,7 @@ replay(output::AbstractOutput) = begin
     nothing
 end
 
-run!(output, model, init, time, args...) = begin
+run!(output, models, init, time, args...) = begin
     initialize(output)
     # Define the index coordinates. There might be a better way than this?
     source = deepcopy(init)
@@ -100,15 +108,15 @@ run!(output, model, init, time, args...) = begin
     mainloop() = for t in time
         # Run the automation on the source array, writing to the dest array and
         # setting the source and dest arrays for the next iteration.
-        source, dest = broadcast_rules!(model, source, dest, index, t, args...)
+        source, dest = broadcast_rules!(models.models, source, dest, index, t, args...)
         # Save the the current frame
         store_frame(output, source)
         # Display the current frame
         show_frame(output, t) || break
-        yield()
+        is_async(output) && yield()
     end
     if is_async(output) 
-        shedule(Task(mainloop))
+        schedule(Task(mainloop))
     else
         mainloop()
     end

@@ -5,13 +5,13 @@ this should replicate the fields for [`Life`](@ref).
 abstract type AbstractLife <: AbstractModel end
 
 " Game-of-life style cellular automata. "
-@with_kw struct Life{N,B,S} <: AbstractLife
+@limits @flattenable @with_kw struct Life{N,B,S} <: AbstractLife
     # "An AbstractNeighborhood. RadialNeighborhood's are common for Cellular Automata."
-    neighborhood::N = RadialNeighborhood(; typ=:moore, radius=1, overflow=Wrap())
+    neighborhood::N = RadialNeighborhood(; typ=:moore, radius=1, overflow=Wrap()) | Exclude() | _
     # "Array, Tuple or Iterable of integers to match neighbors when cell is empty."
-    b::B = (3)
+    b::B = (3)    | Include() | (1, 9)
     # "Array, Tuple or Iterable of integers to match neighbors cell is full."
-    s::S = (2,3)
+    s::S = (2, 3) | Exclude() | (1, 9)
 end
 
 """

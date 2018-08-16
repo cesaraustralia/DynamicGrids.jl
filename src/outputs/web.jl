@@ -15,53 +15,60 @@ WebInterface(frames::AbstractVector, fps::Number, model) = begin
     running = [false]
     init = deepcopy(frames[1])
 
+    # Standard output and controls
     image = Observable{Any}(dom"div"([Images.Gray.(frames[1])]))
     obs_fps = Observable{Int}(fps)
     t = Observable{Int}(1)
-    timespan = Observable{Int}(100)
+    timespan = Observable{Int}(1000)
     sim = button("sim")
     resume = button("resume")
     stop = button("stop")
     replay = button("replay")
-    time_box = textbox("1")
+    time_box = textbox("1000")
+    timetext = Observable{Any}(dom"div"("0"))
     fps_slider = slider(1:60, label="FPS")
-    page = dom"div"(vbox(image, hbox(sim, resume, stop, replay, fps_slider, time_box)))
+    basewidgets = hbox(sim, resume, stop, replay, vbox(dom"span"("Frames"), time_box), fps_slider)
 
-    interface = WebInterface{typeof.((frames, obs_fps, time(), page, image, t))...}(frames, obs_fps, time(), ok, running, page, image, t)
+    # Auto-generated model controls
+    params = flatten(model.models)
+    fnames = metaflatten(model.models, fieldname_meta)
+    lims = metaflatten(model.models, MetaFields.limits)
+    parents = metaflatten(Vector, model.models, fieldparent_meta)
+    attributes = broadcast((p, n) -> Dict(:title => "$p.$n"), parents, fnames)
+    make_slider(p, lab, lim, attr) = slider(lim[1]:(lim[2]-lim[1])/400:lim[2], label=string(lab), attributes=attr, value=p)
+    sliders = broadcast(make_slider, params, fnames, lims, attributes)
+    slider_obs = map((s...) -> s, observe.(sliders)...)
+    modelwidgets = vbox(dom"span"("Model: "), hbox(sliders...))
 
+    # Put it all together into a webpage
+    page = dom"div"(vbox(hbox(image, timetext), basewidgets, modelwidgets))
+
+    # Construct the interface output
+    interface = WebInterface{typeof.((frames, obs_fps, time(), page, image, t))...}(
+                            frames, obs_fps, time(), ok, running, page, image, t)
+
+
+    # Frame updating
     map!(t -> dom"div"([Images.Gray.(frames[t])]), image, t)
+    map!(t -> dom"div"(string(t)), timetext, t)
+
+    # Control mappings
     map!(i -> i, obs_fps, observe(fps_slider))
-    map!(timespan, observe(time_box)) do t
-        parse(Int, t)
+    map!(t -> parse(Int, t), timespan, observe(time_box)) 
+    on(sim -> sim!(interface, model, init; time = timespan[]), observe(sim)) 
+    on(x -> resume!(interface, model; time = timespan[]), observe(resume))
+    on(x -> replay(interface), observe(replay)) 
+    on(observe(stop)) do x
+        set_ok(interface, false)
+        set_running(interface, false)
     end
-    on(observe(sim)) do x
-        sim!(interface, model, init; time = 100)
+    on(slider_obs) do s
+        model.models = Flatten.reconstruct(model.models, s)
     end
-    on(observe(resume)) do x
-        resume!(interface, model; time = 100)
-    end
-    on(observe(replay)) do x
-        replay(interface)
-    end
-    on(x -> set_ok(interface, false), observe(stop))
 
     interface
 end
 
-length(o::AbstractWebOutput) = length(o.interface)
-size(o::AbstractWebOutput) = size(o.interface)
-endof(o::AbstractWebOutput) = endof(o.interface)
-getindex(o::AbstractWebOutput, i) = getindex(o.interface, i)
-setindex!(o::AbstractWebOutput, x, i) = setindex!(o.interface, x, i)
-push!(o::AbstractWebOutput, x) = push!(o.interface, x)
-append!(o::AbstractWebOutput, x) = append!(o.interface, x)
-clear(o::AbstractWebOutput) = clear(o.interface)
-store_frame(o::AbstractWebOutput, frame) = store_frame(o.interface, frame)
-initialize(o::AbstractWebOutput) = set_ok(o.interface, true)
-is_ok(o::AbstractWebOutput) = is_ok(o.interface)
-set_ok(o::AbstractWebOutput, x) = set_ok(o.interface, x) 
-is_running(o::AbstractWebOutput) = is_running(o.interface)
-set_running(o::AbstractWebOutput, x) = set_running(o.interface, x) 
 set_time(o::AbstractWebOutput, t) = set_time(o.interface, t)
 set_time(o::AbstractWebOutput, t) = set_time(o.interface, t)
 is_async(o::AbstractWebOutput) = true

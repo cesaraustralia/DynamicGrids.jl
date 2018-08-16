@@ -43,9 +43,13 @@ using Parameters,
       TerminalGraphics, 
       REPLTetris.Terminal, 
       Images, 
+      Flatten,
+      MetaFields,
       FileIO
 
 import Base: show, getindex, setindex!, endof, size, length, push!, append!
+import Flatten: @flattenable, flattenable
+import MetaFields: @limits, limits
 
 # Documentation templates
 @template TYPES =
@@ -79,6 +83,7 @@ export sim!,
        CustomNeighborhood,
        MultiCustomNeighborhood,
        AbstractOverflow,
+       Models,
        Skip,
        Wrap,
        AbstractOutput,
@@ -98,12 +103,12 @@ end
     export PlotsOutput
 end
 
-@require Blink begin
+# @require Blink begin
     using Blink
     export BlinkOutput
     include("outputs/web.jl")
     include("outputs/blink.jl")
-end
+# end
 
 @require Mux begin
     using Mux

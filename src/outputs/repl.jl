@@ -59,7 +59,7 @@ end
 
 
 movedisplay(output) = begin
-    while is_ok(output)
+    while is_ok(output) && is_running(output)
         c = Terminal.readKey()
         c == "Up"      && move_y!(output, -1)
         c == "Down"    && move_y!(output, 1)

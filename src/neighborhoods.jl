@@ -38,8 +38,7 @@ Rotated von Neumann neigborhoods, and may have a radius of any integer size.
 RadialNeighborhood(; typ=:moore, radius=1, overflow=Skip()) =
     RadialNeighborhood{typ, typeof(overflow)}(radius, overflow)
 
-"""
-Custom neighborhoods are tuples of custom coordinates in relation to the central point
+""" Custom neighborhoods are tuples of custom coordinates in relation to the central point
 of the current cell. They can be any arbitrary shape or size.
 """
 abstract type AbstractCustomNeighborhood <: AbstractNeighborhood end
@@ -120,7 +119,7 @@ end
     neighbors(hood::AbstractCustomNeighborhood, state, index, t, source, args...)
 Sum a single custom neighborhood.
 """
-neighbors(hood::AbstractCustomNeighborhood, state, index, t, source, args...) =
+neighbors(hood::AbstractCustomNeighborhood, model, state, index, t, source, args...) =
     custom_neighbors(hood.neighbors, hood, index, t, source, args...)
 
 """
