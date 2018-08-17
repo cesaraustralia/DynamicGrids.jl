@@ -27,11 +27,11 @@ struct Wrap <: AbstractOverflow end
 "Skip coords that overflow boundaries"
 struct Skip <: AbstractOverflow end
 
+" Mutable container for models. Allows updating of immutable for live control "
 mutable struct Models{M}
     models::M
 end
 Models(args...) = Models{typeof(args)}(args)
-
 
 
 
