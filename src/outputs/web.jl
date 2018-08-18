@@ -10,6 +10,9 @@ abstract type AbstractWebOutput{T} <: AbstractOutput{T} end
         new(frames, fps, timestamp, ok, running, page, image, t)
 end
 
+build_range(lim::Tuple{Float64,Float64}) = lim[1]:(lim[2]-lim[1])/400:lim[2]
+build_range(lim::Tuple{Int,Int}) = lim[1]:1:lim[2]
+
 WebInterface(frames::AbstractVector, fps::Number, model) = begin
     ok = [true]
     running = [false]
@@ -33,9 +36,9 @@ WebInterface(frames::AbstractVector, fps::Number, model) = begin
     params = flatten(model.models)
     fnames = metaflatten(model.models, fieldname_meta)
     lims = metaflatten(model.models, MetaFields.limits)
-    parents = metaflatten(Vector, model.models, fieldparent_meta)
+    parents = metaflatten(Tuple, model.models, fieldparent_meta)
     attributes = broadcast((p, n) -> Dict(:title => "$p.$n"), parents, fnames)
-    make_slider(p, lab, lim, attr) = slider(lim[1]:(lim[2]-lim[1])/400:lim[2], label=string(lab), attributes=attr, value=p)
+    make_slider(p, lab, lim, attr) = slider(build_range(lim), label=string(lab), attributes=attr, value=p)
     sliders = broadcast(make_slider, params, fnames, lims, attributes)
     slider_obs = map((s...) -> s, observe.(sliders)...)
     modelwidgets = vbox(dom"span"("Model: "), hbox(sliders...))
