@@ -5,6 +5,7 @@ DocStringExtensions
 REPLGamesBase
 TerminalGraphics
 FixedPointNumbers 
+Flatten
 Colors
 FileIO
 Mixers
