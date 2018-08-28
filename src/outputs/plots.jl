@@ -1,3 +1,5 @@
+using Plots
+
 """
 A Plots.jl Output to plot cells as a heatmap in any Plots backend. Some backends
 (such as plotly) may be very slow to refresh. Others like gr() should be fine.
@@ -20,14 +22,12 @@ Constructor for PlotsOutput.
 """
 PlotsOutput(frames::AbstractVector; fps=25.0, aspect_ratio=:equal, kwargs...) = begin
     plt = heatmap(; aspect_ratio=aspect_ratio, kwargs...)
-    ok = [true]
-    running = [false]
-    PlotsOutput(frames, fps, time() ok, running, plt)
+    PlotsOutput(frames, fps, 0.0, [false], plt)
 end
 
 initialize(output::PlotsOutput) = begin
-    set_ok(output, true)
     display(output.plot)
+    output.timestamp = time()
 end
 
 """
@@ -38,6 +38,4 @@ function show_frame(output::PlotsOutput, t)
     rem(t, output.interval) == 0 || return true
     heatmap!(output.plot, output[t])
     display(output.plot)
-    delay(output)
-    is_ok(output)
 end

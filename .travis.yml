@@ -3,18 +3,18 @@ language: julia
 sudo: required
 os:
   - linux
-  # - osx
+  - osx
 julia:
-  - 0.6
+  - 0.7
   - nightly
 notifications:
   email: false
 git:
   depth: 99999999
 
-matrix:
- allow_failures:
- - julia: nightly
+# matrix:
+ # allow_failures:
+ # - julia: nightly
 
 addons:
   apt:
@@ -24,18 +24,21 @@ addons:
       - libgtk-3-0
 
 script:
-- if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
-- if [[ `uname` = "Linux" ]]; then TESTCMD="xvfb-run julia"; else TESTCMD="julia"; fi
-- julia -e 'Pkg.clone("https://github.com/rafaqz/TerminalGraphics.jl.git"); Pkg.build("TerminalGraphics")'
-- julia -e 'Pkg.clone("https://github.com/rafaqz/MetaFields.jl.git"); Pkg.build("MetaFields")'
-- julia -e 'Pkg.clone("https://github.com/rafaqz/Flatten.jl.git"); Pkg.build("Flatten")'
-- $TESTCMD -e 'Pkg.clone(pwd()); 
-               Pkg.build("Cellular"); 
-               Pkg.add("Blink"); 
-               Pkg.build("Blink"); 
-               using Blink;
-               Blink.AtomShell.install();
-               Pkg.test("Cellular"; coverage=true)'
+  - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
+  - if [[ `uname` = "Linux" ]]; then TESTCMD="xvfb-run julia"; else TESTCMD="julia"; fi
+  - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/TerminalGraphics.jl.git")); Pkg.build("TerminalGraphics")'
+  - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/Tags.jl.git")); Pkg.build("Tags")'
+  - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/Nested.jl.git")); Pkg.build("Nested")'
+  - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/Flatten.jl.git")); Pkg.build("Flatten")'
+  - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/ChristianKurz/REPLGamesBase.jl.git")); Pkg.build("REPLGamesBase")'
+  - $TESTCMD -e 'using Pkg;
+                 Pkg.add(PackageSpec(url=pwd())); 
+                 Pkg.build("Cellular"); 
+                 Pkg.add("Blink"); 
+                 Pkg.build("Blink"); 
+                 using Blink;
+                 Blink.AtomShell.install();
+                 Pkg.test("Cellular"; coverage=true)'
 
 after_success:
   # push coverage results to Coveralls

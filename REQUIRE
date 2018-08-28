@@ -1,13 +1,12 @@
-julia 0.6
+julia 0.7
 Parameters 
 Requires
 DocStringExtensions
-REPLTetris
+REPLGamesBase
 TerminalGraphics
 FixedPointNumbers 
 Colors
 FileIO
 Mixers
 Images
-Flatten
-MetaFields
+Tags

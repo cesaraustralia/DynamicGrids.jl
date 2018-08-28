@@ -1,6 +1,7 @@
+using Cairo, Gtk, Images, Graphics
+
 """
 Shows output live in a Gtk window.
-
 Only available after running `using Gtk`
 """
 @Ok @FPS @Frames mutable struct GtkOutput{W,C} <: AbstractOutput{T}
@@ -8,24 +9,21 @@ Only available after running `using Gtk`
     canvas::C
 end
 
-
-is_ok(output::GtkOutput) = output.ok[1] && output.canvas.is_realized
-initialize(output::GtkOutput) = set_ok(output, true)
+is_running(output::GtkOutput) = output.running[1] && output.canvas.is_realized
 
 """
     GtkOutput(init; fps=25.0)
 Constructor for GtkOutput.
-- `init::AbstractArray`: the same `init` array that will also be passed to sim!()
+- `frames::AbstractArray`: Vector of frames
 """
 GtkOutput(frames::AbstractVector; fps=25.0) = begin
-    canvas = @GtkCanvas()
-    window = GtkWindow(canvas, "Cellular Automata")
+    canvas = Gtk.@GtkCanvas()
+    window = Gtk.Window(canvas, "Cellular Automata")
     show(canvas)
-    ok = [true]
     running = [false]
-    canvas.mouse.button1press = (widget,event) -> ok[1] = false
+    canvas.mouse.button1press = (widget, event) -> running[1] = false
 
-    GtkOutput(frames[:], fps, time(), ok, running, window, canvas)
+    GtkOutput(frames[:], fps, 0.0, running, window, canvas)
 end
 
 """
@@ -34,10 +32,12 @@ Send current frame to the canvas in a Gtk window.
 """
 function show_frame(output::GtkOutput, t)
     img = process_image(output, output[t])
-    canvas = output.canvas
-    @guarded draw(canvas) do widget
-        copy!(canvas, img)
+    Gtk.@guarded Gtk.draw(output.canvas) do widget
+        ctx = Gtk.getgc(output.canvas)
+        Cairo.reset_transform(ctx)
+        Cairo.image(ctx, img, 0, 0, Graphics.width(ctx), Graphics.height(ctx))
     end
-    delay(output)
-    is_ok(output)
 end
+
+process_image(output::GtkOutput, frame) =
+    Cairo.CairoImageSurface(convert(Matrix{UInt32}, frame), Cairo.FORMAT_RGB24)

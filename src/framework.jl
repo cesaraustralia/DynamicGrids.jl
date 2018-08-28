@@ -28,10 +28,9 @@ struct Wrap <: AbstractOverflow end
 struct Skip <: AbstractOverflow end
 
 " Mutable container for models. Allows updating of immutable for live control "
-mutable struct Models{M}
-    models::M
+mutable struct Models{M} models::M
+    Models(args...) = new{typeof(args)}(args)
 end
-Models(args...) = Models{typeof(args)}(args)
 
 
 
@@ -53,7 +52,6 @@ the passed in output for each time-step.
 sim!(output, models, init, args...; time=100) = begin
     is_running(output) && return
     set_running(output, true)
-    set_ok(output, true)
     clear(output)
     store_frame(output, init)
     show_frame(output, 1) 
@@ -68,8 +66,7 @@ Restart the simulation where you stopped last time.
 resume!(output, models, args...; time=100) = begin
     is_running(output) && return
     set_running(output, true)
-    set_ok(output, true)
-    timespan = 1 + endof(output):endof(output) + time
+    timespan = 1 + lastindex(output):lastindex(output) + time
     run!(output, models, output[end], timespan, args...)
     output
 end
@@ -89,43 +86,50 @@ replay(output::AbstractOutput) = begin
     set_running(output, true)
     initialize(output)
     for (t, frame) in enumerate(output)
-        delay(output)
-        show_frame(output, t) || break
+        delay(output, t)
+        show_frame(output, t)
+        is_running(output) || break
     end
     set_running(output, false)
-    nothing
 end
 
-run!(output, models, init, time, args...) = begin
+run!(output, model, init, time, args...) = begin
     initialize(output)
-    # Define the index coordinates. There might be a better way than this?
     source = deepcopy(init)
     dest = deepcopy(init)
-    width, height = size(init)
-    index = collect((col,row) for col in 1:width, row in 1:height)
+
+    # Define the index coordinates. There might be a better way than this?
+    h, w = size(init)
+    rows = typeof(init)(collect(row for row in 1:h, col in 1:w))
+    cols = typeof(init)(collect(col for row in 1:h, col in 1:w))
 
     # Loop over the selected timespan
     mainloop() = for t in time
         # Run the automation on the source array, writing to the dest array and
         # setting the source and dest arrays for the next iteration.
-        source, dest = broadcast_rules!(models.models, source, dest, index, t, args...)
+        source, dest = broadcast_rules!(model.models, source, dest, rows, cols, t, args...)
         # Save the the current frame
         store_frame(output, source)
         # Display the current frame
-        show_frame(output, t) || break
+        show_frame(output, t)
         is_async(output) && yield()
+        delay(output, t)
+        if !is_running(output) || t == time.stop 
+            set_running(output, false)
+            finalize(output)
+            break
+        end
     end
+
     if is_async(output) 
         schedule(Task(mainloop))
     else
         mainloop()
     end
-    finalize(output)
-    set_running(output, false)
 end
 
 """
-    broadcast_rules!(models, source, dest, index, t, args...)
+    broadcast_rules!(models, source, dest, rows, cols, t, args...)
 Runs the rule(s) for each cell in the grid, dependin on the model(s) passed in.
 For [`AbstractModel`] the returned values are written to the `dest` grid,
 while for [`AbstractPartialModel`](@ref) the grid is
@@ -133,26 +137,28 @@ pre-initialised to zero and rules manually populate the dest grid.
 
 Returns a tuple containing the source and dest arrays for the next iteration.
 """
-broadcast_rules!(models::Tuple{T,Vararg}, source, dest, index, t, args...) where {T<:AbstractModel} = begin
+broadcast_rules!(models::Tuple{T,Vararg}, source, dest, rows, cols, t, args...
+                ) where {T<:AbstractModel} = begin
     # Write rule outputs to every cell of the dest array
-    broadcast!(rule, dest, models[1], source, index, t, (source,), (dest,), args...)
+    broadcast!(rule, dest, Ref(models[1]), source, rows, cols, t, (source,), (dest,), tuple.(args)...)
     # Swap source and dest for the next rule/iteration
-    broadcast_rules!(Base.tail(models), dest, source, index, t, args...)
+    broadcast_rules!(Base.tail(models), dest, source, rows, cols, t, args...)
 end
-broadcast_rules!(models::Tuple{T,Vararg}, source, dest, index, t, args...) where {T<:AbstractPartialModel} = begin
+
+broadcast_rules!(models::Tuple{T,Vararg}, source, dest, rows, cols, t, args...
+                ) where {T<:AbstractPartialModel} = begin
     # Initialise the dest array
     dest .= source
     # The rule writes to the dest array manually where required
-    broadcast(rule, models[1], source, index, t, (source,), (dest,), args...)
+    broadcast(rule, Ref(models[1]), source, rows, cols, t, (source,), (dest,), tuple.(args)...)
     # Swap source and dest for the next rule/iteration
-    broadcast_rules!(Base.tail(models), dest, source, index, t, args...)
+    broadcast_rules!(Base.tail(models), dest, source, rows, cols, t, args...)
 end
-broadcast_rules!(models::Tuple{}, source, dest, index, t, args...) = source, dest
-broadcast_rules!(model, args...) = broadcast_rules!((model,), args...)
+broadcast_rules!(models::Tuple{}, source, dest, rows, cols, t, args...) = source, dest
 
 
 """
-    function rule(model, state, index, t, source, dest, args...)
+    function rule(model, state, rows, cols, t, source, dest, args...)
 Rules alter cell values based on their current state and other cells, often
 [`neighbors`](@ref). Most rules return a value to be written to the current cell,
 except rules for models inheriting from [`AbstractPartialModel`](@ref).
@@ -166,9 +172,8 @@ These must write to the `dest` array directly.
 - `source`: the whole source array. Not to be written to
 - `dest`: the whole destination array. To be written to for AbstractPartialModel.
 - `args`: additional arguments passed through from user input to [`sim!`](@ref)
-
 """
-function rule(model::Void, state, index, t, source, args...) end
+function rule(model::Nothing, state, row, col, t, source, dest, args...) end
 
 """
     inbounds(x, max, overflow)

@@ -21,7 +21,7 @@ constructor should be preferable.
     The 'radius' of the neighborhood is the distance to the edge
     from the center cell. A neighborhood with radius 1 is 3 cells wide.
     """
-    radius::UInt32
+    radius::Int32
 end 
 """
     RadialNeighborhood(;typ = :moore, radius = 1, overflow = Skip)
@@ -35,7 +35,7 @@ Rotated von Neumann neigborhoods, and may have a radius of any integer size.
 - radius: Int. Default: 1
 - overflow: [`AbstractOverflow`](@ref). Default: Skip()
 """
-RadialNeighborhood(; typ=:moore, radius=1, overflow=Skip()) =
+RadialNeighborhood(; typ=:moore, radius=Int32(1), overflow=Skip()) =
     RadialNeighborhood{typ, typeof(overflow)}(radius, overflow)
 
 """ Custom neighborhoods are tuples of custom coordinates in relation to the central point
@@ -58,36 +58,37 @@ end
 """
 Sets of custom neighborhoods that can have separate rules for each set.
 """
-@Overflow struct MultiCustomNeighborhood{H} <: AbstractCustomNeighborhood
+@Overflow struct MultiCustomNeighborhood{H, C} <: AbstractCustomNeighborhood
     """
     A tuple of tuple of tuples of Int (or an array of arrays of arrays of Int, etc),
     contains 2-D coordinates relative to the central point.
     """
     multineighbors::H
     "A vector the length of the base multineighbors tuple, for intermediate storage"
-    cc::Vector{Int8}
+    cc::C
 end
-MultiCustomNeighborhood(;multi=(), overflow=Wrap())=MultiCustomNeighborhood(multi, zeros(Int8, length(multi)), overflow)
+MultiCustomNeighborhood(;multi=(), overflow=Wrap(), init=Int32[0]) = 
+    MultiCustomNeighborhood(multi, typeof(init)(zeros(eltype(init), length(multi))), overflow)
 
 
 """
-    neighbors(hood::AbstractNeighborhood, state, index, t, source, args...)
+    neighbors(hood::AbstractNeighborhood, state, row, col, t, source, args...)
 Checks all cells in neighborhood and combines them according
 to the particular neighborhood type.
 """
 function neighbors() end
 
 """
-    neighbors(hood::AbstractRadialNeighborhood{:onedim}, state, index, t, source, args...)
+    neighbors(hood::AbstractRadialNeighborhood{:onedim}, state, row, col, t, source, args...)
 Sums single dimension radial neighborhoods. Commonly used by Wolfram.
 """
-neighbors(hood::AbstractRadialNeighborhood{:onedim}, model, state, index, t, source, args...) = begin
+neighbors(hood::AbstractRadialNeighborhood{:onedim}, model, state, row, col, t, source, args...) = begin
     width = size(source)
     r = hood.radius
     # Initialise minus the current cell value, as it will be added back in the loop
-    cc = -source[index]
+    cc = -source[row, col]
     # Sum active cells in the neighborhood
-    for p = (index - r):(index + r)
+    for p = (row, col - r):(row, col + r)
         p = bounded(p, width, hood.overflow)
         cc += source[p]
     end
@@ -95,47 +96,51 @@ neighbors(hood::AbstractRadialNeighborhood{:onedim}, model, state, index, t, sou
 end
 
 """
-    neighbors(hood::AbstractRadialNeighborhood, state, index, t, source, args...)
+    neighbors(hood::AbstractRadialNeighborhood, state, row, col, t, source, args...)
 Sums 2-dimensional radial Nieghborhoods. Specific shapes like Moore and Von Neumann
 are determined by [`inhood`](@ref), as this method is general.
 """
-neighbors(hood::AbstractRadialNeighborhood, model, state, index, t, source, args...) = begin
+neighbors(hood::AbstractRadialNeighborhood, model, state, row, col, t, source, args...) = begin
     height, width = size(source)
-    row, col = index
     r = hood.radius
     # Initialise minus the current cell value, as it will be added back in the loop
     cc = zero(state) 
     # Sum active cells in the neighborhood
-    for q = (col - r):(col + r), p = (row - r):(row + r)
-        ((p, q) == index) && continue
+    for p = (row - r):(row + r), q = (col - r):(col + r) 
+        if ((p, q) == (row, col)) 
+            # println((p, q), (row, col))
+            continue
+        end
+        # println((p, q))
         p, q, is_inbounds = inbounds((p, q), (height, width), hood.overflow)
         is_inbounds && inhood(hood, p, q, row, col) || continue
+        # println((p, q))
         cc += source[p, q]
     end
+    # println(cc)
     cc
 end
 
 """
-    neighbors(hood::AbstractCustomNeighborhood, state, index, t, source, args...)
+    neighbors(hood::AbstractCustomNeighborhood, state, row, col, t, source, args...)
 Sum a single custom neighborhood.
 """
-neighbors(hood::AbstractCustomNeighborhood, model, state, index, t, source, args...) =
-    custom_neighbors(hood.neighbors, hood, index, t, source, args...)
+neighbors(hood::AbstractCustomNeighborhood, model, state, row, col, t, source, args...) =
+    custom_neighbors(hood.neighbors, hood, row, col, t, source, args...)
 
 """
-    neighbors(hood::MultiCustomNeighborhood, state, index, t, source, args...)
+    neighbors(hood::MultiCustomNeighborhood, state, row, col, t, source, args...)
 Sum multiple custom neighborhoods separately.
 """
-neighbors(hood::MultiCustomNeighborhood, model, state, index, t, source, args...) = begin
+neighbors(hood::MultiCustomNeighborhood, model, state, row, col, t, source, args...) = begin
     for i = 1:length(hood.multineighbors)
-        hood.cc[i] = custom_neighbors(hood.multineighbors[i], hood, index, t, source)
+        hood.cc[i] = custom_neighbors(hood.multineighbors[i], hood, row, col, t, source)
     end
     hood.cc
 end
 
-custom_neighbors(n, hood, index, t, source) = begin
+custom_neighbors(n, hood, row, col, t, source) = begin
     height, width = size(source)
-    row, col = index
     # Initialise to empty
     cc = zero(eltype(source))
     # Sum active cells in the neighborhood

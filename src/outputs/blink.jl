@@ -1,3 +1,5 @@
+using Blink
+
 """
 A html output using Interact.jl
 
@@ -18,23 +20,24 @@ Only available after running `using Blink`
 end
 
 """
-    WebOutput(frames)
-Constructor for WebOutput.
+    BlinkOutput(frames)
+Constructor for BlinkOutput.
 ### Arguments
 - `frames::AbstractArray`: vector of matrices.
+- `model::Models`: tuple of models wrapped in Models().
+- `args`: any additional arguments to be passed to `sim!` and `resume!`
 
 ### Keyword arguments
 - `aspec_ratio` : passed to the plots heatmap, default is :equal
 - `kwargs` : extra keyword args to modify the heatmap
 """
-BlinkOutput(frames::T, model; fps=25, kwargs...) where T <: AbstractVector = begin
-    interface = WebInterface(frames, fps, deepcopy(model))
+BlinkOutput(frames::T, model, args...; fps=25, kwargs...) where T <: AbstractVector = begin
+    interface = WebInterface(frames, fps, deepcopy(model), args...)
     window = Blink.AtomShell.Window()
 
     body!(window, interface.page)
     BlinkOutput{T,typeof(interface)}(interface, window)
 end
-
 
 # Forward output methods to WebInterface. BlinkOutput is just a wrapper.
 length(o::BlinkOutput) = length(o.interface)
@@ -47,9 +50,6 @@ append!(o::BlinkOutput, x) = append!(o.interface, x)
 clear(o::BlinkOutput) = clear(o.interface)
 store_frame(o::BlinkOutput, frame) = store_frame(o.interface, frame)
 show_frame(o::BlinkOutput, frame) = show_frame(o.interface, frame)
-initialize(o::BlinkOutput) = set_ok(o.interface, true)
 
-is_ok(o::BlinkOutput) = is_ok(o.interface) && active(o.window)
-set_ok(o::BlinkOutput, x) = set_ok(o.interface, x) 
 is_running(o::BlinkOutput) = is_running(o.interface)
 set_running(o::BlinkOutput, x) = set_running(o.interface, x) 
