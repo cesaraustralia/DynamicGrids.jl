@@ -29,6 +29,7 @@ script:
   - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/TerminalGraphics.jl.git")); Pkg.build("TerminalGraphics")'
   - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/Tags.jl.git")); Pkg.build("Tags")'
   - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/Nested.jl.git")); Pkg.build("Nested")'
+  - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/Mixers.jl.git")); Pkg.build("Mixers")'
   - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/rafaqz/Flatten.jl.git")); Pkg.build("Flatten")'
   - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/ChristianKurz/REPLGamesBase.jl.git")); Pkg.build("REPLGamesBase")'
   - $TESTCMD -e 'using Pkg;
