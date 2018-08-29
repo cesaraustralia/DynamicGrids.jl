@@ -23,7 +23,7 @@ import Cellular: rule, neighbors
 end
 
 struct TestModel <: AbstractModel end
-struct TestPartial <: AbstractPartialModel end
+struct TestPartial <: AbstractPartialModel end 
 struct TestPartialWrite <: AbstractPartialModel end
 
 rule(::TestModel, state, row, col, t, source, dest, args...) = 0
@@ -86,8 +86,8 @@ end
     rotvonneumann = RadialNeighborhood(typ=:rotvonneumann, radius=1, overflow=Wrap())
     custom = CustomNeighborhood(((-1,-1), (-1,2), (0,0)), Wrap())
     multi = MultiCustomNeighborhood(multi=(((-1,1), (-3,2)), ((1,2), (2,2))), overflow=Wrap())
-    state = 0
-    t = 1
+    global state = 0
+    global t = 1
 
     @test neighbors(moore, nothing, state, 6, 2, t, init) == 0
     @test neighbors(vonneumann, nothing, state, 6, 2, t, init) == 0
@@ -168,28 +168,28 @@ end
         # server = Cellular.MuxServer(init, model; port=rand(8000:9000)) 
     # end
 
-    @testset "REPLOutput{:braile} works" begin
-        output = REPLOutput{:braile}(init; fps=100)
-        sim!(output, model, init; time=2)
-        sleep(0.5)
-        resume!(output, model; time=5)
-        sleep(0.5)
-        @test output[3] == test
-        @test output[5] == test2
-        # replay(output)
+    # @testset "REPLOutput{:braile} works" begin
+    #     output = REPLOutput{:braile}(init; fps=100)
+    #     sim!(output, model, init; time=2)
+    #     sleep(0.5)
+    #     resume!(output, model; time=5)
+    #     sleep(0.5)
+    #     @test output[3] == test
+    #     @test output[5] == test2
+    #     # replay(output)
 
-    end
+    # end
 
-    @testset "REPLOutput{:block} works" begin
-        output = REPLOutput{:block}(init; fps=100)
-        sim!(output, model, init; time=2)
-        sleep(0.5)
-        resume!(output, model; time=5)
-        sleep(0.5)
-        @test output[3] == test
-        @test output[5] == test2
-        replay(output)
-    end
+    # @testset "REPLOutput{:block} works" begin
+    #     output = REPLOutput{:block}(init; fps=100)
+    #     sim!(output, model, init; time=2)
+    #     sleep(0.5)
+    #     resume!(output, model; time=5)
+    #     sleep(0.5)
+    #     @test output[3] == test
+    #     @test output[5] == test2
+    #     replay(output)
+    # end
 
     # @testset "GtkOutput works" begin
     #     using Gtk
