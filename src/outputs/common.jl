@@ -6,7 +6,7 @@ Types that extend AbstractOutput define their own method for [`show_frame`](@ref
 """
 abstract type AbstractOutput{T} <: AbstractVector{T} end
 
-@premix struct Frames{T<:Vector}
+@premix struct Frames{T<:AbstractVector}
     "An array that holds each frame of the simulation"
     frames::T
 end

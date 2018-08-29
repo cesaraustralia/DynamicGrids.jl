@@ -31,9 +31,9 @@ WebInterface(frames::AbstractVector, fps::Number, model, args...) = begin
 
     # Auto-generated model controls
     params = flatten(model.models)
-    fnames = metaflatten(model.models, fieldname_meta)
-    lims = metaflatten(model.models, Tags.limits)
-    parents = metaflatten(Tuple, model.models, fieldparent_meta)
+    fnames = tagflatten(model.models, fieldname_tag)
+    lims = tagflatten(model.models, Tags.limits)
+    parents = tagflatten(Tuple, model.models, fieldparent_tag)
     attributes = broadcast((p, n) -> Dict(:title => "$p.$n"), parents, fnames)
     make_slider(p, lab, lim, attr) = slider(build_range(lim), label=string(lab), attributes=attr, value=p)
     sliders = broadcast(make_slider, params, fnames, lims, attributes)
@@ -79,7 +79,4 @@ is_async(o::WebInterface) = true
     show_frame(output::WebOutput, t; fps=25.0)
 Update plot for every specitfied interval
 """
-function show_frame(output::WebInterface, t; fps=0.1)
-    # This will trigger the image redraw.
-    is_running(output) && set_time(output, t)
-end
+show_frame(output::WebInterface, t) = set_time(output, t) # trigger the image redraw.

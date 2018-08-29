@@ -106,7 +106,6 @@ end
     @test neighbors(multi, nothing, state, 1, 1, t, init) == [1, 2]
 
 end
-
 @testset "life glider does its thing" begin
 
     global init = [0 0 0 0 0 0;
@@ -142,12 +141,12 @@ end
         @test output[5] == test2
     end
 
-    # @testset "converted results match glider behaviour" begin
-    #     output = ArrayOutput(output)
-    #     @test output[3] == test
-    #     @test output[5] == test2
-    #     replay(output)
-    # end
+    @testset "converted results match glider behaviour" begin
+        output = ArrayOutput(output)
+        @test output[3] == test
+        @test output[5] == test2
+        replay(output)
+    end
 
     # @testset "BlinkOutput works" begin
     #     using Blink
@@ -168,28 +167,31 @@ end
         # server = Cellular.MuxServer(init, model; port=rand(8000:9000)) 
     # end
 
-    # @testset "REPLOutput{:braile} works" begin
-    #     output = REPLOutput{:braile}(init; fps=100)
-    #     sim!(output, model, init; time=2)
-    #     sleep(0.5)
-    #     resume!(output, model; time=5)
-    #     sleep(0.5)
-    #     @test output[3] == test
-    #     @test output[5] == test2
-    #     # replay(output)
+    @testset "REPLOutput{:braile} works" begin
+        output = REPLOutput{:braile}(init; fps=100)
+        sim!(output, model, init; time=2)
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 0
+        sleep(0.5)
+        resume!(output, model; time=5)
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 0
+        sleep(0.5)
+        @test output[3] == test
+        @test output[5] == test2
+        replay(output)
+    end
 
-    # end
-
-    # @testset "REPLOutput{:block} works" begin
-    #     output = REPLOutput{:block}(init; fps=100)
-    #     sim!(output, model, init; time=2)
-    #     sleep(0.5)
-    #     resume!(output, model; time=5)
-    #     sleep(0.5)
-    #     @test output[3] == test
-    #     @test output[5] == test2
-    #     replay(output)
-    # end
+    @testset "REPLOutput{:block} works" begin
+        output = REPLOutput{:block}(init; fps=100)
+        sim!(output, model, init; time=2)
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 0
+        sleep(0.5)
+        resume!(output, model; time=5)
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 0
+        sleep(0.5)
+        @test output[3] == test
+        @test output[5] == test2
+        replay(output)
+    end
 
     # @testset "GtkOutput works" begin
     #     using Gtk
