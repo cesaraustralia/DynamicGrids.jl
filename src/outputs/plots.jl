@@ -22,7 +22,7 @@ Constructor for PlotsOutput.
 """
 PlotsOutput(frames::AbstractVector; fps=25.0, aspect_ratio=:equal, kwargs...) = begin
     plt = heatmap(; aspect_ratio=aspect_ratio, kwargs...)
-    PlotsOutput(frames, fps, 0.0, [false], plt)
+    PlotsOutput(frames, fps, 0.0, 0, [false], plt)
 end
 
 initialize(output::PlotsOutput) = begin
@@ -35,7 +35,7 @@ end
 Update plot for every specified interval
 """
 function show_frame(output::PlotsOutput, t)
-    rem(t, output.interval) == 0 || return true
-    heatmap!(output.plot, output[t])
+    # rem(t, output.interval) == 0 || return true
+    heatmap!(output.plot, output[curframe(o, t)])
     display(output.plot)
 end
