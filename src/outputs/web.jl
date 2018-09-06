@@ -1,4 +1,4 @@
-using InteractBulma, InteractBase, WebIO, Observables, CSSUtil, Flatten, Images 
+using InteractBulma, InteractBase, WebIO, Observables, CSSUtil, Flatten, Images
 
 abstract type AbstractWebOutput{T} <: AbstractOutput{T} end
 
@@ -7,17 +7,14 @@ abstract type AbstractWebOutput{T} <: AbstractOutput{T} end
     image::Im
     t::Ti
 end
-
 build_range(lim::Tuple{Float64,Float64}) = lim[1]:(lim[2]-lim[1])/400:lim[2]
 build_range(lim::Tuple{Int,Int}) = lim[1]:1:lim[2]
 
-WebInterface(frames::AbstractVector, fps::Number, model, args...) = begin
-    running = [false]
+WebInterface(frames::AbstractVector, fps::Number, showmax_fps::Number, store, model, args...) = begin
     init = deepcopy(frames[1])
 
     # Standard output and controls
     image = Observable{Any}(dom"div"(Images.Gray.(Array(frames[1]))))
-    obs_fps = Observable{Int}(fps)
     t = Observable{Int}(1)
     timespan = Observable{Int}(1000)
     sim = button("sim")
@@ -43,40 +40,49 @@ WebInterface(frames::AbstractVector, fps::Number, model, args...) = begin
     # Put it all together into a webpage
     page = dom"div"(vbox(hbox(image, timetext), basewidgets, modelwidgets))
 
-    # Construct the interface output
-    interface = WebInterface{typeof.((frames, obs_fps, 0.0, page, image, t))...}(
-                            frames, obs_fps, 0.0, running, page, image, t)
+    # Construct the interface object
+    timestamp = 0.0; tref = 0; running = [false]
+    interface = WebInterface{typeof.((frames, fps, timestamp, tref, page, image, t))...}(
+                             frames, fps, showmax_fps, timestamp, tref, store, running, page, image, t)
 
-
-    # Frame updating
-    map!(t -> dom"div"(Images.Gray.(Array(frames[t]))), image, t)
-    map!(t -> dom"div"(string(t)), timetext, t)
+    # Frame updates when t changes
+    map!(image, t) do t
+        dom"div"(Images.Gray.(Array(frames[curframe(interface, t)])))
+    end
 
     # Control mappings
-    map!(i -> i, obs_fps, observe(fps_slider))
-    map!(t -> parse(Int, t), timespan, observe(time_box)) 
-    on(sim -> sim!(interface, model, init, args...; time = timespan[]), observe(sim)) 
-    on(x -> resume!(interface, model, args...; time = timespan[]), observe(resume))
-    on(x -> replay(interface), observe(replay)) 
-    on(observe(stop)) do x
+    map!(timespan, observe(time_box)) do t
+        parse(Int, t)
+    end
+    map!(timetext, t) do t
+        dom"div"(string(t)) 
+    end
+    on(observe(sim)) do _
+        sim!(interface, model, init, args...; time = timespan[])
+    end
+    on(observe(resume)) do _
+        resume!(interface, model, args...; time = timespan[]) 
+    end
+    on(observe(replay)) do _
+        replay(interface) 
+    end
+    on(observe(stop)) do _
         set_running(interface, false)
     end
+    on(observe(fps_slider)) do fps
+        interface.fps = fps 
+        set_timestamp(interface, interface.t[])
+    end
     on(slider_obs) do s
-        model.models = Flatten.reconstruct(model.models, s)
+        model.models = Flatten.reconstruct(model.models, s) 
     end
 
     interface
 end
 
-set_time(o::AbstractWebOutput, t) = set_time(o.interface, t)
-set_time(o::AbstractWebOutput, t) = set_time(o.interface, t)
-is_async(o::AbstractWebOutput) = true
-
 set_time(o::WebInterface, t) = o.t[] = t
 is_async(o::WebInterface) = true
-
-"""
-    show_frame(output::WebOutput, t; fps=25.0)
-Update plot for every specitfied interval
-"""
-show_frame(output::WebInterface, t) = set_time(output, t) # trigger the image redraw.
+show_frame(o::WebInterface, t) = 
+    if use_frame(o, t)
+        set_time(o, t) # trigger the image redraw.
+    end
