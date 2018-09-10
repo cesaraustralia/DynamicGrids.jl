@@ -56,19 +56,11 @@ rule(model::AbstractLife, state, args...) = begin
     # Sum neighborhood
     cc = neighbors(model.neighborhood, model, state, args...)
     # Determine next state based on current state and neighborhood total
-    if state == zero(state) 
-        for i = 1:length(model.b)
-            if model.b[i] == cc
-                return oneunit(state)
-            end
+    counts = state == zero(state) ? model.b : model.s
+    for i = 1:length(counts)
+        if counts[i] == cc
+            return oneunit(state)
         end
-        return zero(state)
-    else 
-        for i = 1:length(model.s)
-            if model.s[i] == cc
-                return oneunit(state)
-            end
-        end
-        return zero(state)
     end
+    return zero(state)
 end
