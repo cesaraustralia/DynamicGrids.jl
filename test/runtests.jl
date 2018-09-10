@@ -75,11 +75,11 @@ end
 
 @testset "neighborhoods sum surrounding values correctly" begin
     global init = [0 0 0 1 1 1;
-            1 0 1 1 0 1;
-            0 1 1 1 1 1;
-            0 1 0 0 1 0;
-            0 0 0 0 1 1;
-            0 1 0 1 1 0]
+                   1 0 1 1 0 1;
+                   0 1 1 1 1 1;
+                   0 1 0 0 1 0;
+                   0 0 0 0 1 1;
+                   0 1 0 1 1 0]
 
     moore = RadialNeighborhood(typ=:moore, radius=1, overflow=Wrap())
     vonneumann = RadialNeighborhood(typ=:vonneumann, radius=1, overflow=Wrap())
@@ -109,25 +109,25 @@ end
 @testset "life glider does its thing" begin
 
     global init = [0 0 0 0 0 0;
-            0 0 0 0 0 0;
-            0 0 0 0 0 0;
-            0 0 0 1 1 1;
-            0 0 0 0 0 1;
-            0 0 0 0 1 0]
+                   0 0 0 0 0 0;
+                   0 0 0 0 0 0;
+                   0 0 0 1 1 1;
+                   0 0 0 0 0 1;
+                   0 0 0 0 1 0]
 
     global test = [0 0 0 0 0 0;
-            0 0 0 0 0 0;
-            0 0 0 0 1 1;
-            0 0 0 1 0 1;
-            0 0 0 0 0 1;
-            0 0 0 0 0 0]
+                   0 0 0 0 0 0;
+                   0 0 0 0 1 1;
+                   0 0 0 1 0 1;
+                   0 0 0 0 0 1;
+                   0 0 0 0 0 0]
 
     global test2 = [0 0 0 0 0 0;
-            0 0 0 0 0 0;
-            1 0 0 0 1 1;
-            1 0 0 0 0 0;
-            0 0 0 0 0 1;
-            0 0 0 0 0 0]
+                    0 0 0 0 0 0;
+                    1 0 0 0 1 1;
+                    1 0 0 0 0 0;
+                    0 0 0 0 0 1;
+                    0 0 0 0 0 0]
 
     global model = Models(Life())
     global output = ArrayOutput(init)
@@ -148,27 +148,26 @@ end
         replay(output)
     end
 
-    # @testset "BlinkOutput works" begin
-    #     using Blink
-    #     output = Cellular.BlinkOutput(init, model) 
-    #     sleep(1.5)
-    #     sim!(output, model, init; time=2) 
-    #     sleep(0.5)
-    #     resume!(output, model; time=5)
-    #     sleep(0.5)
-    #     @test output[3] == test
-    #     @test output[5] == test2
-    #     replay(output)
-    #     close(output.window)
-    # end
+    @testset "BlinkOutput works" begin
+        using Blink
+        output = Cellular.BlinkOutput(init, model, store=true) 
+        sim!(output, model, init; time=2) 
+        sleep(0.5)
+        resume!(output, model; time=5)
+        sleep(0.5)
+        @test output[3] == test
+        @test output[5] == test2
+        replay(output)
+        close(output.window)
+    end
 
     # @testset "MuxServer works" begin
         # using Mux
-        # server = Cellular.MuxServer(init, model; port=rand(8000:9000)) 
+        # server = Cellular.MuxServer(init, model; port=8333) 
     # end
 
     @testset "REPLOutput{:braile} works" begin
-        output = REPLOutput{:braile}(init; fps=100)
+        output = REPLOutput{:braile}(init; fps=100, store=true)
         sim!(output, model, init; time=2)
         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 0
         sleep(0.5)
@@ -181,7 +180,7 @@ end
     end
 
     @testset "REPLOutput{:block} works" begin
-        output = REPLOutput{:block}(init; fps=100)
+        output = REPLOutput{:block}(init; fps=100, store=true)
         sim!(output, model, init; time=2)
         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 0
         sleep(0.5)
@@ -193,16 +192,16 @@ end
         replay(output)
     end
 
-    # @testset "GtkOutput works" begin
-    #     using Gtk
-    #     output = GtkOutput(init) 
-    #     sim!(output, model, init; time=2) 
-    #     resume!(output, model; time=5)
-    #     @test output[3] == test
-    #     @test output[5] == test2
-    #     replay(output)
-    #     destroy(output.window)
-    # end
+    @testset "GtkOutput works" begin
+        using Gtk
+        output = GtkOutput(init, store=true) 
+        sim!(output, model, init; time=2) 
+        resume!(output, model; time=5)
+        @test output[3] == test
+        @test output[5] == test2
+        replay(output)
+        destroy(output.window)
+    end
 
     # Works but not set up for travis yet
     # @testset "Plots output works" begin
