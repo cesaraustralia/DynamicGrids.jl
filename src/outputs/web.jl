@@ -28,9 +28,9 @@ WebInterface(frames::AbstractVector, fps::Number, showmax_fps::Number, store, mo
 
     # Auto-generated model controls
     params = flatten(model.models)
-    fnames = tagflatten(model.models, fieldname_tag)
+    fnames = fieldnameflatten(model.models)
     lims = tagflatten(model.models, Tags.limits)
-    parents = tagflatten(Tuple, model.models, fieldparent_tag)
+    parents = parentflatten(Tuple, model.models)
     attributes = broadcast((p, n) -> Dict(:title => "$p.$n"), parents, fnames)
     make_slider(p, lab, lim, attr) = slider(build_range(lim), label=string(lab), attributes=attr, value=p)
     sliders = broadcast(make_slider, params, fnames, lims, attributes)

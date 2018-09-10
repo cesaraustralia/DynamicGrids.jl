@@ -23,7 +23,7 @@ Constructor for GtkOutput.
 - `fps`: frames per second
 - `showmax_fps`: maximum displayed frames per second
 """
-GtkOutput(frames::AbstractVector; fps=25.0, showmax_fps=100, store=false) = begin
+GtkOutput(frames::AbstractVector; fps=25, showmax_fps=100, store=false) = begin
     canvas = Gtk.@GtkCanvas()
     window = Gtk.Window(canvas, "Cellular Automata")
     show(canvas)
@@ -32,6 +32,7 @@ GtkOutput(frames::AbstractVector; fps=25.0, showmax_fps=100, store=false) = begi
 
     GtkOutput(frames[:], fps, showmax_fps, 0.0, 0, store, running, window, canvas)
 end
+
 
 """
     show_frame(o::GtkOutput, t)
