@@ -27,7 +27,9 @@ struct Wrap <: AbstractOverflow end
 "Skip coords that overflow boundaries"
 struct Skip <: AbstractOverflow end
 
-" Mutable container for models. Allows updating of immutable for live control "
+" A mutable container for models. 
+This allows updating of immutable values for live control, such as with 
+BlinkOutput, while keeping the core model immutable for GPU compatability."
 mutable struct Models{M} models::M
     Models(args...) = new{typeof(args)}(args)
 end
@@ -41,9 +43,9 @@ the passed in output for each time-step.
 
 ### Arguments
 - `output`: An [AbstractOutput](@ref) to store frames or display them on the screen.
-- `model`: A single [`AbstractModel`](@ref) or a tuple of models that will each be run in sequence.
+- `model`: A Model() containing one ore more [`AbstractModel`](@ref). These will each be run in sequence.
 - `init`: The initialisation array.
-- `args`: Any additional user defined args are passed through to [`rule`](@ref) and
+- `args`: additional args are passed through to [`rule`](@ref) and
   [`neighbors`](@ref) methods.
 
 ### Keyword Arguments
@@ -53,7 +55,7 @@ sim!(output, models, init, args...; time=100) = begin
     is_running(output) && return
     set_running(output, true)
     clear(output)
-    store_frame(output, init)
+    store_frame(output, init, 1)
     show_frame(output, 1) 
     run!(output, models, init, 2:time, args...)
     output
@@ -62,6 +64,9 @@ end
 """
     resume!(output, models, args...; time=100)
 Restart the simulation where you stopped last time.
+
+### Arguments
+See [`sim!`](@ref). 
 """
 resume!(output, models, args...; time=100) = begin
     is_running(output) && return
@@ -71,66 +76,52 @@ resume!(output, models, args...; time=100) = begin
     output
 end
 
-"""
-    replay(output::AbstractOutput) = begin
-Show the simulation again. You can also use this to show a sequence 
-run with a different output type.
-
-### Example
-```julia
-replay(REPLOutput(output))
-```
-"""
-replay(output::AbstractOutput) = begin
-    is_running(output) && return
-    set_running(output, true)
-    initialize(output)
-    for (t, frame) in enumerate(output)
-        delay(output, t)
-        show_frame(output, t)
-        is_running(output) || break
+run!(output, args...) = 
+    if is_async(output) 
+        f() = frameloop(output, args...)
+        schedule(Task(f))
+    else
+        frameloop(output, args...)
     end
-    set_running(output, false)
-end
 
-run!(output, model, init, time, args...) = begin
+# Loop over the selected timespan
+frameloop(output, model, init, time, args...) = begin
+    # Define the index coordinates. There might be a better way than this?
+    h, w = size(init)
+    rows = typeof(similar(init, Int))(collect(row for row in 1:h, col in 1:w))
+    cols = typeof(similar(init, Int))(collect(col for row in 1:h, col in 1:w))
+
     initialize(output)
     source = deepcopy(init)
     dest = deepcopy(init)
+    set_timestamp(output, time.start)
 
-    # Define the index coordinates. There might be a better way than this?
-    h, w = size(init)
-    rows = typeof(init)(collect(row for row in 1:h, col in 1:w))
-    cols = typeof(init)(collect(col for row in 1:h, col in 1:w))
-
-    # Loop over the selected timespan
-    mainloop() = for t in time
+    for t in time
+        t = t
         # Run the automation on the source array, writing to the dest array and
         # setting the source and dest arrays for the next iteration.
         source, dest = broadcast_rules!(model.models, source, dest, rows, cols, t, args...)
         # Save the the current frame
-        store_frame(output, source)
+        store_frame(output, source, t)
         # Display the current frame
-        show_frame(output, t)
+        use_frame(output, t) && show_frame(output, t)
+        # Let other tasks run (like ui controls)
         is_async(output) && yield()
+        # Stick to the FPS
         delay(output, t)
+        # Exit gracefully
         if !is_running(output) || t == time.stop 
+            show_frame(output, t)
             set_running(output, false)
             finalize(output)
             break
         end
     end
-
-    if is_async(output) 
-        schedule(Task(mainloop))
-    else
-        mainloop()
-    end
 end
 
 """
     broadcast_rules!(models, source, dest, rows, cols, t, args...)
-Runs the rule(s) for each cell in the grid, dependin on the model(s) passed in.
+Internal method that runs the rule(s) for each cell in the grid, dependin on the model(s) passed in.
 For [`AbstractModel`] the returned values are written to the `dest` grid,
 while for [`AbstractPartialModel`](@ref) the grid is
 pre-initialised to zero and rules manually populate the dest grid.
@@ -202,3 +193,25 @@ inbounds(x::Number, max::Number, overflow::Wrap) =
     else
         x, true
     end
+
+"""
+    replay(output::AbstractOutput) = begin
+Show the simulation again. You can also use this to show a sequence 
+run with a different output type.
+
+### Example
+```julia
+replay(REPLOutput(output))
+```
+"""
+replay(output::AbstractOutput) = begin
+    is_running(output) && return
+    set_running(output, true)
+    initialize(output)
+    for (t, frame) in enumerate(output)
+        delay(output, t)
+        show_frame(output, t)
+        is_running(output) || break
+    end
+    set_running(output, false)
+end

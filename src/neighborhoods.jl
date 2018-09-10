@@ -108,16 +108,12 @@ neighbors(hood::AbstractRadialNeighborhood, model, state, row, col, t, source, a
     # Sum active cells in the neighborhood
     for p = (row - r):(row + r), q = (col - r):(col + r) 
         if ((p, q) == (row, col)) 
-            # println((p, q), (row, col))
             continue
         end
-        # println((p, q))
         p, q, is_inbounds = inbounds((p, q), (height, width), hood.overflow)
         is_inbounds && inhood(hood, p, q, row, col) || continue
-        # println((p, q))
         cc += source[p, q]
     end
-    # println(cc)
     cc
 end
 

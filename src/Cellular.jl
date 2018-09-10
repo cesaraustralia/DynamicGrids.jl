@@ -20,27 +20,27 @@ A typical simulation is run with a script like:
 
 ```julia
 init = my_array
-model = Life()
+model = Models(Life())
 output = REPLOutput(init)
 
 sim!(output, model, init)
 ```
 
-Multiple models can be passed to  `sim!()` in a tuple, and each of their rules
+Multiple models can be passed to `sim!()` wrap in `Models()`, and each of their rules
 will be run for the whole grid in sequence.
 
 ```julia
-sim!(output, (model1, model2), init)
+sim!(output, Models(model1, model2), init)
 ```
 """
 module Cellular
 
-using Parameters, 
-      Mixers, 
-      Requires, 
-      DocStringExtensions, 
-      TerminalGraphics, 
-      REPLGamesBase, 
+using Parameters,
+      Mixers,
+      Requires,
+      DocStringExtensions,
+      TerminalGraphics,
+      REPLGamesBase,
       Tags,
       FileIO
 
@@ -88,7 +88,7 @@ include("outputs/array.jl")
 include("framework.jl")
 include("neighborhoods.jl")
 include("life.jl")
-include("sensitivity.jl")
+include("outputs/sensitivity.jl")
 
 
 function __init__()
@@ -112,7 +112,7 @@ function __init__()
 
     @require Mux="a975b10e-0019-58db-a62f-e48ff68538c9" begin
         using Mux
-        export MuxOutput 
+        export MuxOutput
         include("outputs/web.jl")
         include("outputs/mux.jl")
     end
