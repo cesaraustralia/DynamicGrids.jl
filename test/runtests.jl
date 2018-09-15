@@ -149,17 +149,17 @@ end
         replay(output)
     end
 
-    @testset "BlinkOutput works" begin
-        using Blink
-        output = Cellular.BlinkOutput(init, model, store=true) 
-        sim!(output, model, init; time=2) 
-        sleep(1.5)
-        resume!(output, model; time=3)
-        sleep(1.5)
+    @testset "REPLOutput{:block} works" begin
+        output = REPLOutput{:block}(init; fps=100, store=true)
+        sim!(output, model, init; time=2)
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 0
+        sleep(0.5)
+        resume!(output, model; time=5)
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 0
+        sleep(0.5)
         @test output[3] == test
         @test output[5] == test2
         replay(output)
-        close(output.window)
     end
 
     @testset "REPLOutput{:braile} works" begin
@@ -175,17 +175,17 @@ end
         replay(output)
     end
 
-    @testset "REPLOutput{:block} works" begin
-        output = REPLOutput{:block}(init; fps=100, store=true)
-        sim!(output, model, init; time=2)
-        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 0
-        sleep(0.5)
-        resume!(output, model; time=5)
-        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 0
-        sleep(0.5)
+    @testset "BlinkOutput works" begin
+        using Blink
+        output = Cellular.BlinkOutput(init, model, store=true) 
+        sim!(output, model, init; time=2) 
+        sleep(1.5)
+        resume!(output, model; time=3)
+        sleep(1.5)
         @test output[3] == test
         @test output[5] == test2
         replay(output)
+        close(output.window)
     end
 
     @testset "GtkOutput works" begin
