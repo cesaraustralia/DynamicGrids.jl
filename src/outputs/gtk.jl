@@ -39,15 +39,16 @@ end
 Send frame at time t to the canvas in a Gtk window.
 """
 function show_frame(o::GtkOutput, t)
-    if use_frame(o, t)
-        img = process_image(o, o[curframe(o, t)])
-        Gtk.@guarded Gtk.draw(o.canvas) do widget
-            ctx = Gtk.getgc(o.canvas)
-            Cairo.reset_transform(ctx)
-            Cairo.image(ctx, img, 0, 0, Graphics.width(ctx), Graphics.height(ctx))
-        end
+    img = process_image(o, o[curframe(o, t)])
+    Gtk.@guarded Gtk.draw(o.canvas) do widget
+        ctx = Gtk.getgc(o.canvas)
+        Cairo.reset_transform(ctx)
+        Cairo.image(ctx, img, 0, 0, Graphics.width(ctx), Graphics.height(ctx))
     end
 end
 
-process_image(o::GtkOutput, frame) =
+process_image(o::GtkOutput, frame::AbstractArray{T}) where T <: Integer =
     Cairo.CairoImageSurface(convert(Matrix{UInt32}, frame) .* 0x00ffffff, Cairo.FORMAT_RGB24)
+
+process_image(o::GtkOutput, frame::AbstractArray{T}) where T <: AbstractFloat =
+    Cairo.CairoImageSurface(convert(Matrix{UInt32}, trunc.(UInt32, frame .* 0xff)) .* 0x00010101, Cairo.FORMAT_RGB24)

@@ -30,21 +30,17 @@ initialize(o::REPLOutput, args...) = begin
     o.timestamp = time()
 end
 
+is_async(o::REPLOutput) = true
+
 """
     show_frame(o::REPLOutput, t)
 Extends show_frame from [`ArrayOuput`](@ref) by also printing to the REPL.
 """
-show_frame(o::REPLOutput, t) = 
-    try 
-        out = replshow(o, curframe(o, t)) 
-        REPLGamesBase.put([0,0], o.color, out) 
-        REPLGamesBase.put([0,0], o.color, string(t)) 
-    catch err
-        set_running(o, false)
-        throw(err)
-    end
-
-is_async(o::REPLOutput) = true
+show_frame(o::REPLOutput, t) = begin
+    out = replshow(o, curframe(o, t)) 
+    REPLGamesBase.put([0,0], o.color, out) 
+    REPLGamesBase.put([0,0], o.color, string(t)) 
+end
 
 replshow(o::REPLOutput{:braile}, t) = replframe(o, t, 4, 2, brailize)
 replshow(o::REPLOutput{:block}, t) = replframe(o, t, 2, 1, blockize)

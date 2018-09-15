@@ -39,11 +39,12 @@ push!(o::AbstractOutput, x) = push!(o.frames, x)
 append!(o::AbstractOutput, x) = append!(o.frames, x)
 clear(o::AbstractOutput) = deleteat!(o.frames, 1:length(o))
 
-show_frame(o::AbstractOutput, t) = nothing
-
 is_running(o::AbstractOutput) = o.running[1]
 set_running(o::AbstractOutput, val) = o.running[1] = val
 is_async(o::AbstractOutput) = false
+
+show_frame(o::AbstractOutput, t) = nothing
+
 process_image(o, frame) = Images.Gray.(frame)
 
 

@@ -15,18 +15,17 @@ run!(o::SensitivityOutput, args...) =
     end
 
 store_frame(::NoFPS, o::SensitivityOutput, frame, t) = 
-    if length(o) < 
+    if length(o) < t
         push!(o, deepcopy(frame))
     else
         o[t] .+= frame
     end
 
-finalize(o::SensitivityOutput, args...) = begin
-
-end
-
-
 "Output constructor to convert a `SensitivityOutput()` to something you can view using replay()"
-(::Type{F})(init::SensitivityOutput, args...; kwargs...) where F <: AbstractOutput = begin
-    F(T[init], args...; kwargs...)
+(::Type{F})(output::SensitivityOutput{T}, args...; kwargs...) where {T, F <: AbstractOutput} = begin
+    # Scale between 0.0 and 1.0
+    for frame in output
+        frame ./= output.passes 
+    end
+    F(T[ouput[:]], args...; kwargs...)
 end

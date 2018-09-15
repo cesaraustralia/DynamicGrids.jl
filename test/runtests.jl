@@ -106,6 +106,7 @@ end
     @test neighbors(multi, nothing, state, 1, 1, t, init) == [1, 2]
 
 end
+
 @testset "life glider does its thing" begin
 
     global init = [0 0 0 0 0 0;
@@ -152,26 +153,21 @@ end
         using Blink
         output = Cellular.BlinkOutput(init, model, store=true) 
         sim!(output, model, init; time=2) 
-        sleep(0.5)
-        resume!(output, model; time=5)
-        sleep(0.5)
+        sleep(1.5)
+        resume!(output, model; time=3)
+        sleep(1.5)
         @test output[3] == test
         @test output[5] == test2
         replay(output)
         close(output.window)
     end
 
-    # @testset "MuxServer works" begin
-        # using Mux
-        # server = Cellular.MuxServer(init, model; port=8333) 
-    # end
-
     @testset "REPLOutput{:braile} works" begin
         output = REPLOutput{:braile}(init; fps=100, store=true)
         sim!(output, model, init; time=2)
         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 0
         sleep(0.5)
-        resume!(output, model; time=5)
+        resume!(output, model; time=3)
         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 0
         sleep(0.5)
         @test output[3] == test
@@ -196,7 +192,7 @@ end
         using Gtk
         output = GtkOutput(init, store=true) 
         sim!(output, model, init; time=2) 
-        resume!(output, model; time=5)
+        resume!(output, model; time=3)
         @test output[3] == test
         @test output[5] == test2
         replay(output)
@@ -216,3 +212,32 @@ end
     # end
 end
 
+
+@testset "Float output" begin
+
+    global flt = [0.0 0.0 0.0 0.1 0.0 0.0;
+                  0.0 0.3 0.0 0.0 0.6 0.0;
+                  0.2 0.0 0.2 0.1 0.0 0.6;
+                  0.0 0.0 0.0 1.0 1.0 1.0;
+                  0.0 0.3 0.3 0.7 0.8 1.0;
+                  0.0 0.0 0.0 0.0 1.0 0.6]
+
+    global int = [0 0 0 0 0 0;
+                  0 0 0 0 0 0;
+                  0 0 0 0 0 0;
+                  0 0 0 1 1 1;
+                  0 0 0 0 0 1;
+                  0 0 0 0 1 0]
+
+    @testset "GtkOutput works" begin
+        using Gtk
+        output = GtkOutput(int) 
+        output
+        Cellular.process_image(output, output[1])
+        Cellular.show_frame(output, 1)
+
+        output = GtkOutput(flt) 
+        Cellular.process_image(output, output[1])
+        Cellular.show_frame(output, 1)
+    end
+end
