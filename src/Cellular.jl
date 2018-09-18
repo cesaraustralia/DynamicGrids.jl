@@ -93,25 +93,22 @@ include("outputs/sensitivity.jl")
 
 function __init__()
     @require Gtk="4c0ca9eb-093a-5379-98c5-f87ac0bbbf44" begin
-        include("outputs/gtk.jl")
         export GtkOutput
+        include("outputs/gtk.jl")
     end
 
     @require Plots="91a5bcdd-55d7-5caf-9e0b-520d859cae80" begin
-        using Plots
-        include("outputs/plots.jl")
         export PlotsOutput
+        include("outputs/plots.jl")
     end
 
     @require Blink="ad839575-38b3-5650-b840-f874b8c74a25" begin
-        using Blink
         export BlinkOutput
         include("outputs/web.jl")
         include("outputs/blink.jl")
     end
 
     @require Mux="a975b10e-0019-58db-a62f-e48ff68538c9" begin
-        using Mux
         export MuxOutput
         include("outputs/web.jl")
         include("outputs/mux.jl")

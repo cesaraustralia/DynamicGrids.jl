@@ -135,13 +135,12 @@ broadcast_rules!(models::Tuple{T,Vararg}, source, dest, rows, cols, t, args...
     # Swap source and dest for the next rule/iteration
     broadcast_rules!(Base.tail(models), dest, source, rows, cols, t, args...)
 end
-
 broadcast_rules!(models::Tuple{T,Vararg}, source, dest, rows, cols, t, args...
                 ) where {T<:AbstractPartialModel} = begin
     # Initialise the dest array
     dest .= source
     # The rule writes to the dest array manually where required
-    broadcast(rule, Ref(models[1]), source, rows, cols, t, (source,), (dest,), tuple.(args)...)
+    broadcast(rule!, Ref(models[1]), source, rows, cols, t, (source,), (dest,), tuple.(args)...)
     # Swap source and dest for the next rule/iteration
     broadcast_rules!(Base.tail(models), dest, source, rows, cols, t, args...)
 end
@@ -158,13 +157,21 @@ These must write to the `dest` array directly.
 ### Arguments:
 - `model` : [`AbstractModel`](@ref)
 - `state`: the value of the current cell
-- `index`: a (row, column) tuple of Int for the current cell coordinates
-- `t`: the current time step
+- `index`: a (row, column) tuple of Int for the current cell coordinates - `t`: the current time step
 - `source`: the whole source array. Not to be written to
 - `dest`: the whole destination array. To be written to for AbstractPartialModel.
 - `args`: additional arguments passed through from user input to [`sim!`](@ref)
 """
 function rule(model::Nothing, state, row, col, t, source, dest, args...) end
+
+"""
+    function rule!(model, state, rows, cols, t, source, dest, args...)
+A rule that writes to the dest array, used in partial models. 
+
+### Arguments:
+see [`rule`](@ref) 
+"""
+function rule!(model::Nothing, state, row, col, t, source, dest, args...) end
 
 """
     inbounds(x, max, overflow)

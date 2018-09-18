@@ -56,8 +56,8 @@ sim!(output, Life(b=[1,3,5,7], s=[1,3,5,7]), init2; pause=0.1)
 ## Models and rules
 
 Models define simulation behaviour. They hold data relevant to the simulation,
-and trigger dispatch of particular [`rule`](@ref) methods. Models can be chained
-together arbitrarily to make composite simulations.
+and trigger dispatch of particular [`rule`](@ref) or [`rule!`](@ref) methods.
+Models can be chained together arbitrarily to make composite simulations.
 
 ### Types and Constructors
 
@@ -72,6 +72,7 @@ Life
 
 ```@docs
 rule
+rule!
 ```
 
 ## Neighborhoods

@@ -1,7 +1,7 @@
 using Revise, 
       Cellular,
       Test
-import Cellular: rule, neighbors
+import Cellular: rule, rule!, neighbors
 
 @testset "boundary overflow checks are working" begin
     @testset "inbounds with Skip() returns index and false for an overflowed index" begin
@@ -27,8 +27,8 @@ struct TestPartial <: AbstractPartialModel end
 struct TestPartialWrite <: AbstractPartialModel end
 
 rule(::TestModel, state, row, col, t, source, dest, args...) = 0
-rule(::TestPartial, state, row, col, t, source, dest, args...) = 0
-rule(::TestPartialWrite, state, row, col, t, source, dest, args...) = dest[row, 2] = 0
+rule!(::TestPartial, state, row, col, t, source, dest, args...) = 0
+rule!(::TestPartialWrite, state, row, col, t, source, dest, args...) = dest[row, 2] = 0
 
 global init  = [0 1 1 0;
                 0 1 1 0;
