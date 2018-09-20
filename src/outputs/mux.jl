@@ -26,8 +26,9 @@ simulations at the chosen port.
 """
 MuxServer(frames::T, model, args...; fps=25, showmax_fps=25, port=8080) where T <: AbstractVector = begin
     server = MuxServer(frames, fps, port)
+    store = false
     function muxapp(req)
-        WebInterface(deepcopy(server.frames), server.fps, false, deepcopy(model), args...).page
+        WebInterface(deepcopy(server.frames), server.fps, showmax_fps, store, deepcopy(model), args...).page
     end
     webio_serve(page("/", req -> muxapp(req)), port)
     server
