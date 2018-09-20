@@ -57,7 +57,7 @@ sim!(output, models, init, args...; time=100) = begin
     clear(output)
     store_frame(output, init, 1)
     show_frame(output, 1) 
-    run!(output, models, init, 2:time, args...)
+    run_sim!(output, models, init, 2:time, args...)
     output
 end
 
@@ -72,11 +72,11 @@ resume!(output, models, args...; time=100) = begin
     is_running(output) && return
     set_running(output, true)
     timespan = 1 + lastindex(output):lastindex(output) + time
-    run!(output, models, output[end], timespan, args...)
+    run_sim!(output, models, output[end], timespan, args...)
     output
 end
 
-run!(output, args...) = 
+run_sim!(output, args...) = 
     if is_async(output) 
         f() = frameloop(output, args...)
         schedule(Task(f))
@@ -100,7 +100,7 @@ frameloop(output, model, init, time, args...) = begin
         t = t
         # Run the automation on the source array, writing to the dest array and
         # setting the source and dest arrays for the next iteration.
-        source, dest = broadcast_rules!(model.models, source, dest, rows, cols, t, args...)
+        source, dest = run_models!(model.models, source, dest, rows, cols, t, args...)
         # Save the the current frame
         store_frame(output, source, t)
         # Display the current frame
@@ -119,32 +119,34 @@ frameloop(output, model, init, time, args...) = begin
     end
 end
 
+
+""" 
+    run_models!(models::Tuple{T,Vararg}, source, dest, args...)
+Run all models recuirsively. Returns a tuple containing the source and dest arrays for the 
+next iteration.
+"""
+run_models!(models::Tuple, source, dest, args...) = begin
+    broadcast_rules!(models[1], source, dest, args...)
+    run_models!(Base.tail(models), dest, source, args...)
+end
+run_models!(models::Tuple{}, source, dest, args...) = source, dest
+
+
 """
     broadcast_rules!(models, source, dest, rows, cols, t, args...)
-Internal method that runs the rule(s) for each cell in the grid, dependin on the model(s) passed in.
+Runs the rule(s) for each cell in the grid, dependin on the model(s) passed in.
 For [`AbstractModel`] the returned values are written to the `dest` grid,
 while for [`AbstractPartialModel`](@ref) the grid is
 pre-initialised to zero and rules manually populate the dest grid.
-
-Returns a tuple containing the source and dest arrays for the next iteration.
 """
-broadcast_rules!(models::Tuple{T,Vararg}, source, dest, rows, cols, t, args...
-                ) where {T<:AbstractModel} = begin
-    # Write rule outputs to every cell of the dest array
-    broadcast!(rule, dest, Ref(models[1]), source, rows, cols, t, (source,), (dest,), tuple.(args)...)
-    # Swap source and dest for the next rule/iteration
-    broadcast_rules!(Base.tail(models), dest, source, rows, cols, t, args...)
+broadcast_rules!(model::AbstractModel, source, dest, rows, cols, t, args...) = begin
+   broadcast!(rule, dest, Ref(model), source, rows, cols, t, (source,), (dest,), tuple.(args)...)
 end
-broadcast_rules!(models::Tuple{T,Vararg}, source, dest, rows, cols, t, args...
-                ) where {T<:AbstractPartialModel} = begin
+broadcast_rules!(model::AbstractPartialModel, source, dest, rows, cols, t, args...) = begin
     # Initialise the dest array
     dest .= source
-    # The rule writes to the dest array manually where required
-    broadcast(rule!, Ref(models[1]), source, rows, cols, t, (source,), (dest,), tuple.(args)...)
-    # Swap source and dest for the next rule/iteration
-    broadcast_rules!(Base.tail(models), dest, source, rows, cols, t, args...)
+    broadcast(rule!, Ref(model), source, rows, cols, t, (source,), (dest,), tuple.(args)...)
 end
-broadcast_rules!(models::Tuple{}, source, dest, rows, cols, t, args...) = source, dest
 
 
 """
