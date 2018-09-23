@@ -53,6 +53,8 @@ export sim!,
        replay,
        savegif,
        show_frame,
+       broadcastable_indices,
+       distances,
        show, getindex, setindex!, lastindex, size, length, push!, append!,
        AbstractModel,
        AbstractPartialModel,
@@ -83,11 +85,13 @@ export sim!,
     """
 
 include("outputs/common.jl")
-include("outputs/repl.jl")
-include("outputs/array.jl")
+include("types.jl")
 include("framework.jl")
 include("neighborhoods.jl")
+include("utils.jl")
 include("life.jl")
+include("outputs/repl.jl")
+include("outputs/array.jl")
 include("outputs/sensitivity.jl")
 
 

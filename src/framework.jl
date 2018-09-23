@@ -1,42 +1,4 @@
 """
-A model contains all the information required to run a rule in a cellular
-simulation, given an initialised array. Models can be chained together in any order.
-
-The output of the rule for an AbstractModel is written to the current cell in the grid.
-"""
-abstract type AbstractModel end
-
-"""
-An abstract type for models that do not write to every cell of the grid, for efficiency.
-
-There are two main differences with `AbstractModel`. AbstractPartialModel requires
-initialisation of the destination array before each timestep, and the output of
-the rule is not written to the grid but done manually.
-"""
-abstract type AbstractPartialModel end
-
-
-"""
-Singleton types for choosing the grid overflow rule used in
-[`inbounds`](@ref). These determine what is done when a neighborhood
-or jump extends outside of the grid.
-"""
-abstract type AbstractOverflow end
-"Wrap cords that overflow to the opposite side"
-struct Wrap <: AbstractOverflow end
-"Skip coords that overflow boundaries"
-struct Skip <: AbstractOverflow end
-
-" A mutable container for models. 
-This allows updating of immutable values for live control, such as with 
-BlinkOutput, while keeping the core model immutable for GPU compatability."
-mutable struct Models{M} models::M
-    Models(args...) = new{typeof(args)}(args)
-end
-
-
-
-"""
     sim!(output, model, init, args...; time=1000)
 Runs the whole simulation, passing the destination aray to
 the passed in output for each time-step.
@@ -88,23 +50,22 @@ run_sim!(output, args...) =
 frameloop(output, model, init, time, args...) = begin
     # Define the index coordinates. There might be a better way than this?
     h, w = size(init)
-    rows = typeof(similar(init, Int))(collect(row for row in 1:h, col in 1:w))
-    cols = typeof(similar(init, Int))(collect(col for row in 1:h, col in 1:w))
+    rows, cols = broadcastable_indices(init)
 
     initialize(output)
-    source = deepcopy(init)
-    dest = deepcopy(init)
     set_timestamp(output, time.start)
 
+    source = deepcopy(init)
+    dest = deepcopy(init)
+
     for t in time
-        t = t
         # Run the automation on the source array, writing to the dest array and
         # setting the source and dest arrays for the next iteration.
         source, dest = run_models!(model.models, source, dest, rows, cols, t, args...)
         # Save the the current frame
         store_frame(output, source, t)
         # Display the current frame
-        use_frame(output, t) && show_frame(output, t)
+        is_showable(output, t) && show_frame(output, t)
         # Let other tasks run (like ui controls)
         is_async(output) && yield()
         # Stick to the FPS
@@ -122,8 +83,8 @@ end
 
 """ 
     run_models!(models::Tuple{T,Vararg}, source, dest, args...)
-Run all models recuirsively. Returns a tuple containing the source and dest arrays for the 
-next iteration.
+Iterate over all models recursively, swapping source and dest arrays. 
+Returns a tuple containing the source and dest arrays for the next iteration.
 """
 run_models!(models::Tuple, source, dest, args...) = begin
     broadcast_rules!(models[1], source, dest, args...)
@@ -174,34 +135,6 @@ A rule that writes to the dest array, used in partial models.
 see [`rule`](@ref) 
 """
 function rule!(model::Nothing, state, row, col, t, source, dest, args...) end
-
-"""
-    inbounds(x, max, overflow)
-Check grid boundaries for a single coordinate and max value or a tuple
-of coorinates and max values.
-
-Returns a tuple containing the coordinate(s) followed by a boolean `true`
-if the cell is in bounds, `false` if not.
-
-Overflow of type [`Skip`](@ref) returns the coordinate and `false` to skip
-coordinates that overflow outside of the grid.
-[`Wrap`](@ref) returns a tuple with the current position or it's
-wrapped equivalent, and `true` as it is allways in-bounds.
-"""
-inbounds(xs::Tuple, maxs::Tuple, overflow) = begin
-    a, inbounds_a = inbounds(xs[1], maxs[1], overflow)
-    b, inbounds_b = inbounds(xs[2], maxs[2], overflow)
-    a, b, inbounds_a && inbounds_b
-end
-inbounds(x::Number, max::Number, overflow::Skip) = x, x > zero(x) && x <= max
-inbounds(x::Number, max::Number, overflow::Wrap) =
-    if x < oneunit(x)
-        max + rem(x, max), true
-    elseif x > max
-        rem(x, max), true
-    else
-        x, true
-    end
 
 """
     replay(output::AbstractOutput) = begin
