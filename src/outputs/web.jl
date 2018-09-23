@@ -80,9 +80,6 @@ WebInterface(frames::AbstractVector, fps::Number, showmax_fps::Number, store, mo
     interface
 end
 
-set_time(o::WebInterface, t) = o.t[] = t
 is_async(o::WebInterface) = true
-show_frame(o::WebInterface, t) = 
-    if use_frame(o, t)
-        set_time(o, t) # trigger the image redraw.
-    end
+set_time(o::WebInterface, t) = o.t[] = t
+show_frame(o::WebInterface, t) = set_time(o, t) # trigger the image redraw.

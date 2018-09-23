@@ -30,20 +30,24 @@ struct NoFPS end
 (::Type{F})(init::T, args...; kwargs...) where F <: AbstractOutput where T <: AbstractMatrix =
     F(T[init], args...; kwargs...)
 
+# Base methods
 length(o::AbstractOutput) = length(o.frames)
 size(o::AbstractOutput) = size(o.frames)
+firstindex(o::AbstractOutput) = firstindex(o.frames)
 lastindex(o::AbstractOutput) = lastindex(o.frames)
 getindex(o::AbstractOutput, i) = getindex(o.frames, i)
 setindex!(o::AbstractOutput, x, i) = setindex!(o.frames, x, i)
 push!(o::AbstractOutput, x) = push!(o.frames, x)
 append!(o::AbstractOutput, x) = append!(o.frames, x)
-clear(o::AbstractOutput) = deleteat!(o.frames, 1:length(o))
 
+# Custom methods
 is_running(o::AbstractOutput) = o.running[1]
+
 set_running(o::AbstractOutput, val) = o.running[1] = val
+
 is_async(o::AbstractOutput) = false
 
-show_frame(o::AbstractOutput, t) = nothing
+clear(o::AbstractOutput) = deleteat!(o.frames, 1:length(o))
 
 process_image(o, frame) = Images.Gray.(frame)
 
@@ -64,11 +68,12 @@ curframe(o::AbstractOutput, t) = curframe(has_fps(o), o, t)
 curframe(::HasFPS, o, t) = o.store ? t : 1
 curframe(::NoFPS, o, t) = t
 
-use_frame(o::AbstractOutput, t) = use_frame(has_fps(o), o, t)
-use_frame(::HasFPS, o, t) = t % (o.fps ÷ o.showmax_fps + 1) == 0
-use_frame(::NoFPS, o, t) = true
+is_showable(o::AbstractOutput, t) = is_showable(has_fps(o), o, t)
+is_showable(::HasFPS, o, t) = t % (o.fps ÷ o.showmax_fps + 1) == 0
+is_showable(::NoFPS, o, t) = false
 
 finalize(o::AbstractOutput, args...) = nothing
+
 initialize(o::AbstractOutput, args...) = initialize(has_fps(o), o, args...)
 initialize(::HasFPS, o, args...) = nothing 
 initialize(::NoFPS, o, args...) = nothing 
@@ -91,3 +96,10 @@ Saving very large gifs may trigger a bug in imagemagick.
 """
 savegif(filename::String, output::AbstractOutput) = 
     FileIO.save(filename, Gray.(cat(3, output...)))
+
+""" 
+    show_frame(output::AbstractOutput, [t])
+Show the last frame of the output, or the frame at time t. 
+"""
+show_frame(o::AbstractOutput, t=lastindex(o))
+
