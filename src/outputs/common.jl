@@ -26,9 +26,10 @@ end
 struct HasFPS end
 struct NoFPS end
 
-"Generic ouput constructor. Converts init array to vector of empty frames."
+"Generic ouput constructor. Converts init array to vector of frames."
 (::Type{F})(init::T, args...; kwargs...) where F <: AbstractOutput where T <: AbstractMatrix =
     F(T[init], args...; kwargs...)
+
 
 # Base methods
 length(o::AbstractOutput) = length(o.frames)
@@ -39,6 +40,7 @@ getindex(o::AbstractOutput, i) = getindex(o.frames, i)
 setindex!(o::AbstractOutput, x, i) = setindex!(o.frames, x, i)
 push!(o::AbstractOutput, x) = push!(o.frames, x)
 append!(o::AbstractOutput, x) = append!(o.frames, x)
+
 
 # Custom methods
 is_running(o::AbstractOutput) = o.running[1]
@@ -101,5 +103,6 @@ savegif(filename::String, output::AbstractOutput) =
     show_frame(output::AbstractOutput, [t])
 Show the last frame of the output, or the frame at time t. 
 """
-show_frame(o::AbstractOutput, t=lastindex(o))
+show_frame(o::AbstractOutput) = showframe(o, lastindex(o))
+show_frame(o::AbstractOutput, t) = nothing
 
