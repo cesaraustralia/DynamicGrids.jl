@@ -41,18 +41,20 @@ using Parameters,
       DocStringExtensions,
       UnicodeGraphics,
       REPLGamesBase,
-      Tags,
+      FieldMetadata,
       FileIO
 
 import Base: show, getindex, setindex!, lastindex, size, length, push!, append!
 import Flatten: @flattenable, flattenable
-import Tags: @limits, limits
+import FieldMetadata: @limits, limits
 
 export sim!,
        resume!,
        replay,
        savegif,
        show_frame,
+       broadcastable_indices,
+       distances,
        show, getindex, setindex!, lastindex, size, length, push!, append!,
        AbstractModel,
        AbstractPartialModel,
@@ -83,11 +85,13 @@ export sim!,
     """
 
 include("outputs/common.jl")
-include("outputs/repl.jl")
-include("outputs/array.jl")
+include("types.jl")
 include("framework.jl")
 include("neighborhoods.jl")
+include("utils.jl")
 include("life.jl")
+include("outputs/repl.jl")
+include("outputs/array.jl")
 include("outputs/sensitivity.jl")
 
 
@@ -102,11 +106,11 @@ function __init__()
         include("outputs/plots.jl")
     end
 
-    @require Blink="ad839575-38b3-5650-b840-f874b8c74a25" begin
-        export BlinkOutput
-        include("outputs/web.jl")
-        include("outputs/blink.jl")
-    end
+    # @require Blink="ad839575-38b3-5650-b840-f874b8c74a25" begin
+    #     export BlinkOutput
+    #     include("outputs/web.jl")
+    #     include("outputs/blink.jl")
+    # end
 
     @require Mux="a975b10e-0019-58db-a62f-e48ff68538c9" begin
         export MuxOutput
@@ -114,5 +118,9 @@ function __init__()
         include("outputs/mux.jl")
     end
 end
+
+        export BlinkOutput
+        include("outputs/web.jl")
+        include("outputs/blink.jl")
 
 end

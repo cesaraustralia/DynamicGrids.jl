@@ -4,7 +4,6 @@ using Mux
 A basic Mux.jl webserver, serving identical pages to BlinkOutput
 """
 @Frames mutable struct MuxServer{F} <: AbstractWebOutput{T}
-    fps::F
     port::Int
 end
 
@@ -24,11 +23,11 @@ simulations at the chosen port.
 - `showmax_fps`: maximum displayed frames per second
 - `port`: port number to reach the server at
 """
-MuxServer(frames::T, model, args...; fps=25, showmax_fps=25, port=8080) where T <: AbstractVector = begin
-    server = MuxServer(frames, fps, port)
+MuxServer(frames::T, model, args...; port=8080, kwargs...) where T <: AbstractVector = begin
+    server = MuxServer(frames, port)
     store = false
     function muxapp(req)
-        WebInterface(deepcopy(server.frames), server.fps, showmax_fps, store, deepcopy(model), args...).page
+        WebInterface(deepcopy(server.frames), deepcopy(model), args...; kwargs...).page
     end
     webio_serve(page("/", req -> muxapp(req)), port)
     server

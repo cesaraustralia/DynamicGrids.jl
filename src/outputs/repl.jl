@@ -37,13 +37,13 @@ is_async(o::REPLOutput) = true
 Extends show_frame from [`ArrayOuput`](@ref) by also printing to the REPL.
 """
 show_frame(o::REPLOutput, t) = begin
-    out = replshow(o, curframe(o, t)) 
+    out = replframe(o, curframe(o, t)) 
     REPLGamesBase.put([0,0], o.color, out) 
     REPLGamesBase.put([0,0], o.color, string(t)) 
 end
 
-replshow(o::REPLOutput{:braile}, t) = replframe(o, t, 4, 2, brailize)
-replshow(o::REPLOutput{:block}, t) = replframe(o, t, 2, 1, blockize)
+replframe(o::REPLOutput{:braile}, t) = replframe(o, t, 4, 2, brailize)
+replframe(o::REPLOutput{:block}, t) = replframe(o, t, 2, 1, blockize)
 
 function replframe(o, i, ystep, xstep, f)
     frame = o[i]
@@ -55,7 +55,7 @@ function replframe(o, i, ystep, xstep, f)
     yrange = max(1, ystep * yoffset):min(youtput, ystep * (dispy + yoffset - 1))
     xrange = max(1, xstep * xoffset):min(xoutput, xstep * (dispx + xoffset - 1))
     let frame=frame, yrange=yrange, xrange=xrange
-        f(Array(frame), 0.5, yrange, xrange)
+        f(view(Array(frame), yrange, xrange), 0.5)
     end
 end
 

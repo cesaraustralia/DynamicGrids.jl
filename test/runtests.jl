@@ -29,19 +29,25 @@ struct TestPartialWrite <: AbstractPartialModel end
 rule(::TestModel, state, row, col, t, source, dest, args...) = 0
 rule!(::TestPartial, state, row, col, t, source, dest, args...) = 0
 rule!(::TestPartialWrite, state, row, col, t, source, dest, args...) = dest[row, 2] = 0
+setup(x) = x
 
-global init  = [0 1 1 0;
-                0 1 1 0;
-                0 1 1 0;
-                0 1 1 0;
-                0 1 1 0]
+# For manual testing on CUDA
+# using CuArrays
+# setup(x) = CuArray(x)
+
+global init  = setup([0 1 1 0;
+                      0 1 1 0;
+                      0 1 1 0;
+                      0 1 1 0;
+                      0 1 1 0])
+
 
 @testset "a rule that returns zero gives zero outputs" begin
-    final = [0 0 0 0;
+    final = setup([0 0 0 0;
              0 0 0 0;
              0 0 0 0;
              0 0 0 0;
-             0 0 0 0]
+             0 0 0 0])
 
     global model = Models(TestModel())
     global output = ArrayOutput(init)
@@ -58,11 +64,11 @@ end
 end
 
 @testset "a partial rule that writes to dest affects output" begin
-    final = [0 0 1 0;
+    final = setup([0 0 1 0;
              0 0 1 0;
              0 0 1 0;
              0 0 1 0;
-             0 0 1 0]
+             0 0 1 0])
 
     global model = Models(TestPartialWrite())
     global output = ArrayOutput(init)
@@ -74,12 +80,12 @@ end
 end
 
 @testset "neighborhoods sum surrounding values correctly" begin
-    global init = [0 0 0 1 1 1;
+    global init = setup([0 0 0 1 1 1;
                    1 0 1 1 0 1;
                    0 1 1 1 1 1;
                    0 1 0 0 1 0;
                    0 0 0 0 1 1;
-                   0 1 0 1 1 0]
+                   0 1 0 1 1 0])
 
     moore = RadialNeighborhood(typ=:moore, radius=1, overflow=Wrap())
     vonneumann = RadialNeighborhood(typ=:vonneumann, radius=1, overflow=Wrap())
@@ -109,26 +115,26 @@ end
 
 @testset "life glider does its thing" begin
 
-    global init = [0 0 0 0 0 0;
+    global init = setup([0 0 0 0 0 0;
                    0 0 0 0 0 0;
                    0 0 0 0 0 0;
                    0 0 0 1 1 1;
                    0 0 0 0 0 1;
-                   0 0 0 0 1 0]
+                   0 0 0 0 1 0])
 
-    global test = [0 0 0 0 0 0;
+    global test = setup([0 0 0 0 0 0;
                    0 0 0 0 0 0;
                    0 0 0 0 1 1;
                    0 0 0 1 0 1;
                    0 0 0 0 0 1;
-                   0 0 0 0 0 0]
+                   0 0 0 0 0 0])
 
-    global test2 = [0 0 0 0 0 0;
+    global test2 = setup([0 0 0 0 0 0;
                     0 0 0 0 0 0;
                     1 0 0 0 1 1;
                     1 0 0 0 0 0;
                     0 0 0 0 0 1;
-                    0 0 0 0 0 0]
+                    0 0 0 0 0 0])
 
     global model = Models(Life())
     global output = ArrayOutput(init)
@@ -215,19 +221,19 @@ end
 
 @testset "Float output" begin
 
-    global flt = [0.0 0.0 0.0 0.1 0.0 0.0;
+    global flt = setup([0.0 0.0 0.0 0.1 0.0 0.0;
                   0.0 0.3 0.0 0.0 0.6 0.0;
                   0.2 0.0 0.2 0.1 0.0 0.6;
                   0.0 0.0 0.0 1.0 1.0 1.0;
                   0.0 0.3 0.3 0.7 0.8 1.0;
-                  0.0 0.0 0.0 0.0 1.0 0.6]
+                  0.0 0.0 0.0 0.0 1.0 0.6])
 
-    global int = [0 0 0 0 0 0;
+    global int = setup([0 0 0 0 0 0;
                   0 0 0 0 0 0;
                   0 0 0 0 0 0;
                   0 0 0 1 1 1;
                   0 0 0 0 0 1;
-                  0 0 0 0 1 0]
+                  0 0 0 0 1 0])
 
     @testset "GtkOutput works" begin
         using Gtk

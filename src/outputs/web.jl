@@ -1,4 +1,20 @@
-using InteractBulma, InteractBase, WebIO, Observables, CSSUtil, Flatten, Images
+using InteractBulma, 
+      InteractBase, 
+      WebIO, 
+      Widgets,
+      Observables, 
+      CSSUtil, 
+      Flatten, 
+      Images
+
+import InteractBase: WidgetTheme, libraries
+
+struct WebTheme <: WidgetTheme end
+
+const css_path = joinpath(dirname(pathof(Cellular)), "assets/web.css")
+
+libraries(::WebTheme) = vcat(libraries(Bulma()), [css_path])
+
 
 abstract type AbstractWebOutput{T} <: AbstractOutput{T} end
 
@@ -10,7 +26,11 @@ end
 build_range(lim::Tuple{Float64,Float64}) = lim[1]:(lim[2]-lim[1])/400:lim[2]
 build_range(lim::Tuple{Int,Int}) = lim[1]:1:lim[2]
 
-WebInterface(frames::AbstractVector, fps::Number, showmax_fps::Number, store, model, args...) = begin
+
+WebInterface(frames::AbstractVector, model, args...; fps=25, showmax_fps=fps, store=false, theme=WebTheme()) = begin
+
+    settheme!(theme)
+
     init = deepcopy(frames[1])
 
     # Standard output and controls
@@ -29,13 +49,13 @@ WebInterface(frames::AbstractVector, fps::Number, showmax_fps::Number, store, mo
     # Auto-generated model controls
     params = flatten(model.models)
     fnames = fieldnameflatten(model.models)
-    lims = tagflatten(model.models, Tags.limits)
+    lims = tagflatten(model.models, FieldMetadata.limits)
     parents = parentflatten(Tuple, model.models)
-    attributes = broadcast((p, n) -> Dict(:title => "$p.$n"), parents, fnames)
-    make_slider(p, lab, lim, attr) = slider(build_range(lim), label=string(lab), attributes=attr, value=p)
-    sliders = broadcast(make_slider, params, fnames, lims, attributes)
+    # attributes = broadcast((p, n) -> Dict(:title => "$p.$n"), parents, fnames) , attributes=attr
+    make_slider(p, lab, lim) = slider(build_range(lim); label=string(lab), value=p)
+    sliders = broadcast(make_slider, params, fnames, lims)
     slider_obs = map((s...) -> s, observe.(sliders)...)
-    modelwidgets = vbox(dom"span"("Model: "), hbox(sliders...))
+    modelwidgets = vbox(dom"span"("Model: "), vbox(sliders...))
 
     # Put it all together into a webpage
     page = dom"div"(vbox(hbox(image, timetext), basewidgets, modelwidgets))
@@ -80,9 +100,6 @@ WebInterface(frames::AbstractVector, fps::Number, showmax_fps::Number, store, mo
     interface
 end
 
-set_time(o::WebInterface, t) = o.t[] = t
 is_async(o::WebInterface) = true
-show_frame(o::WebInterface, t) = 
-    if use_frame(o, t)
-        set_time(o, t) # trigger the image redraw.
-    end
+set_time(o::WebInterface, t) = o.t[] = t
+show_frame(o::WebInterface, t) = set_time(o, t) # trigger the image redraw.
