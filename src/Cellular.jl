@@ -39,7 +39,7 @@ using Parameters,
       Mixers,
       Requires,
       DocStringExtensions,
-      TerminalGraphics,
+      UnicodeGraphics,
       REPLGamesBase,
       Tags,
       FileIO
