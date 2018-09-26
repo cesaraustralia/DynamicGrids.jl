@@ -55,7 +55,7 @@ function replframe(o, i, ystep, xstep, f)
     yrange = max(1, ystep * yoffset):min(youtput, ystep * (dispy + yoffset - 1))
     xrange = max(1, xstep * xoffset):min(xoutput, xstep * (dispx + xoffset - 1))
     let frame=frame, yrange=yrange, xrange=xrange
-        f(Array(frame), 0.5, yrange, xrange)
+        f(view(Array(frame), yrange, xrange), 0.5)
     end
 end
 
