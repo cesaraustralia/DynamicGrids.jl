@@ -1,9 +1,4 @@
-using InteractBulma, 
-      InteractBase, 
-      WebIO, 
-      Widgets,
-      Observables, 
-      CSSUtil, 
+using Interact, 
       Flatten, 
       Images
 
