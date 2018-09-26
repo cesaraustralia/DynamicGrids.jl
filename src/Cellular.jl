@@ -106,11 +106,11 @@ function __init__()
         include("outputs/plots.jl")
     end
 
-    # @require Blink="ad839575-38b3-5650-b840-f874b8c74a25" begin
-    #     export BlinkOutput
-    #     include("outputs/web.jl")
-    #     include("outputs/blink.jl")
-    # end
+    @require Blink="ad839575-38b3-5650-b840-f874b8c74a25" begin
+        export BlinkOutput
+        include("outputs/web.jl")
+        include("outputs/blink.jl")
+    end
 
     @require Mux="a975b10e-0019-58db-a62f-e48ff68538c9" begin
         export MuxOutput
@@ -118,9 +118,5 @@ function __init__()
         include("outputs/mux.jl")
     end
 end
-
-        export BlinkOutput
-        include("outputs/web.jl")
-        include("outputs/blink.jl")
 
 end
