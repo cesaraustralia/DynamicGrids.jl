@@ -2,7 +2,7 @@ using Interact,
       Flatten, 
       Images
 
-import InteractBase: WidgetTheme, libraries
+import Interact: WidgetTheme, libraries
 
 struct WebTheme <: WidgetTheme end
 
