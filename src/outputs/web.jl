@@ -49,7 +49,7 @@ WebInterface(frames::AbstractVector, model, args...; fps=25, showmax_fps=fps, st
     # Auto-generated model controls
     params = flatten(model.models)
     fnames = fieldnameflatten(model.models)
-    lims = tagflatten(model.models, FieldMetadata.limits)
+    lims = metaflatten(model.models, FieldMetadata.limits)
     parents = parentflatten(Tuple, model.models)
     # attributes = broadcast((p, n) -> Dict(:title => "$p.$n"), parents, fnames) , attributes=attr
     make_slider(p, lab, lim) = slider(build_range(lim); label=string(lab), value=p)
