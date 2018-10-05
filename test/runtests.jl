@@ -241,9 +241,11 @@ end
         output
         Cellular.process_image(output, output[1])
         Cellular.show_frame(output, 1)
+        destroy(output.window)
 
         output = GtkOutput(flt) 
         Cellular.process_image(output, output[1])
         Cellular.show_frame(output, 1)
+        destroy(output.window)
     end
 end
