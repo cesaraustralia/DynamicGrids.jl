@@ -3,11 +3,11 @@ Parameters
 Requires
 DocStringExtensions
 REPLGamesBase
-UnicodeGraphics
 FixedPointNumbers 
-Flatten
 Colors
 FileIO
-Mixers
 Images
-FieldMetadata
+Mixers 0.1.0
+Flatten 0.0.1
+FieldMetadata 0.0.1
+UnicodeGraphics 0.0.1
