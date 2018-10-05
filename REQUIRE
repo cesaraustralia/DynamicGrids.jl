@@ -4,6 +4,9 @@ Requires
 DocStringExtensions
 REPLGamesBase
 FixedPointNumbers 
+Gtk
+Cairo
+Graphics
 Colors
 FileIO
 Images
