@@ -42,11 +42,14 @@ using Parameters,
       UnicodeGraphics,
       REPLGamesBase,
       FieldMetadata,
+      Gtk, 
+      Cairo,
       FileIO
 
 import Base: show, getindex, setindex!, lastindex, size, length, push!, append!
 import Flatten: @flattenable, flattenable
 import FieldMetadata: @limits, limits
+
 
 export sim!,
        resume!,
@@ -73,6 +76,7 @@ export sim!,
        AbstractOutput,
        AbstractArrayOutput,
        ArrayOutput,
+       GtkOutput,
        REPLOutput
 
 
@@ -91,16 +95,12 @@ include("neighborhoods.jl")
 include("utils.jl")
 include("life.jl")
 include("outputs/repl.jl")
+include("outputs/gtk.jl")
 include("outputs/array.jl")
 include("outputs/sensitivity.jl")
 
 
 function __init__()
-    @require Gtk="4c0ca9eb-093a-5379-98c5-f87ac0bbbf44" begin
-        export GtkOutput
-        include("outputs/gtk.jl")
-    end
-
     @require Plots="91a5bcdd-55d7-5caf-9e0b-520d859cae80" begin
         export PlotsOutput
         include("outputs/plots.jl")
