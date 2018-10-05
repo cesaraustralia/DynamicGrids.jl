@@ -1,8 +1,10 @@
 using Interact, 
+      InteractBase,
+      InteractBulma,
       Flatten, 
       Images
 
-import Interact: WidgetTheme, libraries
+import InteractBase: WidgetTheme, libraries
 
 struct WebTheme <: WidgetTheme end
 

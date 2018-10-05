@@ -53,8 +53,8 @@ clear(o::AbstractOutput) = deleteat!(o.frames, 1:length(o))
 
 process_image(o, frame) = Images.Gray.(frame)
 
-
 has_fps(o::O) where O = all(fn -> fn in fieldnames(O), (:fps, :timestamp)) ? HasFPS() : NoFPS()
+
 fps(o) = o.fps
 
 store_frame(o::AbstractOutput, frame, t) = store_frame(has_fps(o), o, frame, t)

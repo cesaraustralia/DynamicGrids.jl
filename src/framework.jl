@@ -15,7 +15,7 @@ the passed in output for each time-step.
 """
 sim!(output, models, init, args...; time=100) = begin
     is_running(output) && return
-    set_running(output, true)
+    set_running(output, true) || return
     clear(output)
     store_frame(output, init, 1)
     show_frame(output, 1) 
@@ -32,7 +32,7 @@ See [`sim!`](@ref).
 """
 resume!(output, models, args...; time=100) = begin
     is_running(output) && return
-    set_running(output, true)
+    set_running(output, true) || return
     timespan = 1 + lastindex(output):lastindex(output) + time
     run_sim!(output, models, output[end], timespan, args...)
     output
