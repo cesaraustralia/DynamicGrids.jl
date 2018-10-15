@@ -1,5 +1,6 @@
 """
     sim!(output, model, init, args...; time=1000)
+
 Runs the whole simulation, passing the destination aray to
 the passed in output for each time-step.
 
@@ -25,6 +26,7 @@ end
 
 """
     resume!(output, models, args...; time=100)
+
 Restart the simulation where you stopped last time.
 
 ### Arguments
@@ -46,9 +48,8 @@ run_sim!(output, args...) =
         frameloop(output, args...)
     end
 
-# Loop over the selected timespan
+" Loop over the selected timespan, running models and displaying output "
 frameloop(output, model, init, time, args...) = begin
-    # Define the index coordinates. There might be a better way than this?
     h, w = size(init)
     rows, cols = broadcastable_indices(init)
 
@@ -83,11 +84,13 @@ end
 
 """ 
     run_models!(models::Tuple{T,Vararg}, source, dest, args...)
+
 Iterate over all models recursively, swapping source and dest arrays. 
+
 Returns a tuple containing the source and dest arrays for the next iteration.
 """
 run_models!(models::Tuple, source, dest, args...) = begin
-    broadcast_rules!(models[1], source, dest, args...)
+    broadcast_rule!(models[1], source, dest, args...)
     run_models!(Base.tail(models), dest, source, args...)
 end
 run_models!(models::Tuple{}, source, dest, args...) = source, dest
@@ -95,15 +98,16 @@ run_models!(models::Tuple{}, source, dest, args...) = source, dest
 
 """
     broadcast_rules!(models, source, dest, rows, cols, t, args...)
+
 Runs the rule(s) for each cell in the grid, dependin on the model(s) passed in.
 For [`AbstractModel`] the returned values are written to the `dest` grid,
 while for [`AbstractPartialModel`](@ref) the grid is
 pre-initialised to zero and rules manually populate the dest grid.
 """
-broadcast_rules!(model::AbstractModel, source, dest, rows, cols, t, args...) = begin
+broadcast_rule!(model::AbstractModel, source, dest, rows, cols, t, args...) = begin
    broadcast!(rule, dest, Ref(model), source, rows, cols, t, (source,), (dest,), tuple.(args)...)
 end
-broadcast_rules!(model::AbstractPartialModel, source, dest, rows, cols, t, args...) = begin
+broadcast_rule!(model::AbstractPartialModel, source, dest, rows, cols, t, args...) = begin
     # Initialise the dest array
     dest .= source
     broadcast(rule!, Ref(model), source, rows, cols, t, (source,), (dest,), tuple.(args)...)
@@ -112,24 +116,26 @@ end
 
 """
     function rule(model, state, rows, cols, t, source, dest, args...)
+
 Rules alter cell values based on their current state and other cells, often
-[`neighbors`](@ref). Most rules return a value to be written to the current cell,
-except rules for models inheriting from [`AbstractPartialModel`](@ref).
-These must write to the `dest` array directly.
+[`neighbors`](@ref). 
 
 ### Arguments:
 - `model` : [`AbstractModel`](@ref)
 - `state`: the value of the current cell
 - `index`: a (row, column) tuple of Int for the current cell coordinates - `t`: the current time step
-- `source`: the whole source array. Not to be written to
-- `dest`: the whole destination array. To be written to for AbstractPartialModel.
+- `source`: the whole source array. Never to be written to.
+- `dest`: the whole destination array. Never to be written to in AbstractModel.
 - `args`: additional arguments passed through from user input to [`sim!`](@ref)
+
+Returns a value to be written to the current cell.
 """
 function rule(model::Nothing, state, row, col, t, source, dest, args...) end
 
 """
     function rule!(model, state, rows, cols, t, source, dest, args...)
-A rule that writes to the dest array, used in partial models. 
+A rule that manually writes to the dest array, used in models inheriting 
+from [`AbstractPartialModel`](@ref).
 
 ### Arguments:
 see [`rule`](@ref) 
@@ -137,8 +143,8 @@ see [`rule`](@ref)
 function rule!(model::Nothing, state, row, col, t, source, dest, args...) end
 
 """
-    replay(output::AbstractOutput) = begin
-Show the simulation again. You can also use this to show a sequence 
+    replay(output::AbstractOutput)
+Show the stored simulation again. You can also use this to show a sequence 
 run with a different output type.
 
 ### Example
