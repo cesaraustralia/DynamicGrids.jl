@@ -4,7 +4,7 @@ this should replicate the fields for [`Life`](@ref).
 """
 abstract type AbstractLife <: AbstractModel end
 
-" Game-of-life style cellular automata. "
+" Model for game-of-life style cellular automata. "
 @limits @flattenable @with_kw struct Life{N,B,S} <: AbstractLife
     # "An AbstractNeighborhood. RadialNeighborhood's are common for Cellular Automata."
     neighborhood::N = RadialNeighborhood(; typ=:moore, radius=1, overflow=Wrap()) | false | _
@@ -16,6 +16,7 @@ end
 
 """
     rule(model::AbstractLife, state, args...)
+
 Rule for game-of-life style cellular automata. This is mostly the
 canonical demonstration of Cellular Automata than a seriously optimised 
 Cellular Automata model.
