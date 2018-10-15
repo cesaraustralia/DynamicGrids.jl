@@ -1,26 +1,7 @@
 using Revise, 
       Cellular,
       Test
-import Cellular: rule, rule!, neighbors
-
-@testset "boundary overflow checks are working" begin
-    @testset "inbounds with Skip() returns index and false for an overflowed index" begin
-        @test Cellular.inbounds((1, 1), (4, 5), Skip()) == (1,1,true)
-        @test Cellular.inbounds((2, 3), (4, 5), Skip()) == (2,3,true)
-        @test Cellular.inbounds((4, 5), (4, 5), Skip()) == (4,5,true)
-        @test Cellular.inbounds((-3, -100), (4, 5), Skip()) == (-3,-100,false)
-        @test Cellular.inbounds((0, 0), (4, 5), Skip()) == (0,0,false)
-        @test Cellular.inbounds((2, 3), (3, 2), Skip()) == (2,3,false)
-        @test Cellular.inbounds((2, 3), (1, 4), Skip()) == (2,3,false)
-        @test Cellular.inbounds((200, 300), (2, 3), Skip()) == (200,300,false)
-    end
-    @testset "inbounds with Wrap() returns new index and true for an overflowed index" begin
-        @test Cellular.inbounds((-2,3), (10, 10), Wrap()) == (8,3,true)
-        @test Cellular.inbounds((2,0), (10, 10), Wrap()) == (2,10,true)
-        @test Cellular.inbounds((22,0), (10, 10), Wrap()) == (2,10,true)
-        @test Cellular.inbounds((-22,0), (10, 10), Wrap()) == (8,10,true)
-    end
-end
+import Cellular: rule, rule!, neighbors, scale_frame
 
 struct TestModel <: AbstractModel end
 struct TestPartial <: AbstractPartialModel end 
@@ -31,6 +12,39 @@ rule!(::TestPartial, state, row, col, t, source, dest, args...) = 0
 rule!(::TestPartialWrite, state, row, col, t, source, dest, args...) = dest[row, 2] = 0
 setup(x) = x
 
+
+@testset "boundary overflow checks are working" begin
+    @testset "inbounds with Skip() returns index and false for an overflowed index" begin
+        @test Cellular.inbounds((1, 1), (4, 5), Skip()) == ((1,1),true)
+        @test Cellular.inbounds((2, 3), (4, 5), Skip()) == ((2,3),true)
+        @test Cellular.inbounds((4, 5), (4, 5), Skip()) == ((4,5),true)
+        @test Cellular.inbounds((-3, -100), (4, 5), Skip()) == ((-3,-100),false)
+        @test Cellular.inbounds((0, 0), (4, 5), Skip()) == ((0,0),false)
+        @test Cellular.inbounds((2, 3), (3, 2), Skip()) == ((2,3),false)
+        @test Cellular.inbounds((2, 3), (1, 4), Skip()) == ((2,3),false)
+        @test Cellular.inbounds((200, 300), (2, 3), Skip()) == ((200,300),false)
+    end
+    @testset "inbounds with Wrap() returns new index and true for an overflowed index" begin
+        @test Cellular.inbounds((-2,3), (10, 10), Wrap()) == ((8,3),true)
+        @test Cellular.inbounds((2,0), (10, 10), Wrap()) == ((2,10),true)
+        @test Cellular.inbounds((22,0), (10, 10), Wrap()) == ((2,10),true)
+        @test Cellular.inbounds((-22,0), (10, 10), Wrap()) == ((8,10),true)
+    end
+end
+
+@testset "Scalable Matrix" begin
+
+    global init = setup([-1 0 1 2 3;
+                          0 1 2 3 4;
+                          1 2 3 4 5;
+                          2 3 4 5 6])
+
+    sm = ScalableMatrix(init, -1, 6)
+    scaled = scale_frame(sm)
+    @test maximum(scaled) == 1.0
+    @test minimum(scaled) == 0.0
+
+end
 # For manual testing on CUDA
 # using CuArrays
 # setup(x) = CuArray(x)
@@ -238,7 +252,6 @@ end
     @testset "GtkOutput works" begin
         using Gtk
         output = GtkOutput(int) 
-        output
         Cellular.process_image(output, output[1])
         Cellular.show_frame(output, 1)
         destroy(output.window)
