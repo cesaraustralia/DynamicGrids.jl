@@ -88,25 +88,30 @@ end
 set_timestamp(::NoFPS, o, t) = nothing
 
 """ 
-    savegif(filename::String, output::AbstractOutput)
-Write the output array to a gif. 
-Saving very large gifs may trigger a bug in imagemagick.
-"""
-savegif(filename::String, o::AbstractOutput) = 
-    FileIO.save(filename, cat(process_image.(o, scale_frame.(o))..., dims=3))
-
-""" 
     show_frame(output::AbstractOutput, [t])
 Show the last frame of the output, or the frame at time t. 
 """
 show_frame(o::AbstractOutput) = show_frame(o, lastindex(o))
 show_frame(o::AbstractOutput, t) = nothing
 
+" Normalise frame values if required "
 scale_frame(a) = a
 
+" peremute image dimensions for Images.jl based outputs "
+images_image(o, frame) = process_image(o, permutedims(scale_frame(frame), (2,1)))
+
+
+" Convert frame matrix to RGB24 "
+process_image(o, frame) = Images.RGB24.(frame)
 # process_image(o, frame) = begin
 #     map = applycolourmap(frame, cmap("L4"))
 #     convert.(RGB24, colorview(RGB, map[:,:,1], map[:,:,2], map[:,:,3]))
 # end
-process_image(o, frame) = Images.RGB24.(frame)
 
+""" 
+    savegif(filename::String, output::AbstractOutput)
+Write the output array to a gif. 
+Saving very large gifs may trigger a bug in imagemagick.
+"""
+savegif(filename::String, o::AbstractOutput) = 
+    FileIO.save(filename, cat(images_image.((o,), o)..., dims=3))

@@ -23,7 +23,7 @@ end
 build_range(lim::Tuple{Float64,Float64}) = lim[1]:(lim[2]-lim[1])/400:lim[2]
 build_range(lim::Tuple{Int,Int}) = lim[1]:1:lim[2]
 
-web_image(interface, frame) = dom"div"(process_image(interface, permutedims(scale_frame(frame), (2,1))))
+web_image(interface, frame) = dom"div"(images_image(interface, frame))
 
 WebInterface(frames::AbstractVector, model, args...; fps=25, showmax_fps=fps, store=false, theme=WebTheme()) = begin
 
@@ -63,12 +63,13 @@ WebInterface(frames::AbstractVector, model, args...; fps=25, showmax_fps=fps, st
     interface = WebInterface{typeof.((frames, fps, timestamp, tref, page, image_obs, t))...}(
                              frames, fps, showmax_fps, timestamp, tref, store, running, page, image_obs, t)
 
+    # Initialise image
+    image_obs[] = web_image(interface, frames[1])
+
     # Frame updates when t changes
     map!(image_obs, t) do t
         web_image(interface, frames[curframe(interface, t)])
     end
-
-    image_obs[] = web_image(interface, interface.frames[1])
 
     # Control mappings
     map!(timespan, observe(time_box)) do t
