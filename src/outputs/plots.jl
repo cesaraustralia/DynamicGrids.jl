@@ -36,6 +36,6 @@ Update plot for every specified interval
 """
 function show_frame(output::PlotsOutput, t)
     # rem(t, output.interval) == 0 || return true
-    heatmap!(output.plot, output[curframe(o, t)])
+    heatmap!(output.plot, scale_frame(output[curframe(o, t)]))
     display(output.plot)
 end

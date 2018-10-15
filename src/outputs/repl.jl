@@ -44,9 +44,8 @@ end
 
 replframe(o::REPLOutput{:braile}, t) = replframe(o, t, 4, 2, brailize)
 replframe(o::REPLOutput{:block}, t) = replframe(o, t, 2, 1, blockize)
-
-function replframe(o, i, ystep, xstep, f)
-    frame = o[i]
+replframe(o, i, ystep, xstep, f) = begin
+    frame = scale_frame(o[i])
     # Limit output area to available terminal size.
     dispy, dispx = dispsize = displaysize(stdout)
     youtput, xoutput = outputsize = size(frame)

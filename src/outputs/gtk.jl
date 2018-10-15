@@ -1,4 +1,7 @@
-using Cairo, Gtk, Images, Graphics
+using Cairo, 
+      Gtk, 
+      Images, 
+      Graphics
 
 """
 Shows output live in a Gtk window.
@@ -29,8 +32,9 @@ GtkOutput(frames::AbstractVector; fps=25, showmax_fps=100, store=false) = begin
     show(canvas)
     running = [false]
     canvas.mouse.button1press = (widget, event) -> running[1] = false
-
-    GtkOutput(frames[:], fps, showmax_fps, 0.0, 0, store, running, window, canvas)
+    output = GtkOutput(frames[:], fps, showmax_fps, 0.0, 0, store, running, window, canvas)
+    show_frame(output, 1)
+    output
 end
 
 
@@ -39,16 +43,10 @@ end
 Send frame at time t to the canvas in a Gtk window.
 """
 function show_frame(o::GtkOutput, t)
-    img = process_image(o, o[curframe(o, t)])
+    img = process_image(o, scale_frame(o[curframe(o, t)]))
     Gtk.@guarded Gtk.draw(o.canvas) do widget
         ctx = Gtk.getgc(o.canvas)
-        Cairo.reset_transform(ctx)
-        Cairo.image(ctx, img, 0, 0, Graphics.width(ctx), Graphics.height(ctx))
+        Cairo.image(ctx, Cairo.CairoImageSurface(img), 0, 0, 
+                    Graphics.width(ctx), Graphics.height(ctx))
     end
 end
-
-process_image(o::GtkOutput, frame::AbstractArray{T}) where T <: Integer =
-    Cairo.CairoImageSurface(convert(Matrix{UInt32}, frame) .* 0x00ffffff, Cairo.FORMAT_RGB24)
-
-process_image(o::GtkOutput, frame::AbstractArray{T}) where T <: AbstractFloat =
-    Cairo.CairoImageSurface(convert(Matrix{UInt32}, trunc.(UInt32, frame .* 0xff)) .* 0x00010101, Cairo.FORMAT_RGB24)

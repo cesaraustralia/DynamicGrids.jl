@@ -1,8 +1,8 @@
 """
-Simulation outputs are decoupled from simulation behaviour and can be used interchangeably.
-These outputs inherit from AbstractOutput.
+All outputs must inherit from AbstractOutput.
 
-Types that extend AbstractOutput define their own method for [`show_frame`](@ref).
+Simulation outputs are decoupled from simulation behaviour and in 
+many cases can be used interchangeably.
 """
 abstract type AbstractOutput{T} <: AbstractVector{T} end
 
@@ -27,9 +27,7 @@ struct HasFPS end
 struct NoFPS end
 
 "Generic ouput constructor. Converts init array to vector of frames."
-(::Type{F})(init::T, args...; kwargs...) where F <: AbstractOutput where T <: AbstractMatrix =
-    F(T[init], args...; kwargs...)
-
+(::Type{F})(init::T, args...; kwargs...) where F <: AbstractOutput where T <: AbstractMatrix = F(T[init], args...; kwargs...) 
 
 # Base methods
 length(o::AbstractOutput) = length(o.frames)
@@ -50,8 +48,6 @@ set_running(o::AbstractOutput, val) = o.running[1] = val
 is_async(o::AbstractOutput) = false
 
 clear(o::AbstractOutput) = deleteat!(o.frames, 1:length(o))
-
-process_image(o, frame) = Images.Gray.(frame)
 
 has_fps(o::O) where O = all(fn -> fn in fieldnames(O), (:fps, :timestamp)) ? HasFPS() : NoFPS()
 
@@ -96,13 +92,21 @@ set_timestamp(::NoFPS, o, t) = nothing
 Write the output array to a gif. 
 Saving very large gifs may trigger a bug in imagemagick.
 """
-savegif(filename::String, output::AbstractOutput) = 
-    FileIO.save(filename, Gray.(cat(3, output...)))
+savegif(filename::String, o::AbstractOutput) = 
+    FileIO.save(filename, cat(process_image.(o, scale_frame.(o))..., dims=3))
 
 """ 
     show_frame(output::AbstractOutput, [t])
 Show the last frame of the output, or the frame at time t. 
 """
-show_frame(o::AbstractOutput) = showframe(o, lastindex(o))
+show_frame(o::AbstractOutput) = show_frame(o, lastindex(o))
 show_frame(o::AbstractOutput, t) = nothing
+
+scale_frame(a) = a
+
+# process_image(o, frame) = begin
+#     map = applycolourmap(frame, cmap("L4"))
+#     convert.(RGB24, colorview(RGB, map[:,:,1], map[:,:,2], map[:,:,3]))
+# end
+process_image(o, frame) = Images.RGB24.(frame)
 

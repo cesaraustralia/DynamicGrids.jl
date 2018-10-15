@@ -23,6 +23,7 @@ end
 build_range(lim::Tuple{Float64,Float64}) = lim[1]:(lim[2]-lim[1])/400:lim[2]
 build_range(lim::Tuple{Int,Int}) = lim[1]:1:lim[2]
 
+web_image(interface, frame) = dom"div"(process_image(interface, permutedims(scale_frame(frame), (2,1))))
 
 WebInterface(frames::AbstractVector, model, args...; fps=25, showmax_fps=fps, store=false, theme=WebTheme()) = begin
 
@@ -31,7 +32,7 @@ WebInterface(frames::AbstractVector, model, args...; fps=25, showmax_fps=fps, st
     init = deepcopy(frames[1])
 
     # Standard output and controls
-    image = Observable{Any}(dom"div"(Images.Gray.(Array(frames[1]))))
+    image_obs = Observable{Any}(dom"div"())
     t = Observable{Int}(1)
     timespan = Observable{Int}(1000)
     sim = button("sim")
@@ -55,17 +56,19 @@ WebInterface(frames::AbstractVector, model, args...; fps=25, showmax_fps=fps, st
     modelwidgets = vbox(dom"span"("Model: "), vbox(sliders...))
 
     # Put it all together into a webpage
-    page = dom"div"(vbox(hbox(image, timetext), basewidgets, modelwidgets))
+    page = vbox(hbox(image_obs, timetext), basewidgets, modelwidgets)
 
     # Construct the interface object
     timestamp = 0.0; tref = 0; running = [false]
-    interface = WebInterface{typeof.((frames, fps, timestamp, tref, page, image, t))...}(
-                             frames, fps, showmax_fps, timestamp, tref, store, running, page, image, t)
+    interface = WebInterface{typeof.((frames, fps, timestamp, tref, page, image_obs, t))...}(
+                             frames, fps, showmax_fps, timestamp, tref, store, running, page, image_obs, t)
 
     # Frame updates when t changes
-    map!(image, t) do t
-        dom"div"(Images.Gray.(Array(frames[curframe(interface, t)])))
+    map!(image_obs, t) do t
+        web_image(interface, frames[curframe(interface, t)])
     end
+
+    image_obs[] = web_image(interface, interface.frames[1])
 
     # Control mappings
     map!(timespan, observe(time_box)) do t
