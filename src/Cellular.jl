@@ -39,6 +39,7 @@ using Parameters,
       Mixers,
       Requires,
       DocStringExtensions,
+      Images,
       UnicodeGraphics,
       REPLGamesBase,
       FieldMetadata,
@@ -61,6 +62,7 @@ export sim!,
        show, getindex, setindex!, lastindex, size, length, push!, append!,
        AbstractModel,
        AbstractPartialModel,
+       ScalableMatrix,
        AbstractLife,
        Life,
        AbstractNeighborhood,
@@ -94,11 +96,11 @@ include("framework.jl")
 include("neighborhoods.jl")
 include("utils.jl")
 include("life.jl")
+include("scalable_matrix.jl")
 include("outputs/repl.jl")
 include("outputs/gtk.jl")
 include("outputs/array.jl")
 include("outputs/sensitivity.jl")
-
 
 function __init__()
     @require Plots="91a5bcdd-55d7-5caf-9e0b-520d859cae80" begin
