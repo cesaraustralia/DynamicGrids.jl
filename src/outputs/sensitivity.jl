@@ -1,5 +1,6 @@
 """
-A simple array output that stores each step of the simulation in an array of arrays.
+A sensitivity output that sums passes to an array. It uses a modified
+`run!` method to run multiple simulations instead of a single simulation.
 """
 @Ok @Frames struct SensitivityOutput{} <: AbstractOutput{T} 
     passes::Int
