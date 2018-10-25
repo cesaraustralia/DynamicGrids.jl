@@ -9,7 +9,7 @@ struct TestPartialWrite <: AbstractPartialModel end
 
 rule(::TestModel, state, index, t, source, dest, args...) = 0
 rule!(::TestPartial, state, index, t, source, dest, args...) = 0
-rule!(::TestPartialWrite, state, index, t, source, dest, args...) = dest[row, 2] = 0
+rule!(::TestPartialWrite, state, index, t, source, dest, args...) = dest[index[1], 2] = 0
 setup(x) = x
 
 # For manual testing on CUDA
@@ -48,6 +48,10 @@ end
     @test maximum(normalized) == 1.0
     @test minimum(normalized) == 0.0
 
+end
+
+@testset "builds indices matrix" begin
+    @test broadcastable_indices([1 2 3; 3 4 5]) == [(1, 1) (1, 2) (1, 3); (2, 1) (2, 2) (2, 3)] 
 end
 
 
@@ -110,21 +114,21 @@ end
     global state = 0
     global t = 1
 
-    @test neighbors(moore, nothing, state, 6, 2, t, init) == 0
-    @test neighbors(vonneumann, nothing, state, 6, 2, t, init) == 0
-    @test neighbors(rotvonneumann, nothing, state, 6, 2, t, init) == 0
+    @test neighbors(moore, nothing, state, (6, 2), t, init) == 0
+    @test neighbors(vonneumann, nothing, state, (6, 2), t, init) == 0
+    @test neighbors(rotvonneumann, nothing, state, (6, 2), t, init) == 0
 
-    @test neighbors(moore, nothing, state, 2, 5, t, init) == 8
-    @test neighbors(vonneumann, nothing, state, 2, 5, t, init) == 4
-    @test neighbors(rotvonneumann, nothing, state, 2, 5, t, init) == 4
+    @test neighbors(moore, nothing, state, (2, 5), t, init) == 8
+    @test neighbors(vonneumann, nothing, state, (2, 5), t, init) == 4
+    @test neighbors(rotvonneumann, nothing, state, (2, 5), t, init) == 4
 
-    @test neighbors(moore, nothing, state, 4, 4, t, init) == 5
-    @test neighbors(vonneumann, nothing, state, 4, 4, t, init) == 2
-    @test neighbors(rotvonneumann, nothing, state, 4, 4, t, init) == 3
+    @test neighbors(moore, nothing, state, (4, 4), t, init) == 5
+    @test neighbors(vonneumann, nothing, state, (4, 4), t, init) == 2
+    @test neighbors(rotvonneumann, nothing, state, (4, 4), t, init) == 3
 
-    @test neighbors(custom, nothing, state, 1, 1, t, init) == 0
-    @test neighbors(custom, nothing, state, 3, 3, t, init) == 1
-    @test neighbors(multi, nothing, state, 1, 1, t, init) == [1, 2]
+    @test neighbors(custom, nothing, state, (1, 1), t, init) == 0
+    @test neighbors(custom, nothing, state, (3, 3), t, init) == 1
+    @test neighbors(multi, nothing, state, (1, 1), t, init) == [1, 2]
 
 end
 
