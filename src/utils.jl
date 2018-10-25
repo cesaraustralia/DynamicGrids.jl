@@ -41,7 +41,5 @@ calc_distance(y, x) = sqrt(y^2 + x^2)
 broadcastable_indices(a) = broadcastable_indices(Int, a)
 broadcastable_indices(T::Type, a) = begin
     h, w = size(a)
-    rows = typeof(similar(a, T))(collect(row for row in 1:h, col in 1:w))
-    cols = typeof(similar(a, T))(collect(col for row in 1:h, col in 1:w))
-    rows, cols
+    typeof(similar(a, T))(collect((row, col) for row in 1:h, col in 1:w))
 end

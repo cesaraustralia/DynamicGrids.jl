@@ -130,7 +130,7 @@ Rules alter cell values based on their current state and other cells, often
 
 Returns a value to be written to the current cell.
 """
-function rule(model::Nothing, state, row, col, t, source, dest, args...) end
+function rule(model::Nothing, state, index, t, source, dest, args...) end
 
 """
     function rule!(model, state, rows, cols, t, source, dest, args...)
@@ -140,7 +140,7 @@ from [`AbstractPartialModel`](@ref).
 ### Arguments:
 see [`rule`](@ref) 
 """
-function rule!(model::Nothing, state, row, col, t, source, dest, args...) end
+function rule!(model::Nothing, state, index, t, source, dest, args...) end
 
 """
     replay(output::AbstractOutput)
