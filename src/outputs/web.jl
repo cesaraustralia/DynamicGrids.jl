@@ -23,8 +23,6 @@ end
 build_range(lim::Tuple{Float64,Float64}) = lim[1]:(lim[2]-lim[1])/400:lim[2]
 build_range(lim::Tuple{Int,Int}) = lim[1]:1:lim[2]
 
-web_image(interface, frame) = dom"div"(images_image(interface, frame))
-
 WebInterface(frames::AbstractVector, model, args...; fps=25, showmax_fps=fps, store=false, theme=WebTheme()) = begin
 
     settheme!(theme)
@@ -33,14 +31,14 @@ WebInterface(frames::AbstractVector, model, args...; fps=25, showmax_fps=fps, st
 
     # Standard output and controls
     image_obs = Observable{Any}(dom"div"())
-    t = Observable{Int}(1)
+    t_obs = Observable{Int}(1)
     timespan = Observable{Int}(1000)
     sim = button("sim")
     resume = button("resume")
     stop = button("stop")
     replay = button("replay")
     time_box = textbox("1000")
-    timetext = Observable{Any}(dom"div"("0"))
+    timedisplay = Observable{Any}(dom"div"("0"))
     fps_slider = slider(1:200, label="FPS")
     basewidgets = hbox(sim, resume, stop, replay, vbox(dom"span"("Frames"), time_box), fps_slider)
 
@@ -56,7 +54,7 @@ WebInterface(frames::AbstractVector, model, args...; fps=25, showmax_fps=fps, st
     modelwidgets = vbox(dom"span"("Model: "), vbox(sliders...))
 
     # Put it all together into a webpage
-    page = vbox(hbox(image_obs, timetext), basewidgets, modelwidgets)
+    page = vbox(hbox(image_obs, timedisplay), basewidgets, modelwidgets)
 
     # Construct the interface object
     timestamp = 0.0; tref = 0; running = [false]
@@ -66,18 +64,14 @@ WebInterface(frames::AbstractVector, model, args...; fps=25, showmax_fps=fps, st
     # Initialise image
     image_obs[] = web_image(interface, frames[1])
 
-    # Frame updates when t changes
-    map!(image_obs, t) do t
-        web_image(interface, frames[curframe(interface, t)])
-    end
-
     # Control mappings
     map!(timespan, observe(time_box)) do t
         parse(Int, t)
     end
-    map!(timetext, t) do t
+    map!(timedisplay, t_obs) do t
         dom"div"(string(t)) 
     end
+
     on(observe(sim)) do _
         sim!(interface, model, init, args...; time = timespan[])
     end
@@ -102,5 +96,10 @@ WebInterface(frames::AbstractVector, model, args...; fps=25, showmax_fps=fps, st
 end
 
 is_async(o::WebInterface) = true
-set_time(o::WebInterface, t) = o.t[] = t
-show_frame(o::WebInterface, t) = set_time(o, t) # trigger the image redraw.
+
+show_frame(o::WebInterface, frame, t) = begin 
+    o.image[] = web_image(o, frame)
+    o.t[] = t
+end
+
+web_image(interface, frame) = dom"div"(images_image(interface, frame))

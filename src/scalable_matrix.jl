@@ -17,4 +17,4 @@ show(io::IO, a::ScalableMatrix) = begin
     show(io, a.data)
 end
 
-scale_frame(a::ScalableMatrix) = (a.data .- a.min) ./ (a.max - a.min)
+normalize_frame(a::ScalableMatrix) = (a.data .- a.min) ./ (a.max - a.min)

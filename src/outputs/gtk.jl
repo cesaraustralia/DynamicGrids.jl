@@ -26,7 +26,7 @@ Constructor for GtkOutput.
 - `fps`: frames per second
 - `showmax_fps`: maximum displayed frames per second
 """
-GtkOutput(frames::AbstractVector; fps=25, showmax_fps=100, store=false) = begin
+GtkOutput(frames::AbstractVector; fps=25, showmax_fps=fps, store=false) = begin
     canvas = Gtk.@GtkCanvas()
     window = Gtk.Window(canvas, "Cellular Automata")
     show(canvas)
@@ -38,12 +38,8 @@ GtkOutput(frames::AbstractVector; fps=25, showmax_fps=100, store=false) = begin
 end
 
 
-"""
-    show_frame(o::GtkOutput, t)
-Send frame at time t to the canvas in a Gtk window.
-"""
-function show_frame(o::GtkOutput, t)
-    img = process_image(o, scale_frame(o[curframe(o, t)]))
+show_frame(o::GtkOutput, frame::AbstractMatrix, t) = begin
+    img = process_image(o, normalize_frame(frame))
     Gtk.@guarded Gtk.draw(o.canvas) do widget
         ctx = Gtk.getgc(o.canvas)
         Cairo.image(ctx, Cairo.CairoImageSurface(img), 0, 0, 

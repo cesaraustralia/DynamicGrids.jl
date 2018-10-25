@@ -20,7 +20,7 @@ REPLOutput{:block}(init)
     displayoffset::Array{Int}
     color::C
 end
-REPLOutput{X}(frames::AbstractVector; fps=25, showmax_fps=100, store=false, color=:white) where X =
+REPLOutput{X}(frames::AbstractVector; fps=25, showmax_fps=fps, store=false, color=:white) where X =
     REPLOutput{X,typeof.((frames, fps, 0.0, 0, color))...}(
                frames, fps, showmax_fps, 0.0, 0, store, [false], [1,1], color)
 
@@ -32,22 +32,25 @@ end
 
 is_async(o::REPLOutput) = true
 
-"""
-    show_frame(o::REPLOutput, t)
-Extends show_frame from [`ArrayOuput`](@ref) by also printing to the REPL.
-"""
-show_frame(o::REPLOutput, t) = begin
-    out = replframe(o, curframe(o, t)) 
-    REPLGamesBase.put([0,0], o.color, out) 
+show_frame(o::REPLOutput, frame, t) = begin 
+    REPLGamesBase.put([0,0], o.color, replframe(o, normalize_frame(frame))) 
     REPLGamesBase.put([0,0], o.color, string(t)) 
 end
 
-replframe(o::REPLOutput{:braile}, t) = replframe(o, t, 4, 2, brailize)
-replframe(o::REPLOutput{:block}, t) = replframe(o, t, 2, 1, blockize)
-replframe(o, i, ystep, xstep, f) = begin
-    frame = scale_frame(o[i])
+
+const YBRAILE = 4
+const XBRAILE = 2
+const YBLOCK = 2
+const XBLOCK = 1
+const XSCROLL = 4
+const YSCROLL = 8
+const PAGESCROLL = 40
+
+replframe(o::REPLOutput{:braile}, frame) = replframe(o, frame, YBRAILE, XBRAILE, brailize)
+replframe(o::REPLOutput{:block}, frame) = replframe(o, frame, YBLOCK, XBLOCK, blockize)
+replframe(o, frame, ystep, xstep, f) = begin
     # Limit output area to available terminal size.
-    dispy, dispx = dispsize = displaysize(stdout)
+    dispy, dispx = displaysize(stdout)
     youtput, xoutput = outputsize = size(frame)
     yoffset, xoffset = o.displayoffset
 
@@ -58,38 +61,31 @@ replframe(o, i, ystep, xstep, f) = begin
     end
 end
 
-
 movedisplay(o) =
     while is_running(o)
         c = REPLGamesBase.readKey()
-        c == "Up"      && move_y!(o, -1)
-        c == "Down"    && move_y!(o, 1)
-        c == "Left"    && move_x!(o, -1)
-        c == "Right"   && move_x!(o, 1)
-        c == "PgUp"    && move_y!(o, -10)
-        c == "PgDown"  && move_y!(o, 10)
+        c == "Up"      && move_y!(o, -YSCROLL)
+        c == "Down"    && move_y!(o, YSCROLL)
+        c == "Left"    && move_x!(o, -XSCROLL)
+        c == "Right"   && move_x!(o, XSCROLL)
+        c == "PgUp"    && move_y!(o, -PAGESCROLL)
+        c == "PgDown"  && move_y!(o, PAGESCROLL)
         c in ["Ctrl-C"]  && set_running(o, false)
     end
 
-move_y!(o::REPLOutput{:block}, n) = begin
-    dispy, dispx = displaysize(stdout)
-    y, x = size(o[1])
-    o.displayoffset[1] = max(0, min(y ÷ 2 - dispy, o.displayoffset[1] + 4n))
+move_y!(o::REPLOutput{:block}, n) = move_y!(n, XBLOCK)
+move_x!(o::REPLOutput{:block}, n) = move_x!(n, XBLOCK)
+move_y!(o::REPLOutput{:braile}, n) = move_y!(n, XBRAILE)
+move_x!(o::REPLOutput{:braile}, n) = move_x!(n, XBRAILE)
+move_y!(n, yscale) = begin
+    dispy, _ = displaysize(stdout)
+    y = size(o[1], 1)
+    o.displayoffset[1] = max(0, min(y ÷ yscale - dispy, o.displayoffset[1] + n))
 end
-move_x!(o::REPLOutput{:block}, n) = begin
-    dispy, dispx = displaysize(stdout)
-    y, x = size(o[1])
-    o.displayoffset[2] = max(0, min(x - dispx, o.displayoffset[2] + 8n))
-end
-move_y!(o::REPLOutput{:braile}, n) = begin
-    dispy, dispx = displaysize(stdout)
-    y, x = size(o[1])
-    o.displayoffset[1] = max(0, min(y ÷ 4 - dispy, o.displayoffset[1] + 4n))
-end
-move_x!(o::REPLOutput{:braile}, n) = begin
-    dispy, dispx = displaysize(stdout)
-    y, x = size(o[1])
-    o.displayoffset[2] = max(0, min(x ÷ 2 - dispx, o.displayoffset[2] + 8n))
+move_x!(n, xscale) = begin
+    _, dispx = displaysize(stdout)
+    x = size(o[1], 2)
+    o.displayoffset[2] = max(0, min(x ÷ xscale - dispx, o.displayoffset[2] + n))
 end
 
 

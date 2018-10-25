@@ -50,7 +50,7 @@ append!(o::BlinkOutput, x) = append!(o.interface, x)
 
 clear(o::BlinkOutput) = clear(o.interface)
 store_frame(o::BlinkOutput, frame, t) = store_frame(o.interface, frame, t)
-show_frame(o::BlinkOutput, frame) = show_frame(o.interface, frame)
+show_frame(o::BlinkOutput, frame, t) = show_frame(o.interface, frame, t)
 is_showable(o::BlinkOutput, t) = is_showable(o.interface, t)
 is_async(o::BlinkOutput) = is_async(o.interface)
 is_running(o::BlinkOutput) = is_alive(o) && is_running(o.interface)

@@ -30,12 +30,7 @@ initialize(output::PlotsOutput) = begin
     output.timestamp = time()
 end
 
-"""
-    show_frame(output::PlotsOutput, t)
-Update plot for every specified interval
-"""
-function show_frame(output::PlotsOutput, t)
-    # rem(t, output.interval) == 0 || return true
-    heatmap!(output.plot, scale_frame(output[curframe(o, t)]))
+show_frame(o::PlotsOutput, frame::AbstractMatrix) = begin
+    heatmap!(output.plot, normalize_frame(frame))
     display(output.plot)
 end

@@ -49,7 +49,7 @@ is_async(o::AbstractOutput) = false
 
 clear(o::AbstractOutput) = deleteat!(o.frames, 1:length(o))
 
-has_fps(o::O) where O = all(fn -> fn in fieldnames(O), (:fps, :timestamp)) ? HasFPS() : NoFPS()
+has_fps(o::O) where O = :fps in fieldnames(O) ? HasFPS() : NoFPS()
 
 fps(o) = o.fps
 
@@ -92,13 +92,15 @@ set_timestamp(::NoFPS, o, t) = nothing
 Show the last frame of the output, or the frame at time t. 
 """
 show_frame(o::AbstractOutput) = show_frame(o, lastindex(o))
-show_frame(o::AbstractOutput, t) = nothing
+show_frame(o::AbstractOutput, t::Number) = show_frame(o, o[curframe(o, t)], t)
+show_frame(o::AbstractOutput, frame::AbstractMatrix) = show_frame(o, frame, 0)
+show_frame(o::AbstractOutput, frame, t) = nothing
 
 " Normalise frame values if required "
-scale_frame(a) = a
+normalize_frame(a) = a
 
 " peremute image dimensions for Images.jl based outputs "
-images_image(o, frame) = process_image(o, permutedims(scale_frame(frame), (2,1)))
+images_image(o, frame) = process_image(o, permutedims(normalize_frame(frame), (2,1)))
 
 
 " Convert frame matrix to RGB24 "
