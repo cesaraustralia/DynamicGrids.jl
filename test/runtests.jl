@@ -1,15 +1,15 @@
 using Revise, 
       Cellular,
       Test
-import Cellular: rule, rule!, neighbors, scale_frame
+import Cellular: rule, rule!, neighbors, normalize_frame
 
 struct TestModel <: AbstractModel end
 struct TestPartial <: AbstractPartialModel end 
 struct TestPartialWrite <: AbstractPartialModel end
 
-rule(::TestModel, state, row, col, t, source, dest, args...) = 0
-rule!(::TestPartial, state, row, col, t, source, dest, args...) = 0
-rule!(::TestPartialWrite, state, row, col, t, source, dest, args...) = dest[row, 2] = 0
+rule(::TestModel, state, index, t, source, dest, args...) = 0
+rule!(::TestPartial, state, index, t, source, dest, args...) = 0
+rule!(::TestPartialWrite, state, index, t, source, dest, args...) = dest[row, 2] = 0
 setup(x) = x
 
 # For manual testing on CUDA
@@ -44,9 +44,9 @@ end
                           2 3 4 5 6])
 
     sm = ScalableMatrix(init, -1, 6)
-    scaled = scale_frame(sm)
-    @test maximum(scaled) == 1.0
-    @test minimum(scaled) == 0.0
+    normalized = normalize_frame(sm)
+    @test maximum(normalized) == 1.0
+    @test minimum(normalized) == 0.0
 
 end
 
