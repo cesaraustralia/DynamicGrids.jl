@@ -5,13 +5,16 @@ struct ScalableMatrix{T,M} <: AbstractMatrix{T}
     max::M
 end
 
-length(a::ScalableMatrix) = length(a.data)
 size(a::ScalableMatrix) = size(a.data)
+Base.@propagate_inbounds getindex(a::ScalableMatrix, I...) = getindex(a.data, I...)
+Base.@propagate_inbounds setindex!(a::ScalableMatrix, v, I...) = setindex!(a.data, v, I...)
 firstindex(a::ScalableMatrix) = firstindex(a.data)
 lastindex(a::ScalableMatrix) = lastindex(a.data)
-Base.@propagate_inbounds getindex(a::ScalableMatrix, I...) = getindex(a.data, I...)
-Base.@propagate_inbounds setindex!(a::ScalableMatrix, x, I...) = setindex!(a.data, x, I...)
+length(a::ScalableMatrix) = length(a.data)
+interate(a::ScalableMatrix) = interate(a.data)
+axes(a::ScalableMatrix) = axes(a.data)
 push!(a::ScalableMatrix, x) = push!(a.data, x)
+IndexStyle(a::ScalableMatrix) = IndexStyle(a.data) 
 show(io::IO, a::ScalableMatrix) = begin
     print(io, "min: ", a.min, " max: ", a.max, " ")
     show(io, a.data)
