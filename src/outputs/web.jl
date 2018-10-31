@@ -17,8 +17,8 @@ abstract type AbstractWebOutput{T} <: AbstractOutput{T} end
 
 @Ok @FPS @Frames mutable struct WebInterface{P,Im,Ti} <: AbstractOutput{T}
     page::P
-    image::Im
-    t::Ti
+    image_obs::Im
+    t_obs::Ti
 end
 build_range(lim::Tuple{Float64,Float64}) = lim[1]:(lim[2]-lim[1])/400:lim[2]
 build_range(lim::Tuple{Int,Int}) = lim[1]:1:lim[2]
@@ -37,10 +37,10 @@ WebInterface(frames::AbstractVector, model, args...; fps=25, showmax_fps=fps, st
     resume = button("resume")
     stop = button("stop")
     replay = button("replay")
-    time_box = textbox("1000")
+    timespan_box = textbox("1000")
     timedisplay = Observable{Any}(dom"div"("0"))
     fps_slider = slider(1:200, label="FPS")
-    basewidgets = hbox(sim, resume, stop, replay, vbox(dom"span"("Frames"), time_box), fps_slider)
+    basewidgets = hbox(sim, resume, stop, replay, vbox(dom"span"("Frames"), timespan_box), fps_slider)
 
     # Auto-generated model controls
     params = flatten(model.models)
@@ -58,15 +58,15 @@ WebInterface(frames::AbstractVector, model, args...; fps=25, showmax_fps=fps, st
 
     # Construct the interface object
     timestamp = 0.0; tref = 0; running = [false]
-    interface = WebInterface{typeof.((frames, fps, timestamp, tref, page, image_obs, t))...}(
-                             frames, fps, showmax_fps, timestamp, tref, store, running, page, image_obs, t)
+    interface = WebInterface{typeof.((frames, fps, timestamp, tref, page, image_obs, t_obs))...}(
+                             frames, fps, showmax_fps, timestamp, tref, store, running, page, image_obs, t_obs)
 
     # Initialise image
     image_obs[] = web_image(interface, frames[1])
 
     # Control mappings
-    map!(timespan, observe(time_box)) do t
-        parse(Int, t)
+    map!(timespan, observe(timespan_box)) do ts
+        parse(Int, ts)
     end
     map!(timedisplay, t_obs) do t
         dom"div"(string(t)) 
@@ -98,8 +98,8 @@ end
 is_async(o::WebInterface) = true
 
 show_frame(o::WebInterface, frame, t) = begin 
-    o.image[] = web_image(o, frame)
-    o.t[] = t
+    o.image_obs[] = web_image(o, frame)
+    o.t_obs[] = t
 end
 
 web_image(interface, frame) = dom"div"(images_image(interface, frame))
