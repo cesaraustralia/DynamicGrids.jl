@@ -15,7 +15,7 @@ wrapped equivalent, and `true` as it is allways in-bounds.
 inbounds(xs::Tuple, maxs::Tuple, overflow) = begin
     a, inbounds_a = inbounds(xs[1], maxs[1], overflow)
     b, inbounds_b = inbounds(xs[2], maxs[2], overflow)
-    (a, b), inbounds_a && inbounds_b
+    (a, b), inbounds_a & inbounds_b
 end
 inbounds(x::Number, max::Number, overflow::Skip) = x, x > zero(x) && x <= max
 inbounds(x::Number, max::Number, overflow::Wrap) =
@@ -32,11 +32,10 @@ inbounds(x::Number, max::Number, overflow::Wrap) =
 
 Calculate the distances between all cells in a matrix
 """
-distances(a::AbstractMatrix) = broadcast(matrix_calc_distance, broadcastable_indices(a)...)
+distances(a) = broadcast(calc_distance, (a,), broadcastable_indices(a))
 
-matrix_calc_distance(row, col) = calc_distance(row - 1, col - 1)
-
-calc_distance(y, x) = sqrt(y^2 + x^2)
+calc_distance(::AbstractMatrix, index) = calc_distance(index .- 1)
+calc_distance((y, x)) = sqrt(y^2 + x^2)
 
 broadcastable_indices(a) = broadcastable_indices(Int, a)
 broadcastable_indices(T::Type, a) = begin
