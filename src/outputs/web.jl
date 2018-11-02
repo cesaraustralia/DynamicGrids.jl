@@ -40,16 +40,19 @@ WebInterface(frames::AbstractVector, model, args...; fps=25, showmax_fps=fps, st
     timespan_box = textbox("1000")
     timedisplay = Observable{Any}(dom"div"("0"))
     fps_slider = slider(1:200, label="FPS")
-    basewidgets = hbox(sim, resume, stop, replay, vbox(dom"span"("Frames"), timespan_box), fps_slider)
+    buttons = store ? (sim, resume, stop, replay) : (sim, resume, stop)
+    basewidgets = hbox(buttons..., vbox(dom"span"("Frames"), timespan_box), fps_slider)
 
     # Auto-generated model controls
     params = flatten(model.models)
     fnames = fieldnameflatten(model.models)
     lims = metaflatten(model.models, FieldMetadata.limits)
     parents = parentflatten(Tuple, model.models)
-    # attributes = broadcast((p, n) -> Dict(:title => "$p.$n"), parents, fnames) , attributes=attr
-    make_slider(p, lab, lim) = slider(build_range(lim); label=string(lab), value=p)
-    sliders = broadcast(make_slider, params, fnames, lims)
+    descriptions = metaflatten(Vector, model.models, FieldMetadata.description)
+    attributes = broadcast((p, n, d) -> Dict(:title => "$p.$n: $d"), parents, fnames, descriptions)
+    make_slider(val, lab, lims, attr) = slider(build_range(lims); label=string(lab), value=val, attributes=attr)
+
+    sliders = broadcast(make_slider, params, fnames, lims, attributes)
     slider_obs = map((s...) -> s, observe.(sliders)...)
     modelwidgets = vbox(dom"span"("Model: "), vbox(sliders...))
 
@@ -86,7 +89,7 @@ WebInterface(frames::AbstractVector, model, args...; fps=25, showmax_fps=fps, st
     end
     on(observe(fps_slider)) do fps
         interface.fps = fps 
-        set_timestamp(interface, interface.t[])
+        set_timestamp(interface, interface.t_obs[])
     end
     on(slider_obs) do s
         model.models = Flatten.reconstruct(model.models, s) 
