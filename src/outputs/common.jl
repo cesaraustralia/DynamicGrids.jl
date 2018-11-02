@@ -67,7 +67,7 @@ curframe(::HasFPS, o, t) = o.store ? t : 1
 curframe(::NoFPS, o, t) = t
 
 is_showable(o::AbstractOutput, t) = is_showable(has_fps(o), o, t)
-is_showable(::HasFPS, o, t) = t % (o.fps ÷ o.showmax_fps + 1) == 0
+is_showable(::HasFPS, o, t) = true # TODO working max fps. o.timestamp + (t - o.tref)/o.showmax_fps < time()
 is_showable(::NoFPS, o, t) = false
 
 finalize(o::AbstractOutput, args...) = nothing
