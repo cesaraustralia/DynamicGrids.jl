@@ -53,9 +53,9 @@ sim!(output, Models(Life(b=(1,3,5,7), s=(1,3,5,7))), init; time=1000)
 ```
 
 """
-rule(model::AbstractLife, state, args...) = begin
+rule(model::AbstractLife, data, state, args...) = begin
     # Sum neighborhood
-    cc = neighbors(model.neighborhood, model, state, args...)
+    cc = neighbors(model.neighborhood, model, data, state, args...)
     # Determine next state based on current state and neighborhood total
     counts = state == zero(state) ? model.b : model.s
     for i = 1:length(counts)

@@ -49,7 +49,7 @@ run_sim!(output, args...) =
     end
 
 " Loop over the selected timespan, running models and displaying output "
-frameloop(output, model, init, time, args...) = begin
+frameloop(output, models, init, time, args...) = begin
     h, w = size(init)
     indices = broadcastable_indices(init)
 
@@ -62,7 +62,8 @@ frameloop(output, model, init, time, args...) = begin
     for t in time
         # Run the automation on the source array, writing to the dest array and
         # setting the source and dest arrays for the next iteration.
-        source, dest = run_models!(model.models, source, dest, indices, t, args...)
+        data = ModelData(models.cellsize, source, dest, t)
+        source, dest = run_models!(models.models, data, indices, args...)
         # Save the the current frame
         store_frame(output, source, t)
         # Display the current frame
@@ -89,28 +90,29 @@ Iterate over all models recursively, swapping source and dest arrays.
 
 Returns a tuple containing the source and dest arrays for the next iteration.
 """
-run_models!(models::Tuple, source, dest, args...) = begin
-    broadcast_rule!(models[1], source, dest, args...)
-    run_models!(Base.tail(models), dest, source, args...)
+run_models!(models::Tuple, data, args...) = begin
+    broadcast_rule!(models[1], data, args...)
+    data = ModelData(data.cellsize, data.dest, data.source, data.t)
+    run_models!(Base.tail(models), data, args...)
 end
-run_models!(models::Tuple{}, source, dest, args...) = source, dest
+run_models!(models::Tuple{}, data, args...) = data.source, data.dest 
 
 
 """
-    broadcast_rules!(models, source, dest, indices, t, args...)
+    broadcast_rules!(models, data, indices, args...)
 
 Runs the rule(s) for each cell in the grid, dependin on the model(s) passed in.
 For [`AbstractModel`] the returned values are written to the `dest` grid,
 while for [`AbstractPartialModel`](@ref) the grid is
 pre-initialised to zero and rules manually populate the dest grid.
 """
-broadcast_rule!(model::AbstractModel, source, dest, indices, t, args...) = begin
-   broadcast!(rule, dest, Ref(model), source, indices, t, (source,), (dest,), tuple.(args)...)
+broadcast_rule!(model::AbstractModel, data, indices, args...) = begin
+    broadcast!(rule, data.dest, Ref(model), Ref(data), data.source, indices, tuple.(args)...)
 end
-broadcast_rule!(model::AbstractPartialModel, source, dest, indices, t, args...) = begin
+broadcast_rule!(model::AbstractPartialModel, data, indices, args...) = begin
     # Initialise the dest array
-    dest .= source
-    broadcast(rule!, Ref(model), source, indices, t, (source,), (dest,), tuple.(args)...)
+    data.dest .= data.source
+    broadcast(rule!, Ref(model), Ref(data), data.source, indices, tuple.(args)...)
 end
 
 
@@ -122,25 +124,24 @@ Rules alter cell values based on their current state and other cells, often
 
 ### Arguments:
 - `model` : [`AbstractModel`](@ref)
+- `data` : [`ModelData`](@ref)
 - `state`: the value of the current cell
 - `index`: a (row, column) tuple of Int for the current cell coordinates - `t`: the current time step
-- `source`: the whole source array. Never to be written to.
-- `dest`: the whole destination array. Never to be written to in AbstractModel.
 - `args`: additional arguments passed through from user input to [`sim!`](@ref)
 
 Returns a value to be written to the current cell.
 """
-function rule(model::Nothing, state, index, t, source, dest, args...) end
+function rule(model::Nothing, data, state, index, args...) end
 
 """
-    function rule!(model, state, indices, t, source, dest, args...)
+    function rule!(model, data, state, indices, args...)
 A rule that manually writes to the dest array, used in models inheriting 
 from [`AbstractPartialModel`](@ref).
 
 ### Arguments:
 see [`rule`](@ref) 
 """
-function rule!(model::Nothing, state, index, t, source, dest, args...) end
+function rule!(model::Nothing, data, state, index, args...) end
 
 """
     replay(output::AbstractOutput)

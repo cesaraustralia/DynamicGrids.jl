@@ -7,9 +7,9 @@ struct TestModel <: AbstractModel end
 struct TestPartial <: AbstractPartialModel end 
 struct TestPartialWrite <: AbstractPartialModel end
 
-rule(::TestModel, state, index, t, source, dest, args...) = 0
-rule!(::TestPartial, state, index, t, source, dest, args...) = 0
-rule!(::TestPartialWrite, state, index, t, source, dest, args...) = dest[index[1], 2] = 0
+rule(::TestModel, data, state, index, args...) = 0
+rule!(::TestPartial, data, state, index, args...) = 0
+rule!(::TestPartialWrite, data, state, index, args...) = data.dest[index[1], 2] = 0
 setup(x) = x
 
 # For manual testing on CUDA
@@ -114,21 +114,23 @@ end
     global state = 0
     global t = 1
 
-    @test neighbors(moore, nothing, state, (6, 2), t, init) == 0
-    @test neighbors(vonneumann, nothing, state, (6, 2), t, init) == 0
-    @test neighbors(rotvonneumann, nothing, state, (6, 2), t, init) == 0
+    data = Cellular.ModelData(1, init, deepcopy(init), 1)
 
-    @test neighbors(moore, nothing, state, (2, 5), t, init) == 8
-    @test neighbors(vonneumann, nothing, state, (2, 5), t, init) == 4
-    @test neighbors(rotvonneumann, nothing, state, (2, 5), t, init) == 4
+    @test neighbors(moore, nothing, data, state, (6, 2)) == 0
+    @test neighbors(vonneumann, nothing, data, state, (6, 2)) == 0
+    @test neighbors(rotvonneumann, nothing, data, state, (6, 2)) == 0
 
-    @test neighbors(moore, nothing, state, (4, 4), t, init) == 5
-    @test neighbors(vonneumann, nothing, state, (4, 4), t, init) == 2
-    @test neighbors(rotvonneumann, nothing, state, (4, 4), t, init) == 3
+    @test neighbors(moore, nothing, data, state, (2, 5)) == 8
+    @test neighbors(vonneumann, nothing, data, state, (2, 5)) == 4
+    @test neighbors(rotvonneumann, nothing, data, state, (2, 5)) == 4
 
-    @test neighbors(custom, nothing, state, (1, 1), t, init) == 0
-    @test neighbors(custom, nothing, state, (3, 3), t, init) == 1
-    @test neighbors(multi, nothing, state, (1, 1), t, init) == [1, 2]
+    @test neighbors(moore, nothing, data, state, (4, 4)) == 5
+    @test neighbors(vonneumann, nothing, data, state, (4, 4)) == 2
+    @test neighbors(rotvonneumann, nothing, data, state, (4, 4)) == 3
+
+    @test neighbors(custom, nothing, data, state, (1, 1)) == 0
+    @test neighbors(custom, nothing, data, state, (3, 3)) == 1
+    @test neighbors(multi, nothing, data, state, (1, 1)) == [1, 2]
 
 end
 
