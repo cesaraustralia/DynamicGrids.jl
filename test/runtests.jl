@@ -48,6 +48,16 @@ end
     @test maximum(normalized) == 1.0
     @test minimum(normalized) == 0.0
 
+    global init = setup([-0.1 0.0 0.1 0.2 0.3;
+                          0.0 0.1 0.2 0.3 0.4;
+                          0.1 0.2 0.3 0.4 0.5;
+                          0.2 0.3 0.4 0.5 0.6])
+
+    sm = ScalableMatrix(init, -0.1, 0.6)
+    normalized = normalize_frame(sm)
+    @test maximum(normalized) == 1.0
+    @test minimum(normalized) == 0.0
+
 end
 
 @testset "builds indices matrix" begin
