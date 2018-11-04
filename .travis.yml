@@ -28,10 +28,12 @@ script:
   - if [[ `uname` = "Linux" ]]; then TESTCMD="xvfb-run julia"; else TESTCMD="julia"; fi
   - julia -e 'using Pkg; Pkg.add(PackageSpec(url="https://github.com/ChristianKurz/REPLGamesBase.jl.git")); Pkg.build("REPLGamesBase")'
   - $TESTCMD -e 'using Pkg;
-                 Pkg.add(PackageSpec(url=pwd())); 
-                 Pkg.build("Cellular"); 
+                 Pkg.add("ImageMagick"); 
+                 Pkg.build("ImageMagick"); 
                  Pkg.add("Blink"); 
                  Pkg.build("Blink"); 
+                 Pkg.add(PackageSpec(url=pwd())); 
+                 Pkg.build("Cellular"); 
                  using Blink;
                  Blink.AtomShell.install();
                  Pkg.test("Cellular"; coverage=true)'
