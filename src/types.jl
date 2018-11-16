@@ -36,9 +36,9 @@ mutable struct Models{M,C<:Number}
     Models(args...; cellsize=1) = new{typeof(args), typeof(cellsize)}(args, cellsize)
 end
 
-struct ModelData{M,A,T} 
-    cellsize::M
+struct FrameData{A,M,T} 
     source::A
     dest::A
+    cellsize::M
     t::T
 end

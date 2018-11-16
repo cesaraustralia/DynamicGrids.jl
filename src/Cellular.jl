@@ -47,7 +47,7 @@ using Parameters,
       Cairo,
       FileIO
 
-import Base: show, getindex, setindex!, lastindex, size, length, push!, append!
+import Base: show, getindex, setindex!, lastindex, size, length, push!, append!, broadcast, broadcast!
 import Flatten: @flattenable, flattenable
 import FieldMetadata: @limits, limits
 
@@ -72,7 +72,7 @@ export sim!,
        CustomNeighborhood,
        MultiCustomNeighborhood,
        AbstractOverflow,
-       Models,
+       ModelList,
        Skip,
        Wrap,
        AbstractOutput,

@@ -62,7 +62,7 @@ frameloop(output, models, init, time, args...) = begin
     for t in time
         # Run the automation on the source array, writing to the dest array and
         # setting the source and dest arrays for the next iteration.
-        data = ModelData(models.cellsize, source, dest, t)
+        data = FrameData(source, dest, models.cellsize, t)
         source, dest = run_models!(models.models, data, indices, args...)
         # Save the the current frame
         store_frame(output, source, t)
@@ -92,7 +92,7 @@ Returns a tuple containing the source and dest arrays for the next iteration.
 """
 run_models!(models::Tuple, data, args...) = begin
     broadcast_rule!(models[1], data, args...)
-    data = ModelData(data.cellsize, data.dest, data.source, data.t)
+    data = FrameData(data.dest, data.source, data.cellsize, data.t)
     run_models!(Base.tail(models), data, args...)
 end
 run_models!(models::Tuple{}, data, args...) = data.source, data.dest 
@@ -115,7 +115,6 @@ broadcast_rule!(model::AbstractPartialModel, data, indices, args...) = begin
     broadcast(rule!, Ref(model), Ref(data), data.source, indices, tuple.(args)...)
 end
 
-
 """
     function rule(model, state, indices, t, source, dest, args...)
 
@@ -124,7 +123,7 @@ Rules alter cell values based on their current state and other cells, often
 
 ### Arguments:
 - `model` : [`AbstractModel`](@ref)
-- `data` : [`ModelData`](@ref)
+- `data` : [`FrameData`](@ref)
 - `state`: the value of the current cell
 - `index`: a (row, column) tuple of Int for the current cell coordinates - `t`: the current time step
 - `args`: additional arguments passed through from user input to [`sim!`](@ref)
