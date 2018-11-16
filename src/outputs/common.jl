@@ -96,8 +96,6 @@ show_frame(o::AbstractOutput, t::Number) = show_frame(o, o[curframe(o, t)], t)
 show_frame(o::AbstractOutput, frame::AbstractMatrix) = show_frame(o, frame, 0)
 show_frame(o::AbstractOutput, frame, t) = nothing
 
-" Normalise frame values if required "
-normalize_frame(a) = a
 
 " peremute image dimensions for Images.jl based outputs "
 images_image(o, frame) = process_image(o, permutedims(normalize_frame(frame), (2,1)))

@@ -20,4 +20,9 @@ show(io::IO, a::ScalableMatrix) = begin
     show(io, a.data)
 end
 
+" Normalise frame values if required "
 normalize_frame(a::ScalableMatrix) = (a.data .- a.min) ./ (a.max - a.min)
+normalize_frame(a) = a
+
+limit_frame(a::ScalableMatrix) = a.data .= max.(a, a.max)
+limit_frame(a) = a
