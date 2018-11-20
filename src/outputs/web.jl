@@ -1,6 +1,7 @@
 using Interact, 
       InteractBase,
       InteractBulma,
+      AssetRegistry,
       Flatten, 
       Images
 
@@ -8,9 +9,9 @@ import InteractBase: WidgetTheme, libraries
 
 struct WebTheme <: WidgetTheme end
 
-const css_path = joinpath(dirname(pathof(Cellular)), "assets/web.css")
+const css_key = AssetRegistry.register(joinpath(dirname(pathof(Cellular)), "../assets/web.css"))
 
-libraries(::WebTheme) = vcat(libraries(Bulma()), [css_path])
+libraries(::WebTheme) = vcat(libraries(Bulma()), [css_key])
 
 
 abstract type AbstractWebOutput{T} <: AbstractOutput{T} end
