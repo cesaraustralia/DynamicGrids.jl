@@ -77,10 +77,10 @@ WebInterface(frames::AbstractVector, model, args...; fps=25, showmax_fps=fps, st
     end
 
     on(observe(sim)) do _
-        sim!(interface, model, init, args...; time = timespan[])
+        sim!(interface, model, init, args...; tstop = timespan[])
     end
     on(observe(resume)) do _
-        resume!(interface, model, args...; time = timespan[]) 
+        resume!(interface, model, args...; tstop = timespan[]) 
     end
     on(observe(replay)) do _
         replay(interface) 

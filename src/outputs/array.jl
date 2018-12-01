@@ -5,3 +5,7 @@ A simple array output that stores each step of the simulation in an array of arr
 ArrayOutput(frames::AbstractVector) = ArrayOutput{typeof(frames)}(frames, [false])
 
 is_async(o::ArrayOutput) = false
+
+allocate(o::ArrayOutput, init, tspan) = append!(o.frames, [similar(init) for i in tspan])
+
+store_frame(::NoFPS, o::ArrayOutput, frame, t) = o[t] .= frame

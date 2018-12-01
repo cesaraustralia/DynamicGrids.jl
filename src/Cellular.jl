@@ -39,15 +39,15 @@ using Parameters,
       Mixers,
       Requires,
       DocStringExtensions,
-      Images,
       UnicodeGraphics,
       REPLGamesBase,
       FieldMetadata,
+      Images,
       Gtk, 
       Cairo,
       FileIO
 
-import Base: show, getindex, setindex!, lastindex, size, length, push!, append!, broadcast, broadcast!
+import Base: show, getindex, setindex!, lastindex, size, length, push!, append!, broadcast, broadcast!, similar, eltype
 import Flatten: @flattenable, flattenable
 import FieldMetadata: @limits, limits
 
@@ -62,6 +62,7 @@ export sim!,
        show, getindex, setindex!, lastindex, size, length, push!, append!,
        AbstractModel,
        AbstractPartialModel,
+       AbstractNeighborhoodModel,
        ScalableMatrix,
        AbstractLife,
        Life,

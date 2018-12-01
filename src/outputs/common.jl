@@ -47,6 +47,8 @@ set_running(o::AbstractOutput, val) = o.running[1] = val
 
 is_async(o::AbstractOutput) = false
 
+allocate(o::AbstractOutput, init, tspan) = nothing
+
 clear(o::AbstractOutput) = deleteat!(o.frames, 1:length(o))
 
 has_fps(o::O) where O = :fps in fieldnames(O) ? HasFPS() : NoFPS()
@@ -73,8 +75,8 @@ is_showable(::NoFPS, o, t) = false
 finalize(o::AbstractOutput, args...) = nothing
 
 initialize(o::AbstractOutput, args...) = initialize(has_fps(o), o, args...)
-initialize(::HasFPS, o, args...) = nothing 
-initialize(::NoFPS, o, args...) = nothing 
+initialize(::HasFPS, args...) = nothing 
+initialize(::NoFPS, args...) = nothing 
 
 delay(o, t) = delay(has_fps(o), o, t) 
 delay(::HasFPS, o, t) = sleep(max(0.0, o.timestamp + (t - o.tref)/fps(o) - time()))

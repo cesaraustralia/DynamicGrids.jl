@@ -13,7 +13,10 @@ There are two main differences with `AbstractModel`. AbstractPartialModel requir
 initialisation of the destination array before each timestep, and the output of
 the rule is not written to the grid but done manually.
 """
-abstract type AbstractPartialModel end
+abstract type AbstractPartialModel <: AbstractModel end
+
+
+abstract type AbstractNeighborhoodModel <: AbstractModel end
 
 
 """
@@ -36,9 +39,15 @@ mutable struct Models{M,C<:Number}
     Models(args...; cellsize=1) = new{typeof(args), typeof(cellsize)}(args, cellsize)
 end
 
-struct FrameData{A,M,T} 
+struct FrameData{A,C,T,MD} 
     source::A
     dest::A
-    cellsize::M
+    cellsize::C
     t::T
+    modeldata::MD
+end
+
+struct NieghborhoodMem{A}
+    extended::A 
+    loc::A
 end

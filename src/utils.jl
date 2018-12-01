@@ -12,13 +12,13 @@ coordinates that overflow outside of the grid.
 [`Wrap`](@ref) returns a tuple with the current position or it's
 wrapped equivalent, and `true` as it is allways in-bounds.
 """
-inbounds(xs::Tuple, maxs::Tuple, overflow) = begin
+@inline inbounds(xs::Tuple, maxs::Tuple, overflow) = begin
     a, inbounds_a = inbounds(xs[1], maxs[1], overflow)
     b, inbounds_b = inbounds(xs[2], maxs[2], overflow)
     (a, b), inbounds_a & inbounds_b
 end
-inbounds(x::Number, max::Number, overflow::Skip) = x, x > zero(x) && x <= max
-inbounds(x::Number, max::Number, overflow::Wrap) =
+@inline inbounds(x::Number, max::Number, overflow::Skip) = x, x > zero(x) && x <= max
+@inline inbounds(x::Number, max::Number, overflow::Wrap) =
     if x < oneunit(x)
         max + rem(x, max), true
     elseif x > max

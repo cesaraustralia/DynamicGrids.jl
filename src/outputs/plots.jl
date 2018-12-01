@@ -25,7 +25,7 @@ PlotsOutput(frames::AbstractVector; fps=25.0, aspect_ratio=:equal, kwargs...) = 
     PlotsOutput(frames, fps, 0.0, 0, [false], plt)
 end
 
-initialize(output::PlotsOutput) = begin
+initialize(output::PlotsOutput, args...) = begin
     display(output.plot)
     output.timestamp = time()
 end
