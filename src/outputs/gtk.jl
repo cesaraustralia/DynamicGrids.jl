@@ -33,7 +33,7 @@ GtkOutput(frames::AbstractVector; fps=25, showmax_fps=fps, store=false) = begin
     running = [false]
     canvas.mouse.button1press = (widget, event) -> running[1] = false
     output = GtkOutput(frames[:], fps, showmax_fps, 0.0, 0, store, running, window, canvas)
-    show_frame(output, 1)
+    show_frame!(output, 1)
     output
 end
 

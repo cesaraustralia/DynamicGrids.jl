@@ -16,11 +16,11 @@ the passed in output for each time-step.
 """
 sim!(output, models, init, args...; tstop=100) = begin
     is_running(output) && return
-    set_running(output, true) || return
-    clear(output)
-    allocate(output, init, 1:tstop)
-    store_frame(output, init, 1)
-    show_frame(output, 1)
+    set_running!(output, true) || return
+    clear!(output)
+    allocate!(output, init, 1:tstop)
+    store_frame!(output, init, 1)
+    show_frame!(output, 1)
     run_sim!(output, models, init, 2:tstop, args...)
     output
 end
@@ -35,7 +35,7 @@ See [`sim!`](@ref).
 """
 resume!(output, models, args...; tadd=100) = begin
     is_running(output) && return
-    set_running(output, true) || return
+    set_running!(output, true) || return
     tspan = 1 + lastindex(output):lastindex(output) + tadd
     run_sim!(output, models, output[end], tspan, args...)
     output
@@ -46,11 +46,11 @@ run_sim!(output, args...) =
         f() = frameloop(output, args...)
         schedule(Task(f))
     else
-        frameloop(output, args...)
+        frameloop!(output, args...)
     end
 
 " Loop over the selected timespan, running models and displaying output "
-frameloop(output, models, init, tspan, args...) = begin
+frameloop!(output, models, init, tspan, args...) = begin
     h, w = size(init)
     indices = broadcastable_indices(init)
 
@@ -138,16 +138,16 @@ broadcast_rule!(model::AbstractNeighborhoodModel, data, indices, args...) = begi
         end
     end
 
-    h, w = size(model.neighborhood.kernel)
+    h, w = size(sml)
     for i = 1:s[1]
-        for b = 1:1+2r
-            @simd for a = 1:1+2r
+        for b = 1:r+1
+            @simd for a = 1:h
                 @inbounds sml[a, b] = zero(eltype(sml)) 
             end
         end
-        for b = r+1:2r
-            @simd for a = 1:1+2r
-                @inbounds sml[a, b] = lge[i+a-1, b+r]
+        for b = r+2:w
+            @simd for a = 1:h
+                @inbounds sml[a, b] = lge[i+a-1, b-1]
             end
         end
         for j = 1:s[2]

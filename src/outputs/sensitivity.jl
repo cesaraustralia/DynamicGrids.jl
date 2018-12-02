@@ -15,7 +15,7 @@ run!(o::SensitivityOutput, args...) =
         frameloop(output, args...)
     end
 
-store_frame(::NoFPS, o::SensitivityOutput, frame, t) = 
+store_frame!(::NoFPS, o::SensitivityOutput, frame, t) = 
     if length(o) < t
         push!(o, deepcopy(frame))
     else

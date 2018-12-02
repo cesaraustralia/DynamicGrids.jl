@@ -24,7 +24,7 @@ REPLOutput{X}(frames::AbstractVector; fps=25, showmax_fps=fps, store=false, colo
     REPLOutput{X,typeof.((frames, fps, 0.0, 0, color))...}(
                frames, fps, showmax_fps, 0.0, 0, store, [false], [1,1], color)
 
-initialize(o::REPLOutput, args...) = begin
+initialize!(o::REPLOutput, args...) = begin
     o.displayoffset .= (1, 1)
     @async movedisplay(o)
     o.timestamp = time()

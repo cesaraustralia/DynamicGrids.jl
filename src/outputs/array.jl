@@ -6,6 +6,9 @@ ArrayOutput(frames::AbstractVector) = ArrayOutput{typeof(frames)}(frames, [false
 
 is_async(o::ArrayOutput) = false
 
-allocate(o::ArrayOutput, init, tspan) = append!(o.frames, [similar(init) for i in tspan])
+allocate!(o::ArrayOutput, init, tspan) = begin
+    append!(o.frames, [similar(init) for i in tspan])
+    nothing
+end
 
-store_frame(::NoFPS, o::ArrayOutput, frame, t) = o[t] .= frame
+store_frame!(::NoFPS, o::ArrayOutput, frame, t) = o[t] .= frame

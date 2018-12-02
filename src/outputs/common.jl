@@ -43,26 +43,26 @@ append!(o::AbstractOutput, x) = append!(o.frames, x)
 # Custom methods
 is_running(o::AbstractOutput) = o.running[1]
 
-set_running(o::AbstractOutput, val) = o.running[1] = val
+set_running!(o::AbstractOutput, val) = o.running[1] = val
 
 is_async(o::AbstractOutput) = false
 
-allocate(o::AbstractOutput, init, tspan) = nothing
+allocate!(o::AbstractOutput, init, tspan) = nothing
 
-clear(o::AbstractOutput) = deleteat!(o.frames, 1:length(o))
+clear!(o::AbstractOutput) = deleteat!(o.frames, 1:length(o))
 
 has_fps(o::O) where O = :fps in fieldnames(O) ? HasFPS() : NoFPS()
 
 fps(o) = o.fps
 
-store_frame(o::AbstractOutput, frame, t) = store_frame(has_fps(o), o, frame, t)
-store_frame(::HasFPS, o, frame, t) = 
+store_frame!(o::AbstractOutput, frame, t) = store_frame(has_fps(o), o, frame, t)
+store_frame!(::HasFPS, o, frame, t) = 
     if o.store || length(o) == 0
         push!(o, deepcopy(frame))
     else
         o[1] .= frame
     end
-store_frame(::NoFPS, o, frame, t) = push!(o, deepcopy(frame))
+store_frame!(::NoFPS, o, frame, t) = push!(o, deepcopy(frame))
 
 curframe(o::AbstractOutput, t) = curframe(has_fps(o), o, t)
 curframe(::HasFPS, o, t) = o.store ? t : 1
@@ -72,22 +72,22 @@ is_showable(o::AbstractOutput, t) = is_showable(has_fps(o), o, t)
 is_showable(::HasFPS, o, t) = true # TODO working max fps. o.timestamp + (t - o.tref)/o.showmax_fps < time()
 is_showable(::NoFPS, o, t) = false
 
-finalize(o::AbstractOutput, args...) = nothing
+finalize!(o::AbstractOutput, args...) = nothing
 
-initialize(o::AbstractOutput, args...) = initialize(has_fps(o), o, args...)
-initialize(::HasFPS, args...) = nothing 
-initialize(::NoFPS, args...) = nothing 
+initialize!(o::AbstractOutput, args...) = initialize(has_fps(o), o, args...)
+initialize!(::HasFPS, args...) = nothing 
+initialize!(::NoFPS, args...) = nothing 
 
 delay(o, t) = delay(has_fps(o), o, t) 
 delay(::HasFPS, o, t) = sleep(max(0.0, o.timestamp + (t - o.tref)/fps(o) - time()))
 delay(::NoFPS, o, t) = nothing
 
-set_timestamp(o, t) = set_timestamp(has_fps(o), o, t) 
-set_timestamp(::HasFPS, o, t) = begin
+set_timestamp!(o, t) = set_timestamp(has_fps(o), o, t) 
+set_timestamp!(::HasFPS, o, t) = begin
     o.timestamp = time()
     o.tref = t
 end
-set_timestamp(::NoFPS, o, t) = nothing
+set_timestamp!(::NoFPS, o, t) = nothing
 
 """ 
     show_frame(output::AbstractOutput, [t])

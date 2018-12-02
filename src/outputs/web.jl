@@ -86,11 +86,11 @@ WebInterface(frames::AbstractVector, model, args...; fps=25, showmax_fps=fps, st
         replay(interface) 
     end
     on(observe(stop)) do _
-        set_running(interface, false)
+        set_running!(interface, false)
     end
     on(observe(fps_slider)) do fps
         interface.fps = fps 
-        set_timestamp(interface, interface.t_obs[])
+        set_timestamp!(interface, interface.t_obs[])
     end
     on(slider_obs) do s
         model.models = Flatten.reconstruct(model.models, s) 
