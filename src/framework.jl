@@ -19,7 +19,7 @@ sim!(output, models, init, args...; tstop=100) = begin
     set_running!(output, true) || return
     clear!(output)
     store_frame!(output, init, 1)
-    # show_frame(output, 1)
+    show_frame(output, 1)
     run_sim!(output, models, init, 2:tstop, args...)
     output
 end
@@ -60,7 +60,6 @@ frameloop!(output, models, init, tspan, args...) = begin
 
     # Define storage arrays. These  may be larger than init!
     source, dest = define_storage(models, init)
-
     
     set_timestamp!(output, tspan.start)
 
@@ -83,7 +82,7 @@ frameloop!(output, models, init, tspan, args...) = begin
         delay(output, t)
         # Exit gracefully
         if !is_running(output) || t == tspan.stop
-            # show_frame(output, t)
+            show_frame(output, t)
             set_running!(output, false)
             # Any finishing touches required by the output
             finalize!(output)
