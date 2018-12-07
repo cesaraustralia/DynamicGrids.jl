@@ -144,7 +144,7 @@ end
 
 end
 
-@testset "life glider does its thing" begin
+@testset "life glider stored properly all outputs" begin
 
     global init = setup([0 0 0 0 0 0;
                          0 0 0 0 0 0;
@@ -208,18 +208,18 @@ end
         replay(output)
     end
 
-    @testset "BlinkOutput works" begin
-        using Blink
-        output = Cellular.BlinkOutput(init, model, store=true) 
-        sim!(output, model, init; tstop=2) 
-        sleep(1.5)
-        resume!(output, model; tadd=3)
-        sleep(1.5)
-        @test output[3] == test
-        @test output[5] == test2
-        replay(output)
-        close(output.window)
-    end
+    # @testset "BlinkOutput works" begin
+        # using Blink
+        # output = Cellular.BlinkOutput(init, model, store=true) 
+        # sim!(output, model, init; tstop=2) 
+        # sleep(1.5)
+        # resume!(output, model; tadd=3)
+        # sleep(1.5)
+        # @test output[3] == test
+        # @test output[5] == test2
+        # replay(output)
+        # close(output.window)
+    # end
 
     @testset "GtkOutput works" begin
         using Gtk
