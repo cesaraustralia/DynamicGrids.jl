@@ -17,11 +17,9 @@ the passed in output for each time-step.
 sim!(output, models, init, args...; tstop=100) = begin
     is_running(output) && return
     set_running!(output, true) || return
-    println("running!")
     clear!(output)
     store_frame!(output, init, 1)
     # show_frame(output, 1)
-    println("stored!")
     run_sim!(output, models, init, 2:tstop, args...)
     output
 end
@@ -47,7 +45,6 @@ end
 
 run_sim!(output, args...) =
     if is_async(output)
-        println("async!")
         f() = frameloop(output, args...)
         schedule(Task(f))
     else
@@ -56,7 +53,6 @@ run_sim!(output, args...) =
 
 " Loop over the selected timespan, running models and displaying output "
 frameloop!(output, models, init, tspan, args...) = begin
-    println("frameloop!")
     sze = size(init)
 
     # Set up the output
@@ -94,7 +90,6 @@ frameloop!(output, models, init, tspan, args...) = begin
             break
         end
     end
-    println("done.")
 end
 
 define_storage(models, init) = begin
