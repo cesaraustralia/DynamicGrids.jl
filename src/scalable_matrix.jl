@@ -15,8 +15,13 @@ length(a::ScalableMatrix) = length(a.data)
 interate(a::ScalableMatrix) = interate(a.data)
 axes(a::ScalableMatrix) = axes(a.data)
 push!(a::ScalableMatrix, x) = push!(a.data, x)
-IndexStyle(a::ScalableMatrix) = IndexStyle(a.data) 
-similar(a::ScalableMatrix) = ScalableMatrix(similar(a.data), a.min, a.max)
+IndexStyle(a::ScalableMatrix) = IndexStyle(a.data)
+similar(a::ScalableMatrix, dims::Union{Integer, AbstractUnitRange}...) =
+    ScalableMatrix(similar(a.data, dims...), a.min, a.max)
+similar(a::ScalableMatrix, ::Type{S}, dims::Union{Integer, AbstractUnitRange}...) where S =
+    ScalableMatrix(similar(a.data, S, dims...), a.min, a.max)
+similar(a::ScalableMatrix, ::Type{S}) where S = 
+    ScalableMatrix(similar(a.data, S), a.min, a.max)
 show(io::IO, a::ScalableMatrix) = begin
     print(io, "min: ", a.min, " max: ", a.max, " ")
     show(io, a.data)

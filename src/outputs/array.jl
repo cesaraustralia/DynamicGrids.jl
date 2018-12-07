@@ -1,14 +1,21 @@
 """
 A simple array output that stores each step of the simulation in an array of arrays.
 """
-@Ok @Frames struct ArrayOutput{} <: AbstractOutput{T} end
-ArrayOutput(frames::AbstractVector) = ArrayOutput{typeof(frames)}(frames, [false])
+abstract type AbstractArrayOutput{T} <: AbstractOutput{T} end
 
-is_async(o::ArrayOutput) = false
+@Ok @Frames struct ArrayOutput{} <: AbstractArrayOutput{T} end
+ArrayOutput(frames::AbstractVector, tstop) = begin
+    o = ArrayOutput{typeof(frames)}(frames, [false])
+    allocate!(o, frames[1], 2:tstop)
+    o
+end
+ArrayOutput(frames::AbstractVector) = ArrayOutput(frames::AbstractVector, length(frames))
 
-allocate!(o::ArrayOutput, init, tspan) = begin
+is_async(o::AbstractArrayOutput) = false
+
+allocate!(o::AbstractArrayOutput, init, tspan) = begin
     append!(o.frames, [similar(init) for i in tspan])
     nothing
 end
 
-store_frame!(::NoFPS, o::ArrayOutput, frame, t) = o[t] .= frame
+clear!(output::AbstractArrayOutput) = nothing

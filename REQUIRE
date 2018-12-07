@@ -6,6 +6,7 @@ REPLGamesBase
 FixedPointNumbers 
 Gtk
 Cairo
+OffsetArrays
 Graphics
 Colors
 FileIO

@@ -79,15 +79,15 @@ global init  = setup([0 1 1 0;
                    0 0 0 0])
 
     global model = Models(TestModel())
-    global output = ArrayOutput(init)
-    sim!(output, model, init; time=10)
+    global output = ArrayOutput(init, 10)
+    sim!(output, model, init; tstop=10)
     @test output[10] == final
 end
 
 @testset "an partial rule that just returns zero does nothing" begin
     global model = Models(TestPartial())
-    global output = ArrayOutput(init)
-    sim!(output, model, init; time=10)
+    global output = ArrayOutput(init, 10)
+    sim!(output, model, init; tstop=10)
     @test output[1] == init
     @test output[10] == init
 end
@@ -100,8 +100,8 @@ end
                    0 0 1 0])
 
     global model = Models(TestPartialWrite())
-    global output = ArrayOutput(init)
-    sim!(output, model, init; time=10)
+    global output = ArrayOutput(init, 10)
+    sim!(output, model, init; tstop=10)
     @test output[1] == init
     @test output[2] == final
     @test output[10] == final
@@ -124,7 +124,7 @@ end
     global state = 0
     global t = 1
 
-    data = Cellular.FrameData(init, deepcopy(init), 1, 1)
+    data = Cellular.FrameData(init, deepcopy(init), 1, 1, ())
 
     @test neighbors(moore, nothing, data, state, (6, 2)) == 0
     @test neighbors(vonneumann, nothing, data, state, (6, 2)) == 0
@@ -168,11 +168,8 @@ end
                           0 0 0 0 0 0])
 
     global model = Models(Life())
-    global output = ArrayOutput(init)
-    # Run half as sim
-    sim!(output, model, init; time=3)
-    # The resume for second half
-    resume!(output, model; time=3)
+    global output = ArrayOutput(init, 5)
+    sim!(output, model, init; tstop=5)
 
     @testset "stored results match glider behaviour" begin
         @test output[3] == test
@@ -183,15 +180,14 @@ end
         output = ArrayOutput(output)
         @test output[3] == test
         @test output[5] == test2
-        replay(output)
     end
 
     @testset "REPLOutput{:block} works" begin
         output = REPLOutput{:block}(init; fps=100, store=true)
-        sim!(output, model, init; time=2)
+        sim!(output, model, init; tstop=2)
         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 0
         sleep(0.5)
-        resume!(output, model; time=5)
+        resume!(output, model; tadd=5)
         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 0
         sleep(0.5)
         @test output[3] == test
@@ -201,10 +197,10 @@ end
 
     @testset "REPLOutput{:braile} works" begin
         output = REPLOutput{:braile}(init; fps=100, store=true)
-        sim!(output, model, init; time=2)
+        sim!(output, model, init; tstop=2)
         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 0
         sleep(0.5)
-        resume!(output, model; time=3)
+        resume!(output, model; tadd=3)
         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa = 0
         sleep(0.5)
         @test output[3] == test
@@ -215,9 +211,9 @@ end
     @testset "BlinkOutput works" begin
         using Blink
         output = Cellular.BlinkOutput(init, model, store=true) 
-        sim!(output, model, init; time=2) 
+        sim!(output, model, init; tstop=2) 
         sleep(1.5)
-        resume!(output, model; time=3)
+        resume!(output, model; tadd=3)
         sleep(1.5)
         @test output[3] == test
         @test output[5] == test2
@@ -228,8 +224,8 @@ end
     @testset "GtkOutput works" begin
         using Gtk
         output = GtkOutput(init, store=true) 
-        sim!(output, model, init; time=2) 
-        resume!(output, model; time=3)
+        sim!(output, model, init; tstop=2) 
+        resume!(output, model; tadd=3)
         @test output[3] == test
         @test output[5] == test2
         replay(output)
@@ -241,8 +237,8 @@ end
     #     using Plots
     #     plotlyjs()
     #     output = PlotsOutput(init)
-    #     sim!(output, model, init; time=2)
-    #     resume!(output, model; time=5)
+    #     sim!(output, model, init; tstop=2)
+    #     resume!(output, model; tadd=5)
     #     @test output[3] == test
     #     @test output[5] == test2
     #     replay(output)

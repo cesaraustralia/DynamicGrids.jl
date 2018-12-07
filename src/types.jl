@@ -17,6 +17,7 @@ abstract type AbstractPartialModel <: AbstractModel end
 
 
 abstract type AbstractNeighborhoodModel <: AbstractModel end
+abstract type AbstractPartialNeighborhoodModel <: AbstractPartialModel end
 
 
 """
@@ -39,15 +40,16 @@ mutable struct Models{M,C<:Number}
     Models(args...; cellsize=1) = new{typeof(args), typeof(cellsize)}(args, cellsize)
 end
 
-struct FrameData{A,C,T,MD} 
+struct FrameData{A,C,T,M} 
     source::A
     dest::A
     cellsize::C
     t::T
-    modeldata::MD
+    modelmem::M
 end
 
-struct NieghborhoodMem{A}
-    extended::A 
-    loc::A
+struct NieghborhoodMem{E,L}
+    extsource::E 
+    extdest::E 
+    loc::L
 end

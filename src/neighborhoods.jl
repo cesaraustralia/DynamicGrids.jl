@@ -4,6 +4,8 @@ abstract type AbstractNeighborhood end
 "Abstract type to extend [`RadialNeighborhoods`](@ref)"
 abstract type AbstractRadialNeighborhood{T} <: AbstractNeighborhood end
 
+radius(hood::AbstractRadialNeighborhood) = hood.radius
+
 @mix struct Overflow{O}
     "[`AbstractOverflow`](@ref). Determines how co-ordinates outside of the grid are handled"
     overflow::O

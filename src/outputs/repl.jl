@@ -26,11 +26,11 @@ REPLOutput{X}(frames::AbstractVector; fps=25, showmax_fps=fps, store=false, colo
 
 initialize!(o::REPLOutput, args...) = begin
     o.displayoffset .= (1, 1)
-    @async movedisplay(o)
+    # @async movedisplay(o)
     o.timestamp = time()
 end
 
-is_async(o::REPLOutput) = true
+is_async(o::REPLOutput) = false #true
 
 show_frame(o::REPLOutput, frame, t) = begin 
     REPLGamesBase.put([0,0], o.color, replframe(o, normalize_frame(frame))) 
