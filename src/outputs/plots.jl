@@ -31,6 +31,6 @@ initialize(output::PlotsOutput, args...) = begin
 end
 
 show_frame(o::PlotsOutput, frame::AbstractMatrix) = begin
-    heatmap!(output.plot, normalize_frame(frame))
+    heatmap!(output.plot, normalize_frame(frame, o))
     display(output.plot)
 end

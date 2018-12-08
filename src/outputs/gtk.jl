@@ -7,7 +7,9 @@ using Cairo,
 Shows output live in a Gtk window.
 Only available after running `using Gtk`
 """
-@Ok @FPS @Frames mutable struct GtkOutput{W,C} <: AbstractOutput{T}
+@Ok @FPS @Frames mutable struct GtkOutput{M,W,C} <: AbstractOutput{T}
+    min::M
+    max::M
     window::W
     canvas::C
 end
@@ -26,20 +28,20 @@ Constructor for GtkOutput.
 - `fps`: frames per second
 - `showmax_fps`: maximum displayed frames per second
 """
-GtkOutput(frames::AbstractVector; fps=25, showmax_fps=fps, store=false) = begin
+GtkOutput(frames::AbstractVector; fps=25, showmax_fps=fps, store=false, min=0, max=1) = begin
     canvas = Gtk.@GtkCanvas()
     window = Gtk.Window(canvas, "Cellular Automata")
     show(canvas)
     running = [false]
     canvas.mouse.button1press = (widget, event) -> running[1] = false
-    output = GtkOutput(frames[:], fps, showmax_fps, 0.0, 0, store, running, window, canvas)
+    output = GtkOutput(frames[:], fps, showmax_fps, 0.0, 0, store, running, min, max, window, canvas)
     show_frame(output, 1)
     output
 end
 
 
 show_frame(o::GtkOutput, frame::AbstractMatrix, t) = begin
-    img = process_image(o, normalize_frame(frame))
+    img = process_image(o, normalize_frame(frame, o))
     Gtk.@guarded Gtk.draw(o.canvas) do widget
         ctx = Gtk.getgc(o.canvas)
         Cairo.image(ctx, Cairo.CairoImageSurface(img), 0, 0, 

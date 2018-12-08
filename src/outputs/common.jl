@@ -100,6 +100,19 @@ set_timestamp!(::HasFPS, o, t) = begin
 end
 set_timestamp!(::NoFPS, o, t) = nothing
 
+struct HasMinMax end
+struct NoMinMax end
+has_minmax(m) = begin
+    fn = fieldnames(typeof(m))
+    :min in fn && :max in fn ? HasMinMax() : NoMinMax
+end
+
+normalize_frame(a::AbstractArray, o) = normalize_frame(has_minmax(o), a, o)
+normalize_frame(::HasMinMax, a::AbstractArray, o) = normalize_frame(a, o.min, o.max)
+normalize_frame(::NoMinMax, a::AbstractArray, o) = a
+normalize_frame(a::AbstractArray, min::Number, max::Number) = (a .- min) ./ (max - min)
+
+
 """
     show_frame(output::AbstractOutput, [t])
 Show the last frame of the output, or the frame at time t.
@@ -111,15 +124,11 @@ show_frame(o::AbstractOutput, frame, t) = nothing
 
 
 " peremute image dimensions for Images.jl based outputs "
-images_image(o, frame) = process_image(o, permutedims(normalize_frame(frame), (2,1)))
+images_image(o, frame) = process_image(o, permutedims(normalize_frame(o, frame), (2,1)))
 
 
 " Convert frame matrix to RGB24 "
 process_image(o, frame) = Images.RGB24.(frame)
-# process_image(o, frame) = begin
-#     map = applycolourmap(frame, cmap("L4"))
-#     convert.(RGB24, colorview(RGB, map[:,:,1], map[:,:,2], map[:,:,3]))
-# end
 
 """
     savegif(filename::String, output::AbstractOutput)

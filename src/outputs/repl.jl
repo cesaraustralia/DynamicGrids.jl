@@ -16,13 +16,15 @@ REPLOutput{:block}(init)
 ```
 """
 @premix struct SubType{X} end
-@Ok @FPS @Frames @SubType mutable struct REPLOutput{C} <: AbstractOutput{T}
+@Ok @FPS @Frames @SubType mutable struct REPLOutput{Co,Cu} <: AbstractOutput{T}
     displayoffset::Array{Int}
-    color::C
+    color::Co
+    cutoff::Cu
 end
-REPLOutput{X}(frames::AbstractVector; fps=25, showmax_fps=fps, store=false, color=:white) where X =
-    REPLOutput{X,typeof.((frames, fps, 0.0, 0, color))...}(
-               frames, fps, showmax_fps, 0.0, 0, store, [false], [1,1], color)
+REPLOutput{X}(frames::AbstractVector; fps=25, showmax_fps=fps, store=false, 
+              color=:white, cutoff=0.5) where X =
+    REPLOutput{X,typeof.((frames, fps, 0.0, 0, color, cutoff))...}(
+               frames, fps, showmax_fps, 0.0, 0, store, [false], [1,1], color, cutoff)
 
 initialize!(o::REPLOutput, args...) = begin
     o.displayoffset .= (1, 1)
@@ -33,7 +35,7 @@ end
 is_async(o::REPLOutput) = false #true
 
 show_frame(o::REPLOutput, frame, t) = begin 
-    REPLGamesBase.put([0,0], o.color, replframe(o, normalize_frame(frame))) 
+    REPLGamesBase.put([0,0], o.color, replframe(o, frame)) 
     REPLGamesBase.put([0,0], o.color, string(t)) 
 end
 
@@ -57,7 +59,7 @@ replframe(o, frame, ystep, xstep, f) = begin
     yrange = max(1, ystep * yoffset):min(youtput, ystep * (dispy + yoffset - 1))
     xrange = max(1, xstep * xoffset):min(xoutput, xstep * (dispx + xoffset - 1))
     let frame=frame, yrange=yrange, xrange=xrange
-        f(view(Array(frame), yrange, xrange), 0.5)
+        f(view(Array(frame), yrange, xrange), o.cutoff)
     end
 end
 

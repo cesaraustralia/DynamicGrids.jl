@@ -36,30 +36,6 @@ setup(x) = x
     end
 end
 
-@testset "Scalable Matrix" begin
-
-    global init = setup([-1 0 1 2 3;
-                          0 1 2 3 4;
-                          1 2 3 4 5;
-                          2 3 4 5 6])
-
-    sm = ScalableMatrix(init, -1, 6)
-    normalized = normalize_frame(sm)
-    @test maximum(normalized) == 1.0
-    @test minimum(normalized) == 0.0
-
-    global init = setup([-0.1 0.0 0.1 0.2 0.3;
-                          0.0 0.1 0.2 0.3 0.4;
-                          0.1 0.2 0.3 0.4 0.5;
-                          0.2 0.3 0.4 0.5 0.6])
-
-    sm = ScalableMatrix(init, -0.1, 0.6)
-    normalized = normalize_frame(sm)
-    @test maximum(normalized) == 1.0
-    @test minimum(normalized) == 0.0
-
-end
-
 @testset "builds indices matrix" begin
     @test broadcastable_indices([1 2 3; 3 4 5]) == [(1, 1) (1, 2) (1, 3); (2, 1) (2, 2) (2, 3)] 
 end

@@ -16,15 +16,17 @@ libraries(::WebTheme) = vcat(libraries(Bulma()), [css_key])
 
 abstract type AbstractWebOutput{T} <: AbstractOutput{T} end
 
-@Ok @FPS @Frames mutable struct WebInterface{P,Im,Ti} <: AbstractOutput{T}
+@Ok @FPS @Frames mutable struct WebInterface{P,Im,Ti,M} <: AbstractOutput{T}
     page::P
     image_obs::Im
     t_obs::Ti
+    min::M
+    max::M
 end
 build_range(lim::Tuple{Float64,Float64}) = lim[1]:(lim[2]-lim[1])/400:lim[2]
 build_range(lim::Tuple{Int,Int}) = lim[1]:1:lim[2]
 
-WebInterface(frames::AbstractVector, model, args...; fps=25, showmax_fps=fps, store=false, theme=WebTheme()) = begin
+WebInterface(frames::AbstractVector, model, args...; fps=25, showmax_fps=fps, store=false, min=0, max=1, theme=WebTheme()) = begin
 
     settheme!(theme)
 

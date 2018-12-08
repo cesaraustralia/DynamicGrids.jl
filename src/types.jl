@@ -15,8 +15,19 @@ the rule is not written to the grid but done manually.
 """
 abstract type AbstractPartialModel <: AbstractModel end
 
+"""
+A Model That only accesses a neighborhood, defined by its radius distance from the current point.
 
+Passed in data.modelmem will contain a matrix with the neighborhood cells. 
+The rule return value is written to every cell.
+"""
 abstract type AbstractNeighborhoodModel <: AbstractModel end
+
+"""
+A Model That only accesses a neighborhood, defined by its radius distance from the current point.
+
+It must write to cells disrectly, but is not guaranteed to write to every cell.
+"""
 abstract type AbstractPartialNeighborhoodModel <: AbstractPartialModel end
 
 
@@ -46,10 +57,4 @@ struct FrameData{A,C,T,M}
     cellsize::C
     t::T
     modelmem::M
-end
-
-struct NieghborhoodMem{E,L}
-    extsource::E 
-    extdest::E 
-    loc::L
 end
