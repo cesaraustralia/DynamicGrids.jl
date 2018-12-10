@@ -60,18 +60,15 @@ frameloop!(output, models, init, tspan, args...) = begin
 
     # Define storage arrays. These  may be larger than init!
     source, dest = define_storage(models, init)
-    
-    set_timestamp!(output, tspan.start)
 
-    # Allocate extra arbitrary memory needed by the models
-    modelmem = allocate_mem(models, init)
+    set_timestamp!(output, tspan.start)
 
     for t in tspan
         # Collect the data elements for this frame
-        data = FrameData(source, dest, models.cellsize, t, modelmem)
+        data = FrameData(source, dest, sze, models.cellsize, t)
         # Run the automation on the source array, writing to the dest array and
         # setting the source and dest arrays for the next iteration.
-        source, dest = run_models!(models.models, data, sze, args...)
+        source, dest = run_models!(models.models, data, args...)
         # Save the the current frame
         store_frame!(output, source, t)
         # Display the current frame
@@ -98,7 +95,7 @@ define_storage(models, init) = begin
     source = OffsetArray(zeros(eltype(init), dims...), -r + 1:sze[1] + r, -r + 1:sze[2] + r)
     source .= 0.0
 
-    for j in 1:sze[2], i in 1:sze[1] 
+    for j in 1:sze[2], i in 1:sze[1]
         @inbounds source[i, j] = init[i,j]
     end
     source, deepcopy(source)
@@ -106,19 +103,13 @@ end
 
 max_radius(modelwrapper::Models, init) = max_radius(modelwrapper.models, init)
 max_radius(models::Tuple{T,Vararg}, init) where T =
-    max(max_radius(models[1], init), max_radius(Base.tail(models), init)...)
+    max(max_radius(models[1], init), max_radius(tail(models), init)...)
 max_radius(models::Tuple{}, init) = 0
 max_radius(model::AbstractModel, init) = radius(model)
 
 radius(model::AbstractNeighborhoodModel) = radius(model.neighborhood)
 radius(model::AbstractPartialNeighborhoodModel) = radius(model.neighborhood)
 radius(model::AbstractModel) = 0
-
-allocate_mem(modelwrapper::Models, init) = allocate_mem(modelwrapper.models, init)
-allocate_mem(models::Tuple, init) = (allocate_mem(models[1], init), allocate_mem(Base.tail(models), init)...)
-allocate_mem(models::Tuple{}, init) = ()
-allocate_mem(model::AbstractModel, init) = ()
-allocate_mem(model::AbstractNeighborhoodModel, init) = zeros(eltype(init), size(model.neighborhood.kernel)...) 
 
 """
     run_models!(models::Tuple{T,Vararg}, source, dest, args...)
@@ -128,70 +119,81 @@ Iterate over all models recursively, swapping source and dest arrays.
 Returns a tuple containing the source and dest arrays for the next iteration.
 """
 run_models!(models::Tuple, data, args...) = begin
-    rule_data = FrameData(data.source, data.dest, data.cellsize, data.t, data.modelmem[1])
-    broadcast_rule!(models[1], rule_data, args...)
+    rule_data = FrameData(data.source, data.dest, data.dims, data.cellsize, data.t)
+    run_rule!(models[1], rule_data, args...)
 
-    tail_data = FrameData(data.dest, data.source, data.cellsize, data.t, Base.tail(data.modelmem))
-    run_models!(Base.tail(models), tail_data, args...)
+    tail_data = FrameData(data.dest, data.source, data.dims, data.cellsize, data.t)
+    run_models!(tail(models), tail_data, args...)
 end
 run_models!(models::Tuple{}, data, args...) = data.source, data.dest
 
+temp_neighborhood(model::T) where T =
+    error("Add a temp_neighborhood(model::$T) method that returns the array location for your model")
 
 """
-    broadcast_rules!(models, data, indices, args...)
+    run_rule!(models, data, indices, args...)
 
 Runs the rule(s) for each cell in the grid, dependin on the model(s) passed in.
 For [`AbstractModel`] the returned values are written to the `dest` grid,
 while for [`AbstractPartialModel`](@ref) the grid is
 pre-initialised to zero and rules manually populate the dest grid.
 """
-broadcast_rule!(model::AbstractModel, data, sze, args...) = begin
-    for i = 1:sze[1]
-        for j = 1:sze[2]
+run_rule!(model::AbstractModel, data, args...) = begin
+    for i = 1:data.dims[1]
+        for j = 1:data.dims[2]
             @inbounds data.dest[i, j] = rule(model, data, data.source[i, j], (i, j), args...)
         end
     end
 end
-broadcast_rule!(model::AbstractPartialModel, data, sze, args...) = begin
+run_rule!(model::AbstractPartialModel, data, args...) = begin
     # Initialise the dest array
     data.dest .= data.source
-    for i = 1:sze[1]
-        for j = 1:sze[2]
+    for i = 1:data.dims[1]
+        for j = 1:data.dims[2]
             @inbounds rule!(model, data, data.source[i, j], (i, j), args...)
         end
     end
 end
-broadcast_rule!(model::AbstractNeighborhoodModel, data, sze, args...) = begin
-    r = model.neighborhood.radius
-    sml = data.modelmem
+run_rule!(model::Union{AbstractNeighborhoodModel, Tuple{AbstractNeighborhoodModel,Vararg}},
+                       data, args...) = begin
+    r = radius(model)
+    temp = temp_neighborhood(model)
 
-    h, w = size(sml)
-    for i = 1:sze[1]
+    h, w = size(temp)
+    for i = 1:data.dims[1]
         # Setup temp array between rows
         for b = 1:r+1
-            @simd for a = 1:h
-                @inbounds sml[a, b] = zero(eltype(sml)) 
+            for a = 1:h
+                @inbounds temp[a, b] = zero(eltype(temp))
             end
         end
         for b = r+2:w
-            @simd for a = 1:h
-                @inbounds sml[a, b] = data.source[i+a-1-r, b-1-r]
+            for a = 1:h
+                @inbounds temp[a, b] = data.source[i+a-1-r, b-1-r]
             end
         end
         # Run rule for a row
-        for j = 1:sze[2]
-            @inbounds copyto!(sml, 1, sml, h + 1, (w - 1) * h)
-            @simd for a = 1:h
-                @inbounds sml[a, w] = data.source[i+a-1-r, j+r]
+        for j = 1:data.dims[2]
+            @inbounds copyto!(temp, 1, temp, h + 1, (w - 1) * h)
+            for a = 1:h
+                @inbounds temp[a, w] = data.source[i+a-1-r, j+r]
             end
             @inbounds data.dest[i, j] = rule(model, data, data.source[i, j], (i, j), args...)
         end
     end
 end
 
+@inline radius(models::Tuple) = radius(models[1])
+@inline temp_neighborhood(models::Tuple) = temp_neighborhood(models[1])
+
+@inline rule(submodels::Tuple, data, state, (i, j), args...) = begin
+    state = rule(submodels[1], data, state, (i, j), args...)
+    rule(tail(submodels), data, state, (i, j), args...)
+end
+@inline rule(submodels::Tuple{}, data, state, args...) = state
 
 """
-    function rule(model, state, sze, t, source, dest, args...)
+    function rule(model, state, t, source, dest, args...)
 
 Rules alter cell values based on their current state and other cells, often
 [`neighbors`](@ref).
@@ -208,7 +210,7 @@ Returns a value to be written to the current cell.
 function rule(model::Nothing, data, state, index, args...) end
 
 """
-    function rule!(model, data, state, sze, args...)
+    function rule!(model, data, state, args...)
 A rule that manually writes to the dest array, used in models inheriting
 from [`AbstractPartialModel`](@ref).
 

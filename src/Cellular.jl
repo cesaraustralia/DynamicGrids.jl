@@ -48,6 +48,8 @@ using Parameters,
       Cairo,
       FileIO
 
+using Base: tail
+
 import Base: show, getindex, setindex!, lastindex, size, length, push!, append!, broadcast, broadcast!, similar, eltype
 import Flatten: @flattenable, flattenable
 import FieldMetadata: @limits, limits

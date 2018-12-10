@@ -30,6 +30,10 @@ It must write to cells disrectly, but is not guaranteed to write to every cell.
 """
 abstract type AbstractPartialNeighborhoodModel <: AbstractPartialModel end
 
+"""
+A Model that only accesses a single cell. Its return value is the new value of the cell.
+"""
+abstract type AbstractCellModel <: AbstractModel end
 
 """
 Singleton types for choosing the grid overflow rule used in
@@ -51,10 +55,10 @@ mutable struct Models{M,C<:Number}
     Models(args...; cellsize=1) = new{typeof(args), typeof(cellsize)}(args, cellsize)
 end
 
-struct FrameData{A,C,T,M} 
+struct FrameData{A,D,C,T} 
     source::A
     dest::A
+    dims::D
     cellsize::C
     t::T
-    modelmem::M
 end
