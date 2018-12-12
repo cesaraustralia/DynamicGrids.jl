@@ -43,6 +43,7 @@ resume!(output, models, args...; tadd=100) = begin
     output
 end
 
+"run the simulation either directly or asynchronously."
 run_sim!(output, args...) =
     if is_async(output)
         f() = frameloop(output, args...)
@@ -68,7 +69,7 @@ frameloop!(output, models, init, tspan, args...) = begin
         data = FrameData(source, dest, sze, models.cellsize, t)
         # Run the automation on the source array, writing to the dest array and
         # setting the source and dest arrays for the next iteration.
-        source, dest = run_models!(models.models, data, args...)
+        source, dest = run_model!(models.models, data, args...)
         # Save the the current frame
         store_frame!(output, source, t)
         # Display the current frame
@@ -88,6 +89,12 @@ frameloop!(output, models, init, tspan, args...) = begin
     end
 end
 
+"""
+    define_storage(models, init)
+
+Define the source and dest arrays for the model. Their size and offset depend on the maximum
+model radius in the list of passed-in models
+"""
 define_storage(models, init) = begin
     r = max_radius(models, init)
     sze = size(init)
@@ -98,37 +105,51 @@ define_storage(models, init) = begin
     for j in 1:sze[2], i in 1:sze[1]
         @inbounds source[i, j] = init[i,j]
     end
-    source, deepcopy(source)
+    dest = deepcopy(source)
+    source, dest
 end
 
+"""
+Find the largest radius present in the passed in models.
+"""
+max_radius(model::AbstractModel, init) = radius(model)
 max_radius(modelwrapper::Models, init) = max_radius(modelwrapper.models, init)
 max_radius(models::Tuple{T,Vararg}, init) where T =
     max(max_radius(models[1], init), max_radius(tail(models), init)...)
 max_radius(models::Tuple{}, init) = 0
-max_radius(model::AbstractModel, init) = radius(model)
 
+"""
+Return the radius of a model if it has one, otherwise zero.
+"""
+function radius end
 radius(model::AbstractNeighborhoodModel) = radius(model.neighborhood)
 radius(model::AbstractPartialNeighborhoodModel) = radius(model.neighborhood)
 radius(model::AbstractModel) = 0
+radius(models::Tuple) = radius(models[1])
 
 """
-    run_models!(models::Tuple{T,Vararg}, source, dest, args...)
+AbstractNeighborhoodModel requires a temp array. `temp_neighborhood()` must be defined to return it.
+"""
+function temp_neighborhood end
+temp_neighborhood(model::T) where T =
+    error("Add a temp_neighborhood(model::$T) method that returns the array location for your model")
+temp_neighborhood(models::Tuple) = temp_neighborhood(models[1])
+
+"""
+    run_model!(models::Tuple{T,Vararg}, source, dest, args...)
 per
 Iterate over all models recursively, swapping source and dest arrays.
 
 Returns a tuple containing the source and dest arrays for the next iteration.
 """
-run_models!(models::Tuple, data, args...) = begin
-    rule_data = FrameData(data.source, data.dest, data.dims, data.cellsize, data.t)
-    run_rule!(models[1], rule_data, args...)
+function run_model! end
+run_model!(models::Tuple, data, args...) = begin
+    run_rule!(models[1], data, args...)
 
     tail_data = FrameData(data.dest, data.source, data.dims, data.cellsize, data.t)
-    run_models!(tail(models), tail_data, args...)
+    run_model!(tail(models), tail_data, args...)
 end
-run_models!(models::Tuple{}, data, args...) = data.source, data.dest
-
-temp_neighborhood(model::T) where T =
-    error("Add a temp_neighborhood(model::$T) method that returns the array location for your model")
+run_model!(models::Tuple{}, data, args...) = data.source, data.dest
 
 """
     run_rule!(models, data, indices, args...)
@@ -138,6 +159,7 @@ For [`AbstractModel`] the returned values are written to the `dest` grid,
 while for [`AbstractPartialModel`](@ref) the grid is
 pre-initialised to zero and rules manually populate the dest grid.
 """
+function run_rule! end
 run_rule!(model::AbstractModel, data, args...) = begin
     for i = 1:data.dims[1]
         for j = 1:data.dims[2]
@@ -183,15 +205,6 @@ run_rule!(model::Union{AbstractNeighborhoodModel, Tuple{AbstractNeighborhoodMode
     end
 end
 
-@inline radius(models::Tuple) = radius(models[1])
-@inline temp_neighborhood(models::Tuple) = temp_neighborhood(models[1])
-
-@inline rule(submodels::Tuple, data, state, (i, j), args...) = begin
-    state = rule(submodels[1], data, state, (i, j), args...)
-    rule(tail(submodels), data, state, (i, j), args...)
-end
-@inline rule(submodels::Tuple{}, data, state, args...) = state
-
 """
     function rule(model, state, t, source, dest, args...)
 
@@ -208,6 +221,20 @@ Rules alter cell values based on their current state and other cells, often
 Returns a value to be written to the current cell.
 """
 function rule(model::Nothing, data, state, index, args...) end
+
+"""
+    rule(submodels::Tuple, data, state, (i, j), args...)
+
+Submodel rule. If a tuple of models is passed in, run the all sequentially for each cell.
+
+This gives correct results only for AbstractCellModel and for an AbstractNeighborhoodModel
+followed by AbstractCellModel.
+"""
+@inline rule(submodels::Tuple{AbstractCellModel,Vararg}, data, state, (i, j), args...) = begin
+    state = rule(submodels[1], data, state, (i, j), args...)
+    rule(tail(submodels), data, state, (i, j), args...)
+end
+@inline rule(submodels::Tuple{}, data, state, args...) = state
 
 """
     function rule!(model, data, state, args...)
