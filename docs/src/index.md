@@ -64,6 +64,9 @@ Models can be chained together arbitrarily to make composite simulations.
 ```@docs
 AbstractModel
 AbstractPartialModel
+AbstractNeighborhoodModel
+AbstractPartialNeighborhoodModel
+AbstractCellModel
 AbstractLife
 Life
 ```
@@ -104,7 +107,6 @@ inhood
 ```@docs
 sim!
 resume!
-replay
 ```
 
 ## Output
@@ -158,7 +160,11 @@ actually modify extend.
 ## Framework
 
 ```@docs
-broadcast_rules!
+run_model!
+run_rule!
+max_radius
+radius
+temp_neighborhood
 inbounds
 process_image
 ```
