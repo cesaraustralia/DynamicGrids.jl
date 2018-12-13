@@ -178,10 +178,10 @@ run_rule!(model::AbstractPartialModel, data, args...) = begin
 end
 run_rule!(model::Union{AbstractNeighborhoodModel, Tuple{AbstractNeighborhoodModel,Vararg}},
                        data, args...) = begin
-    r = radius(model)
     temp = temp_neighborhood(model)
-
+    r = radius(model)
     h, w = size(temp)
+
     for i = 1:data.dims[1]
         # Setup temp array between rows
         for b = 1:r+1
@@ -230,11 +230,11 @@ Submodel rule. If a tuple of models is passed in, run the all sequentially for e
 This gives correct results only for AbstractCellModel and for an AbstractNeighborhoodModel
 followed by AbstractCellModel.
 """
-@inline rule(submodels::Tuple{AbstractCellModel,Vararg}, data, state, (i, j), args...) = begin
-    state = rule(submodels[1], data, state, (i, j), args...)
-    rule(tail(submodels), data, state, (i, j), args...)
+@inline rule(submodels::Tuple, data, state, index, args...) = begin
+    state = rule(submodels[1], data, state, index, args...)
+    rule(tail(submodels), data, state, index, args...)
 end
-@inline rule(submodels::Tuple{}, data, state, args...) = state
+@inline rule(submodels::Tuple{}, data, state, index, args...) = state
 
 """
     function rule!(model, data, state, args...)
