@@ -100,7 +100,7 @@ end
     global state = 0
     global t = 1
 
-    data = Cellular.FrameData(init, deepcopy(init), 1, 1, ())
+    data = Cellular.FrameData(init, deepcopy(init), 1, 1, 1, ())
 
     @test neighbors(moore, nothing, data, state, (6, 2)) == 0
     @test neighbors(vonneumann, nothing, data, state, (6, 2)) == 0

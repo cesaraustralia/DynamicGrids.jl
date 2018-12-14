@@ -20,7 +20,7 @@ sim!(output, models, init, args...; tstop=100) = begin
     clear!(output)
     store_frame!(output, init, 1)
     show_frame(output, 1)
-    run_sim!(output, models, init, 2:tstop, args...)
+    @sync run_sim!(output, models, init, 2:tstop, args...)
     output
 end
 
@@ -39,7 +39,7 @@ resume!(output, models, args...; tadd=100) = begin
 
     cur = lastindex(output)
     tspan = cur + 1:cur + tadd
-    run_sim!(output, models, output[cur], tspan, args...)
+    @sync run_sim!(output, models, output[cur], tspan, args...)
     output
 end
 
@@ -66,7 +66,7 @@ frameloop!(output, models, init, tspan, args...) = begin
 
     for t in tspan
         # Collect the data elements for this frame
-        data = FrameData(source, dest, sze, models.cellsize, t)
+        data = FrameData(source, dest, sze, models.cellsize, models.timestep, t)
         # Run the automation on the source array, writing to the dest array and
         # setting the source and dest arrays for the next iteration.
         source, dest = run_model!(models.models, data, args...)
@@ -144,9 +144,11 @@ Returns a tuple containing the source and dest arrays for the next iteration.
 """
 function run_model! end
 run_model!(models::Tuple, data, args...) = begin
+    # Run the first model
     run_rule!(models[1], data, args...)
-
-    tail_data = FrameData(data.dest, data.source, data.dims, data.cellsize, data.t)
+    # Swap the source and dest arrays
+    tail_data = FrameData(data.dest, data.source, data.dims, data.cellsize, data.timestep, data.t)
+    # Run the rest of the models, recursively 
     run_model!(tail(models), tail_data, args...)
 end
 run_model!(models::Tuple{}, data, args...) = data.source, data.dest
@@ -161,6 +163,7 @@ pre-initialised to zero and rules manually populate the dest grid.
 """
 function run_rule! end
 run_rule!(model::AbstractModel, data, args...) = begin
+    # Run the rule for all cells, writing the result to the dest array
     for i = 1:data.dims[1]
         for j = 1:data.dims[2]
             @inbounds data.dest[i, j] = rule(model, data, data.source[i, j], (i, j), args...)
@@ -170,6 +173,7 @@ end
 run_rule!(model::AbstractPartialModel, data, args...) = begin
     # Initialise the dest array
     data.dest .= data.source
+    # Run the rule for all cells, the rule must write to the dest array manually
     for i = 1:data.dims[1]
         for j = 1:data.dims[2]
             @inbounds rule!(model, data, data.source[i, j], (i, j), args...)
@@ -182,6 +186,8 @@ run_rule!(model::Union{AbstractNeighborhoodModel, Tuple{AbstractNeighborhoodMode
     r = radius(model)
     h, w = size(temp)
 
+    # Run the rule for all cells, writing the result to the dest array
+    # The neighborhood is copied to the models temp neighborhood array for performance
     for i = 1:data.dims[1]
         # Setup temp array between rows
         for b = 1:r+1
@@ -227,7 +233,7 @@ function rule(model::Nothing, data, state, index, args...) end
 
 Submodel rule. If a tuple of models is passed in, run the all sequentially for each cell.
 
-This gives correct results only for AbstractCellModel and for an AbstractNeighborhoodModel
+This gives correct results only for AbstractCellModel or for a single AbstractNeighborhoodModel
 followed by AbstractCellModel.
 """
 @inline rule(submodels::Tuple, data, state, index, args...) = begin

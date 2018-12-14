@@ -49,16 +49,19 @@ struct Skip <: AbstractOverflow end
 " A mutable container for models. 
 This allows updating of immutable values for live control, such as with 
 BlinkOutput, while keeping the core model immutable for GPU compatability."
-mutable struct Models{M,C<:Number} 
+mutable struct Models{M,C<:Number,T<:Number} 
     models::M
     cellsize::C
-    Models(args...; cellsize=1) = new{typeof(args), typeof(cellsize)}(args, cellsize)
+    timestep::T
+    Models(args...; cellsize=1, timestep=1) = 
+        new{typeof(args), typeof(cellsize), typeof(timestep)}(args, cellsize, timestep)
 end
 
-struct FrameData{A,D,C,T} 
+struct FrameData{A,D,C,TS,T} 
     source::A
     dest::A
     dims::D
     cellsize::C
+    timestep::TS
     t::T
 end
