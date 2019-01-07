@@ -86,7 +86,7 @@ Sums single dimension radial neighborhoods. Commonly used by Wolfram.
 """
 neighbors(hood::AbstractRadialNeighborhood{:onedim}, model, data, state, (row, col), args...) = begin
     width = size(source)
-    r = hood.radius
+    r = radius(radius)
     # Initialise minus the current cell value, as it will be added back in the loop
     cc = -source[row, col]
     # Sum active cells in the neighborhood
@@ -105,7 +105,7 @@ are determined by [`inhood`](@ref), as this method is general.
 neighbors(hood::AbstractRadialNeighborhood, model, data, state, index, args...) = begin
     height, width = size(data.source)
     row, col = index
-    r = hood.radius
+    r = radius(hood)
     # Initialise minus the current cell value, as it will be added back in the loop
     cc = zero(state) 
     # Sum active cells in the neighborhood
@@ -154,16 +154,16 @@ end
     inhood(n::AbstractRadialNeighborhood{:moore}, hood_index, source_index)
 Check cell is inside a Moore neighborhood. Always returns `true`.
 """
-inhood(n::AbstractRadialNeighborhood{:moore}, hood_index, source_index) = true
+inhood(hood::AbstractRadialNeighborhood{:moore}, hood_index, source_index) = true
 """
     inhood(n::AbstractRadialNeighborhood{:vonneumann}, hood_index, source_index)
 Check cell is inside a Vonn-Neumann neighborhood, returning a boolean.
 """
-inhood(n::AbstractRadialNeighborhood{:vonneumann}, hood_index, source_index) =
-    sum(abs.(hood_index .- source_index)) <= n.radius
+inhood(hood::AbstractRadialNeighborhood{:vonneumann}, hood_index, source_index) =
+sum(abs.(hood_index .- source_index)) <= radius(hood)
 """
     inhood(n::AbstractRadialNeighborhood{:rotvonneumann}, hood_index, source_index)
 Check cell is inside a Rotated Von-Neumann neighborhood, returning a boolean.
 """
-inhood(n::AbstractRadialNeighborhood{:rotvonneumann}, hood_index, source_index) =
-    sum(abs.(hood_index .- source_index)) > n.radius
+inhood(hood::AbstractRadialNeighborhood{:rotvonneumann}, hood_index, source_index) =
+    sum(abs.(hood_index .- source_index)) > radius(hood)
