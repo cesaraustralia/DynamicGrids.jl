@@ -1,8 +1,8 @@
-using Interact, 
+using Interact,
       InteractBase,
       InteractBulma,
       AssetRegistry,
-      Flatten, 
+      Flatten,
       Images
 
 import InteractBase: WidgetTheme, libraries
@@ -16,12 +16,10 @@ libraries(::WebTheme) = vcat(libraries(Bulma()), [css_key])
 
 abstract type AbstractWebOutput{T} <: AbstractOutput{T} end
 
-@Ok @FPS @Frames mutable struct WebInterface{P,Im,Ti,M} <: AbstractOutput{T}
+@MinMax @Ok @FPS @Frames mutable struct WebInterface{P,Im,Ti,M} <: AbstractOutput{T}
     page::P
     image_obs::Im
     t_obs::Ti
-    min::M
-    max::M
 end
 build_range(lim::Tuple{Float64,Float64}) = lim[1]:(lim[2]-lim[1])/400:lim[2]
 build_range(lim::Tuple{Int,Int}) = lim[1]:1:lim[2]
@@ -53,8 +51,8 @@ WebInterface(frames::AbstractVector, model, args...; fps=25, showmax_fps=fps, st
     parents = parentflatten(Tuple, model.models)
     descriptions = metaflatten(Vector, model.models, FieldMetadata.description)
     attributes = broadcast((p, n, d) -> Dict(:title => "$p.$n: $d"), parents, fnames, descriptions)
-    make_slider(val, lab, lims, attr) = slider(build_range(lims); label=string(lab), value=val, attributes=attr)
 
+    make_slider(val, lab, lims, attr) = slider(build_range(lims); label=string(lab), value=val, attributes=attr)
     sliders = broadcast(make_slider, params, fnames, lims, attributes)
     slider_obs = map((s...) -> s, observe.(sliders)...)
     modelwidgets = vbox(dom"span"("Model: "), vbox(sliders...))
@@ -63,39 +61,39 @@ WebInterface(frames::AbstractVector, model, args...; fps=25, showmax_fps=fps, st
     page = vbox(hbox(image_obs, timedisplay), basewidgets, modelwidgets)
 
     # Construct the interface object
-    timestamp = 0.0; tref = 0; running = [false]
-    interface = WebInterface{typeof.((frames, fps, timestamp, tref, page, image_obs, t_obs))...}(
-                             frames, fps, showmax_fps, timestamp, tref, store, running, page, image_obs, t_obs)
+    timestamp = 0.0; tref = 0; tlast = 1; running = [false]
+    interface = WebInterface{typeof.((frames, fps, timestamp, tref, min, page, image_obs, t_obs))...}(
+                             frames, fps, showmax_fps, timestamp, tref, tlast, store, running, min, max, page, image_obs, t_obs)
 
     # Initialise image
     image_obs[] = web_image(interface, frames[1])
 
-    # Control mappings
+    # # Control mappings
     map!(timespan, observe(timespan_box)) do ts
         parse(Int, ts)
     end
     map!(timedisplay, t_obs) do t
-        dom"div"(string(t)) 
+        dom"div"(string(t))
     end
 
     on(observe(sim)) do _
         sim!(interface, model, init, args...; tstop = timespan[])
     end
     on(observe(resume)) do _
-        resume!(interface, model, args...; tadd = timespan[]) 
+        resume!(interface, model, args...; tadd = timespan[])
     end
     on(observe(replay)) do _
-        replay(interface) 
+        replay(interface)
     end
     on(observe(stop)) do _
         set_running!(interface, false)
     end
     on(observe(fps_slider)) do fps
-        interface.fps = fps 
+        interface.fps = fps
         set_timestamp!(interface, interface.t_obs[])
     end
     on(slider_obs) do s
-        model.models = Flatten.reconstruct(model.models, s) 
+        model.models = Flatten.reconstruct(model.models, s)
     end
 
     interface
@@ -103,9 +101,9 @@ end
 
 is_async(o::WebInterface) = true
 
-show_frame(o::WebInterface, frame, t) = begin 
+show_frame(o::WebInterface, frame, t) = begin
     o.image_obs[] = web_image(o, frame)
     o.t_obs[] = t
 end
 
-web_image(interface, frame) = dom"div"(images_image(interface, frame))
+web_image(interface, frame) = dom"div"(process_image(interface, frame))

@@ -22,9 +22,11 @@ REPLOutput{:block}(init)
     cutoff::Cu
 end
 REPLOutput{X}(frames::AbstractVector; fps=25, showmax_fps=fps, store=false, 
-              color=:white, cutoff=0.5) where X =
-    REPLOutput{X,typeof.((frames, fps, 0.0, 0, color, cutoff))...}(
-               frames, fps, showmax_fps, 0.0, 0, store, [false], [1,1], color, cutoff)
+              color=:white, cutoff=0.5) where X = begin
+    timestamp = 0.0; tref = 0; tlast = 1; running = [false]; displayoffset = [1, 1];
+    REPLOutput{X,typeof.((frames, fps, timestamp, tref, color, cutoff))...}(
+               frames, fps, showmax_fps, timestamp, tref, tlast, store, running, displayoffset, color, cutoff)
+end
 
 initialize!(o::REPLOutput, args...) = begin
     o.displayoffset .= (1, 1)
@@ -32,11 +34,12 @@ initialize!(o::REPLOutput, args...) = begin
     o.timestamp = time()
 end
 
-is_async(o::REPLOutput) = false #true
+is_async(o::REPLOutput) = false
 
 show_frame(o::REPLOutput, frame, t) = begin 
     REPLGamesBase.put([0,0], o.color, replframe(o, frame)) 
     REPLGamesBase.put([0,0], o.color, string(t)) 
+    REPLGamesBase.enableRawMode()
 end
 
 
@@ -72,7 +75,7 @@ movedisplay(o) =
         c == "Right"   && move_x!(o, XSCROLL)
         c == "PgUp"    && move_y!(o, -PAGESCROLL)
         c == "PgDown"  && move_y!(o, PAGESCROLL)
-        c in ["Ctrl-C"]  && set_running(o, false)
+        c == "Ctrl-C"  && set_running!(o, false)
     end
 
 move_y!(o::REPLOutput{:block}, n) = move_y!(n, XBLOCK)

@@ -15,20 +15,36 @@ end
     running::Array{Bool}
 end
 
-@premix struct FPS{F,TS,TR}
+@premix struct FPS{F,TS,TM}
     fps::F
     showmax_fps::F
     timestamp::TS
-    tref::TR
+    tref::TM
+    tlast::TM
     store::Bool
 end
 
 struct HasFPS end
 struct NoFPS end
 
+has_fps(o::O) where O = :fps in fieldnames(O) ? HasFPS() : NoFPS()
+
+@premix struct MinMax{M}
+    min::M
+    max::M
+end
+
+struct HasMinMax end
+struct NoMinMax end
+
+has_minmax(m) = begin
+    fns = fieldnames(typeof(m))
+    :min in fns && :max in fns ? HasMinMax() : NoMinMax()
+end
+
 "Generic ouput constructor. Converts init array to vector of frames."
 (::Type{F})(init::T, args...; kwargs...) where F <: AbstractOutput where T <: AbstractMatrix = 
-    F(T[init], args...; kwargs...)
+    F(T[deepcopy(init)], args...; kwargs...)
 
 # Base methods
 length(o::AbstractOutput) = length(o.frames)
@@ -50,12 +66,19 @@ is_async(o::AbstractOutput) = false
 
 clear!(o::AbstractOutput) = deleteat!(o.frames, 1:length(o))
 
-has_fps(o::O) where O = :fps in fieldnames(O) ? HasFPS() : NoFPS()
-
 fps(o) = o.fps
 
+allocate_frames!(o::AbstractOutput, init, tspan) = begin
+    append!(o.frames, [similar(init) for i in tspan])
+    nothing
+end
+
+last_t(o::AbstractOutput) = last_t(has_fps(o), o)
+last_t(::HasFPS, o::AbstractOutput) = o.tlast
+last_t(::NoFPS, o::AbstractOutput) = lastindex(o)
+
 store_frame!(o::AbstractOutput, frame, t) = store_frame!(has_fps(o), o, frame, t)
-store_frame!(::HasFPS, o, frame, t) = 
+store_frame!(::HasFPS, o, frame, t) = begin
     if length(o) == 0
         push!(o, frame)
     elseif o.store
@@ -64,28 +87,31 @@ store_frame!(::HasFPS, o, frame, t) =
     else
         update_frame!(o, frame, 1)
     end
+    o.tlast = t
+end
 store_frame!(::NoFPS, o, frame, t) = update_frame!(o, frame, t)
 
 update_frame!(o, frame, t) = begin
     sze = size(o[1])
-    for j in 1:sze[2]
-        for i in 1:sze[1]
-            @inbounds o[t][i, j] = frame[i, j]
-        end
+    for j in 1:sze[2], i in 1:sze[1]
+        @inbounds o[t][i, j] = frame[i, j]
     end
 end
 
 curframe(o::AbstractOutput, t) = curframe(has_fps(o), o, t)
-curframe(::HasFPS, o, t) = o.store ? t : 1
+curframe(::HasFPS, o, t) = o.store ? t : oneunit(t)
 curframe(::NoFPS, o, t) = t
 
-is_showable(o::AbstractOutput, t) = is_showable(has_fps(o), o, t)
-is_showable(::HasFPS, o, t) = true # TODO working max fps. o.timestamp + (t - o.tref)/o.showmax_fps < time()
-is_showable(::NoFPS, o, t) = false
+isshowable(o::AbstractOutput, t) = isshowable(has_fps(o), o, t)
+isshowable(::HasFPS, o, t) = true # TODO working max fps. o.timestamp + (t - o.tref)/o.showmax_fps < time()
+isshowable(::NoFPS, o, t) = false 
 
 finalize!(o::AbstractOutput, args...) = nothing
 
-initialize!(o::AbstractOutput, args...) = initialize!(has_fps(o), o, args...)
+initialize!(o::AbstractOutput, args...) = begin
+    println("standard init")
+    initialize!(has_fps(o), o, args...)
+end
 initialize!(::HasFPS, args...) = nothing
 initialize!(::NoFPS, args...) = nothing
 
@@ -100,18 +126,11 @@ set_timestamp!(::HasFPS, o, t) = begin
 end
 set_timestamp!(::NoFPS, o, t) = nothing
 
-struct HasMinMax end
-struct NoMinMax end
-has_minmax(m) = begin
-    fn = fieldnames(typeof(m))
-    :min in fn && :max in fn ? HasMinMax() : NoMinMax
-end
-
-normalize_frame(a::AbstractArray, o) = normalize_frame(has_minmax(o), a, o)
-normalize_frame(::HasMinMax, a::AbstractArray, o) = normalize_frame(a, o.min, o.max)
-normalize_frame(::NoMinMax, a::AbstractArray, o) = a
-normalize_frame(a::AbstractArray, min::Number, max::Number) = (a .- min) ./ (max - min)
-
+normalize_frame(o, a::AbstractArray) = normalize_frame(has_minmax(o), o, a)
+normalize_frame(::HasMinMax, o, a::AbstractArray) = normalize_frame(a, o.min, o.max)
+normalize_frame(::NoMinMax, o, a::AbstractArray) = a
+normalize_frame(a::AbstractArray, minval::Number, maxval::Number) = 
+    min.((a .- minval) ./ (maxval - minval), one(eltype(a)))
 
 """
     show_frame(output::AbstractOutput, [t])
@@ -122,13 +141,12 @@ show_frame(o::AbstractOutput, t::Number) = show_frame(o, o[curframe(o, t)], t)
 show_frame(o::AbstractOutput, frame::AbstractMatrix) = show_frame(o, frame, 0)
 show_frame(o::AbstractOutput, frame, t) = nothing
 
-
-" peremute image dimensions for Images.jl based outputs "
-images_image(o, frame) = process_image(o, permutedims(normalize_frame(o, frame), (2,1)))
-
-
-" Convert frame matrix to RGB24 "
-process_image(o, frame) = Images.RGB24.(frame)
+" Convert frame matrix to RGB24 " 
+process_image(o, frame) = begin
+    a = Images.RGB24.(normalize_frame(o, frame)) 
+    replace!(x -> x == RGB24(0.0, 0.0, 0.0) ? RGB24(0.0, 0.0, 1.0) : x, a)
+    a
+end
 
 """
     savegif(filename::String, output::AbstractOutput)
@@ -136,4 +154,4 @@ Write the output array to a gif.
 Saving very large gifs may trigger a bug in imagemagick.
 """
 savegif(filename::String, o::AbstractOutput) =
-    FileIO.save(filename, cat(images_image.((o,), o)..., dims=3))
+    FileIO.save(filename, cat(process_image.(Ref(o), o)..., dims=3))
