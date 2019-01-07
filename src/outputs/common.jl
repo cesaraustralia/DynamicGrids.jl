@@ -108,10 +108,7 @@ isshowable(::NoFPS, o, t) = false
 
 finalize!(o::AbstractOutput, args...) = nothing
 
-initialize!(o::AbstractOutput, args...) = begin
-    println("standard init")
-    initialize!(has_fps(o), o, args...)
-end
+initialize!(o::AbstractOutput, args...) = initialize!(has_fps(o), o, args...)
 initialize!(::HasFPS, args...) = nothing
 initialize!(::NoFPS, args...) = nothing
 
@@ -144,6 +141,7 @@ show_frame(o::AbstractOutput, frame, t) = nothing
 " Convert frame matrix to RGB24 " 
 process_image(o, frame) = begin
     a = Images.RGB24.(normalize_frame(o, frame)) 
+    # Colour zero cells
     replace!(x -> x == RGB24(0.0, 0.0, 0.0) ? RGB24(0.0, 0.0, 1.0) : x, a)
     a
 end
