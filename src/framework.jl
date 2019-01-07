@@ -38,9 +38,9 @@ resume!(output, models, args...; tadd=100) = begin
     length(output) > 0 || error("run sim! first")
     set_running!(output, true) || return
 
-    cur = lastindex(output)
-    tspan = cur + 1:cur + tadd
-    run_sim!(output, models, output[cur], tspan, args...)
+    cur_t = last_t(output)
+    tspan = cur_t + 1:cur_t + tadd
+    run_sim!(output, models, output[curframe(output, cur_t)], tspan, args...)
     output
 end
 
