@@ -15,12 +15,13 @@ the passed in output for each time-step.
 - `tstop`: Any Number. Default: 100
 """
 sim!(output, models, init, args...; tstop=100) = begin
+    init = deepcopy(init)
     is_running(output) && return
     set_running!(output, true) || return
     clear!(output)
     store_frame!(output, init, 1)
     show_frame(output, 1)
-    @sync run_sim!(output, models, init, 2:tstop, args...)
+    run_sim!(output, models, init, 2:tstop, args...)
     output
 end
 
@@ -39,15 +40,14 @@ resume!(output, models, args...; tadd=100) = begin
 
     cur = lastindex(output)
     tspan = cur + 1:cur + tadd
-    @sync run_sim!(output, models, output[cur], tspan, args...)
+    run_sim!(output, models, output[cur], tspan, args...)
     output
 end
 
 "run the simulation either directly or asynchronously."
 run_sim!(output, args...) =
     if is_async(output)
-        f() = frameloop(output, args...)
-        schedule(Task(f))
+        @async frameloop!(output, args...)
     else
         frameloop!(output, args...)
     end
@@ -73,7 +73,7 @@ frameloop!(output, models, init, tspan, args...) = begin
         # Save the the current frame
         store_frame!(output, source, t)
         # Display the current frame
-        is_showable(output, t) && show_frame(output, t)
+        isshowable(output, t) && show_frame(output, t)
         # Let other tasks run (like ui controls)
         is_async(output) && yield()
         # Stick to the FPS
