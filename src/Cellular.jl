@@ -107,11 +107,6 @@ include("outputs/array.jl")
 include("outputs/sensitivity.jl")
 
 function __init__()
-    @require Plots="91a5bcdd-55d7-5caf-9e0b-520d859cae80" begin
-        export PlotsOutput
-        include("outputs/plots.jl")
-    end
-
     @require Blink="ad839575-38b3-5650-b840-f874b8c74a25" begin
         export BlinkOutput
         include("outputs/web.jl")

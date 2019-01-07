@@ -63,16 +63,16 @@
     end
 
     # @testset "BlinkOutput works" begin
-        # using Blink
-        # output = Cellular.BlinkOutput(init, model, store=true) 
-        # sim!(output, model, init; tstop=2) 
-        # sleep(1.5)
-        # resume!(output, model; tadd=3)
-        # sleep(1.5)
-        # @test output[3] == test
-        # @test output[5] == test2
-        # replay(output)
-        # close(output.window)
+    #     using Blink
+    #     output = Cellular.BlinkOutput(init, model, store=true) 
+    #     sim!(output, model, init; tstop=2) 
+    #     sleep(1.5)
+    #     resume!(output, model; tadd=3)
+    #     sleep(1.5)
+    #     @test output[3] == test
+    #     @test output[5] == test2
+    #     replay(output)
+    #     close(output.window)
     # end
 
     @testset "GtkOutput works" begin
@@ -86,17 +86,6 @@
         destroy(output.window)
     end
 
-    # Works but not set up for travis yet
-    # @testset "Plots output works" begin
-    #     using Plots
-    #     plotlyjs()
-    #     output = PlotsOutput(init)
-    #     sim!(output, model, init; tstop=2)
-    #     resume!(output, model; tadd=5)
-    #     @test output[3] == test
-    #     @test output[5] == test2
-    #     replay(output)
-    # end
 end
 
 
