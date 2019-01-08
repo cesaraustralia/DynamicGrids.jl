@@ -55,10 +55,25 @@ WebInterface(frames::AbstractVector, model, args...; fps=25, showmax_fps=fps, st
     make_slider(val, lab, lims, attr) = slider(build_range(lims); label=string(lab), value=val, attributes=attr)
     sliders = broadcast(make_slider, params, fnames, lims, attributes)
     slider_obs = map((s...) -> s, observe.(sliders)...)
-    modelwidgets = vbox(dom"span"("Model: "), vbox(sliders...))
+
+    group_title = nothing
+    slider_groups = []
+    group_items = []
+    for i in 1:length(params)
+        parent = parents[i]
+        if group_title != parent
+            group_title == nothing || push!(slider_groups, dom"div"(group_items...))
+            group_items = Any[dom"h2"(string(parent))]
+            group_title = parent
+        end
+        push!(group_items, sliders[i])
+    end
+    push!(slider_groups, dom"h2"(group_items...))
+
+    modelsliders = vbox(slider_groups...)
 
     # Put it all together into a webpage
-    page = vbox(hbox(image_obs, timedisplay), basewidgets, modelwidgets)
+    page = vbox(hbox(image_obs, timedisplay), basewidgets, modelsliders)
 
     # Construct the interface object
     timestamp = 0.0; tref = 0; tlast = 1; running = [false]
