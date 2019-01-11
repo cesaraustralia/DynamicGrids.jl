@@ -140,10 +140,9 @@ show_frame(o::AbstractOutput, frame, t) = nothing
 
 " Convert frame matrix to RGB24 " 
 process_image(o, frame) = begin
-    a = Images.RGB24.(normalize_frame(o, frame)) 
+    a = normalize_frame(o, frame) 
     # Colour zero cells
-    replace!(x -> x == RGB24(0.0, 0.0, 0.0) ? RGB24(0.0, 0.0, 1.0) : x, a)
-    a
+    map(x -> x == zero(x) ? RGB24(0.0, 0.0, 1.0) : RGB24(x), a)
 end
 
 """
