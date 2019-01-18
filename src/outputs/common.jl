@@ -56,6 +56,11 @@ setindex!(o::AbstractOutput, x, i) = setindex!(o.frames, x, i)
 push!(o::AbstractOutput, x) = push!(o.frames, x)
 append!(o::AbstractOutput, x) = append!(o.frames, x)
 
+# Generic Null output that does nothing
+@Frames struct NullOutput{} <: AbstractOutput{T} end
+
+NullOutput(args...) = NullOutput{typeof([])}([])
+
 
 # Custom methods
 is_running(o::AbstractOutput) = o.running[1]
