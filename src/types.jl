@@ -35,6 +35,8 @@ A Model that only accesses a single cell. Its return value is the new value of t
 """
 abstract type AbstractCellModel <: AbstractModel end
 
+
+
 """
 Singleton types for choosing the grid overflow rule used in
 [`inbounds`](@ref). These determine what is done when a neighborhood
@@ -45,6 +47,8 @@ abstract type AbstractOverflow end
 struct Wrap <: AbstractOverflow end
 "Skip coords that overflow boundaries"
 struct Skip <: AbstractOverflow end
+
+
 
 " A mutable container for models. 
 This allows updating of immutable values for live control, such as with 
@@ -57,7 +61,11 @@ mutable struct Models{M,C<:Number,T<:Number}
         new{typeof(args), typeof(cellsize), typeof(timestep)}(args, cellsize, timestep)
 end
 
-struct FrameData{A,D,C,TS,T} 
+
+
+abstract type AbstractFrameData end
+
+struct FrameData{A,D,C,TS,T} <: AbstractFrameData
     source::A
     dest::A
     dims::D
@@ -65,3 +73,10 @@ struct FrameData{A,D,C,TS,T}
     timestep::TS
     t::T
 end
+
+source(d::AbstractFrameData) = d.source
+dest(d::AbstractFrameData) = d.dest
+dims(d::AbstractFrameData) = d.dims
+timestep(d::AbstractFrameData) = d.timestep
+cellsize(d::AbstractFrameData) = d.cellsize
+t(d::AbstractFrameData) = d.t

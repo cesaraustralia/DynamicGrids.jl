@@ -147,11 +147,11 @@ run_model!(models::Tuple, data, args...) = begin
     # Run the first model
     run_rule!(models[1], data, args...)
     # Swap the source and dest arrays
-    tail_data = FrameData(data.dest, data.source, data.dims, data.cellsize, data.timestep, data.t)
+    tail_data = FrameData(dest(data), source(data), dims(data), cellsize(data), timestep(data), t(data))
     # Run the rest of the models, recursively 
     run_model!(tail(models), tail_data, args...)
 end
-run_model!(models::Tuple{}, data, args...) = data.source, data.dest
+run_model!(models::Tuple{}, data, args...) = source(data), dest(data)
 
 """
     run_rule!(models, data, indices, args...)
@@ -164,19 +164,19 @@ pre-initialised to zero and rules manually populate the dest grid.
 function run_rule! end
 run_rule!(model::AbstractModel, data, args...) = begin
     # Run the rule for all cells, writing the result to the dest array
-    for i = 1:data.dims[1]
-        for j = 1:data.dims[2]
-            @inbounds data.dest[i, j] = rule(model, data, data.source[i, j], (i, j), args...)
+    for i = 1:dims(data)[1]
+        for j = 1:dims(data)[2]
+            @inbounds dest(data)[i, j] = rule(model, data, source(data)[i, j], (i, j), args...)
         end
     end
 end
 run_rule!(model::AbstractPartialModel, data, args...) = begin
     # Initialise the dest array
-    data.dest .= data.source
+    dest(data) .= source(data)
     # Run the rule for all cells, the rule must write to the dest array manually
-    for i = 1:data.dims[1]
-        for j = 1:data.dims[2]
-            @inbounds rule!(model, data, data.source[i, j], (i, j), args...)
+    for i = 1:dims(data)[1]
+        for j = 1:dims(data)[2]
+            @inbounds rule!(model, data, source(data)[i, j], (i, j), args...)
         end
     end
 end
@@ -188,7 +188,7 @@ run_rule!(model::Union{AbstractNeighborhoodModel, Tuple{AbstractNeighborhoodMode
 
     # Run the rule for all cells, writing the result to the dest array
     # The neighborhood is copied to the models temp neighborhood array for performance
-    for i = 1:data.dims[1]
+    for i = 1:dims(data)[1]
         # Setup temp array between rows
         for b = 1:r+1
             for a = 1:h
@@ -197,16 +197,16 @@ run_rule!(model::Union{AbstractNeighborhoodModel, Tuple{AbstractNeighborhoodMode
         end
         for b = r+2:w
             for a = 1:h
-                @inbounds temp[a, b] = data.source[i+a-1-r, b-1-r]
+                @inbounds temp[a, b] = source(data)[i+a-1-r, b-1-r]
             end
         end
         # Run rule for a row
-        for j = 1:data.dims[2]
+        for j = 1:dims(dims)[2]
             @inbounds copyto!(temp, 1, temp, h + 1, (w - 1) * h)
             for a = 1:h
-                @inbounds temp[a, w] = data.source[i+a-1-r, j+r]
+                @inbounds temp[a, w] = source(data)[i+a-1-r, j+r]
             end
-            @inbounds data.dest[i, j] = rule(model, data, data.source[i, j], (i, j), args...)
+            @inbounds dest(data)[i, j] = rule(model, data, source(data)[i, j], (i, j), args...)
         end
     end
 end

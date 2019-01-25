@@ -103,7 +103,7 @@ Sums 2-dimensional radial Nieghborhoods. Specific shapes like Moore and Von Neum
 are determined by [`inhood`](@ref), as this method is general.
 """
 neighbors(hood::AbstractRadialNeighborhood, model, data, state, index, args...) = begin
-    height, width = size(data.source)
+    height, width = size(source(data))
     row, col = index
     r = radius(hood)
     # Initialise minus the current cell value, as it will be added back in the loop
@@ -113,7 +113,7 @@ neighbors(hood::AbstractRadialNeighborhood, model, data, state, index, args...) 
         (p, q) == index && continue
         hood_index, is_inbounds = inbounds((p, q), (height, width), hood.overflow)
         is_inbounds && inhood(hood, hood_index, index) || continue
-        cc += data.source[hood_index...]
+        cc += source(data)[hood_index...]
     end
     cc
 end
@@ -123,7 +123,7 @@ end
 Sum a single custom neighborhood.
 """
 neighbors(hood::AbstractCustomNeighborhood, model, data, state, index, args...) =
-    custom_neighbors(hood.neighbors, hood, data.source, index, args...)
+custom_neighbors(hood.neighbors, hood, source(data), index, args...)
 
 """
     neighbors(hood::MultiCustomNeighborhood, data, state, index, args...)
@@ -131,7 +131,7 @@ Sum multiple custom neighborhoods separately.
 """
 neighbors(hood::MultiCustomNeighborhood, model, data, state, index, args...) = begin
     for i = 1:length(hood.multineighbors)
-        hood.cc[i] = custom_neighbors(hood.multineighbors[i], hood, data.source, index)
+        hood.cc[i] = custom_neighbors(hood.multineighbors[i], hood, source(data), index)
     end
     hood.cc
 end
