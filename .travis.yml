@@ -40,11 +40,9 @@ script:
 
 after_success:
   # push coverage results to Coveralls
-  - julia -e 'cd(Pkg.dir("Cellular")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
+  - julia -e 'using Pkg; cd(Pkg.dir("Cellular")); Pkg.add("Coverage"); using Coverage; Coveralls.submit(Coveralls.process_folder())'
   # push coverage results to Codecov
-  - julia -e 'cd(Pkg.dir("Cellular")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
+  - julia -e 'using Pkg; cd(Pkg.dir("Cellular")); Pkg.add("Coverage"); using Coverage; Codecov.submit(Codecov.process_folder())'
   # update docs, add requires deps for optional docs
-  - julia -e 'Pkg.add("Plots")'
-  - julia -e 'Pkg.add("FileIO")'
-  - julia -e 'Pkg.add("Documenter"); Pkg.checkout("Documenter")'
-  - $TESTCMD -e 'cd(Pkg.dir("Cellular")); ENV["DOCUMENTER_DEBUG"] = "true"; include(joinpath("docs", "make.jl"))'
+  - julia -e 'using Pkg; Pkg.add("Plots"); Pkg.add("FileIO"); Pkg.add("Documenter"); Pkg.checkout("Documenter")'
+  - $TESTCMD -e 'using Pkg; cd(Pkg.dir("Cellular")); ENV["DOCUMENTER_DEBUG"] = "true"; include(joinpath("docs", "make.jl"))'
