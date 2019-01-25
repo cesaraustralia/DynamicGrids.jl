@@ -201,7 +201,7 @@ run_rule!(model::Union{AbstractNeighborhoodModel, Tuple{AbstractNeighborhoodMode
             end
         end
         # Run rule for a row
-        for j = 1:dims(dims)[2]
+        for j = 1:dims(data)[2]
             @inbounds copyto!(temp, 1, temp, h + 1, (w - 1) * h)
             for a = 1:h
                 @inbounds temp[a, w] = source(data)[i+a-1-r, j+r]
