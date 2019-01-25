@@ -1,15 +1,6 @@
-using Revise, 
-      Cellular,
-      Test
-import Cellular: rule, rule!, neighbors
+using SafeTestsets
 
-setup(x) = x
-
-# For manual testing on CUDA
-# using CuArrays
-# setup(x) = CuArray(x)
-
-@testset "neighborhoods" begin include("neighborhoods.jl") end
-@testset "framework" begin include("framework.jl") end
-@testset "common" begin include("common.jl") end
-@testset "integration" begin include("integration.jl") end
+@time @safetestset "neighborhoods" begin include("neighborhoods.jl") end
+@time @safetestset "framework" begin include("framework.jl") end
+@time @safetestset "common" begin include("common.jl") end
+@time @safetestset "integration" begin include("integration.jl") end

@@ -1,3 +1,4 @@
+using Cellular, Test
 import Cellular: rule, rule!
 
 struct TestModel <: AbstractModel end
@@ -7,7 +8,6 @@ struct TestPartialWrite <: AbstractPartialModel end
 rule(::TestModel, data, state, index, args...) = 0
 rule!(::TestPartial, data, state, index, args...) = 0
 rule!(::TestPartialWrite, data, state, index, args...) = data.dest[index[1], 2] = 0
-setup(x) = x
 
 
 @testset "boundary overflow checks are working" begin
@@ -35,42 +35,42 @@ end
 end
 
 
-global init  = setup([0 1 1 0;
-                      0 1 1 0;
-                      0 1 1 0;
-                      0 1 1 0;
-                      0 1 1 0])
+init  = [0 1 1 0;
+         0 1 1 0;
+         0 1 1 0;
+         0 1 1 0;
+         0 1 1 0]
 
 @testset "a rule that returns zero gives zero outputs" begin
-    final = setup([0 0 0 0;
-                   0 0 0 0;
-                   0 0 0 0;
-                   0 0 0 0;
-                   0 0 0 0])
+    final = [0 0 0 0;
+             0 0 0 0;
+             0 0 0 0;
+             0 0 0 0;
+             0 0 0 0]
 
-    global model = Models(TestModel())
-    global output = ArrayOutput(init, 10)
+    model = Models(TestModel())
+    output = ArrayOutput(init, 10)
     sim!(output, model, init; tstop=10)
     @test output[10] == final
 end
 
 @testset "an partial rule that returns zero does nothing" begin
-    global model = Models(TestPartial())
-    global output = ArrayOutput(init, 10)
+    model = Models(TestPartial())
+    output = ArrayOutput(init, 10)
     sim!(output, model, init; tstop=10)
     @test output[1] == init
     @test output[10] == init
 end
 
 @testset "a partial rule that writes to dest affects output" begin
-    final = setup([0 0 1 0;
-                   0 0 1 0;
-                   0 0 1 0;
-                   0 0 1 0;
-                   0 0 1 0])
+    final = [0 0 1 0;
+             0 0 1 0;
+             0 0 1 0;
+             0 0 1 0;
+             0 0 1 0]
 
-    global model = Models(TestPartialWrite())
-    global output = ArrayOutput(init, 10)
+    model = Models(TestPartialWrite())
+    output = ArrayOutput(init, 10)
     sim!(output, model, init; tstop=10)
     @test output[1] == init
     @test output[2] == final

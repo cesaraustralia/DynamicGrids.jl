@@ -1,28 +1,30 @@
+using Cellular, Test
+
 @testset "life glider stored properly all outputs" begin
 
-    global init = setup([0 0 0 0 0 0;
-                         0 0 0 0 0 0;
-                         0 0 0 0 0 0;
-                         0 0 0 1 1 1;
-                         0 0 0 0 0 1;
-                         0 0 0 0 1 0])
+    init =  [0 0 0 0 0 0;
+             0 0 0 0 0 0;
+             0 0 0 0 0 0;
+             0 0 0 1 1 1;
+             0 0 0 0 0 1;
+             0 0 0 0 1 0]
+                   
+    test =  [0 0 0 0 0 0;
+             0 0 0 0 0 0;
+             0 0 0 0 1 1;
+             0 0 0 1 0 1;
+             0 0 0 0 0 1;
+             0 0 0 0 0 0]
 
-    global test = setup([0 0 0 0 0 0;
-                         0 0 0 0 0 0;
-                         0 0 0 0 1 1;
-                         0 0 0 1 0 1;
-                         0 0 0 0 0 1;
-                         0 0 0 0 0 0])
+    test2 = [0 0 0 0 0 0;
+             0 0 0 0 0 0;
+             1 0 0 0 1 1;
+             1 0 0 0 0 0;
+             0 0 0 0 0 1;
+             0 0 0 0 0 0]
 
-    global test2 = setup([0 0 0 0 0 0;
-                          0 0 0 0 0 0;
-                          1 0 0 0 1 1;
-                          1 0 0 0 0 0;
-                          0 0 0 0 0 1;
-                          0 0 0 0 0 0])
-
-    global model = Models(Life())
-    global output = ArrayOutput(init, 5)
+    model = Models(Life())
+    output = ArrayOutput(init, 5)
     sim!(output, model, init; tstop=5)
 
     @testset "stored results match glider behaviour" begin
@@ -62,18 +64,18 @@
         replay(output)
     end
 
-    # @testset "BlinkOutput works" begin
-    #     using Blink
-    #     output = Cellular.BlinkOutput(init, model, store=true) 
-    #     sim!(output, model, init; tstop=2) 
-    #     sleep(1.5)
-    #     resume!(output, model; tadd=3)
-    #     sleep(1.5)
-    #     @test output[3] == test
-    #     @test output[5] == test2
-    #     replay(output)
-    #     close(output.window)
-    # end
+    @testset "BlinkOutput works" begin
+        using Blink
+        output = Cellular.BlinkOutput(init, model, store=true) 
+        sim!(output, model, init; tstop=2) 
+        sleep(1.5)
+        resume!(output, model; tadd=3)
+        sleep(1.5)
+        @test_broken output[3] == test
+        @test_broken output[5] == test2
+        replay(output)
+        close(output.window)
+    end
 
     @testset "GtkOutput works" begin
         using Gtk
@@ -91,19 +93,19 @@ end
 
 @testset "Float output" begin
 
-    global flt = setup([0.0 0.0 0.0 0.1 0.0 0.0;
-                        0.0 0.3 0.0 0.0 0.6 0.0;
-                        0.2 0.0 0.2 0.1 0.0 0.6;
-                        0.0 0.0 0.0 1.0 1.0 1.0;
-                        0.0 0.3 0.3 0.7 0.8 1.0;
-                        0.0 0.0 0.0 0.0 1.0 0.6])
+    flt = [0.0 0.0 0.0 0.1 0.0 0.0;
+           0.0 0.3 0.0 0.0 0.6 0.0;
+           0.2 0.0 0.2 0.1 0.0 0.6;
+           0.0 0.0 0.0 1.0 1.0 1.0;
+           0.0 0.3 0.3 0.7 0.8 1.0;
+           0.0 0.0 0.0 0.0 1.0 0.6]
 
-    global int = setup([0 0 0 0 0 0;
-                        0 0 0 0 0 0;
-                        0 0 0 0 0 0;
-                        0 0 0 1 1 1;
-                        0 0 0 0 0 1;
-                        0 0 0 0 1 0])
+    int = [0 0 0 0 0 0;
+           0 0 0 0 0 0;
+           0 0 0 0 0 0;
+           0 0 0 1 1 1;
+           0 0 0 0 0 1;
+           0 0 0 0 1 0]
 
     @testset "GtkOutput works" begin
         using Gtk
