@@ -57,7 +57,6 @@ end
 end
 
 @testset "BlinkOutput works" begin
-    using Blink
     output = Cellular.BlinkOutput(init, model, store=true) 
     sim!(output, model, init; tstop=20) 
     sleep(1.5)
@@ -70,7 +69,6 @@ end
 end
 
 @testset "GtkOutput works" begin
-    using Gtk
     output = GtkOutput(init, store=true) 
     sim!(output, model, init; tstop=2) 
     resume!(output, model; tadd=3)
@@ -98,7 +96,6 @@ end
            0 0 0 0 1 0]
 
     @testset "GtkOutput works" begin
-        using Gtk
         output = GtkOutput(int) 
         Cellular.process_image(output, output[1])
         Cellular.show_frame(output, 1)

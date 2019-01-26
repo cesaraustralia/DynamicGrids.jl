@@ -1,4 +1,6 @@
 using SafeTestsets
+using Blink
+using ImageMagick
 
 @time @safetestset "neighborhoods" begin include("neighborhoods.jl") end
 @time @safetestset "framework" begin include("framework.jl") end
