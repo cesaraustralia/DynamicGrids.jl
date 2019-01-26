@@ -1,4 +1,4 @@
-using Cellular, Test
+using Cellular, Test, Gtk
 
 # life glider sims
 
@@ -47,8 +47,7 @@ end
     replay(output)
 end
 
-@testset "REPLOutput{:braile} works" begin
-    output = REPLOutput{:braile}(init; fps=100, store=true)
+@testset "REPLOutput{:braile} works" begin output = REPLOutput{:braile}(init; fps=100, store=true)
     sim!(output, model, init; tstop=2)
     resume!(output, model; tadd=3)
     @test output[3] == test
