@@ -15,10 +15,11 @@ the passed in output for each time-step.
 - `tstop`: Any Number. Default: 100
 """
 sim!(output, models, init, args...; tstop=100) = begin
-    init = deepcopy(init)
     is_running(output) && return
-    set_running!(output, true) || return
+    set_running!(output, true)
+
     clear!(output)
+    init = deepcopy(init)
     store_frame!(output, init, 1)
     show_frame(output, 1)
     run_sim!(output, models, init, 2:tstop, args...)
@@ -64,7 +65,7 @@ frameloop!(output, models, init, tspan, args...) = begin
 
     set_timestamp!(output, tspan.start)
 
-    for t in tspan
+    for t in tspan       
         # Collect the data elements for this frame
         data = FrameData(source, dest, sze, models.cellsize, models.timestep, t)
         # Run the automation on the source array, writing to the dest array and

@@ -48,15 +48,28 @@ setindex!(o::BlinkOutput, x, i) = setindex!(o.interface, x, i)
 push!(o::BlinkOutput, x) = push!(o.interface, x)
 append!(o::BlinkOutput, x) = append!(o.interface, x)
 
+
 clear!(o::BlinkOutput) = clear!(o.interface)
 store_frame!(o::BlinkOutput, frame, t) = store_frame!(o.interface, frame, t)
+update_frame!(o::BlinkOutput, frame, t) = update_frame!(o.interface, frame, t)
 set_time!(o::BlinkOutput, t) = set_time!(o.interface, t)
+set_timestamp!(o::BlinkOutput, t) = set_timestamp!(o.interface, t)
 set_running!(o::BlinkOutput, x) = set_running!(o.interface, x) 
 show_frame(o::BlinkOutput, t::Number) = show_frame(o.interface, t)
+delay(o::BlinkOutput, t::Number) = delay(o.interface, t)
+
 is_showable(o::BlinkOutput, t) = is_showable(o.interface, t)
 is_async(o::BlinkOutput) = is_async(o.interface)
 is_running(o::BlinkOutput) = is_alive(o) && is_running(o.interface)
 is_alive(o::BlinkOutput) = o.window.content.sock.state == WebSockets.ReadyState(1)
+
+last_t(o::BlinkOutput) = last_t(o.interface)
+fps(o::BlinkOutput) = fps(o.interface)
+curframe(o::BlinkOutput, t) = curframe(o.interface, t)
+
+normalize_frame(o::BlinkOutput, a::AbstractArray) = normalize_frame(o.interface, a)
+show_frame(o::BlinkOutput, args...) = show_frame(o, args...)
+process_image(o::BlinkOutput, frame) = process_image(o, frame)
 
 has_fps(o::BlinkOutput) = has_fps(o.interface)
 has_minmax(o::BlinkOutput) = has_minmax(o.interface)
