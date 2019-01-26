@@ -30,8 +30,10 @@ script:
   - $TESTCMD -e 'using Pkg;
                  Pkg.add("ImageMagick"); 
                  Pkg.build("ImageMagick"); 
+                 using ImageMagick;
                  Pkg.add("Blink"); 
                  Pkg.build("Blink"); 
+                 using Blink;
                  Pkg.add(PackageSpec(url=pwd())); 
                  Pkg.build("Cellular"); 
                  using Blink;
