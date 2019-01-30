@@ -82,7 +82,7 @@ WebInterface(frames::AbstractVector, model, args...; fps=25, showmax_fps=fps, st
                              frames, fps, showmax_fps, timestamp, tref, tlast, store, running, processor, min, max, page, image_obs, t_obs,)
 
     # Initialise image
-    image_obs[] = web_image(interface, frames[1])
+    image_obs[] = web_image(interface, frames[1], 1)
 
     # # Control mappings
     map!(timespan, observe(timespan_box)) do ts
@@ -122,8 +122,8 @@ build_range(lim::Tuple{Int,Int}) = lim[1]:1:lim[2]
 is_async(o::WebInterface) = true
 
 show_frame(o::WebInterface, frame, t) = begin
-    o.image_obs[] = web_image(o, frame)
+    o.image_obs[] = web_image(o, frame, t)
     o.t_obs[] = t
 end
 
-web_image(interface, frame) = dom"div"(process_image(interface, frame, t))
+web_image(interface, frame, t) = dom"div"(process_image(interface, frame, t))

@@ -72,7 +72,9 @@ curframe(o::BlinkOutput, t) = curframe(o.interface, t)
 
 normalize_frame(o::BlinkOutput, a::AbstractArray) = normalize_frame(o.interface, a)
 show_frame(o::BlinkOutput, args...) = show_frame(o, args...)
-process_image(o::BlinkOutput, frame) = process_image(o, frame)
+process_image(o::BlinkOutput, frame, t) = process_image(o, frame, t)
+web_image(o::BlinkOutput, frame, t) = process_image(o, frame, t)
 
 has_fps(o::BlinkOutput) = has_fps(o.interface)
 has_minmax(o::BlinkOutput) = has_minmax(o.interface)
+has_processor(o::BlinkOutput) = has_processor(o.interface)

@@ -32,4 +32,4 @@ Write the output array to a gif.
 Saving very large gifs may trigger a bug in imagemagick.
 """
 savegif(filename::String, o::AbstractOutput) =
-    FileIO.save(filename, cat(process_image.(Ref(o), o)..., dims=3))
+    FileIO.save(filename, cat(process_image.(Ref(o), o, collect(1:lastindex(o)))..., dims=3))

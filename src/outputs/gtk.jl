@@ -7,7 +7,7 @@ using Cairo,
 Shows output live in a Gtk window.
 Only available after running `using Gtk`
 """
-@MinMax @Ok @FPS @Frames mutable struct GtkOutput{W,C} <: AbstractOutput{T}
+@MinMax @ImageProc @Ok @FPS @Frames mutable struct GtkOutput{W,C} <: AbstractOutput{T}
     window::W
     canvas::C
 end
@@ -26,7 +26,7 @@ Constructor for GtkOutput.
 - `fps`: frames per second
 - `showmax_fps`: maximum displayed frames per second
 """
-GtkOutput(frames::AbstractVector; fps=25, showmax_fps=fps, store=false, min=0, max=1) = begin
+GtkOutput(frames::AbstractVector; fps=25, showmax_fps=fps, store=false, processor=Greyscale(), min=0, max=1) = begin
     timestamp = 0.0; tref = 0; tlast = 1; running = [false]
 
     canvas = Gtk.@GtkCanvas()
@@ -34,7 +34,7 @@ GtkOutput(frames::AbstractVector; fps=25, showmax_fps=fps, store=false, min=0, m
     show(canvas)
     canvas.mouse.button1press = (widget, event) -> running[1] = false
 
-    output = GtkOutput(frames[:], fps, showmax_fps, timestamp, tref, tlast, store, running, min, max, window, canvas)
+    output = GtkOutput(frames[:], fps, showmax_fps, timestamp, tref, tlast, store, running, processor, min, max, window, canvas)
     show_frame(output, 1)
     output
 end
