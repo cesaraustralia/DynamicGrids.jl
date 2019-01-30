@@ -51,43 +51,34 @@ using Parameters,
 using Base: tail
 
 import Base: show, getindex, setindex!, lastindex, size, length, push!, append!, broadcast, broadcast!, similar, eltype
-import Flatten: @flattenable, flattenable
-import FieldMetadata: @limits, limits
+
+import FieldMetadata: @limits, limits, @flattenable, flattenable
 
 
-export sim!,
-       resume!,
-       replay,
-       savegif,
-       show_frame,
-       broadcastable_indices,
-       distances,
-       AbstractModel,
-       AbstractPartialModel,
-       AbstractNeighborhoodModel,
-       AbstractPartialNeighborhoodModel,
-       AbstractCellModel,
-       ScalableMatrix,
-       AbstractLife,
-       Life,
-       AbstractNeighborhood,
-       AbstractRadialNeighborhood,
-       RadialNeighborhood,
-       AbstractCustomNeighborhood,
-       CustomNeighborhood,
-       MultiCustomNeighborhood,
-       AbstractOverflow,
-       Models,
-       Skip,
-       Wrap,
-       AbstractOutput,
-       AbstractArrayOutput,
-       ArrayOutput,
-       GtkOutput,
-       REPLOutput,
-       AbstractImageProcessor,
-       Greyscale,
-       ColorZeros
+
+export sim!, resume!, replay
+
+export savegif, show_frame
+
+export distances, broadcastable_indices
+
+export AbstractModel, AbstractPartialModel, 
+       AbstractNeighborhoodModel, AbstractPartialNeighborhoodModel, 
+       AbstractCellModel
+
+export Models # TODO: a real name for this
+
+export AbstractLife, Life
+
+export AbstractNeighborhood, AbstractRadialNeighborhood, RadialNeighborhood,
+       AbstractCustomNeighborhood, CustomNeighborhood, MultiCustomNeighborhood
+
+export AbstractOverflow, Skip, Wrap
+
+export AbstractOutput, AbstractArrayOutput, ArrayOutput, GtkOutput, REPLOutput
+
+export AbstractImageProcessor, Greyscale, ColorZeros
+
 
 
 
