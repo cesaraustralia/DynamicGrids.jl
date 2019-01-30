@@ -12,6 +12,13 @@ Colors
 FileIO
 Images
 Mixers 0.1.0
-Flatten 0.0.2
+Flatten 0.0.4
 FieldMetadata 0.0.1
 UnicodeGraphics 0.0.1
+Interact
+InteractBase
+ImageMagick
+WebSockets
+AssetRegistry
+InteractBase
+InteractBulma
