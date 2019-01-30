@@ -7,6 +7,8 @@ using Interact,
 
 import InteractBase: WidgetTheme, libraries
 
+
+# Custom css theme
 struct WebTheme <: WidgetTheme end
 
 const css_key = AssetRegistry.register(joinpath(dirname(pathof(Cellular)), "../assets/web.css"))
@@ -16,15 +18,14 @@ libraries(::WebTheme) = vcat(libraries(Bulma()), [css_key])
 
 abstract type AbstractWebOutput{T} <: AbstractOutput{T} end
 
-@MinMax @Ok @FPS @Frames mutable struct WebInterface{P,Im,Ti,M} <: AbstractOutput{T}
+@MinMax @ImageProc @Ok @FPS @Frames mutable struct WebInterface{P,IM,TI} <: AbstractOutput{T}
     page::P
-    image_obs::Im
-    t_obs::Ti
+    image_obs::IM
+    t_obs::TI
 end
-build_range(lim::Tuple{Float64,Float64}) = lim[1]:(lim[2]-lim[1])/400:lim[2]
-build_range(lim::Tuple{Int,Int}) = lim[1]:1:lim[2]
 
-WebInterface(frames::AbstractVector, model, args...; fps=25, showmax_fps=fps, store=false, min=0, max=1, theme=WebTheme()) = begin
+WebInterface(frames::AbstractVector, model, args...; fps=25, showmax_fps=fps, store=false, 
+             processor=Greyscale(), min=0, max=1, theme=WebTheme()) = begin
 
     settheme!(theme)
 
@@ -77,8 +78,8 @@ WebInterface(frames::AbstractVector, model, args...; fps=25, showmax_fps=fps, st
 
     # Construct the interface object
     timestamp = 0.0; tref = 0; tlast = 1; running = [false]
-    interface = WebInterface{typeof.((frames, fps, timestamp, tref, min, page, image_obs, t_obs))...}(
-                             frames, fps, showmax_fps, timestamp, tref, tlast, store, running, min, max, page, image_obs, t_obs)
+    interface = WebInterface{typeof.((frames, fps, timestamp, tref, processor, min, page, image_obs, t_obs))...}(
+                             frames, fps, showmax_fps, timestamp, tref, tlast, store, running, processor, min, max, page, image_obs, t_obs,)
 
     # Initialise image
     image_obs[] = web_image(interface, frames[1])
@@ -114,6 +115,10 @@ WebInterface(frames::AbstractVector, model, args...; fps=25, showmax_fps=fps, st
     interface
 end
 
+build_range(lim::Tuple{Float64,Float64}) = lim[1]:(lim[2]-lim[1])/400:lim[2]
+build_range(lim::Tuple{Int,Int}) = lim[1]:1:lim[2]
+
+
 is_async(o::WebInterface) = true
 
 show_frame(o::WebInterface, frame, t) = begin
@@ -121,4 +126,4 @@ show_frame(o::WebInterface, frame, t) = begin
     o.t_obs[] = t
 end
 
-web_image(interface, frame) = dom"div"(process_image(interface, frame))
+web_image(interface, frame) = dom"div"(process_image(interface, frame, t))

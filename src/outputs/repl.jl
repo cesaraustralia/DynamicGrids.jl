@@ -16,17 +16,20 @@ REPLOutput{:block}(init)
 ```
 """
 @premix struct SubType{X} end
+
 @Ok @FPS @Frames @SubType mutable struct REPLOutput{Co,Cu} <: AbstractOutput{T}
     displayoffset::Array{Int}
     color::Co
     cutoff::Cu
 end
+
 REPLOutput{X}(frames::AbstractVector; fps=25, showmax_fps=fps, store=false, 
               color=:white, cutoff=0.5) where X = begin
     timestamp = 0.0; tref = 0; tlast = 1; running = [false]; displayoffset = [1, 1];
     REPLOutput{X,typeof.((frames, fps, timestamp, tref, color, cutoff))...}(
                frames, fps, showmax_fps, timestamp, tref, tlast, store, running, displayoffset, color, cutoff)
 end
+
 
 initialize!(o::REPLOutput, args...) = begin
     o.displayoffset .= (1, 1)
@@ -61,36 +64,34 @@ replframe(o, frame, ystep, xstep, f) = begin
 
     yrange = max(1, ystep * yoffset):min(youtput, ystep * (dispy + yoffset - 1))
     xrange = max(1, xstep * xoffset):min(xoutput, xstep * (dispx + xoffset - 1))
-    let frame=frame, yrange=yrange, xrange=xrange
-        f(view(Array(frame), yrange, xrange), o.cutoff)
-    end
+    f(view(Array(frame), yrange, xrange), o.cutoff)
 end
 
-movedisplay(o) =
-    while is_running(o)
-        c = REPLGamesBase.readKey()
-        c == "Up"      && move_y!(o, -YSCROLL)
-        c == "Down"    && move_y!(o, YSCROLL)
-        c == "Left"    && move_x!(o, -XSCROLL)
-        c == "Right"   && move_x!(o, XSCROLL)
-        c == "PgUp"    && move_y!(o, -PAGESCROLL)
-        c == "PgDown"  && move_y!(o, PAGESCROLL)
-        c == "Ctrl-C"  && set_running!(o, false)
-    end
+# movedisplay(o) =
+#     while is_running(o)
+#         c = REPLGamesBase.readKey()
+#         c == "Up"      && move_y!(o, -YSCROLL)
+#         c == "Down"    && move_y!(o, YSCROLL)
+#         c == "Left"    && move_x!(o, -XSCROLL)
+#         c == "Right"   && move_x!(o, XSCROLL)
+#         c == "PgUp"    && move_y!(o, -PAGESCROLL)
+#         c == "PgDown"  && move_y!(o, PAGESCROLL)
+#         c == "Ctrl-C"  && set_running!(o, false)
+#     end
 
-move_y!(o::REPLOutput{:block}, n) = move_y!(n, XBLOCK)
-move_x!(o::REPLOutput{:block}, n) = move_x!(n, XBLOCK)
-move_y!(o::REPLOutput{:braile}, n) = move_y!(n, XBRAILE)
-move_x!(o::REPLOutput{:braile}, n) = move_x!(n, XBRAILE)
-move_y!(n, yscale) = begin
-    dispy, _ = displaysize(stdout)
-    y = size(o[1], 1)
-    o.displayoffset[1] = max(0, min(y ÷ yscale - dispy, o.displayoffset[1] + n))
-end
-move_x!(n, xscale) = begin
-    _, dispx = displaysize(stdout)
-    x = size(o[1], 2)
-    o.displayoffset[2] = max(0, min(x ÷ xscale - dispx, o.displayoffset[2] + n))
-end
+# move_y!(o::REPLOutput{:block}, n) = move_y!(n, XBLOCK)
+# move_x!(o::REPLOutput{:block}, n) = move_x!(n, XBLOCK)
+# move_y!(o::REPLOutput{:braile}, n) = move_y!(n, XBRAILE)
+# move_x!(o::REPLOutput{:braile}, n) = move_x!(n, XBRAILE)
+# move_y!(n, yscale) = begin
+#     dispy, _ = displaysize(stdout)
+#     y = size(o[1], 1)
+#     o.displayoffset[1] = max(0, min(y ÷ yscale - dispy, o.displayoffset[1] + n))
+# end
+# move_x!(n, xscale) = begin
+#     _, dispx = displaysize(stdout)
+#     x = size(o[1], 2)
+#     o.displayoffset[2] = max(0, min(x ÷ xscale - dispx, o.displayoffset[2] + n))
+# end
 
 

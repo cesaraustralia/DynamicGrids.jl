@@ -7,7 +7,7 @@ using Cairo,
 Shows output live in a Gtk window.
 Only available after running `using Gtk`
 """
-@MinMax @Ok @FPS @Frames mutable struct GtkOutput{M,W,C} <: AbstractOutput{T}
+@MinMax @Ok @FPS @Frames mutable struct GtkOutput{W,C} <: AbstractOutput{T}
     window::W
     canvas::C
 end
@@ -41,7 +41,7 @@ end
 
 
 show_frame(o::GtkOutput, frame::AbstractMatrix, t) = begin
-    img = permutedims(process_image(o, frame))
+    img = permutedims(process_image(o, frame, t))
     println(t)
     Gtk.@guarded Gtk.draw(o.canvas) do widget
         ctx = Gtk.getgc(o.canvas)

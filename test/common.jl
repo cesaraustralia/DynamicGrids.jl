@@ -12,12 +12,6 @@ output = MinMaxOutput(init, 0.0, 10.0)
 @test curframe(output, 5) == 5 
 @test isshowable(output, 5) == false
 
-@test normalize_frame(output, output[1]) == [1.0 1.0;
-                                             0.0 0.5]
-
-@test process_image(output, output[1]) == [RGB24(1.0, 1.0, 1.0) RGB24(1.0, 1.0, 1.0);
-                                           RGB24(0.0, 0.0, 1.0) RGB24(0.5, 0.5, 0.5)]
-
 update = [8.0 15.0;
           2.0  9.0]
 
@@ -40,3 +34,12 @@ store_frame!(output, update, 3)
 output2 = MinMaxOutput(output, 0.0, 10.0)
 @test length(output2) == 5
 @test output2[3] == update
+
+
+@testset "image processing" begin
+    @test normalize_frame(output, output[1]) == [1.0 1.0;
+                                                 0.0 0.5]
+
+    @test process_image(output, output[1], 1) == [RGB24(1.0, 1.0, 1.0) RGB24(1.0, 1.0, 1.0);
+                                                  RGB24(0.0, 0.0, 0.0) RGB24(0.5, 0.5, 0.5)]
+end

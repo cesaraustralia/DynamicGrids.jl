@@ -1,10 +1,5 @@
-"""
-All outputs must inherit from AbstractOutput.
 
-Simulation outputs are decoupled from simulation behaviour and in
-many cases can be used interchangeably.
-"""
-abstract type AbstractOutput{T} <: AbstractVector{T} end
+# Mixins
 
 @premix struct Frames{T<:AbstractVector}
     "An array that holds each frame of the simulation"
@@ -24,15 +19,22 @@ end
     store::Bool
 end
 
+@premix struct MinMax{MM}
+    min::MM
+    max::MM
+end
+
+@premix struct ImageProc{IP}
+    processor::IP
+end
+
+
+# Traits
+
 struct HasFPS end
 struct NoFPS end
 
 has_fps(o::O) where O = :fps in fieldnames(O) ? HasFPS() : NoFPS()
-
-@premix struct MinMax{M}
-    min::M
-    max::M
-end
 
 struct HasMinMax end
 struct NoMinMax end
@@ -42,11 +44,30 @@ has_minmax(m) = begin
     :min in fns && :max in fns ? HasMinMax() : NoMinMax()
 end
 
+struct HasProcessor end
+struct NoProcessor end
+
+has_processor(o::O) where O = :processor in fieldnames(O) ? HasProcessor() : NoProcessor()
+
+
+
+# Abstract output type and generic methods
+
+"""
+All outputs must inherit from AbstractOutput.
+
+Simulation outputs are decoupled from simulation behaviour and in
+many cases can be used interchangeably.
+"""
+abstract type AbstractOutput{T} <: AbstractVector{T} end
+
 "Generic ouput constructor. Converts init array to vector of frames."
 (::Type{F})(init::T, args...; kwargs...) where F <: AbstractOutput where T <: AbstractMatrix = 
     F(T[deepcopy(init)], args...; kwargs...)
 
-# Base methods
+
+# Forward base methods to the frames array
+
 length(o::AbstractOutput) = length(o.frames)
 size(o::AbstractOutput) = size(o.frames)
 firstindex(o::AbstractOutput) = firstindex(o.frames)
@@ -56,20 +77,15 @@ setindex!(o::AbstractOutput, x, i) = setindex!(o.frames, x, i)
 push!(o::AbstractOutput, x) = push!(o.frames, x)
 append!(o::AbstractOutput, x) = append!(o.frames, x)
 
-# Generic Null output that does nothing
-@Frames struct NullOutput{} <: AbstractOutput{T} end
-
-NullOutput(args...) = NullOutput{typeof([])}([])
 
 
 # Custom methods
+
 is_running(o::AbstractOutput) = o.running[1]
 
 set_running!(o::AbstractOutput, val) = o.running[1] = val
 
 is_async(o::AbstractOutput) = false
-
-clear!(o::AbstractOutput) = deleteat!(o.frames, 1:length(o))
 
 fps(o) = o.fps
 
@@ -77,6 +93,10 @@ allocate_frames!(o::AbstractOutput, init, tspan) = begin
     append!(o.frames, [similar(init) for i in tspan])
     nothing
 end
+
+clear!(o::AbstractOutput) = clear!(has_fps(o), o::AbstractOutput)
+clear!(::HasFPS, o::AbstractOutput) = deleteat!(o.frames, 1:length(o))
+clear!(::NoFPS, o::AbstractOutput) = nothing
 
 last_t(o::AbstractOutput) = last_t(has_fps(o), o)
 last_t(::HasFPS, o::AbstractOutput) = o.tlast
@@ -128,12 +148,6 @@ set_timestamp!(::HasFPS, o, t) = begin
 end
 set_timestamp!(::NoFPS, o, t) = nothing
 
-normalize_frame(o, a::AbstractArray) = normalize_frame(has_minmax(o), o, a)
-normalize_frame(::HasMinMax, o, a::AbstractArray) = normalize_frame(a, o.min, o.max)
-normalize_frame(::NoMinMax, o, a::AbstractArray) = a
-normalize_frame(a::AbstractArray, minval::Number, maxval::Number) = 
-    min.((a .- minval) ./ (maxval - minval), one(eltype(a)))
-
 """
     show_frame(output::AbstractOutput, [t])
 Show the last frame of the output, or the frame at time t.
@@ -143,17 +157,10 @@ show_frame(o::AbstractOutput, t::Number) = show_frame(o, o[curframe(o, t)], t)
 show_frame(o::AbstractOutput, frame::AbstractMatrix) = show_frame(o, frame, 0)
 show_frame(o::AbstractOutput, frame, t) = nothing
 
-" Convert frame matrix to RGB24 " 
-process_image(o, frame) = begin
-    a = normalize_frame(o, frame) 
-    # Colour zero cells
-    map(x -> x == zero(x) ? RGB24(0.0, 0.0, 1.0) : RGB24(x), a)
-end
 
-"""
-    savegif(filename::String, output::AbstractOutput)
-Write the output array to a gif.
-Saving very large gifs may trigger a bug in imagemagick.
-"""
-savegif(filename::String, o::AbstractOutput) =
-    FileIO.save(filename, cat(process_image.(Ref(o), o)..., dims=3))
+
+" A generic Null output that does nothing "
+@Frames struct NullOutput{} <: AbstractOutput{T} end
+
+NullOutput(args...) = NullOutput{typeof([])}([])
+

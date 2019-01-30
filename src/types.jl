@@ -43,16 +43,20 @@ Singleton types for choosing the grid overflow rule used in
 or jump extends outside of the grid.
 """
 abstract type AbstractOverflow end
+
 "Wrap cords that overflow to the opposite side"
 struct Wrap <: AbstractOverflow end
+
 "Skip coords that overflow boundaries"
 struct Skip <: AbstractOverflow end
 
 
 
-" A mutable container for models. 
-This allows updating of immutable values for live control, such as with 
-BlinkOutput, while keeping the core model immutable for GPU compatability."
+""" 
+    Models(args...; cellsize=1, timestep=1)
+A mutable container for chaining immutable models, that 
+allows flattening and reconstruction with Flatten.jl. 
+"""
 mutable struct Models{M,C<:Number,T<:Number} 
     models::M
     cellsize::C
@@ -65,6 +69,7 @@ end
 
 abstract type AbstractFrameData end
 
+" Simulation data passed to rules for each timestep "
 struct FrameData{A,D,C,TS,T} <: AbstractFrameData
     source::A
     dest::A

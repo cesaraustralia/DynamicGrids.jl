@@ -4,6 +4,9 @@ using Blink,
 """
 A html output using Interact.jl and an Electron window through Blink.jl
 
+BlinkOutput automatically generates sliders to control simulaitons
+in realtime.
+
 ## Example
 ```julia
 using Blink

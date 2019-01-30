@@ -1,4 +1,4 @@
-using Cellular, Test, Gtk
+using Blink, Cellular, Test, Gtk, Colors
 
 # life glider sims
 
@@ -23,6 +23,13 @@ test2 = [0 0 0 0 0 0;
          0 0 0 0 0 1;
          0 0 0 0 0 0]
 
+image2 = [RGB24(0) RGB24(0) RGB24(0) RGB24(0) RGB24(0) RGB24(0);
+          RGB24(0) RGB24(0) RGB24(0) RGB24(0) RGB24(0) RGB24(0);
+          RGB24(1) RGB24(0) RGB24(0) RGB24(0) RGB24(1) RGB24(1);
+          RGB24(1) RGB24(0) RGB24(0) RGB24(0) RGB24(0) RGB24(0);
+          RGB24(0) RGB24(0) RGB24(0) RGB24(0) RGB24(0) RGB24(1);
+          RGB24(0) RGB24(0) RGB24(0) RGB24(0) RGB24(0) RGB24(0)]
+
 model = Models(Life())
 output = ArrayOutput(init, 5)
 sim!(output, model, init; tstop=5)
@@ -40,7 +47,7 @@ end
 
 @testset "REPLOutput{:block} works" begin
     output = REPLOutput{:block}(init; fps=100, store=true)
-    sim!(output, model, init; tstop=2)
+    sim!(output, model, init; tstop=200)
     resume!(output, model; tadd=5)
     @test output[3] == test
     @test output[5] == test2
@@ -56,19 +63,20 @@ end
 end
 
 @testset "BlinkOutput works" begin
-    output = Cellular.BlinkOutput(init, model, store=true) 
-    sim!(output, model, init; tstop=20) 
+    output = Cellular.BlinkOutput(init, model; store=true) 
+    sim!(output, model, init; tstop=2) 
     sleep(1.5)
     resume!(output.interface, model; tadd=3)
     sleep(1.5)
     @test output[3] == test
     @test output[5] == test2
+    @test output.interface.image_obs[].children.tail[1] == image2
     replay(output)
     close(output.window)
 end
 
 @testset "GtkOutput works" begin
-    output = GtkOutput(init, store=true) 
+    output = GtkOutput(init; store=true) 
     sim!(output, model, init; tstop=2) 
     resume!(output, model; tadd=3)
     @test output[3] == test
@@ -96,12 +104,10 @@ end
 
     @testset "GtkOutput works" begin
         output = GtkOutput(int) 
-        Cellular.process_image(output, output[1])
         Cellular.show_frame(output, 1)
         destroy(output.window)
 
         output = GtkOutput(flt) 
-        Cellular.process_image(output, output[1])
         Cellular.show_frame(output, 1)
         destroy(output.window)
     end
