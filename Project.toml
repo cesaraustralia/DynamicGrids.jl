@@ -1,6 +1,0 @@
-authors = ["Rafael Schouten <rafaelschouten@gmail.com>"]
-name = "Cellular"
-uuid = "7eb2d0c0-3446-11e9-39ed-6b750839c257"
-version = "0.1.0"
-
-[deps]
