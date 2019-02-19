@@ -35,6 +35,7 @@ build_script:
                  using Blink;
                  Blink.AtomShell.install()"
   - C:\julia\bin\julia -e "using Pkg; Pkg.add(PackageSpec(url=\"https://github.com/ChristianKurz/REPLGamesBase.jl.git\")); Pkg.build(\"REPLGamesBase\")"
+  - C:\julia\bin\julia -e "using Pkg; Pkg.add(PackageSpec(url=\"https://github.com/rafaqz/FielddocTables.jl.git\")); Pkg.build(\"FielddocTables\")"
   - echo "%JL_BUILD_SCRIPT%"
   - C:\julia\bin\julia -e "%JL_BUILD_SCRIPT%"
 

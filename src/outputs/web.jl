@@ -1,6 +1,6 @@
 using Interact, InteractBase, InteractBulma, AssetRegistry, Flatten, Images
 
-import Widgets: WidgetTheme, libraries
+import InteractBase: WidgetTheme, libraries
 
 
 # Custom css theme

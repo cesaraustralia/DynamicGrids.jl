@@ -20,6 +20,7 @@ UnicodeGraphics 0.0.1
 Interact
 InteractBase
 InteractBulma
+Widgets
 ImageMagick
 WebSockets
 AssetRegistry
