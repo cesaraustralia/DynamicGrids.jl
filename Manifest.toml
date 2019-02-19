@@ -554,11 +554,9 @@ uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 
 [[REPLGamesBase]]
 deps = ["Crayons", "REPL"]
-git-tree-sha1 = "1827375cdb1ec9913e058e2f851c4975b1a032c6"
 repo-rev = "master"
 repo-url = "https://github.com/ChristianKurz/REPLGamesBase.jl"
 uuid = "061b77f0-9d53-11e8-11f4-7df760718934"
-version = "0.1.0"
 
 [[Random]]
 deps = ["Serialization"]
