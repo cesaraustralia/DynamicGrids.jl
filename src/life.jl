@@ -4,22 +4,21 @@ this should replicate the fields for [`Life`](@ref).
 """
 abstract type AbstractLife <: AbstractModel end
 
-" Model for game-of-life style cellular automata. "
-@limits @flattenable @with_kw struct Life{N,B,S} <: AbstractLife
-    # "An AbstractNeighborhood. RadialNeighborhood's are common for Cellular Automata."
-    neighborhood::N = RadialNeighborhood(; typ=:moore, radius=1, overflow=Wrap()) | false | _
-    # "Array, Tuple or Iterable of integers to match neighbors when cell is empty."
-    b::B = (3, 3) | true | (0, 9)
-    # "Array, Tuple or Iterable of integers to match neighbors cell is full."
-    s::S = (2, 3) | true | (0, 9)
+""" 
+Model for game-of-life style cellular automata. 
+$(FIELDDOCTABLE)
+"""
+@description @limits @flattenable @default_kw struct Life{N,B,S} <: AbstractLife
+    neighborhood::N | RadialNeighborhood(; typ=:moore, radius=1, overflow=Wrap()) | false | _ | "An AbstractNeighborhood. RadialNeighborhood's are common for Cellular Automata."
+    b::B | (3, 3) | true | (0, 9) | "Array, Tuple or Iterable of integers to match neighbors when cell is empty."
+    s::S | (2, 3) | true | (0, 9) | "Array, Tuple or Iterable of integers to match neighbors cell is full."
 end
 
 """
     rule(model::AbstractLife, state, args...)
 
-Rule for game-of-life style cellular automata. This is mostly the
-canonical demonstration of Cellular Automata than a seriously optimised 
-Cellular Automata model.
+Rule for game-of-life style cellular automata. This is a demonstration of 
+Cellular Automata more than a seriously optimised game of life model.
 
 
 Cells becomes active if it is empty and the number of neightbors is a number in

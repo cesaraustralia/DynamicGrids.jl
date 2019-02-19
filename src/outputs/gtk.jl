@@ -1,11 +1,7 @@
-using Cairo, 
-      Gtk, 
-      Images, 
-      Graphics
+using Cairo, Gtk, Images, Graphics
 
 """
 Shows output live in a Gtk window.
-Only available after running `using Gtk`
 """
 @MinMax @ImageProc @Ok @FPS @Frames mutable struct GtkOutput{W,C} <: AbstractOutput{T}
     window::W
@@ -15,7 +11,7 @@ end
 is_running(o::GtkOutput) = o.running[1] && o.canvas.is_realized
 
 """
-    GtkOutput(init; fps=25.0)
+    GtkOutput(init)
 Constructor for GtkOutput.
 
 ### Arguments:

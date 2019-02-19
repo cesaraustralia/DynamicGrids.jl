@@ -1,11 +1,6 @@
-using Interact,
-      InteractBase,
-      InteractBulma,
-      AssetRegistry,
-      Flatten,
-      Images
+using Interact, InteractBase, InteractBulma, AssetRegistry, Flatten, Images
 
-import InteractBase: WidgetTheme, libraries
+import Widgets: WidgetTheme, libraries
 
 
 # Custom css theme
@@ -16,14 +11,21 @@ const css_key = AssetRegistry.register(joinpath(dirname(pathof(Cellular)), "../a
 libraries(::WebTheme) = vcat(libraries(Bulma()), [css_key])
 
 
+"Web outputs, such as BlinkOutput and MuxServer"
 abstract type AbstractWebOutput{T} <: AbstractOutput{T} end
 
+
+" The backend interface for BlinkOuput and MuxServer"
 @MinMax @ImageProc @Ok @FPS @Frames mutable struct WebInterface{P,IM,TI} <: AbstractOutput{T}
     page::P
     image_obs::IM
     t_obs::TI
 end
 
+"""
+    WebInterface(frames::AbstractVector, model, args...; fps=25, showmax_fps=fps, store=false, 
+             processor=Greyscale(), min=0, max=1, theme=WebTheme())
+"""
 WebInterface(frames::AbstractVector, model, args...; fps=25, showmax_fps=fps, store=false, 
              processor=Greyscale(), min=0, max=1, theme=WebTheme()) = begin
 

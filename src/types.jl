@@ -2,36 +2,42 @@
 A model contains all the information required to run a rule in a cellular
 simulation, given an initialised array. Models can be chained together in any order.
 
-The output of the rule for an AbstractModel is written to the current cell in the grid.
+The output of the rule for an AbstractModel is allways written to the current cell in the grid.
 """
 abstract type AbstractModel end
 
 """
-An abstract type for models that do not write to every cell of the grid, for efficiency.
+An abstract type for models that do not write to every cell of the grid.
 
-There are two main differences with `AbstractModel`. AbstractPartialModel requires
-initialisation of the destination array before each timestep, and the output of
-the rule is not written to the grid but done manually.
+Updates to the destination array (`data.dest`) must be performed manually. The destination array is 
+copied from the source prior to running the rule! method, which can be quicker than writing each cell 
+individually and potentially produce more succinct formulations.
 """
 abstract type AbstractPartialModel <: AbstractModel end
 
 """
-A Model That only accesses a neighborhood, defined by its radius distance from the current point.
+A Model That only accesses a neighborhood, defined by its radius distance from the current point. 
 
-Passed in data.modelmem will contain a matrix with the neighborhood cells. 
-The rule return value is written to every cell.
+The models temp_neighborhood field will be populated with a matrix containing the 
+neighborhood cells, so that BLAS routines and other optimised matrix algebra may be performed
+on the neighborhood, and no bounds checking is required. 
+
+It must read only from the state variable and the temp_neighborhood array, and never manually write to the 
+`data.dest` array. Its return value is allways written to the central cell.
 """
 abstract type AbstractNeighborhoodModel <: AbstractModel end
 
 """
 A Model That only accesses a neighborhood, defined by its radius distance from the current point.
 
-It must write to cells disrectly, but is not guaranteed to write to every cell.
+It must read only from the models temp_neighborhood array, and manually write to the `data.dest` array.
 """
 abstract type AbstractPartialNeighborhoodModel <: AbstractPartialModel end
 
 """
-A Model that only accesses a single cell. Its return value is the new value of the cell.
+A Model that only writes and accesses a single cell: its return value is the new value of the cell.
+This limitation can be useful for performance improvements. Accessing the `data.source` and `data.dest` 
+arrays directly is not guaranteed to have logical results, and should not be done.
 """
 abstract type AbstractCellModel <: AbstractModel end
 

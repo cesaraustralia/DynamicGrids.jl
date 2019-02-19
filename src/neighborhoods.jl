@@ -77,8 +77,9 @@ MultiCustomNeighborhood(;multi=(), overflow=Wrap(), init=Int32[0]) =
     neighbors(hood::AbstractNeighborhood, state, indices, t, source, args...)
 Checks all cells in neighborhood and combines them according
 to the particular neighborhood type.
+$METHODLIST
 """
-function neighbors() end
+function neighbors end
 
 """
     neighbors(hood::AbstractRadialNeighborhood{:onedim}, state, indices, t, source, args...)
@@ -150,20 +151,9 @@ custom_neighbors(n, hood, source, source_index) = begin
 end
 
 
-"""
-    inhood(n::AbstractRadialNeighborhood{:moore}, hood_index, source_index)
-Check cell is inside a Moore neighborhood. Always returns `true`.
-"""
+"Check cell is inside its neighborhood"
 inhood(hood::AbstractRadialNeighborhood{:moore}, hood_index, source_index) = true
-"""
-    inhood(n::AbstractRadialNeighborhood{:vonneumann}, hood_index, source_index)
-Check cell is inside a Vonn-Neumann neighborhood, returning a boolean.
-"""
 inhood(hood::AbstractRadialNeighborhood{:vonneumann}, hood_index, source_index) =
-sum(abs.(hood_index .- source_index)) <= radius(hood)
-"""
-    inhood(n::AbstractRadialNeighborhood{:rotvonneumann}, hood_index, source_index)
-Check cell is inside a Rotated Von-Neumann neighborhood, returning a boolean.
-"""
+    sum(abs.(hood_index .- source_index)) <= radius(hood)
 inhood(hood::AbstractRadialNeighborhood{:rotvonneumann}, hood_index, source_index) =
     sum(abs.(hood_index .- source_index)) > radius(hood)

@@ -6,7 +6,7 @@ local browser or the web.
 
 MuxServer automatically generates sliders to control simulaitons
 in realtime. Unlike BlinkOUtput, the modifications are not written back 
-to the original model. Each page load gets a identically initialised model.
+to the original model. Each page load gets a identical initialised model.
 """
 @Frames mutable struct MuxServer{F} <: AbstractWebOutput{T}
     port::Int

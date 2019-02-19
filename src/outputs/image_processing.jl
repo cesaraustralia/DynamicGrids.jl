@@ -1,15 +1,34 @@
-abstract type AbstractImageProcessor end
+"""
+Frame processors convert frame data into RGB24 images
+They can be passed as `procesor` keyword argument to outputs that have an image display.
 
-struct Greyscale <: AbstractImageProcessor end
+To add new processor, define a type that inherits from AbstractFrameProcessor
+and a [`process_image`](@ref) method:
+```julia
+process_image(p::YourType, output, frame, t) = some_rbg_image
+```
+"""
+abstract type AbstractFrameProcessor end
+
+"Converts frame to a greyscale image"
+struct Greyscale <: AbstractFrameProcessor end
 const Grayscale = Greyscale
 
 
-struct ColorZeros{C} <: AbstractImageProcessor
+""""
+Converts frame to a greyscale image with the chosen color for zeros. 
+Usefull for separating low values from actual zeros
+"""
+struct ColorZeros{C} <: AbstractFrameProcessor
     color::C
 end
 
 
-" Convert frame matrix to RGB24 " 
+""" 
+Convert frame matrix to RGB24, using any AbstractFrameProcessor
+$METHODLIST
+""" 
+function process_image end
 process_image(o, frame, t) = process_image(has_processor(o), o, frame, t)
 process_image(::HasProcessor, o, frame, t) = process_image(o.processor, o, frame, t)
 process_image(::NoProcessor, o, frame, t) = process_image(Greyscale(), o, frame, t)

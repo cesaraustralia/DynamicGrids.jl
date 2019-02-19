@@ -1,3 +1,5 @@
+@premix struct SubType{X} end
+
 """
 A simple output that is displayed directly in the REPL.
 
@@ -15,14 +17,13 @@ Pass `:braile` or `:block` to the constructor:
 REPLOutput{:block}(init)
 ```
 """
-@premix struct SubType{X} end
-
 @Ok @FPS @Frames @SubType mutable struct REPLOutput{Co,Cu} <: AbstractOutput{T}
     displayoffset::Array{Int}
     color::Co
     cutoff::Cu
 end
 
+REPLOutput(frames::AbstractVector; kwargs...) = REPLOutput{:block}(frames; kwargs...)
 REPLOutput{X}(frames::AbstractVector; fps=25, showmax_fps=fps, store=false, 
               color=:white, cutoff=0.5) where X = begin
     timestamp = 0.0; tref = 0; tlast = 1; running = [false]; displayoffset = [1, 1];

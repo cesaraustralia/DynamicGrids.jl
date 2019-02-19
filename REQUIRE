@@ -1,5 +1,6 @@
 julia 0.7
-Parameters 
+FieldDefaults 
+FielddocTables
 Requires
 DocStringExtensions
 REPLGamesBase
@@ -11,14 +12,16 @@ Graphics
 Colors
 FileIO
 Images
+Lazy
 Mixers 0.1.0
 Flatten 0.0.4
 FieldMetadata 0.0.1
 UnicodeGraphics 0.0.1
 Interact
 InteractBase
+InteractBulma
 ImageMagick
 WebSockets
 AssetRegistry
-InteractBase
-InteractBulma
+Blink
+Mux

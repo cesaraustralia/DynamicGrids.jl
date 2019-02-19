@@ -6,8 +6,8 @@ are *init* arrays and *outputs*.
 
 Models hold the configuration for a simulation, and trigger a specific `rule` method
 that operates on each of the cells in the grid. See [`AbstractModel`](@ref) and
-[`rule`](@ref). Models come in a number of flavours, which allows assumptions to be made that 
-can greatly improve performance. 
+[`rule`](@ref). Models come in a number of flavours, which allows assumptions to be made that
+can greatly improve performance.
 
 Outputs are ways of storing of viewing the simulation, and can be used interchangeably
 depending on your needs. See [`AbstractOutput`](@ref).
@@ -32,10 +32,19 @@ will be run for the whole grid in sequence.
 ```julia
 sim!(output, Models(model1, model2), init)
 ```
+
+For better performance, models included in a tuple will be combined into a single model 
+(with only one array write). This is limited to [`AbstractCellModel`](@ref), although 
+[`AbstractNeighborhoodModel`](@ref) may be used as the first model in the tuple.
+
+```julia
+sim!(output, Models(model1, (model2, model3)), init)
+```
 """
 module Cellular
 
-using Parameters,
+using FieldDefaults,
+      FielddocTables,
       Mixers,
       Requires,
       DocStringExtensions,
@@ -49,10 +58,11 @@ using Parameters,
       FileIO
 
 using Base: tail
+using Lazy: @forward
 
 import Base: show, getindex, setindex!, lastindex, size, length, push!, append!, broadcast, broadcast!, similar, eltype
 
-import FieldMetadata: @limits, limits, @flattenable, flattenable
+import FieldMetadata: @description, description, @limits, limits, @flattenable, flattenable, default
 
 
 
@@ -62,8 +72,8 @@ export savegif, show_frame
 
 export distances, broadcastable_indices
 
-export AbstractModel, AbstractPartialModel, 
-       AbstractNeighborhoodModel, AbstractPartialNeighborhoodModel, 
+export AbstractModel, AbstractPartialModel,
+       AbstractNeighborhoodModel, AbstractPartialNeighborhoodModel,
        AbstractCellModel
 
 export Models # TODO: a real name for this
@@ -77,17 +87,19 @@ export AbstractOverflow, Skip, Wrap
 
 export AbstractOutput, AbstractArrayOutput, ArrayOutput, GtkOutput, REPLOutput
 
-export AbstractImageProcessor, Greyscale, ColorZeros
+export AbstractFrameProcessor, Greyscale, ColorZeros
 
 
-
+const FIELDDOCTABLE = FielddocTable((:Description, :Default, :Limits), 
+                                    (description, default, limits);
+                                    truncation=(100,40,100))
 
 # Documentation templates
 @template TYPES =
     """
     $(TYPEDEF)
     $(DOCSTRING)
-    $(FIELDS)
+    $(METHODLIST)
     """
 
 include("outputs/common.jl")

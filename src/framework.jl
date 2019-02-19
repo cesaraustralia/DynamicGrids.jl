@@ -65,7 +65,7 @@ frameloop!(output, models, init, tspan, args...) = begin
 
     set_timestamp!(output, tspan.start)
 
-    for t in tspan       
+    for t in tspan
         # Collect the data elements for this frame
         data = FrameData(source, dest, sze, models.cellsize, models.timestep, t)
         # Run the automation on the source array, writing to the dest array and
@@ -137,11 +137,13 @@ temp_neighborhood(model::T) where T =
 temp_neighborhood(models::Tuple) = temp_neighborhood(models[1])
 
 """
-    run_model!(models::Tuple{T,Vararg}, source, dest, args...)
-per
+    run_model!(models::Tuple, source, dest, args...)
+
 Iterate over all models recursively, swapping source and dest arrays.
 
 Returns a tuple containing the source and dest arrays for the next iteration.
+
+$METHODLIST
 """
 function run_model! end
 run_model!(models::Tuple, data, args...) = begin
@@ -149,7 +151,7 @@ run_model!(models::Tuple, data, args...) = begin
     run_rule!(models[1], data, args...)
     # Swap the source and dest arrays
     tail_data = FrameData(dest(data), source(data), dims(data), cellsize(data), timestep(data), t(data))
-    # Run the rest of the models, recursively 
+    # Run the rest of the models, recursively
     run_model!(tail(models), tail_data, args...)
 end
 run_model!(models::Tuple{}, data, args...) = source(data), dest(data)
@@ -157,38 +159,41 @@ run_model!(models::Tuple{}, data, args...) = source(data), dest(data)
 """
     run_rule!(models, data, indices, args...)
 
-Runs the rule(s) for each cell in the grid, dependin on the model(s) passed in.
-For [`AbstractModel`] the returned values are written to the `dest` grid,
-while for [`AbstractPartialModel`](@ref) the grid is
-pre-initialised to zero and rules manually populate the dest grid.
+Runs the rule(s) for each cell in the grid, following rules defined by the supertype of each
+model(s) passed in.
+
+$METHODLIST
 """
 function run_rule! end
+
+" Run the rule for all cells, writing the result to the dest array"
 run_rule!(model::AbstractModel, data, args...) = begin
-    # Run the rule for all cells, writing the result to the dest array
     for i = 1:dims(data)[1]
         for j = 1:dims(data)[2]
             @inbounds dest(data)[i, j] = rule(model, data, source(data)[i, j], (i, j), args...)
         end
     end
 end
+"Run the rule for all cells, the rule must write to the dest array manually"
 run_rule!(model::AbstractPartialModel, data, args...) = begin
     # Initialise the dest array
     dest(data) .= source(data)
-    # Run the rule for all cells, the rule must write to the dest array manually
     for i = 1:dims(data)[1]
         for j = 1:dims(data)[2]
             @inbounds rule!(model, data, source(data)[i, j], (i, j), args...)
         end
     end
 end
+"""
+Run the rule for all cells, writing the result to the dest array
+The neighborhood is copied to the models temp neighborhood array for performance
+"""
 run_rule!(model::Union{AbstractNeighborhoodModel, Tuple{AbstractNeighborhoodModel,Vararg}},
                        data, args...) = begin
     temp = temp_neighborhood(model)
     r = radius(model)
     h, w = size(temp)
 
-    # Run the rule for all cells, writing the result to the dest array
-    # The neighborhood is copied to the models temp neighborhood array for performance
     for i = 1:dims(data)[1]
         # Setup temp array between rows
         for b = 1:r+1
@@ -226,6 +231,8 @@ Rules alter cell values based on their current state and other cells, often
 - `args`: additional arguments passed through from user input to [`sim!`](@ref)
 
 Returns a value to be written to the current cell.
+
+$METHODLIST
 """
 function rule(model::Nothing, data, state, index, args...) end
 
@@ -237,6 +244,7 @@ Submodel rule. If a tuple of models is passed in, run the all sequentially for e
 This gives correct results only for AbstractCellModel or for a single AbstractNeighborhoodModel
 followed by AbstractCellModel.
 """
+
 @inline rule(submodels::Tuple, data, state, index, args...) = begin
     state = rule(submodels[1], data, state, index, args...)
     rule(tail(submodels), data, state, index, args...)
@@ -250,13 +258,17 @@ from [`AbstractPartialModel`](@ref).
 
 ### Arguments:
 see [`rule`](@ref)
+
+$METHODLIST
 """
 function rule!(model::Nothing, data, state, index, args...) end
 
 """
     replay(output::AbstractOutput)
-Show the stored simulation again. You can also use this to show a sequence
-run with a different output type.
+Show a stored simulation again. You can also use this to show a simulation
+in different output type.
+
+If you run an output with `store=false` ther won't be much to replay.
 
 ### Example
 ```julia
