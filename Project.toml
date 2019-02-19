@@ -29,3 +29,10 @@ Requires = "ae029012-a4dd-5104-9daa-d747884805df"
 UnicodeGraphics = "ebadf6b4-db70-5817-83da-4a19ad584e34"
 WebSockets = "104b5d7c-a370-577a-8038-80a2059c5097"
 Widgets = "cc8bc4a8-27d6-5769-a93b-9d913e69aa62"
+
+[extras]
+SafeTestsets = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["SafeTestsets", "Test"]
