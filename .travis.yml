@@ -39,8 +39,6 @@ before_script:
                  Pkg.build("ImageMagick"); 
                  Pkg.add("Blink"); 
                  Pkg.build("Blink"); 
-                 Pkg.add(PackageSpec(url=pwd())); 
-                 Pkg.build("Cellular"); 
                  using Blink;
                  Blink.AtomShell.install();
                  Pkg.test("Cellular"; coverage=true)'
