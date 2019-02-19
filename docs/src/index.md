@@ -121,6 +121,8 @@ AbstractOutput
 ArrayOutput
 REPLOutput
 GtkOutput
+```
+```@docs
 BlinkOuput
 MuxServer
 ```
