@@ -40,8 +40,9 @@ before_script:
                  Pkg.add("Blink"); 
                  Pkg.build("Blink"); 
                  using Blink;
-                 Blink.AtomShell.install();
-                 Pkg.test("Cellular"; coverage=true)'
+                 Blink.AtomShell.install();'
+script: 
+  - $TESTCMD -e 'using Pkg; Pkg.test("Cellular"; coverage=true)'
 
 after_success:
   # push coverage results to Coveralls
