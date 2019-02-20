@@ -47,8 +47,10 @@ end
 
 @testset "REPLOutput{:block} works" begin
     output = REPLOutput{:block}(init; fps=100, store=true)
-    sim!(output, model, init; tstop=200)
+    sim!(output, model, init; tstop=2)
+    fix_for_testing_hang_after_simulations = 0
     resume!(output, model; tadd=5)
+    fix_for_testing_hang_after_simulations = 0
     @test output[3] == test
     @test output[5] == test2
     replay(output)
@@ -56,7 +58,9 @@ end
 
 @testset "REPLOutput{:braile} works" begin output = REPLOutput{:braile}(init; fps=100, store=true)
     sim!(output, model, init; tstop=2)
+    fix_for_testing_hang_after_simulations = 0
     resume!(output, model; tadd=3)
+    fix_for_testing_hang_after_simulations = 0
     @test output[3] == test
     @test output[5] == test2
     replay(output)
