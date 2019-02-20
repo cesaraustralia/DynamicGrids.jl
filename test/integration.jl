@@ -67,15 +67,19 @@ end
 end
 
 @testset "BlinkOutput works" begin
+    println("Start blink tests")
     output = Cellular.BlinkOutput(init, model; store=true) 
     sim!(output, model, init; tstop=2) 
+    fix_for_testing_hang_after_simulations = 0
     sleep(1.5)
     resume!(output.interface, model; tadd=3)
+    fix_for_testing_hang_after_simulations = 0
     sleep(1.5)
     @test output[3] == test
     @test output[5] == test2
     @test output.interface.image_obs[].children.tail[1] == image2
     replay(output)
+    fix_for_testing_hang_after_simulations = 0
     close(output.window)
 end
 
