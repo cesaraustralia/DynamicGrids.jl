@@ -1,14 +1,14 @@
 using Mux
 
 """
-A basic Mux.jl webserver, serving the same pages as BlinkOutput, but serve for a 
-local browser or the web.
+A basic Mux.jl webserver, serving the same pages as BlinkOutput, but served for a 
+multiple outputs in a local browser or the web.
 
 MuxServer automatically generates sliders to control simulaitons
 in realtime. Unlike BlinkOUtput, the modifications are not written back 
 to the original model. Each page load gets a identical initialised model.
 """
-@Frames mutable struct MuxServer{F} <: AbstractWebOutput{T}
+@Frames mutable struct MuxServer{} <: AbstractWebOutput{T}
     port::Int
 end
 

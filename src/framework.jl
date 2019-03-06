@@ -14,11 +14,12 @@ the passed in output for each time-step.
 ### Keyword Arguments
 - `tstop`: Any Number. Default: 100
 """
-sim!(output, models, init, args...; tstop=100) = begin
+sim!(output, models, init, args...; tstop=100, fps=get_fps(output)) = begin
     is_running(output) && return
     set_running!(output, true)
 
-    clear!(output)
+    set_fps!(output, fps)
+    delete_frames!(output)
     init = deepcopy(init)
     store_frame!(output, init, 1)
     show_frame(output, 1)
@@ -34,12 +35,13 @@ Restart the simulation where you stopped last time.
 ### Arguments
 See [`sim!`](@ref).
 """
-resume!(output, models, args...; tadd=100) = begin
+resume!(output, models, args...; tadd=100, fps=get_fps(output)) = begin
     is_running(output) && return
     length(output) > 0 || error("run sim! first")
     set_running!(output, true) || return
 
-    cur_t = last_t(output)
+    set_fps!(output, fps)
+    cur_t = get_tlast(output)
     tspan = cur_t + 1:cur_t + tadd
     run_sim!(output, models, output[curframe(output, cur_t)], tspan, args...)
     output
@@ -74,7 +76,7 @@ frameloop!(output, models, init, tspan, args...) = begin
         # Save the the current frame
         store_frame!(output, source, t)
         # Display the current frame
-        isshowable(output, t) && show_frame(output, t)
+        is_showable(output, t) && show_frame(output, t)
         # Let other tasks run (like ui controls)
         is_async(output) && yield()
         # Stick to the FPS
@@ -168,20 +170,16 @@ function run_rule! end
 
 " Run the rule for all cells, writing the result to the dest array"
 run_rule!(model::AbstractModel, data, args...) = begin
-    for i = 1:dims(data)[1]
-        for j = 1:dims(data)[2]
-            @inbounds dest(data)[i, j] = rule(model, data, source(data)[i, j], (i, j), args...)
-        end
+    for i = 1:dims(data)[1], j = 1:dims(data)[2]
+        @inbounds dest(data)[i, j] = rule(model, data, source(data)[i, j], (i, j), args...)
     end
 end
 "Run the rule for all cells, the rule must write to the dest array manually"
 run_rule!(model::AbstractPartialModel, data, args...) = begin
     # Initialise the dest array
     dest(data) .= source(data)
-    for i = 1:dims(data)[1]
-        for j = 1:dims(data)[2]
-            @inbounds rule!(model, data, source(data)[i, j], (i, j), args...)
-        end
+    for i = 1:dims(data)[1], j = 1:dims(data)[2]
+        @inbounds rule!(model, data, source(data)[i, j], (i, j), args...)
     end
 end
 """

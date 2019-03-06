@@ -133,7 +133,7 @@ MuxServer
 AbstractFrameProcessor
 Greyscale
 ColorZeros
-process_image
+process_frame
 ```
 
 ### Methods

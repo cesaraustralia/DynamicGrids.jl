@@ -7,7 +7,7 @@
 end
 
 @premix struct Ok
-    running::Array{Bool}
+    running::Bool
 end
 
 @premix struct FPS{F,TS,TM}
@@ -44,14 +44,14 @@ has_minmax(m) = begin
     :min in fns && :max in fns ? HasMinMax() : NoMinMax()
 end
 
-struct HasProcessor end
-struct NoProcessor end
-
-has_processor(o::O) where O = :processor in fieldnames(O) ? HasProcessor() : NoProcessor()
-
-
 
 # Abstract output type and generic methods
+
+"""
+Output additions that summarise the current frame. 
+This could be a plot or graphic.
+"""
+abstract type AbstractSummary end
 
 """
 All outputs must inherit from AbstractOutput.
@@ -66,8 +66,13 @@ abstract type AbstractOutput{T} <: AbstractVector{T} end
     F(T[deepcopy(init)], args...; kwargs...)
 
 
-# Forward base methods to the frames array
+" A generic Null output that does nothing "
+@Frames struct NullOutput{} <: AbstractOutput{T} end
 
+NullOutput(args...) = NullOutput{typeof([])}([])
+
+
+# Forward base methods to the frames array
 length(o::AbstractOutput) = length(o.frames)
 size(o::AbstractOutput) = size(o.frames)
 firstindex(o::AbstractOutput) = firstindex(o.frames)
@@ -78,30 +83,39 @@ push!(o::AbstractOutput, x) = push!(o.frames, x)
 append!(o::AbstractOutput, x) = append!(o.frames, x)
 
 
-
-# Custom methods
-
-is_running(o::AbstractOutput) = o.running[1]
-
-set_running!(o::AbstractOutput, val) = o.running[1] = val
-
+# Bool getters and setters
 is_async(o::AbstractOutput) = false
 
-fps(o) = o.fps
+is_showable(o::AbstractOutput, t) = is_showable(has_fps(o), o, t)
+is_showable(::HasFPS, o, t) = true # TODO working max fps. o.timestamp + (t - o.tref)/o.showmax_fps < time()
+is_showable(::NoFPS, o, t) = false 
 
-allocate_frames!(o::AbstractOutput, init, tspan) = begin
-    append!(o.frames, [similar(init) for i in tspan])
-    nothing
+is_running(o::AbstractOutput) = o.running
+
+set_running!(o::AbstractOutput, val) = o.running = val
+
+# Getters and setters
+get_tlast(o::AbstractOutput) = get_tlast(has_fps(o), o)
+get_tlast(::HasFPS, o::AbstractOutput) = o.tlast
+get_tlast(::NoFPS, o::AbstractOutput) = lastindex(o)
+
+get_fps(o) = get_fps(has_fps(o), o) 
+get_fps(::HasFPS, o) = o.fps
+get_fps(::NoFPS, o) = 0.0
+
+set_fps!(o, x) = set_fps!(has_fps(o), o, x) 
+set_fps!(::HasFPS, o, x) = o.fps = x
+set_fps!(::NoFPS, o, x) = nothing
+
+set_timestamp!(o, t) = set_timestamp!(has_fps(o), o, t)
+set_timestamp!(::HasFPS, o, t) = begin
+    o.timestamp = time()
+    o.tref = t
 end
+set_timestamp!(::NoFPS, o, t) = nothing
 
-clear!(o::AbstractOutput) = clear!(has_fps(o), o::AbstractOutput)
-clear!(::HasFPS, o::AbstractOutput) = deleteat!(o.frames, 1:length(o))
-clear!(::NoFPS, o::AbstractOutput) = nothing
 
-last_t(o::AbstractOutput) = last_t(has_fps(o), o)
-last_t(::HasFPS, o::AbstractOutput) = o.tlast
-last_t(::NoFPS, o::AbstractOutput) = lastindex(o)
-
+# Frame handling
 store_frame!(o::AbstractOutput, frame, t) = store_frame!(has_fps(o), o, frame, t)
 store_frame!(::HasFPS, o, frame, t) = begin
     if length(o) == 0
@@ -123,30 +137,15 @@ update_frame!(o, frame, t) = begin
     end
 end
 
-curframe(o::AbstractOutput, t) = curframe(has_fps(o), o, t)
-curframe(::HasFPS, o, t) = o.store ? t : oneunit(t)
-curframe(::NoFPS, o, t) = t
 
-isshowable(o::AbstractOutput, t) = isshowable(has_fps(o), o, t)
-isshowable(::HasFPS, o, t) = true # TODO working max fps. o.timestamp + (t - o.tref)/o.showmax_fps < time()
-isshowable(::NoFPS, o, t) = false 
-
-finalize!(o::AbstractOutput, args...) = nothing
-
-initialize!(o::AbstractOutput, args...) = initialize!(has_fps(o), o, args...)
-initialize!(::HasFPS, args...) = nothing
-initialize!(::NoFPS, args...) = nothing
-
-delay(o, t) = delay(has_fps(o), o, t)
-delay(::HasFPS, o, t) = sleep(max(0.0, o.timestamp + (t - o.tref)/fps(o) - time()))
-delay(::NoFPS, o, t) = nothing
-
-set_timestamp!(o, t) = set_timestamp!(has_fps(o), o, t)
-set_timestamp!(::HasFPS, o, t) = begin
-    o.timestamp = time()
-    o.tref = t
+allocate_frames!(o::AbstractOutput, init, tspan) = begin
+    append!(o.frames, [similar(init) for i in tspan])
+    nothing
 end
-set_timestamp!(::NoFPS, o, t) = nothing
+
+delete_frames!(o::AbstractOutput) = delete_frames!(has_fps(o), o::AbstractOutput)
+delete_frames!(::HasFPS, o::AbstractOutput) = deleteat!(o.frames, 1:length(o))
+delete_frames!(::NoFPS, o::AbstractOutput) = nothing
 
 """
     show_frame(output::AbstractOutput, [t])
@@ -157,10 +156,19 @@ show_frame(o::AbstractOutput, t) = show_frame(o, o[curframe(o, t)], t)
 show_frame(o::AbstractOutput, frame::AbstractMatrix) = show_frame(o, frame, 0)
 show_frame(o::AbstractOutput, frame, t) = nothing
 
+curframe(o::AbstractOutput, t) = curframe(has_fps(o), o, t)
+curframe(::HasFPS, o, t) = o.store ? t : oneunit(t)
+curframe(::NoFPS, o, t) = t
 
 
-" A generic Null output that does nothing "
-@Frames struct NullOutput{} <: AbstractOutput{T} end
+# Setup and close output
+initialize!(o::AbstractOutput, args...) = initialize!(has_fps(o), o, args...)
+initialize!(::HasFPS, args...) = nothing
+initialize!(::NoFPS, args...) = nothing
 
-NullOutput(args...) = NullOutput{typeof([])}([])
+finalize!(o::AbstractOutput, args...) = nothing
 
+# Delay output to maintain the frame rate
+delay(o, t) = delay(has_fps(o), o, t)
+delay(::HasFPS, o, t) = sleep(max(0.0, o.timestamp + (t - o.tref)/get_fps(o) - time()))
+delay(::NoFPS, o, t) = nothing

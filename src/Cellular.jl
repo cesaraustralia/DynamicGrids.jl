@@ -14,8 +14,7 @@ depending on your needs. See [`AbstractOutput`](@ref).
 
 The inititialisation array may be any AbstractArray, containing whatever initialisation data
 is required to start the simulation. Most rules work on two-dimensional arrays, but one-dimensional
-arrays are also use for some cellular automata.
-
+arrays are also use for some cellular automata.  
 A typical simulation is run with a script like:
 
 ```julia
@@ -70,10 +69,10 @@ export sim!, resume!, replay
 
 export savegif, show_frame
 
-export distances, broadcastable_indices
+export distances, broadcastable_indices 
 
 export AbstractModel, AbstractPartialModel,
-       AbstractNeighborhoodModel, AbstractPartialNeighborhoodModel,
+       AbstractNeighborhoodModel, AbstractPartialNeighborhoodModel, 
        AbstractCellModel
 
 export Models # TODO: a real name for this
@@ -87,7 +86,11 @@ export AbstractOverflow, Skip, Wrap
 
 export AbstractOutput, AbstractArrayOutput, ArrayOutput, GtkOutput, REPLOutput
 
-export AbstractFrameProcessor, Greyscale, ColorZeros
+export AbstractFrameProcessor, GreyscaleProcessor, GrayscaleProcessor, 
+       GreyscaleZerosProcessor, GrayscaleZerosProcessor, 
+       ColoSchemeProcessor, ColorSchemeZerosProcessor 
+
+export AbstractSummary
 
 
 const FIELDDOCTABLE = FielddocTable((:Description, :Default, :Limits), 
@@ -108,12 +111,11 @@ include("framework.jl")
 include("neighborhoods.jl")
 include("utils.jl")
 include("life.jl")
-include("outputs/image_processing.jl")
+include("outputs/frame_processing.jl")
 include("outputs/repl.jl")
 include("outputs/gtk.jl")
 include("outputs/array.jl")
 include("outputs/sensitivity.jl")
-
 
 function __init__()
     @require Blink="ad839575-38b3-5650-b840-f874b8c74a25" begin

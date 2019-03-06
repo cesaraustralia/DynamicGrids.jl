@@ -1,5 +1,7 @@
 @premix struct SubType{X} end
 
+abstract type AbstractREPLOutput{X,T} <: AbstractOutput{T} end
+
 """
 A simple output that is displayed directly in the REPL.
 
@@ -17,7 +19,7 @@ Pass `:braile` or `:block` to the constructor:
 REPLOutput{:block}(init)
 ```
 """
-@Ok @FPS @Frames @SubType mutable struct REPLOutput{Co,Cu} <: AbstractOutput{T}
+@Ok @FPS @Frames @SubType mutable struct REPLOutput{Co,Cu} <: AbstractREPLOutput{X,T}
     displayoffset::Array{Int}
     color::Co
     cutoff::Cu
@@ -26,21 +28,21 @@ end
 REPLOutput(frames::AbstractVector; kwargs...) = REPLOutput{:block}(frames; kwargs...)
 REPLOutput{X}(frames::AbstractVector; fps=25, showmax_fps=fps, store=false, 
               color=:white, cutoff=0.5) where X = begin
-    timestamp = 0.0; tref = 0; tlast = 1; running = [false]; displayoffset = [1, 1];
+    timestamp = 0.0; tref = 0; tlast = 1; running = false; displayoffset = [1, 1];
     REPLOutput{X,typeof.((frames, fps, timestamp, tref, color, cutoff))...}(
                frames, fps, showmax_fps, timestamp, tref, tlast, store, running, displayoffset, color, cutoff)
 end
 
 
-initialize!(o::REPLOutput, args...) = begin
+initialize!(o::AbstractREPLOutput, args...) = begin
     o.displayoffset .= (1, 1)
     # @async movedisplay(o)
     o.timestamp = time()
 end
 
-is_async(o::REPLOutput) = false
+is_async(o::AbstractREPLOutput) = false
 
-show_frame(o::REPLOutput, frame, t) = begin 
+show_frame(o::AbstractREPLOutput, frame, t) = begin 
     REPLGamesBase.put([0,0], o.color, replframe(o, frame)) 
     REPLGamesBase.put([0,0], o.color, string(t)) 
     REPLGamesBase.enableRawMode()
@@ -55,8 +57,8 @@ const XSCROLL = 4
 const YSCROLL = 8
 const PAGESCROLL = 40
 
-replframe(o::REPLOutput{:braile}, frame) = replframe(o, frame, YBRAILE, XBRAILE, brailize)
-replframe(o::REPLOutput{:block}, frame) = replframe(o, frame, YBLOCK, XBLOCK, blockize)
+replframe(o::AbstractREPLOutput{:braile}, frame) = replframe(o, frame, YBRAILE, XBRAILE, brailize)
+replframe(o::AbstractREPLOutput{:block}, frame) = replframe(o, frame, YBLOCK, XBLOCK, blockize)
 replframe(o, frame, ystep, xstep, f) = begin
     # Limit output area to available terminal size.
     dispy, dispx = displaysize(stdout)

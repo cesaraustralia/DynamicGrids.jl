@@ -1,5 +1,5 @@
 using Cellular, Test, Images
-using Cellular: process_image, normalize_frame, is_showable, curframe, 
+using Cellular: process_frame, normalize_frame, is_showable, curframe, 
                 allocate_frames!, store_frame!, @Frames, @MinMax
 
 @MinMax @Frames struct MinMaxOutput{} <: AbstractOutput{T} end
@@ -40,6 +40,6 @@ output2 = MinMaxOutput(output, 0.0, 10.0)
     @test normalize_frame(output, output[1]) == [1.0 1.0;
                                                  0.0 0.5]
 
-    @test process_image(output, output[1], 1) == [RGB24(1.0, 1.0, 1.0) RGB24(1.0, 1.0, 1.0);
+    @test process_frame(output, output[1], 1) == [RGB24(1.0, 1.0, 1.0) RGB24(1.0, 1.0, 1.0);
                                                   RGB24(0.0, 0.0, 0.0) RGB24(0.5, 0.5, 0.5)]
 end

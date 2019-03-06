@@ -1,4 +1,4 @@
-using Blink, Cellular, Test, Gtk, Colors
+using Blink, Cellular, Test, Gtk, Colors, ColorSchemes
 
 # life glider sims
 
@@ -24,12 +24,25 @@ test2 = [0 0 0 0 0 0;
          0 0 0 0 0 1;
          0 0 0 0 0 0]
 
-image2 = [RGB24(0) RGB24(0) RGB24(0) RGB24(0) RGB24(0) RGB24(0);
-          RGB24(0) RGB24(0) RGB24(0) RGB24(0) RGB24(0) RGB24(0);
-          RGB24(1) RGB24(0) RGB24(0) RGB24(0) RGB24(1) RGB24(1);
-          RGB24(1) RGB24(0) RGB24(0) RGB24(0) RGB24(0) RGB24(0);
-          RGB24(0) RGB24(0) RGB24(0) RGB24(0) RGB24(0) RGB24(1);
-          RGB24(0) RGB24(0) RGB24(0) RGB24(0) RGB24(0) RGB24(0)]
+g0 = RGB24(0)
+g1 = RGB24(1)
+grey2 = [g0 g0 g0 g0 g0 g0;
+         g0 g0 g0 g0 g0 g0;
+         g1 g0 g0 g0 g1 g1;
+         g1 g0 g0 g0 g0 g0;
+         g0 g0 g0 g0 g0 g1;
+         g0 g0 g0 g0 g0 g0]
+
+l0 = get(ColorSchemes.leonardo, 0)
+l1 = get(ColorSchemes.leonardo, 1)
+
+leonardo2 = [l0 l0 l0 l0 l0 l0;
+             l0 l0 l0 l0 l0 l0;
+             l1 l0 l0 l0 l1 l1;
+             l1 l0 l0 l0 l0 l0;
+             l0 l0 l0 l0 l0 l1;
+             l0 l0 l0 l0 l0 l0]
+
 
 model = Models(Life())
 output = ArrayOutput(init, 5)
@@ -70,8 +83,9 @@ if !haskey(ENV, "TRAVIS")
     end
 
     @testset "BlinkOutput works" begin
-        println("Start blink tests")
-        output = Cellular.BlinkOutput(init, model; store=true) 
+        println("Start Blink tests")
+        processor = Cellular.ColorSchemeProcessor(ColorSchemes.leonardo)
+        output = Cellular.BlinkOutput(init, model; store=true, processor=processor) 
         sim!(output, model, init; tstop=2) 
         fix_for_testing_hang_after_simulations = 0
         sleep(1.5)
@@ -80,7 +94,7 @@ if !haskey(ENV, "TRAVIS")
         sleep(1.5)
         @test output[3] == test
         @test output[5] == test2
-        @test output.interface.image_obs[].children.tail[1] == image2
+        @test output.interface.image_obs[].children.tail[1] == leonardo2
         replay(output)
         fix_for_testing_hang_after_simulations = 0
         close(output.window)
@@ -88,6 +102,7 @@ if !haskey(ENV, "TRAVIS")
 
     @testset "GtkOutput works" begin
         println("Start Gtk tests")
+        processor = Cellular.GrayscaleProcessor()
         output = GtkOutput(init; store=true) 
         sim!(output, model, init; tstop=2) 
         resume!(output, model; tadd=3)
@@ -96,6 +111,7 @@ if !haskey(ENV, "TRAVIS")
         replay(output)
         destroy(output.window)
     end
+
 end
 
 

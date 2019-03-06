@@ -42,7 +42,6 @@ arrays directly is not guaranteed to have logical results, and should not be don
 abstract type AbstractCellModel <: AbstractModel end
 
 
-
 """
 Singleton types for choosing the grid overflow rule used in
 [`inbounds`](@ref). These determine what is done when a neighborhood
