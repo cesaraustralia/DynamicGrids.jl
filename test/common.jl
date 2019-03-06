@@ -1,5 +1,5 @@
 using Cellular, Test, Images
-using Cellular: process_image, normalize_frame, isshowable, curframe, 
+using Cellular: process_image, normalize_frame, is_showable, curframe, 
                 allocate_frames!, store_frame!, @Frames, @MinMax
 
 @MinMax @Frames struct MinMaxOutput{} <: AbstractOutput{T} end
@@ -10,7 +10,7 @@ init = [10.0 11.0;
 output = MinMaxOutput(init, 0.0, 10.0)
 
 @test curframe(output, 5) == 5 
-@test isshowable(output, 5) == false
+@test is_showable(output, 5) == false
 
 update = [8.0 15.0;
           2.0  9.0]
