@@ -1,5 +1,5 @@
-using Cellular, Test
-import Cellular: neighbors
+using CellularAutomataBase, Test
+import CellularAutomataBase: neighbors, SimData
 
 init = [0 0 0 1 1 1;
         1 0 1 1 0 1;
@@ -8,28 +8,46 @@ init = [0 0 0 1 1 1;
         0 0 0 0 1 1;
         0 1 0 1 1 0]
 
-moore = RadialNeighborhood(typ=:moore, radius=1, overflow=Wrap())
-vonneumann = RadialNeighborhood(typ=:vonneumann, radius=1, overflow=Wrap())
-rotvonneumann = RadialNeighborhood(typ=:rotvonneumann, radius=1, overflow=Wrap())
-custom = CustomNeighborhood(((-1,-1), (-1,2), (0,0)), Wrap())
-multi = MultiCustomNeighborhood(multi=(((-1,1), (-3,2)), ((1,2), (2,2))), overflow=Wrap())
-state = 0
+moore = RadialNeighborhood(1)
+vonneumann = VonNeumannNeighborhood()
 t = 1
 
-data = Cellular.FrameData(init, deepcopy(init), 1, 1, 1, ())
+buf = [0 0 0
+       0 1 0
+       0 0 0]
+state = buf[2, 2]
+data = SimData(init, nothing, nothing, buf, state, nothing, 0, 0, 1)
+@test neighbors(moore, nothing, data, state, nothing) == 0
+@test neighbors(vonneumann, nothing, data, state, nothing) == 0
 
-@test neighbors(moore, nothing, data, state, (6, 2)) == 0
-@test neighbors(vonneumann, nothing, data, state, (6, 2)) == 0
-@test neighbors(rotvonneumann, nothing, data, state, (6, 2)) == 0
+buf = [1 1 1
+       1 0 1
+       1 1 1]
+state = buf[2, 2]
+data = SimData(init, nothing, nothing, buf, nothing, nothing, 0, 0, 1)
+@test neighbors(moore, nothing, data, state, nothing) == 8
+@test neighbors(vonneumann, nothing, data, state, nothing) == 4
 
-@test neighbors(moore, nothing, data, state, (2, 5)) == 8
-@test neighbors(vonneumann, nothing, data, state, (2, 5)) == 4
-@test neighbors(rotvonneumann, nothing, data, state, (2, 5)) == 4
+buf = [1 1 1
+       0 0 1
+       0 0 1]
+state = buf[2, 2]
+data = SimData(init, nothing, nothing, buf, nothing, nothing, 0, 0, 1)
+@test neighbors(moore, nothing, data, state, nothing) == 5
+@test neighbors(vonneumann, nothing, data, state, nothing) == 2
 
-@test neighbors(moore, nothing, data, state, (4, 4)) == 5
-@test neighbors(vonneumann, nothing, data, state, (4, 4)) == 2
-@test neighbors(rotvonneumann, nothing, data, state, (4, 4)) == 3
 
-@test neighbors(custom, nothing, data, state, (1, 1)) == 0
-@test neighbors(custom, nothing, data, state, (3, 3)) == 1
-@test neighbors(multi, nothing, data, state, (1, 1)) == [1, 2]
+buf = [0 1 0 0 1
+       0 0 1 0 0
+       0 0 0 1 1 
+       0 0 1 0 1 
+       1 0 1 0 1]
+state = buf[3, 3]
+data = SimData(init, nothing, nothing, buf, nothing, nothing, 0, 0, 1)
+custom1 = CustomNeighborhood(((-1,-1), (2,-2), (2,2), (-1,2), (0,0)))
+custom2 = CustomNeighborhood(((-1,-1), (0,-1), (1,-1), (2,-1), (0,0)))
+layered = LayeredCustomNeighborhood((((-1,1), (-2,2)), ((1,2), (2,2))))
+
+@test neighbors(custom1, nothing, data, state, nothing) == 2
+@test neighbors(custom2, nothing, data, state, nothing) == 0
+@test neighbors(layered, nothing, data, state, nothing) == (1, 2)

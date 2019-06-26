@@ -28,7 +28,11 @@ t(d::SimData) = d.t
 overflow(d::SimData) = d.overflow
 
 swapsource(data::SimData) = 
-    SimData(data.init, data.source, data.dest, data.buffer, data.size, 
+    SimData(data.init, data.dest, data.source, data.buffer, data.size, 
+            data.overflow, data.cellsize, data.timestep, data.t)
+
+newbuffer(data::SimData, buffer) = 
+    SimData(data.init, data.source, data.dest, buffer, data.size, 
             data.overflow, data.cellsize, data.timestep, data.t)
 
 simdata(model::Models, source, dest, sze, t) = 

@@ -1,4 +1,4 @@
-using CellularAutomataBase, Test, 
+using CellularAutomataBase, Test
 
 # life glider sims
 
@@ -24,10 +24,9 @@ test2 = [0 0 0 0 0 0;
          0 0 0 0 0 1;
          0 0 0 0 0 0]
 
-
-model = Models(Life())
+model = Models(Life(); init=init, overflow=WrapOverflow())
 output = ArrayOutput(init, 5)
-sim!(output, model, init; tstop=5)
+sim!(output, model; tstop=5)
 
 @testset "stored results match glider behaviour" begin
     @test output[3] == test

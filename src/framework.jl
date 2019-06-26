@@ -91,7 +91,7 @@ simloop!(output, model, init, tspan, args...) = begin
         data = simdata(model, source, dest, sze, t)
         # Run the automation on the source array, writing to the dest array and
         # setting the source and dest arrays for the next iteration.
-        source, dest = run_model!(model.models, data, args...)
+        source, dest = run_model!(data, model.models, args...)
         # Save the the current frame
         store_frame!(output, source, t)
         # Display the current frame
@@ -155,69 +155,159 @@ radius(model::AbstractModel) = 0
 radius(models::Tuple) = radius(models[1])
 
 
-run_model!(models::Tuple, data, args...) = begin
+run_model!(data, models::Tuple, args...) = begin
     # Run the first model
-    run_rule!(models[1], data, args...)
+    run_rule!(data, models[1], args...)
     # Swap the source and dest arrays
     tail_data = swapsource(data)
     # Run the rest of the models, recursively
-    run_model!(tail(models), tail_data, args...)
+    run_model!(tail_data, tail(models), args...)
 end
-run_model!(models::Tuple{}, data, args...) = source(data), dest(data)
+run_model!(data, models::Tuple{}, args...) = source(data), dest(data)
 
 " Run the rule for all cells, writing the result to the dest array"
-run_rule!(model::AbstractModel, data, args...) = begin
+run_rule!(data::AbstractSimData{T,1}, model::AbstractModel, args...) where T = 
+    for i = 1:size(data)[1]
+        @inbounds dest(data)[i] = rule(model, data, source(data)[i], (i), args...)
+    end
+run_rule!(data::AbstractSimData{T,2}, model::AbstractModel, args...) where T = 
     for i = 1:size(data)[1], j = 1:size(data)[2]
         @inbounds dest(data)[i, j] = rule(model, data, source(data)[i, j], (i, j), args...)
     end
-end
+run_rule!(data::AbstractSimData{T,3}, model::AbstractModel, args...) where T = 
+    for i = 1:size(data)[1], j = 1:size(data)[2], k = 1:size(data)[3]
+        @inbounds dest(data)[i, j, k] = rule(model, data, source(data)[i, j, k], (i, j, k), args...)
+    end
+
 "Run the rule for all cells, the rule must write to the dest array manually"
-run_rule!(model::AbstractPartialModel, data, args...) = begin
+run_rule!(data::AbstractSimData{T,1}, model::AbstractPartialModel, args...) where T = begin
     # Initialise the dest array
     dest(data) .= source(data)
-    for i = 1:size(data)[1], j = 1:size(data)[2]
+    for i in 1:size(data)[1]
+        @inbounds rule!(model, data, source(data)[i], (i,), args...)
+    end
+end
+run_rule!(data::AbstractSimData{T,2}, model::AbstractPartialModel, args...) where T = begin
+    # Initialise the dest array
+    dest(data) .= source(data)
+    for i in 1:size(data)[1], j in 1:size(data)[2]
         @inbounds rule!(model, data, source(data)[i, j], (i, j), args...)
     end
 end
+run_rule!(data::AbstractSimData{T,3}, model::AbstractPartialModel, args...) where T = begin
+    # Initialise the dest array
+    dest(data) .= source(data)
+    for i in 1:size(data)[1], j in 1:size(data)[2], k in 1:size(data)[2]
+        @inbounds rule!(model, data, source(data)[i, j, k], (i, j, k), args...)
+    end
+end
+
 """
 Run the rule for all cells, writing the result to the dest array
 The neighborhood is copied to the models neighborhood buffer array for performance
 """
-run_rule!(model::Union{AbstractNeighborhoodModel, Tuple{AbstractNeighborhoodModel,Vararg}},
-          data::S, args...) where S<:AbstractSimData{T,2} where T = begin
+run_rule!(data::AbstractSimData{T,1}, model::Union{AbstractNeighborhoodModel, Tuple{AbstractNeighborhoodModel,Vararg}},
+          args...)  where T = begin
     # The model provides the neighborhood buffer
     r = radius(model)
     sze = hoodsize(r)
     buf = similar(init(data), sze, sze)
+    src, dst = source(data), dest(data)
+    nrows = size(data)
+
+    handle_overflow!(data, overflow(data), r)
+
+    # Setup buffer array between rows
+    # Ignore the first column, it wil be copied over in the main loop
+    for i in 2:sze
+        @inbounds buf[i] = src[i-1-r]
+    end
+    # Run rule for a row
+    for i in 1:nrows
+        @inbounds copyto!(buf, 1, buf, 2)
+        @inbounds buf[sze] = src[i+r]
+        @inbounds dst[i] = rule(model, data, buf[r+1], (i,), args...)
+    end
+end
+run_rule!(data::AbstractSimData{T,2}, model::Union{AbstractNeighborhoodModel, Tuple{AbstractNeighborhoodModel,Vararg}},
+          args...) where T = begin
+    # The model provides the neighborhood buffer
+    r = radius(model)
+    sze = hoodsize(r)
+    buf = similar(init(data), sze, sze)
+    data = newbuffer(data, buf)
+    src, dst = source(data), dest(data)
+    nrows, ncols = size(data)
+
+    handle_overflow!(data, overflow(data), r)
 
     # Run the model row by row. When we move along a row by one cell, we access only
     # a single new column of data same the hight of the nighborhood, and move the existing
     # data in the neighborhood buffer array accross by one column. This saves on reads
     # from the main array, and focusses reads and writes in the small buffere array that
     # should be in fast local memory.
-    for i = 1:size(data)[1]
-        # Setup buffer array between rows
-        for y = 1:r+1
+    for i = 1:nrows
+        # Setup the buffer array for the new row
+        # Ignore the first column, it wil be copied over in the main loop
+        for y = 2:sze
             for x = 1:sze
-                @inbounds buf[x, y] = zero(eltype(buf))
-            end
-        end
-        for y = r+2:sze
-            for x = 1:sze
-                @inbounds buf[x, y] = source(data)[i+x-1-r, y-1-r]
+                @inbounds buf[x, y] = src[i+x-1-r, y-1-r]
             end
         end
         # Run rule for a row
-        for j = 1:size(data)[2]
+        for j = 1:ncols
+            # Move the neighborhood buffer accross one column 
+            # copyto! uses linear indexing, so 2d dims are transformed manually
             @inbounds copyto!(buf, 1, buf, sze + 1, (sze - 1) * sze)
-            for a = 1:sze
-                @inbounds buf[x, sze] = source(data)[i+x-1-r, j+r]
+            # Copy a new column to the neighborhood buffer
+            for x = 1:sze
+                @inbounds buf[x, sze] = src[i+x-1-r, j+r]
             end
-            @inbounds dest(data)[i, j] = rule(model, data, source(data)[i, j], (i, j), args...)
+            # Run the rule using the buffer
+            @inbounds dst[i, j] = 
+            rule(model, data, buf[r+1, r+1], (i, j), args...)
         end
     end
 end
+# TODO 3d neighborhood
 
+
+"""
+Wrap overflow where required. This optimisation allows us to ignore
+bounds checks on neighborhoods and still use a wraparound grid.
+"""
+handle_overflow!(data::AbstractSimData{T,1}, overflow::WrapOverflow, r) where T = begin
+    # Copy two sides
+    @inbounds copyto!(source, 1-r:0, source, nrows+1-r:nrows)
+    @inbounds copyto!(source, nrows+1:nrows+r, source, 1:r)
+end
+handle_overflow!(data::AbstractSimData{T,2}, overflow::WrapOverflow, r) where T = begin
+    nrows, ncols = size(data)
+    src = source(data)
+    # Left
+    @inbounds copyto!(src, CartesianIndices((1:nrows, 1-r:0)),
+                      src, CartesianIndices((1:nrows, ncols+1-r:ncols)))
+    # Right
+    @inbounds copyto!(src, CartesianIndices((1:nrows, ncols+1:ncols+r)),
+                      src, CartesianIndices((1:nrows, 1:r)))
+    # Top
+    @inbounds copyto!(src, CartesianIndices((1-r:0, 1:ncols)),
+                      src, CartesianIndices((ncols+1-r:ncols, 1:ncols)))
+    # Bottom
+    @inbounds copyto!(src, CartesianIndices((ncols+1:ncols+r, 1:ncols)),
+                      src, CartesianIndices((1:r, 1:ncols)))
+
+    # Copy four corners
+    @inbounds copyto!(src, CartesianIndices((1-r:0, 1-r:0)),
+                      src, CartesianIndices((nrows+1-r:nrows, ncols+1-r:ncols)))
+    @inbounds copyto!(src, CartesianIndices((1-r:0, ncols+1:ncols+r)),
+                      src, CartesianIndices((nrows+1-r:nrows, 1:r)))
+    @inbounds copyto!(src, CartesianIndices((nrows+1:nrows+r, ncols+1:ncols+r)),
+                      src, CartesianIndices((1:r, 1:r)))
+    @inbounds copyto!(src, CartesianIndices((nrows+1:nrows+r, 1-r:0)),
+                      src, CartesianIndices((1:r, ncols+1-r:ncols)))
+end
+handle_overflow!(data, overflow::RemoveOverflow, r) = nothing
 
 """
     rule(submodels::Tuple, data, state, (i, j), args...)

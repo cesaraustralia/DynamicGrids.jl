@@ -1,4 +1,4 @@
-using CellularAutomataBase, Test, Images
+using CellularAutomataBase, Test, Colors
 using CellularAutomataBase: process_frame, normalize_frame, is_showable, curframe, 
                             allocate_frames!, store_frame!, @Frames, @MinMax
 

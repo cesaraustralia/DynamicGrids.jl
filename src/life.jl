@@ -9,7 +9,7 @@ Model for game-of-life style cellular automata.
 $(FIELDDOCTABLE)
 """
 @description @limits @flattenable @default_kw struct Life{N,B,S} <: AbstractLife
-    neighborhood::N | RadialNeighborhood(; typ=:moore, radius=1, overflow=Wrap()) | false | _ | "An AbstractNeighborhood. RadialNeighborhood's are common for Cellular Automata."
+    neighborhood::N | RadialNeighborhood(1) | false | _ | "An AbstractNeighborhood. RadialNeighborhood's are common for Cellular Automata."
     b::B | (3, 3) | true | (0, 9) | "Array, Tuple or Iterable of integers to match neighbors when cell is empty."
     s::S | (2, 3) | true | (0, 9) | "Array, Tuple or Iterable of integers to match neighbors cell is full."
 end
