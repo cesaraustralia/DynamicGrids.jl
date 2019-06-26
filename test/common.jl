@@ -1,6 +1,6 @@
-using Cellular, Test, Images
-using Cellular: process_frame, normalize_frame, is_showable, curframe, 
-                allocate_frames!, store_frame!, @Frames, @MinMax
+using CellularAutomataBase, Test, Images
+using CellularAutomataBase: process_frame, normalize_frame, is_showable, curframe, 
+                            allocate_frames!, store_frame!, @Frames, @MinMax
 
 @MinMax @Frames struct MinMaxOutput{} <: AbstractOutput{T} end
 

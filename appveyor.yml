@@ -1,8 +1,8 @@
 environment:
   matrix:
-    - julia_version: 0.7
     - julia_version: 1.0
-    - julia_version: latest
+    - julia_version: 1.1
+    - julia_version: nightly
 
 platform:
   # - x86 # 32-bit
@@ -29,12 +29,6 @@ install:
   - ps: iex ((new-object net.webclient).DownloadString("https://raw.githubusercontent.com/JuliaCI/Appveyor.jl/version-1/bin/install.ps1"))
 
 build_script:
-  - C:\julia\bin\julia -e "using Pkg;
-                 Pkg.add(\"Blink\"); 
-                 Pkg.build(\"Blink\"); 
-                 using Blink;
-                 Blink.AtomShell.install()"
-  - C:\julia\bin\julia -e "using Pkg; Pkg.add(PackageSpec(url=\"https://github.com/ChristianKurz/REPLGamesBase.jl.git\")); Pkg.build(\"REPLGamesBase\")"
   - C:\julia\bin\julia -e "using Pkg; Pkg.add(PackageSpec(url=\"https://github.com/rafaqz/FielddocTables.jl.git\")); Pkg.build(\"FielddocTables\")"
   - echo "%JL_BUILD_SCRIPT%"
   - C:\julia\bin\julia -e "%JL_BUILD_SCRIPT%"

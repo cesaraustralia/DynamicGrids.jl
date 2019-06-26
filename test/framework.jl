@@ -1,5 +1,5 @@
-using Cellular, Test
-import Cellular: rule, rule!
+using CellularAutomataBase, Test
+import CellularAutomataBase: rule, rule!
 
 struct TestModel <: AbstractModel end
 struct TestPartial <: AbstractPartialModel end

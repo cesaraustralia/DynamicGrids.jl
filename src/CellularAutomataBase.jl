@@ -1,5 +1,5 @@
 """
-Cellular provides a framework for building grid based simulations. Everything
+CellularAutomataBase provides a framework for building grid based simulations. Everything
 can be customised and added to, but there are some central idea that define how a Cellular
 simulation works: *models*, *rules* and *neighborhoods*. For input and output of data there
 are *init* arrays and *outputs*.
@@ -40,7 +40,7 @@ For better performance, models included in a tuple will be combined into a singl
 sim!(output, Models(model1, (model2, model3)), init)
 ```
 """
-module Cellular
+module CellularAutomataBase
 
 using FieldDefaults,
       FielddocTables,
