@@ -14,71 +14,90 @@ the passed in output for each time-step.
 ### Keyword Arguments
 - `tstop`: Any Number. Default: 100
 """
-sim!(output, models, init, args...; tstop=100, fps=get_fps(output)) = begin
+sim!(output, model, args...; init=nothing, tstop=100, fps=get_fps(output)) = begin
     is_running(output) && return
     set_running!(output, true)
 
+    # Set the output fps from keyword arg
     set_fps!(output, fps)
+    # Delete frames output by the previous simulations
     delete_frames!(output)
-    init = deepcopy(init)
+    # Copy the init array from the model or keyword arg
+    init = deepcopy(chooseinit(model.init, init))
+    # Write the init array as the first frame
     store_frame!(output, init, 1)
+    # Show the first frame
     show_frame(output, 1)
-    run_sim!(output, models, init, 2:tstop, args...)
+    # Run the simulation
+    run_sim!(output, model, init, 2:tstop, args...)
+    # Return the output object
     output
 end
 
+# Allows attaching an init array to the model, but also passing in an
+# alternate array as a keyword arg (which will take preference).
+chooseinit(modelinit, arginit) = arginit
+chooseinit(modelinit::Nothing, arginit) = arginit
+chooseinit(modelinit, arginit::Nothing) = modelinit
+chooseinit(modelinit::Nothing, arginit::Nothing) =
+    error("Include an init array: either with the model or the init keyword")
+
 """
-    resume!(output, models, args...; tstop=100)
+    resume!(output, model, args...; tstop=100)
 
 Restart the simulation where you stopped last time.
 
 ### Arguments
 See [`sim!`](@ref).
 """
-resume!(output, models, args...; tadd=100, fps=get_fps(output)) = begin
+resume!(output, model, args...; tadd=100, fps=get_fps(output)) = begin
     is_running(output) && return
-    length(output) > 0 || error("run sim! first")
+    length(output) > 0 || error("There is no simulation to resume. Run `sim!` first")
     set_running!(output, true) || return
 
+    # Set the output fps from keyword arg
     set_fps!(output, fps)
-    cur_t = get_tlast(output)
-    tspan = cur_t + 1:cur_t + tadd
-    run_sim!(output, models, output[curframe(output, cur_t)], tspan, args...)
+    1:tadd .+ get_tlast(output) 
+    # Use the last frame of the existing simulation as the init frame
+    init = output[curframe(output, cur_t)]
+    run_sim!(output, model, init, tspan, args...)
     output
 end
+
+
 
 "run the simulation either directly or asynchronously."
 run_sim!(output, args...) =
     if is_async(output)
-        @async frameloop!(output, args...)
+        @async simloop!(output, args...)
     else
-        frameloop!(output, args...)
+        simloop!(output, args...)
     end
 
-" Loop over the selected timespan, running models and displaying output "
-frameloop!(output, models, init, tspan, args...) = begin
+" Loop over the selected timespan, running model and displaying output "
+simloop!(output, model, init, tspan, args...) = begin
     sze = size(init)
 
     # Set up the output
     initialize!(output, args...)
 
-    # Define storage arrays. These  may be larger than init!
-    source, dest = define_storage(models, init)
+    # Preallocate arrays. These may be larger than init.
+    source, dest = allocate_storage(model, init)
 
     set_timestamp!(output, tspan.start)
 
     for t in tspan
         # Collect the data elements for this frame
-        data = FrameData(source, dest, sze, models.cellsize, models.timestep, t)
+        data = simdata(model, source, dest, sze, t)
         # Run the automation on the source array, writing to the dest array and
         # setting the source and dest arrays for the next iteration.
-        source, dest = run_model!(models.models, data, args...)
+        source, dest = run_model!(model.models, data, args...)
         # Save the the current frame
         store_frame!(output, source, t)
         # Display the current frame
         is_showable(output, t) && show_frame(output, t)
         # Let other tasks run (like ui controls)
-        is_async(output) && yield()
+        yield()
         # Stick to the FPS
         delay(output, t)
         # Exit gracefully
@@ -92,22 +111,30 @@ frameloop!(output, models, init, tspan, args...) = begin
     end
 end
 
-"""
-    define_storage(models, init)
 
-Define the source and dest arrays for the model. Their size and offset depend on the maximum
-model radius in the list of passed-in models
 """
-define_storage(models, init) = begin
-    r = max_radius(models, init)
+    allocate_storage(model, init)
+
+Define the `source` and `dest` arrays for the model, possibly larger than the `init` array.
+This is an optimisation to avoid the need for bounds checking in `rule`. Their size and
+offset depend on the maximum model radius in the list of passed-in model.
+"""
+
+allocate_storage(model, init::AbstractArray) = allocate_storage(maxradius(model), init)
+allocate_storage(r::Integer, init::AbstractArray) = begin
+    # Find the maximum radius required by all models
     sze = size(init)
-    dims = sze .+ 2r
-    source = OffsetArray(zeros(eltype(init), dims...), -r + 1:sze[1] + r, -r + 1:sze[2] + r)
-    source .= 0.0
+    newsize = sze .+ 2r
+    # Add a margin around the original init array, offset into the negative
+    # So that the first real cell is still 1, 1
+    newindices = -r + 1:sze[1] + r, -r + 1:sze[2] + r
+    source = OffsetArray(zeros(eltype(init), newsize...), newindices...)
 
+    # Copy the init array to the middle section of the source array
     for j in 1:sze[2], i in 1:sze[1]
-        @inbounds source[i, j] = init[i,j]
+        source[i, j] = init[i,j]
     end
+    # The dest array is the same as the source array
     dest = deepcopy(source)
     source, dest
 end
@@ -115,62 +142,32 @@ end
 """
 Find the largest radius present in the passed in models.
 """
-max_radius(model::AbstractModel, init) = radius(model)
-max_radius(modelwrapper::Models, init) = max_radius(modelwrapper.models, init)
-max_radius(models::Tuple{T,Vararg}, init) where T =
-    max(max_radius(models[1], init), max_radius(tail(models), init)...)
-max_radius(models::Tuple{}, init) = 0
+maxradius(modelwrapper::Models) = maxradius(modelwrapper.models)
+maxradius(models::Tuple{T,Vararg}) where T =
+    max(maxradius(models[1]), maxradius(tail(models))...)
+maxradius(models::Tuple{}) = 0
+maxradius(model::AbstractModel) = radius(model)
 
-"""
-Return the radius of a model if it has one, otherwise zero.
-"""
-function radius end
 radius(model::AbstractNeighborhoodModel) = radius(model.neighborhood)
 radius(model::AbstractPartialNeighborhoodModel) = radius(model.neighborhood)
 radius(model::AbstractModel) = 0
+# For submodel tuples. Only the first submodel can have a radius.
 radius(models::Tuple) = radius(models[1])
 
-"""
-AbstractNeighborhoodModel requires a temp array. `temp_neighborhood()` must be defined to return it.
-"""
-function temp_neighborhood end
-temp_neighborhood(model::T) where T =
-    error("Add a temp_neighborhood(model::$T) method that returns the array location for your model")
-temp_neighborhood(models::Tuple) = temp_neighborhood(models[1])
 
-"""
-    run_model!(models::Tuple, source, dest, args...)
-
-Iterate over all models recursively, swapping source and dest arrays.
-
-Returns a tuple containing the source and dest arrays for the next iteration.
-
-$METHODLIST
-"""
-function run_model! end
 run_model!(models::Tuple, data, args...) = begin
     # Run the first model
     run_rule!(models[1], data, args...)
     # Swap the source and dest arrays
-    tail_data = FrameData(dest(data), source(data), dims(data), cellsize(data), timestep(data), t(data))
+    tail_data = swapsource(data)
     # Run the rest of the models, recursively
     run_model!(tail(models), tail_data, args...)
 end
 run_model!(models::Tuple{}, data, args...) = source(data), dest(data)
 
-"""
-    run_rule!(models, data, indices, args...)
-
-Runs the rule(s) for each cell in the grid, following rules defined by the supertype of each
-model(s) passed in.
-
-$METHODLIST
-"""
-function run_rule! end
-
 " Run the rule for all cells, writing the result to the dest array"
 run_rule!(model::AbstractModel, data, args...) = begin
-    for i = 1:dims(data)[1], j = 1:dims(data)[2]
+    for i = 1:size(data)[1], j = 1:size(data)[2]
         @inbounds dest(data)[i, j] = rule(model, data, source(data)[i, j], (i, j), args...)
     end
 end
@@ -178,95 +175,71 @@ end
 run_rule!(model::AbstractPartialModel, data, args...) = begin
     # Initialise the dest array
     dest(data) .= source(data)
-    for i = 1:dims(data)[1], j = 1:dims(data)[2]
+    for i = 1:size(data)[1], j = 1:size(data)[2]
         @inbounds rule!(model, data, source(data)[i, j], (i, j), args...)
     end
 end
 """
 Run the rule for all cells, writing the result to the dest array
-The neighborhood is copied to the models temp neighborhood array for performance
+The neighborhood is copied to the models neighborhood buffer array for performance
 """
 run_rule!(model::Union{AbstractNeighborhoodModel, Tuple{AbstractNeighborhoodModel,Vararg}},
-                       data, args...) = begin
-    temp = temp_neighborhood(model)
+          data::S, args...) where S<:AbstractSimData{T,2} where T = begin
+    # The model provides the neighborhood buffer
     r = radius(model)
-    h, w = size(temp)
+    sze = hoodsize(r)
+    buf = similar(init(data), sze, sze)
 
-    for i = 1:dims(data)[1]
-        # Setup temp array between rows
-        for b = 1:r+1
-            for a = 1:h
-                @inbounds temp[a, b] = zero(eltype(temp))
+    # Run the model row by row. When we move along a row by one cell, we access only
+    # a single new column of data same the hight of the nighborhood, and move the existing
+    # data in the neighborhood buffer array accross by one column. This saves on reads
+    # from the main array, and focusses reads and writes in the small buffere array that
+    # should be in fast local memory.
+    for i = 1:size(data)[1]
+        # Setup buffer array between rows
+        for y = 1:r+1
+            for x = 1:sze
+                @inbounds buf[x, y] = zero(eltype(buf))
             end
         end
-        for b = r+2:w
-            for a = 1:h
-                @inbounds temp[a, b] = source(data)[i+a-1-r, b-1-r]
+        for y = r+2:sze
+            for x = 1:sze
+                @inbounds buf[x, y] = source(data)[i+x-1-r, y-1-r]
             end
         end
         # Run rule for a row
-        for j = 1:dims(data)[2]
-            @inbounds copyto!(temp, 1, temp, h + 1, (w - 1) * h)
-            for a = 1:h
-                @inbounds temp[a, w] = source(data)[i+a-1-r, j+r]
+        for j = 1:size(data)[2]
+            @inbounds copyto!(buf, 1, buf, sze + 1, (sze - 1) * sze)
+            for a = 1:sze
+                @inbounds buf[x, sze] = source(data)[i+x-1-r, j+r]
             end
             @inbounds dest(data)[i, j] = rule(model, data, source(data)[i, j], (i, j), args...)
         end
     end
 end
 
-"""
-    function rule(model, state, t, source, dest, args...)
-
-Rules alter cell values based on their current state and other cells, often
-[`neighbors`](@ref).
-
-### Arguments:
-- `model` : [`AbstractModel`](@ref)
-- `data` : [`FrameData`](@ref)
-- `state`: the value of the current cell
-- `index`: a (row, column) tuple of Int for the current cell coordinates - `t`: the current time step
-- `args`: additional arguments passed through from user input to [`sim!`](@ref)
-
-Returns a value to be written to the current cell.
-
-$METHODLIST
-"""
-function rule(model::Nothing, data, state, index, args...) end
 
 """
     rule(submodels::Tuple, data, state, (i, j), args...)
 
-Submodel rule. If a tuple of models is passed in, run the all sequentially for each cell.
-
-This gives correct results only for AbstractCellModel or for a single AbstractNeighborhoodModel
-followed by AbstractCellModel.
+Submodel rule. If a tuple of models is passed in, run them all sequentially for each cell.
+This can have much beter performance as no writes occur between models, and they are 
+essentially compiled together into compound rules. This gives correct results only for
+AbstractCellModel, or for a single AbstractNeighborhoodModel followed by AbstractCellModel.
 """
-
 @inline rule(submodels::Tuple, data, state, index, args...) = begin
     state = rule(submodels[1], data, state, index, args...)
     rule(tail(submodels), data, state, index, args...)
 end
 @inline rule(submodels::Tuple{}, data, state, index, args...) = state
 
-"""
-    function rule!(model, data, state, args...)
-A rule that manually writes to the dest array, used in models inheriting
-from [`AbstractPartialModel`](@ref).
-
-### Arguments:
-see [`rule`](@ref)
-
-$METHODLIST
-"""
-function rule!(model::Nothing, data, state, index, args...) end
 
 """
     replay(output::AbstractOutput)
 Show a stored simulation again. You can also use this to show a simulation
 in different output type.
 
-If you run an output with `store=false` ther won't be much to replay.
+If you ran a simulation with `store=false` there won't be much to replay.
 
 ### Example
 ```julia
@@ -283,4 +256,13 @@ replay(output::AbstractOutput) = begin
         is_running(output) || break
     end
     set_running!(output, false)
+end
+
+abstract type MyAbstractType{T <: AbstractFloat} end
+struct MyConcreteType1{T} <: MyAbstractType{T} end
+struct MyConcreteType2{T} <: MyAbstractType{T} end
+
+function fun(x::MyAbstractType{U}, y::MyAbstractType{V}) where {U<:AbstractFloat, V<:AbstractFloat}
+    println(typeof(x) )
+    println(typeof(y) )
 end

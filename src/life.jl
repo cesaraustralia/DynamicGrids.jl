@@ -2,7 +2,7 @@
 Triggers dispatch on rule  for game of life simulations. Models that extend
 this should replicate the fields for [`Life`](@ref).
 """
-abstract type AbstractLife <: AbstractModel end
+abstract type AbstractLife <: AbstractNeighborhoodModel end
 
 """ 
 Model for game-of-life style cellular automata. 
