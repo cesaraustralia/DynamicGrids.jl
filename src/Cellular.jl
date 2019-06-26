@@ -20,7 +20,7 @@ A typical simulation is run with a script like:
 ```julia
 init = my_array
 model = Models(Life())
-output = REPLOutput(init)
+output = ArrayOutput(init)
 
 sim!(output, model, init)
 ```
@@ -48,12 +48,7 @@ using FieldDefaults,
       Requires,
       DocStringExtensions,
       OffsetArrays,
-      UnicodeGraphics,
-      REPLGamesBase,
       FieldMetadata,
-      Images,
-      Gtk,
-      Cairo,
       FileIO
 
 using Base: tail
@@ -69,7 +64,7 @@ export sim!, resume!, replay
 
 export savegif, show_frame
 
-export distances, broadcastable_indices 
+export distances, broadcastable_indices, sizefromradius 
 
 export AbstractModel, AbstractPartialModel,
        AbstractNeighborhoodModel, AbstractPartialNeighborhoodModel, 
@@ -82,9 +77,11 @@ export AbstractLife, Life
 export AbstractNeighborhood, AbstractRadialNeighborhood, RadialNeighborhood,
        AbstractCustomNeighborhood, CustomNeighborhood, MultiCustomNeighborhood
 
-export AbstractOverflow, Skip, Wrap
+export Moore, VonNeumann, RotVonNeumann
 
-export AbstractOutput, AbstractArrayOutput, ArrayOutput, GtkOutput, REPLOutput
+export AbstractOverflow, RemoveOverflow, WrapOverflow
+
+export AbstractOutput, AbstractArrayOutput, ArrayOutput
 
 export AbstractFrameProcessor, GreyscaleProcessor, GrayscaleProcessor, 
        GreyscaleZerosProcessor, GrayscaleZerosProcessor, 
@@ -107,39 +104,13 @@ const FIELDDOCTABLE = FielddocTable((:Description, :Default, :Limits),
 
 include("outputs/common.jl")
 include("types.jl")
+include("simulationdata.jl")
+include("interface.jl")
 include("framework.jl")
 include("neighborhoods.jl")
 include("utils.jl")
 include("life.jl")
 include("outputs/frame_processing.jl")
-include("outputs/repl.jl")
-include("outputs/gtk.jl")
 include("outputs/array.jl")
-include("outputs/sensitivity.jl")
-
-function __init__()
-    @require Blink="ad839575-38b3-5650-b840-f874b8c74a25" begin
-        export BlinkOutput
-        include("outputs/web.jl")
-        include("outputs/blink.jl")
-        @require Revise="295af30f-e4ad-537b-8983-00126c2a3abe" begin
-            import .Revise
-            Revise.add_file(Cellular, "src/outputs/web.jl")
-            Revise.add_file(Cellular, "src/outputs/blink.jl")
-        end
-    end
-
-    @require Mux="a975b10e-0019-58db-a62f-e48ff68538c9" begin
-        export MuxOutput
-        include("outputs/web.jl")
-        include("outputs/mux.jl")
-        @require Revise="295af30f-e4ad-537b-8983-00126c2a3abe" begin
-            import .Revise
-            Revise.add_file(Cellular, "src/outputs/web.jl")
-            Revise.add_file(Cellular, "src/outputs/mux.jl")
-        end
-    end
-end
-
 
 end
