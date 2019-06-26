@@ -130,10 +130,22 @@ store_frame!(::HasFPS, o, frame, t) = begin
 end
 store_frame!(::NoFPS, o, frame, t) = update_frame!(o, frame, t)
 
-update_frame!(o, frame, t) = begin
+update_frame!(o, frame::AbstractArray{T,1}, t) where T = begin
+    sze = size(o[1])
+    for i in 1:sze[1]
+        @inbounds o[t][i] = frame[i]
+    end
+end
+update_frame!(o, frame::AbstractArray{T,2}, t) where T = begin
     sze = size(o[1])
     for j in 1:sze[2], i in 1:sze[1]
         @inbounds o[t][i, j] = frame[i, j]
+    end
+end
+update_frame!(o, frame::AbstractArray{T,3}, t) where T = begin
+    sze = size(o[1])
+    for i in 1:sze[1], j in 1:sze[2], k in 1:sze[3]
+        @inbounds o[t][i, j, k] = frame[i, j, k]
     end
 end
 
