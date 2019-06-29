@@ -14,22 +14,22 @@ the passed in output for each time-step.
 ### Keyword Arguments
 - `tstop`: Any Number. Default: 100
 """
-sim!(output, ruleset; init=nothing, tstop=100, fps=get_fps(output)) = begin
-    is_running(output) && return
-    set_running!(output, true)
+sim!(output, ruleset; init=nothing, tstop=100, fps=getfps(output)) = begin
+    isrunning(output) && return
+    setrunning!(output, true)
 
     # Set the output fps from keyword arg
-    set_fps!(output, fps)
+    setfps!(output, fps)
     # Delete frames output by the previous simulations
-    delete_frames!(output)
+    deleteframes!(output)
     # Copy the init array from the ruleset or keyword arg
     init = deepcopy(chooseinit(ruleset.init, init))
     # Write the init array as the first frame
-    store_frame!(output, init, 1)
+    storeframe!(output, init, 1)
     # Show the first frame
-    show_frame(output, 1)
+    showframe(output, 1)
     # Run the simulation
-    run_sim!(output, ruleset, init, 2:tstop)
+    runsim!(output, ruleset, init, 2:tstop)
     # Return the output object
     output
 end
@@ -50,26 +50,26 @@ Restart the simulation where you stopped last time.
 ### Arguments
 See [`sim!`](@ref).
 """
-resume!(output, ruleset; tadd=100, fps=get_fps(output)) = begin
-    is_running(output) && return
+resume!(output, ruleset; tadd=100, fps=getfps(output)) = begin
+    isrunning(output) && return
     length(output) > 0 || error("There is no simulation to resume. Run `sim!` first")
-    set_running!(output, true) || return
+    setrunning!(output, true) || return
 
     # Set the output fps from keyword arg
-    set_fps!(output, fps)
-    cur_t = get_tlast(output)
+    setfps!(output, fps)
+    cur_t = gettlast(output)
     tspan = cur_t + 1:cur_t + tadd
     # Use the last frame of the existing simulation as the init frame
     init = output[curframe(output, cur_t)]
-    run_sim!(output, ruleset, init, tspan)
+    runsim!(output, ruleset, init, tspan)
     output
 end
 
 
 
 "run the simulation either directly or asynchronously."
-run_sim!(output, args...) =
-    if is_async(output)
+runsim!(output, args...) =
+    if isasync(output)
         @async simloop!(output, args...)
     else
         simloop!(output, args...)
@@ -83,9 +83,9 @@ simloop!(output, ruleset, init, tspan) = begin
     initialize!(output)
 
     # Preallocate arrays. These may be larger than init.
-    source, dest = allocate_storage(ruleset, init)
+    source, dest = allocatestorage(ruleset, init)
 
-    set_timestamp!(output, tspan.start)
+    settimestamp!(output, tspan.start)
 
     for t in tspan
         # Collect the data elements for this frame
@@ -94,17 +94,17 @@ simloop!(output, ruleset, init, tspan) = begin
         # setting the source and dest arrays for the next iteration.
         source, dest = sequencerules!(data, ruleset)
         # Save the the current frame
-        store_frame!(output, source, t)
+        storeframe!(output, source, t)
         # Display the current frame
-        is_showable(output, t) && show_frame(output, t)
+        isshowable(output, t) && showframe(output, t)
         # Let other tasks run (like ui controls)
         yield()
         # Stick to the FPS
         delay(output, t)
         # Exit gracefully
-        if !is_running(output) || t == tspan.stop
-            show_frame(output, t)
-            set_running!(output, false)
+        if !isrunning(output) || t == tspan.stop
+            showframe(output, t)
+            setrunning!(output, false)
             # Any finishing touches required by the output
             finalize!(output)
             break
@@ -114,15 +114,15 @@ end
 
 
 """
-    allocate_storage(ruleset, init)
+    allocatestorage(ruleset, init)
 
 Define the `source` and `dest` arrays for the ruleset, possibly larger than the `init` array.
 This is an optimisation to avoid the need for bounds checking in `rule`. Their size and
 offset depend on the maximum rule radius in the list of passed-in rules.
 """
 
-allocate_storage(ruleset, init::AbstractArray) = allocate_storage(maxradius(ruleset), init)
-allocate_storage(r::Integer, init::AbstractArray) = begin
+allocatestorage(ruleset, init::AbstractArray) = allocatestorage(maxradius(ruleset), init)
+allocatestorage(r::Integer, init::AbstractArray) = begin
     # Find the maximum radius required by all rules
     sze = size(init)
     newsize = sze .+ 2r
@@ -164,11 +164,11 @@ sequencerules!(data, ruleset::Ruleset) =
     sequencerules!(data, ruleset.rules)
 sequencerules!(data, rules::Tuple) = begin
     # Run the first rule for the whole frame
-    map_rule!(data, rules[1])
+    maprule!(data, rules[1])
     # Swap the source and dest arrays
-    tail_data = swapsource(data)
+    taildata = swapsource(data)
     # Run the rest of the rules, recursively
-    sequencerules!(tail_data, tail(rules))
+    sequencerules!(taildata, tail(rules))
 end
 sequencerules!(data, rules::Tuple{}) = source(data), dest(data)
 
@@ -176,35 +176,35 @@ sequencerules!(data, rules::Tuple{}) = source(data), dest(data)
 Apply the rule for each cell in the grid, using optimisations 
 allowed for the supertype of the rule.
 """
-map_rule!(data::AbstractSimData{T,1}, rule::AbstractRule) where T = 
+maprule!(data::AbstractSimData{T,1}, rule::AbstractRule) where T = 
     for i = 1:size(data)[1]
         @inbounds dest(data)[i] = applyrule(rule, data, source(data)[i], (i))
     end
-map_rule!(data::AbstractSimData{T,2}, rule::AbstractRule) where T = 
+maprule!(data::AbstractSimData{T,2}, rule::AbstractRule) where T = 
     for i = 1:size(data)[1], j = 1:size(data)[2]
         @inbounds dest(data)[i, j] = applyrule(rule, data, source(data)[i, j], (i, j))
     end
-map_rule!(data::AbstractSimData{T,3}, rule::AbstractRule) where T = 
+maprule!(data::AbstractSimData{T,3}, rule::AbstractRule) where T = 
     for i = 1:size(data)[1], j = 1:size(data)[2], k = 1:size(data)[3]
         @inbounds dest(data)[i, j, k] = applyrule(rule, data, source(data)[i, j, k], (i, j, k))
     end
 
 "Run the rule for all cells, the rule must write to the dest array manually"
-map_rule!(data::AbstractSimData{T,1}, rule::AbstractPartialRule) where T = begin
+maprule!(data::AbstractSimData{T,1}, rule::AbstractPartialRule) where T = begin
     # Initialise the dest array
     dest(data) .= source(data)
     for i in 1:size(data)[1]
         @inbounds applyrule!(rule, data, source(data)[i], (i,))
     end
 end
-map_rule!(data::AbstractSimData{T,2}, rule::AbstractPartialRule) where T = begin
+maprule!(data::AbstractSimData{T,2}, rule::AbstractPartialRule) where T = begin
     # Initialise the dest array
     dest(data) .= source(data)
     for i in 1:size(data)[1], j in 1:size(data)[2]
         @inbounds applyrule!(rule, data, source(data)[i, j], (i, j))
     end
 end
-map_rule!(data::AbstractSimData{T,3}, rule::AbstractPartialRule) where T = begin
+maprule!(data::AbstractSimData{T,3}, rule::AbstractPartialRule) where T = begin
     # Initialise the dest array
     dest(data) .= source(data)
     for i in 1:size(data)[1], j in 1:size(data)[2], k in 1:size(data)[2]
@@ -216,7 +216,7 @@ end
 Run the rule for all cells, writing the result to the dest array
 The neighborhood is copied to the rules neighborhood buffer array for performance
 """
-map_rule!(data::AbstractSimData{T,1}, rule::Union{AbstractNeighborhoodRule, Tuple{AbstractNeighborhoodRule,Vararg}},
+maprule!(data::AbstractSimData{T,1}, rule::Union{AbstractNeighborhoodRule, Tuple{AbstractNeighborhoodRule,Vararg}},
           args...)  where T = begin
     # The rule provides the neighborhood buffer
     r = radius(rule)
@@ -225,7 +225,7 @@ map_rule!(data::AbstractSimData{T,1}, rule::Union{AbstractNeighborhoodRule, Tupl
     src, dst = source(data), dest(data)
     nrows = size(data)
 
-    handle_overflow!(data, overflow(data), r)
+    handleoverflow!(data, overflow(data), r)
 
     # Setup buffer array between rows
     # Ignore the first column, it wil be copied over in the main loop
@@ -241,7 +241,7 @@ map_rule!(data::AbstractSimData{T,1}, rule::Union{AbstractNeighborhoodRule, Tupl
         @inbounds dst[i] = newstate
     end
 end
-map_rule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule, Tuple{AbstractNeighborhoodRule,Vararg}},
+maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule, Tuple{AbstractNeighborhoodRule,Vararg}},
           args...) where T = begin
     # The rule provides the neighborhood buffer
     r = radius(rule)
@@ -251,7 +251,7 @@ map_rule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule, Tupl
     src, dst = source(data), dest(data)
     nrows, ncols = size(data)
 
-    handle_overflow!(data, overflow(data), r)
+    handleoverflow!(data, overflow(data), r)
 
     # Run the rule row by row. When we move along a row by one cell, we access only
     # a single new column of data same the hight of the nighborhood, and move the existing
@@ -289,12 +289,12 @@ end
 Wrap overflow where required. This optimisation allows us to ignore
 bounds checks on neighborhoods and still use a wraparound grid.
 """
-handle_overflow!(data::AbstractSimData{T,1}, overflow::WrapOverflow, r) where T = begin
+handleoverflow!(data::AbstractSimData{T,1}, overflow::WrapOverflow, r) where T = begin
     # Copy two sides
     @inbounds copyto!(source, 1-r:0, source, nrows+1-r:nrows)
     @inbounds copyto!(source, nrows+1:nrows+r, source, 1:r)
 end
-handle_overflow!(data::AbstractSimData{T,2}, overflow::WrapOverflow, r) where T = begin
+handleoverflow!(data::AbstractSimData{T,2}, overflow::WrapOverflow, r) where T = begin
     nrows, ncols = size(data)
     src = source(data)
     # Left
@@ -320,7 +320,7 @@ handle_overflow!(data::AbstractSimData{T,2}, overflow::WrapOverflow, r) where T 
     @inbounds copyto!(src, CartesianIndices((nrows+1:nrows+r, 1-r:0)),
                       src, CartesianIndices((1:r, ncols+1-r:ncols)))
 end
-handle_overflow!(data, overflow::RemoveOverflow, r) = nothing
+handleoverflow!(data, overflow::RemoveOverflow, r) = nothing
 
 """
     applyrule(rules::Tuple, data, state, (i, j))
@@ -350,15 +350,15 @@ replay(REPLOutput(output))
 ```
 """
 replay(output::AbstractOutput) = begin
-    is_running(output) && return
-    set_running!(output, true)
+    isrunning(output) && return
+    setrunning!(output, true)
     initialize!(output)
     for (t, frame) in enumerate(output)
         delay(output, t)
-        show_frame(output, t)
-        is_running(output) || break
+        showframe(output, t)
+        isrunning(output) || break
     end
-    set_running!(output, false)
+    setrunning!(output, false)
 end
 
 abstract type MyAbstractType{T <: AbstractFloat} end

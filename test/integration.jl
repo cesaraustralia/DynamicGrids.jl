@@ -48,11 +48,10 @@ end
     replay(output)
 end
 
-@testset "REPLOutput{:braile} works" begin output = REPLOutput{:braile}(init; fps=100, store=true)
-    sim!(output, rule; tstop=2)
-    fix_for_testing_hang_after_simulations = 0
+@testset "REPLOutput{:braile} works" begin 
+    output = REPLOutput{:braile}(init; fps=100, store=true)
+    sim!(output, ruleinit; tstop=2)
     resume!(output, rule; tadd=3)
-    fix_for_testing_hang_after_simulations = 0
     @test output[3] == test
     @test output[5] == test2
     replay(output)

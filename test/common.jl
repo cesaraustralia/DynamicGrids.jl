@@ -1,16 +1,16 @@
 using CellularAutomataBase, Test, Colors
-using CellularAutomataBase: process_frame, normalize_frame, is_showable, curframe, 
-                            allocate_frames!, store_frame!, @Frames, @MinMax
+using CellularAutomataBase: processframe, normalizeframe, isshowable, curframe, 
+                            allocateframes!, storeframe!, @Output, @MinMax
 
-@MinMax @Frames struct MinMaxOutput{} <: AbstractOutput{T} end
+@MinMax @Output struct MinMaxOutput{} <: AbstractOutput{T} end
 
 init = [10.0 11.0;
         0.0   5.0]
 
-output = MinMaxOutput(init, 0.0, 10.0)
+output = MinMaxOutput(init, false, 0.0, 10.0)
 
 @test curframe(output, 5) == 5 
-@test is_showable(output, 5) == false
+@test isshowable(output, 5) == false
 
 update = [8.0 15.0;
           2.0  9.0]
@@ -20,7 +20,7 @@ push!(output, update)
 @test length(output) == 2
 @test output[2] == update
 
-allocate_frames!(output, init, 3:5)
+allocateframes!(output, init, 3:5)
 
 @test length(output) == 5
 @test firstindex(output) == 1
@@ -28,18 +28,18 @@ allocate_frames!(output, init, 3:5)
 @test size(output) == (5,)
 
 @test output[3] != update
-store_frame!(output, update, 3)
+storeframe!(output, update, 3)
 @test output[3] == update
 
-output2 = MinMaxOutput(output, 0.0, 10.0)
+output2 = MinMaxOutput(output, false, 0.0, 10.0)
 @test length(output2) == 5
 @test output2[3] == update
 
 
 @testset "image processing" begin
-    @test normalize_frame(output, output[1]) == [1.0 1.0;
+    @test normalizeframe(output, output[1]) == [1.0 1.0;
                                                  0.0 0.5]
 
-    @test process_frame(output, output[1], 1) == [RGB24(1.0, 1.0, 1.0) RGB24(1.0, 1.0, 1.0);
+    @test processframe(output, output[1], 1) == [RGB24(1.0, 1.0, 1.0) RGB24(1.0, 1.0, 1.0);
                                                   RGB24(0.0, 0.0, 0.0) RGB24(0.5, 0.5, 0.5)]
 end

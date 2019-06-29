@@ -15,9 +15,9 @@ function source end
 
 """
     dest(data) 
-Provides the source array for all rule types.
+Provides the dest array for all rule types.
 """
-function source end
+function dest end
 
 """
     overflow(data) 

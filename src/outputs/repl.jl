@@ -15,7 +15,7 @@ A simple output that is displayed directly in the REPL.
 
 ### Keyword Arguments:
 - `fps`: frames per second
-- `showmax_fps`: maximum displayed frames per second
+- `showfps`: maximum displayed frames per second
 - `store::Bool`: save frames or not
 - `color`: a color name symbol from Crayons.jl
 
@@ -24,18 +24,18 @@ Pass `:braile` or `:block` to the constructor:
 REPLOutput{:block}(init)
 ```
 """
-@Ok @FPS @Frames @SubType mutable struct REPLOutput{Co,Cu} <: AbstractOutput{T}
+@FPS @Output @SubType mutable struct REPLOutput{Co,Cu} <: AbstractOutput{T}
     displayoffset::Array{Int}
     color::Co
     cutoff::Cu
 end
 
 REPLOutput(frames::AbstractVector; kwargs...) = REPLOutput{:block}(frames; kwargs...)
-REPLOutput{X}(frames::AbstractVector; fps=25, showmax_fps=fps, store=false, 
+REPLOutput{X}(frames::AbstractVector; fps=25, showfps=fps, store=false, 
               color=:white, cutoff=0.5) where X = begin
     timestamp = 0.0; tref = 0; tlast = 1; running = false; displayoffset = [1, 1];
     REPLOutput{X,typeof.((frames, fps, timestamp, tref, color, cutoff))...}(
-               frames, fps, showmax_fps, timestamp, tref, tlast, store, running, displayoffset, color, cutoff)
+               frames, running, fps, showfps, timestamp, tref, tlast, store, displayoffset, color, cutoff)
 end
 
 
@@ -45,9 +45,9 @@ initialize!(o::REPLOutput, args...) = begin
     o.timestamp = time()
 end
 
-is_async(o::REPLOutput) = false
+isasync(o::REPLOutput) = false
 
-show_frame(o::REPLOutput, frame, t) = begin 
+showframe(o::REPLOutput, frame, t) = begin 
     # Print the frame
     put((0,0), o.color, replframe(o, frame)) 
     # Print the timestamp in the top right corner
@@ -55,17 +55,17 @@ show_frame(o::REPLOutput, frame, t) = begin
 end
 
 
-cursor_save_position(buf::IO=terminal.out_stream) = print(buf, "\x1b[s")
-cursor_restore_position(buf::IO=terminal.out_stream) = print(buf, "\x1b[u")
-cursor_move_abs(buf::IO, c=(0,0)) = print(buf, "\x1b[$(c[2]);$(c[1])H")
+savepos(buf::IO=terminal.out_stream) = print(buf, "\x1b[s")
+restorepos(buf::IO=terminal.out_stream) = print(buf, "\x1b[u")
+movepos(buf::IO, c=(0,0)) = print(buf, "\x1b[$(c[2]);$(c[1])H")
 
-function put(pos, color::Crayon, s::String)
+function put(pos, color::Crayon, str::String)
     buf = terminal.out_stream
-    cursor_save_position(buf)
-    cursor_move_abs(buf, pos)
+    savepos(buf)
+    movepos(buf, pos)
     print(buf, color)
-    print(buf, s)
-    cursor_restore_position(buf)
+    print(buf, str)
+    restorepos(buf)
 end
 put(pos, c::Symbol, s::String) = put(pos, Crayon(foreground=c), s)
 
