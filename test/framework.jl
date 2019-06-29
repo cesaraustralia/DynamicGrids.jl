@@ -1,18 +1,13 @@
 using CellularAutomataBase, Test
-import CellularAutomataBase: rule, rule!
+import CellularAutomataBase: applyrule, applyrule!
 
-struct TestModel <: AbstractModel end
-struct TestPartial <: AbstractPartialModel end
-struct TestPartialWrite <: AbstractPartialModel end
+struct TestRule <: AbstractRule end
+struct TestPartial <: AbstractPartialRule end
+struct TestPartialWrite <: AbstractPartialRule end
 
-rule(::TestModel, data, state, index, args...) = 0
-rule!(::TestPartial, data, state, index, args...) = 0
-rule!(::TestPartialWrite, data, state, index, args...) = data.dest[index[1], 2] = 0
-
-
-@testset "builds indices matrix" begin
-    @test broadcastable_indices([1 2 3; 3 4 5]) == [(1, 1) (1, 2) (1, 3); (2, 1) (2, 2) (2, 3)]
-end
+applyrule(::TestRule, data, state, index) = 0
+applyrule!(::TestPartial, data, state, index) = 0
+applyrule!(::TestPartialWrite, data, state, index) = data.dest[index[1], 2] = 0
 
 
 init  = [0 1 1 0;
@@ -28,16 +23,16 @@ init  = [0 1 1 0;
              0 0 0 0;
              0 0 0 0]
 
-    model = Models(TestModel(); init=init)
+    rule = Ruleset(TestRule(); init=init)
     output = ArrayOutput(init, 10)
-    sim!(output, model; tstop=10)
+    sim!(output, rule; tstop=10)
     @test output[10] == final
 end
 
 @testset "an partial rule that returns zero does nothing" begin
-    model = Models(TestPartial(); init=init)
+    rule = Ruleset(TestPartial(); init=init)
     output = ArrayOutput(init, 10)
-    sim!(output, model; tstop=10)
+    sim!(output, rule; tstop=10)
     @test output[1] == init
     @test output[10] == init
 end
@@ -49,9 +44,9 @@ end
              0 0 1 0;
              0 0 1 0]
 
-    model = Models(TestPartialWrite(); init=init)
+    rule = Ruleset(TestPartialWrite(); init=init)
     output = ArrayOutput(init, 10)
-    sim!(output, model; tstop=10)
+    sim!(output, rule; tstop=10)
     @test output[1] == init
     @test output[2] == final
     @test output[10] == final

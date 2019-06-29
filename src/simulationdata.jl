@@ -1,5 +1,30 @@
 abstract type AbstractSimData{T,N} end
 
+"""
+    buffer(data) 
+Provides a buffer matching the neighborhood size
+for all rules `<: AbstractNeighborhoodRule` 
+"""
+function buffer end
+
+"""
+    source(data) 
+Provides the source array for all rule types.
+"""
+function source end
+
+"""
+    dest(data) 
+Provides the source array for all rule types.
+"""
+function source end
+
+"""
+    overflow(data) 
+Provides the overflow type for the simulation.
+"""
+function overflow end
+
 " Simulation data and storage is passed to rules for each timestep "
 struct SimData{T,N,I<:AbstractArray{T,N},St,B,Si,O,CS,TS,Ti} <: AbstractSimData{T,N}
     init::I
@@ -35,6 +60,6 @@ newbuffer(data::SimData, buffer) =
     SimData(data.init, data.source, data.dest, buffer, data.size, 
             data.overflow, data.cellsize, data.timestep, data.t)
 
-simdata(model::Models, source, dest, sze, t) = 
+simdata(model::Ruleset, source, dest, sze, t) = 
     SimData(model.init, source, dest, model.init, sze, 
             model.overflow, model.cellsize, model.timestep, t)

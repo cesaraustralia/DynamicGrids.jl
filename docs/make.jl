@@ -1,6 +1,4 @@
-using Documenter, CellularAutomataBase, Gtk, Plots, FileIO, Mux, Blink
-using CellularAutomataBase: rule, rule!, run_model!, run_rule!, max_radius, radius, 
-      temp_neighborhood, neighbors, inhood, inbounds, process_frame
+using Documenter, CellularAutomataBase
 
 makedocs(
     modules = [CellularAutomataBase],

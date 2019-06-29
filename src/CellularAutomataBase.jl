@@ -1,56 +1,58 @@
 """
 CellularAutomataBase provides a framework for building grid based simulations. 
 
-The framework is highly customisable, but there are some central idea that define how a Cellular
-simulation works: *models*, *rules* and *neighborhoods*. For input and output of data there
-are *init* arrays and *outputs*.
+The framework is highly customisable, but there are some central idea that define 
+how a Cellular simulation works: *rules*, and *neighborhoods*. 
+For input and output of data there are *init* arrays and *outputs*.
 
-Models hold the configuration for a simulation, and trigger a specific `rule` method
-that operates on each of the cells in the grid. See [`AbstractModel`](@ref) and
-[`rule`](@ref). Models come in a number of flavours, which allows assumptions to be made 
+Rules hold the configuration for a simulation, and trigger a specific `applyrule` method
+that operates on each of the cells in the grid. See [`AbstractRule`](@ref) and
+[`applyrule`](@ref). Rules come in a number of flavours, which allows assumptions to be made 
 about running them that can greatly improve performance.
 
-Outputs are ways of storing of viewing the simulation, and can be used interchangeably
+Outputs are ways of storing of viewing a simulation, and can be used interchangeably
 depending on your needs. See [`AbstractOutput`](@ref).
 
-The inititialisation array may be any AbstractArray, containing whatever initialisation data
-is required to start the simulation. Most rules work on two-dimensional arrays, but one-dimensional
-arrays are also use for some cellular automata.  
+The init array may be any AbstractArray, containing whatever initialisation data
+is required to start the simulation.
 A typical simulation is run with a script like:
 
 ```julia
 init = my_array
-model = Models(Life())
+rules = Ruleset(Life())
 output = ArrayOutput(init)
 
-sim!(output, model, init)
+sim!(output, rules; init=init)
 ```
 
-Multiple models can be passed to `sim!()` wrap in `Models()`, and each of their rules
-will be run for the whole grid in sequence.
+Multiple models can be passed to `sim!()` in a `Ruleset()`. Each rule
+will be run for the whole grid, in sequence.
 
 ```julia
-sim!(output, Models(model1, model2), init)
+sim!(output, Ruleset(rule1, rule2); init=init)
 ```
 
 For better performance, models included in a tuple will be combined into a single model 
-(with only one array write). This is limited to [`AbstractCellModel`](@ref), although 
-[`AbstractNeighborhoodModel`](@ref) may be used as the *first* model in the tuple.
+(with only one array write). This is limited to [`AbstractCellRule`](@ref), although 
+[`AbstractNeighborhoodRule`](@ref) may be used as the *first* model in the tuple.
 
 ```julia
-sim!(output, Models(model1, (model2, model3)), init)
+sim!(output, Rules(rule1, (rule2, rule3)); init=init)
 ```
 """
 module CellularAutomataBase
 
 using Colors, 
+      Crayons,
       DocStringExtensions,
       FieldDefaults,
       FieldMetadata,
       FielddocTables,
       FileIO,
       Mixers,
-      OffsetArrays
+      OffsetArrays,
+      REPL,
+      UnicodeGraphics
 
 using Base: tail
 using Lazy: @forward
@@ -67,11 +69,11 @@ export savegif, show_frame
 
 export distances, broadcastable_indices, sizefromradius 
 
-export AbstractModel, AbstractPartialModel,
-       AbstractNeighborhoodModel, AbstractPartialNeighborhoodModel, 
-       AbstractCellModel
+export AbstractRule, AbstractPartialRule,
+       AbstractNeighborhoodRule, AbstractPartialNeighborhoodRule, 
+       AbstractCellRule
 
-export Models # TODO: a real name for this
+export AbstractRuleset, Ruleset
 
 export AbstractLife, Life
 
@@ -80,7 +82,7 @@ export AbstractNeighborhood, RadialNeighborhood, AbstractCustomNeighborhood,
 
 export AbstractOverflow, RemoveOverflow, WrapOverflow
 
-export AbstractOutput, AbstractArrayOutput, ArrayOutput
+export AbstractOutput, AbstractArrayOutput, ArrayOutput, REPLOutput
 
 export AbstractFrameProcessor, GreyscaleProcessor, GrayscaleProcessor, 
        GreyscaleZerosProcessor, GrayscaleZerosProcessor, 
@@ -111,5 +113,6 @@ include("utils.jl")
 include("life.jl")
 include("outputs/frame_processing.jl")
 include("outputs/array.jl")
+include("outputs/repl.jl")
 
 end

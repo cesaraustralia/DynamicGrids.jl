@@ -1,50 +1,53 @@
 """
-A model contains all the information required to run a rule in a cellular
-simulation, given an initialised array. Models can be chained together in any order.
+A rule contains all the information required to run a rule in a cellular
+simulation, given an initial array. Rules can be chained together sequentially.
 
-The output of the rule for an AbstractModel is allways written to the current cell in the grid.
+The output of the rule for an AbstractRule is allways written to the current cell in the grid.
 """
-abstract type AbstractModel end
-
-"""
-An abstract type for models that do not write to every cell of the grid.
-
-Updates to the destination array (`data.dest`) must be performed manually. The destination array is 
-copied from the source prior to running the rule! method, which can be quicker than writing each cell 
-individually and potentially produce more succinct formulations.
-"""
-abstract type AbstractPartialModel <: AbstractModel end
+abstract type AbstractRule end
 
 """
-A Model That only accesses a neighborhood, defined by its radius distance from the current point. 
+AbstractPartialRule is for rules that manually write to whichever cells of the grid
+that they choose, instead of updating every cell with their output.
 
-The models neighborhood_buffer field will be populated with a matrix containing the 
-neighborhood cells, so that BLAS routines and other optimised matrix algebra may be performed
-on the neighborhood, and no bounds checking is required. 
+Updates to the destination array (`dest(data)`) must be performed manually, while
+the source array can be accessed with `source(data)`.
 
-It must read only from the state variable and the neighborhood_buffer array, and never manually write to the 
-`data.dest` array. Its return value is allways written to the central cell.
+The dest array is copied from the source prior to running the `applyrule!` method.
 """
-abstract type AbstractNeighborhoodModel <: AbstractModel end
-
-"""
-A Model That only accesses a neighborhood, defined by its radius distance from the current point.
-
-It must read only from the models neighborhood_buffer array, 
-and manually write to the `data.dest` array.
-
-Neighborhood models must return their neighborhood radius with a radius() method.
-"""
-abstract type AbstractPartialNeighborhoodModel <: AbstractPartialModel end
+abstract type AbstractPartialRule <: AbstractRule end
 
 """
-A Model that only writes and accesses a single cell: its return value is the new 
-value of the cell. This limitation can be useful for performance optimisations. 
+A Rule That only accesses a neighborhood, defined by its radius distance from the current cell.
 
-Accessing the `data.source` and `data.dest` arrays directly is not guaranteed to have 
+For each cell a buffer will be populated containing the neighborhood cells, accessible with
+`buffer(data)`. This allows memory optimisations and the use of BLAS routines on the neighborhood. 
+It also means that and no bounds checking is required.
+
+`AbstractNeighborhoodRule` must read only from the state variable and the 
+neighborhood_buffer array, and never manually write to the `dest(data)` array. 
+Its return value is allways written to the central cell.
+
+Custom Neighborhood rules must return their radius with a `radius()` method.
+"""
+abstract type AbstractNeighborhoodRule <: AbstractRule end
+
+"""
+A Rule that only writes to its neighborhood, defined by its radius distance from the current point.
+TODO: should this exist?
+
+Custom PartialNeighborhood rules must return their radius with a `radius()` method.
+"""
+abstract type AbstractPartialNeighborhoodRule <: AbstractPartialRule end
+
+"""
+A Rule that only writes and accesses a single cell: its return value is the new
+value of the cell. This limitation can be useful for performance optimisations.
+
+Accessing the `data.source` and `data.dest` arrays directly is not guaranteed to have
 correct results, and should not be done.
 """
-abstract type AbstractCellModel <: AbstractModel end
+abstract type AbstractCellRule <: AbstractRule end
 
 
 """
@@ -61,19 +64,19 @@ struct WrapOverflow <: AbstractOverflow end
 struct RemoveOverflow <: AbstractOverflow end
 
 
+"""
+    Ruleset(rules...; init=nothing, overflow=RemoveOverflow(), cellsize=1, timestep=1)
 
-""" 
-    Models(models...; init=[], cellsize=1, timestep=1)
-
-A mutable container for holding chains immutable models, an initialisation
+A container for holding a sequence of AbstractRule, an init
 array and other simulaiton details.
 """
-mutable struct Models{M,I,O<:AbstractOverflow,C<:Number,T<:Number} 
-    models::M
+mutable struct Ruleset{M,I,O<:AbstractOverflow,C<:Number,T<:Number}
+    rules::M
     init::I
     overflow::O
     cellsize::C
     timestep::T
 end
-Models(args...; init=nothing, overflow=RemoveOverflow(), cellsize=1, timestep=1) = 
-    Models{typeof.((args, init, overflow, cellsize, timestep))...}(args, init, overflow, cellsize, timestep)
+Ruleset(args...; init=nothing, overflow=RemoveOverflow(), cellsize=1, timestep=1) =
+    Ruleset{typeof.((args, init, overflow, cellsize, timestep))...
+           }(args, init, overflow, cellsize, timestep)
