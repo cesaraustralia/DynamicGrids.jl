@@ -64,19 +64,24 @@ struct WrapOverflow <: AbstractOverflow end
 struct RemoveOverflow <: AbstractOverflow end
 
 
+abstract type AbstractRuleset end
+
 """
     Ruleset(rules...; init=nothing, overflow=RemoveOverflow(), cellsize=1, timestep=1)
 
 A container for holding a sequence of AbstractRule, an init
 array and other simulaiton details.
 """
-mutable struct Ruleset{M,I,O<:AbstractOverflow,C<:Number,T<:Number}
-    rules::M
+mutable struct Ruleset{R,I,O<:AbstractOverflow,C<:Number,T<:Number,M} <: AbstractRuleset
+    rules::R
     init::I
     overflow::O
     cellsize::C
     timestep::T
+    min::M
+    max::M
 end
-Ruleset(args...; init=nothing, overflow=RemoveOverflow(), cellsize=1, timestep=1) =
-    Ruleset{typeof.((args, init, overflow, cellsize, timestep))...
-           }(args, init, overflow, cellsize, timestep)
+Ruleset(args...; init=nothing, overflow=RemoveOverflow(), cellsize=1, timestep=1, 
+        min=nothing, max=nothing) = 
+    Ruleset{typeof.((args, init, overflow, cellsize, timestep, min))...
+           }(args, init, overflow, cellsize, timestep, min, max)

@@ -47,7 +47,7 @@ end
 
 isasync(o::REPLOutput) = false
 
-showframe(o::REPLOutput, frame, t) = begin 
+showframe(o::REPLOutput, frame::AbstractArray, t) = begin 
     # Print the frame
     put((0,0), o.color, replframe(o, frame)) 
     # Print the timestamp in the top right corner

@@ -7,10 +7,15 @@
 [![Coverage Status](https://coveralls.io/repos/rafaqz/CellularAutomataBase.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/rafaqz/CellularAutomataBase.jl?branch=master) 
 [![codecov.io](http://codecov.io/github/rafaqz/CellularAutomataBase.jl/coverage.svg?branch=master)](http://codecov.io/github/rafaqz/CellularAutomataBase.jl?branch=master)
 
-Cellular is a generalised modular framework for cellular automata and similar spatial models.
+CellularAutomataBase is a generalised modular framework for cellular automata and similar spatial models.
 
-This package is extended by [Dispersal.jl](https://github.com/rafaqz/Dispersal.jl)
-for modelling organism dispersal.
+This package is extended by
+[Dispersal.jl](https://github.com/rafaqz/Dispersal.jl) for modelling organism
+dispersal.
+[CellularAutomataWeb.jl](https://github.com/rafaqz/CellularAutomataWeb.jl) and
+[CellularAutomataGtk.jl](https://github.com/rafaqz/CellularAutomataGtk.jl)
+provide simulation interfaces for web pages/electron apps and for Gtk.
+
 
 Installation:
 ```julia

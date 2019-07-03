@@ -1,13 +1,12 @@
-using CellularAutomataBase, Test, Colors
-using CellularAutomataBase: processframe, normalizeframe, isshowable, curframe, 
-                            allocateframes!, storeframe!, @Output, @MinMax
-
-@MinMax @Output struct MinMaxOutput{} <: AbstractOutput{T} end
+using CellularAutomataBase, Test
+using CellularAutomataBase: normalizeframe, isshowable, curframe, 
+                            allocateframes!, storeframe!, @Output
 
 init = [10.0 11.0;
         0.0   5.0]
 
-output = MinMaxOutput(init, false, 0.0, 10.0)
+output = ArrayOutput(init, false)
+ruleset = Ruleset(; min=0.0, max=10.0)
 
 @test curframe(output, 5) == 5 
 @test isshowable(output, 5) == false
@@ -31,15 +30,10 @@ allocateframes!(output, init, 3:5)
 storeframe!(output, update, 3)
 @test output[3] == update
 
-output2 = MinMaxOutput(output, false, 0.0, 10.0)
+output2 = ArrayOutput(output, false)
 @test length(output2) == 5
 @test output2[3] == update
 
-
-@testset "image processing" begin
-    @test normalizeframe(output, output[1]) == [1.0 1.0;
-                                                 0.0 0.5]
-
-    @test processframe(output, output[1], 1) == [RGB24(1.0, 1.0, 1.0) RGB24(1.0, 1.0, 1.0);
-                                                  RGB24(0.0, 0.0, 0.0) RGB24(0.5, 0.5, 0.5)]
-end
+normed = normalizeframe(ruleset, output[1])
+@test normed == [1.0 1.0
+                 0.0 0.5]

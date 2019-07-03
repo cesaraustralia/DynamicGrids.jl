@@ -27,7 +27,7 @@ sim!(output, ruleset; init=nothing, tstop=100, fps=getfps(output)) = begin
     # Write the init array as the first frame
     storeframe!(output, init, 1)
     # Show the first frame
-    showframe(output, 1)
+    showframe(output, ruleset, 1)
     # Run the simulation
     runsim!(output, ruleset, init, 2:tstop)
     # Return the output object
@@ -96,14 +96,14 @@ simloop!(output, ruleset, init, tspan) = begin
         # Save the the current frame
         storeframe!(output, source, t)
         # Display the current frame
-        isshowable(output, t) && showframe(output, t)
+        isshowable(output, t) && showframe(output, ruleset, t)
         # Let other tasks run (like ui controls)
         yield()
         # Stick to the FPS
         delay(output, t)
         # Exit gracefully
         if !isrunning(output) || t == tspan.stop
-            showframe(output, t)
+            showframe(output, ruleset, t)
             setrunning!(output, false)
             # Any finishing touches required by the output
             finalize!(output)
@@ -176,15 +176,15 @@ sequencerules!(data, rules::Tuple{}) = source(data), dest(data)
 Apply the rule for each cell in the grid, using optimisations 
 allowed for the supertype of the rule.
 """
-maprule!(data::AbstractSimData{T,1}, rule::AbstractRule) where T = 
+maprule!(data::AbstractSimData{T,1}, rule) where T = 
     for i = 1:size(data)[1]
         @inbounds dest(data)[i] = applyrule(rule, data, source(data)[i], (i))
     end
-maprule!(data::AbstractSimData{T,2}, rule::AbstractRule) where T = 
+maprule!(data::AbstractSimData{T,2}, rule) where T = 
     for i = 1:size(data)[1], j = 1:size(data)[2]
         @inbounds dest(data)[i, j] = applyrule(rule, data, source(data)[i, j], (i, j))
     end
-maprule!(data::AbstractSimData{T,3}, rule::AbstractRule) where T = 
+maprule!(data::AbstractSimData{T,3}, rule) where T = 
     for i = 1:size(data)[1], j = 1:size(data)[2], k = 1:size(data)[3]
         @inbounds dest(data)[i, j, k] = applyrule(rule, data, source(data)[i, j, k], (i, j, k))
     end

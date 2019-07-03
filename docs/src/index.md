@@ -108,6 +108,8 @@ REPLOutput
 AbstractFrameProcessor
 Greyscale
 ColorZeros
+ColorSchemeProcessor
+ColorSchemeZerosProcessor
 ```
 
 ## Overflow

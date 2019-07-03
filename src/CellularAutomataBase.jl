@@ -47,7 +47,7 @@ using Colors,
       DocStringExtensions,
       FieldDefaults,
       FieldMetadata,
-      FielddocTables,
+      FieldDocTables,
       FileIO,
       Mixers,
       OffsetArrays,
@@ -86,12 +86,12 @@ export AbstractOutput, AbstractArrayOutput, ArrayOutput, REPLOutput
 
 export AbstractFrameProcessor, GreyscaleProcessor, GrayscaleProcessor, 
        GreyscaleZerosProcessor, GrayscaleZerosProcessor, 
-       ColoSchemeProcessor, ColorSchemeZerosProcessor 
+       ColorSchemeProcessor, ColorSchemeZerosProcessor 
 
 export AbstractSummary
 
 
-const FIELDDOCTABLE = FielddocTable((:Description, :Default, :Limits), 
+const FIELDDOCTABLE = FieldDocTable((:Description, :Default, :Limits), 
                                     (description, default, limits);
                                     truncation=(100,40,100))
 
@@ -103,8 +103,8 @@ const FIELDDOCTABLE = FielddocTable((:Description, :Default, :Limits),
     $(METHODLIST)
     """
 
-include("outputs/common.jl")
 include("types.jl")
+include("outputs/common.jl")
 include("simulationdata.jl")
 include("interface.jl")
 include("framework.jl")

@@ -18,11 +18,6 @@ Mixin for all outputs that display frames live.
     store::Bool
 end
 
-@premix struct MinMax{MM}
-    min::MM
-    max::MM
-end
-
 """
 Mixin for outputs that output real images and can use an image processor.
 """
@@ -38,13 +33,11 @@ struct NoFPS end
 
 hasfps(o::O) where O = :fps in fieldnames(O) ? HasFPS() : NoFPS()
 
+
 struct HasMinMax end
 struct NoMinMax end
 
-hasminmax(m) = begin
-    fns = fieldnames(typeof(m))
-    :min in fns && :max in fns ? HasMinMax() : NoMinMax()
-end
+hasminmax(ruleset::T) where T = fieldtype(T, :min) <: Number ? HasMinMax() : NoMinMax()
 
 
 # Abstract output type and generic methods
@@ -167,12 +160,24 @@ Show the last frame of the output, or the frame at time t.
 """
 showframe(o::AbstractOutput) = showframe(o, lastindex(o))
 showframe(o::AbstractOutput, t) = showframe(o, o[curframe(o, t)], t)
-showframe(o::AbstractOutput, frame::AbstractMatrix) = showframe(o, frame, 0)
-showframe(o::AbstractOutput, frame, t) = nothing
+showframe(o::AbstractOutput, frame::AbstractArray) = showframe(o, frame, 0)
+showframe(o::AbstractOutput, frame::AbstractArray, t) = nothing
+showframe(o::AbstractOutput, ruleset::AbstractRuleset, t) = 
+    showframe(o, ruleset, o[curframe(o, t)], t)
+showframe(o::AbstractOutput, ruleset::AbstractRuleset, frame::AbstractArray, t) = 
+    showframe(o::AbstractOutput, normalizeframe(ruleset, frame), t)
 
 curframe(o::AbstractOutput, t) = curframe(hasfps(o), o, t)
 curframe(::HasFPS, o, t) = o.store ? t : oneunit(t)
 curframe(::NoFPS, o, t) = t
+
+normalizeframe(ruleset, a::AbstractArray) =
+    normalizeframe(hasminmax(ruleset), ruleset, a)
+normalizeframe(::HasMinMax, ruleset, a::AbstractArray) =
+    normalizeframe(a, ruleset.min, ruleset.max)
+normalizeframe(a::AbstractArray, minval::Number, maxval::Number) =
+    min.((a .- minval) ./ (maxval - minval), one(eltype(a)))
+normalizeframe(::NoMinMax, ruleset, a::AbstractArray) = a
 
 
 # Setup and close output
