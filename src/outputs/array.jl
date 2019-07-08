@@ -1,9 +1,11 @@
 abstract type AbstractArrayOutput{T} <: AbstractOutput{T} end
 
 """
-A simple array output that stores each step of the simulation in an array of arrays.
+A simple output that stores each step of the simulation in a vector of arrays.
 
-Accepts an init matrix and tstop time, or any vector of matrices.
+### Arguments:
+- `frames`: Single init array or vector of arrays
+- `tstop`: The length of the output.
 """
 @Output mutable struct ArrayOutput{} <: AbstractArrayOutput{T} end
 

@@ -54,7 +54,7 @@ LayeredCustomNeighborhood(layeredcoords) =
 VonNeumannNeighborhood() = CustomNeighborhood(((0,-1), (-1,0), (1,0), (0,1)))
 
 """
-    neighbors(hood::RadialNeighborhood{:moore}, data, state, index, args...)
+    neighbors(hood::RadialNeighborhood, data, state, index, args...)
 
 Sums moore nieghborhoods of any dimension. 
 """

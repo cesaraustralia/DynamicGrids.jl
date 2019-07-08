@@ -1,20 +1,22 @@
 """
-CellularAutomataBase provides a framework for building grid based simulations. 
+CellularAutomataBase provides a framework for building grid-based simulations. 
 
-The framework is highly customisable, but there are some central idea that define 
-how a Cellular simulation works: *rules*, and *neighborhoods*. 
-For input and output of data there are *init* arrays and *outputs*.
+The framework is highly customisable, but there are some central ideas that define 
+how a simulation works: *rules*, *init* arrays and *outputs*.
 
 Rules hold the configuration for a simulation, and trigger a specific `applyrule` method
 that operates on each of the cells in the grid. See [`AbstractRule`](@ref) and
 [`applyrule`](@ref). Rules come in a number of flavours, which allows assumptions to be made 
-about running them that can greatly improve performance.
+about running them that can greatly improve performance. Rules are chained together in
+a [`Ruleset`](@ref) object.
+
+The init array may be any AbstractArray, containing whatever initialisation data
+is required to start the simulation. The Array type and element type of the init
+array determine the types used in the simulation, as well as providing the initial conditions.
 
 Outputs are ways of storing of viewing a simulation, and can be used interchangeably
 depending on your needs. See [`AbstractOutput`](@ref).
 
-The init array may be any AbstractArray, containing whatever initialisation data
-is required to start the simulation.
 A typical simulation is run with a script like:
 
 ```julia
@@ -25,7 +27,7 @@ output = ArrayOutput(init)
 sim!(output, rules; init=init)
 ```
 
-Multiple models can be passed to `sim!()` in a `Ruleset()`. Each rule
+Multiple models can be passed to [`sim!`](@ref) in a [`Ruleset`](@ref). Each rule
 will be run for the whole grid, in sequence.
 
 ```julia
@@ -100,7 +102,6 @@ const FIELDDOCTABLE = FieldDocTable((:Description, :Default, :Limits),
     """
     $(TYPEDEF)
     $(DOCSTRING)
-    $(METHODLIST)
     """
 
 include("types.jl")

@@ -8,21 +8,24 @@ end
 @premix struct SubType{X} end
 
 """
-A simple output that is displayed directly in the REPL.
+An output that is displayed directly in the REPL. It can either store or discard
+simulation frames.
 
 ### Arguments:
-- `frames::AbstractVector`: Vector of frames
+- `frames`: Single init array or vector of arrays
 
 ### Keyword Arguments:
-- `fps`: frames per second
-- `showfps`: maximum displayed frames per second
-- `store::Bool`: save frames or not
-- `color`: a color name symbol from Crayons.jl
+- `fps::Real`: frames per second to run at
+- `showfps::Real`: maximum displayed frames per second
+- `store::Bool`: store frames or not
+- `color`: a color from Crayons.jl
+- `cutoff::Real`: the cutoff point to display a full or empty cell. Default is `0.5`
 
-Pass `:braile` or `:block` to the constructor:
+To choose the display type can pass `:braile` or `:block` to the constructor:
 ```julia
 REPLOutput{:block}(init)
 ```
+The default option is `:block`.
 """
 @FPS @Output @SubType mutable struct REPLOutput{Co,Cu} <: AbstractOutput{T}
     displayoffset::Array{Int}

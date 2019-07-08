@@ -4,11 +4,6 @@
 CellularAutomataBase
 ```
 
-## Index
-
-```@contents
-```
-
 ## Examples
 
 While this package isn't designed or optimised specifically to run the game of
@@ -84,7 +79,6 @@ and how they are combined to update the value of the current cell.
 
 ```@docs
 AbstractNeighborhood
-AbstractRadialNeighborhood
 RadialNeighborhood
 AbstractCustomNeighborhood
 CustomNeighborhood
@@ -106,16 +100,13 @@ REPLOutput
 
 ```@docs
 AbstractFrameProcessor
-Greyscale
-ColorZeros
+GreyscaleProcessor
+GreyscaleZerosProcessor
 ColorSchemeProcessor
 ColorSchemeZerosProcessor
 ```
 
 ## Overflow
-
-Your grids have edges. When neighborhood or spotting activities overflow past edge, 
-you need a rule for deciding what to do.
 
 ```@docs
 AbstractOverflow

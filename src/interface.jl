@@ -1,11 +1,11 @@
 """
-    function rule(model, state, t, source, dest, args...)
+    applyrule(rule::AbstractRule, data, state, index)
 
-Rules alter cell values based on their current state and other cells, often
-[`neighbors`](@ref).
+Updates cell values based on their current state and the state of other cells
+as defined in the Rule.
 
 ### Arguments:
-- `model` : [`AbstractRule`](@ref)
+- `rule` : [`AbstractRule`](@ref)
 - `data` : [`FrameData`](@ref)
 - `state`: the value of the current cell
 - `index`: a (row, column) tuple of Int for the current cell coordinates - `t`: the current time step
@@ -19,12 +19,12 @@ function applyrule end
 
 
 """
-    function rule!(model, data, state, args...)
-A rule that manually writes to the dest array, used in models inheriting
+    applyrule!(rule::AbstractPartialRule, data, state, index)
+A rule that manually writes to the dest array, used in rules inheriting
 from [`AbstractPartialRule`](@ref).
 
 ### Arguments:
-see [`rule`](@ref)
+see [`applyrule`](@ref)
 
 $METHODLIST
 """
@@ -42,6 +42,6 @@ function neighbors end
 
 
 """
-Return the radius of a model if it has one, otherwise zero.
+Return the radius of a rule if it has one, otherwise zero.
 """
 function radius end
