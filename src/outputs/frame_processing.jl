@@ -18,7 +18,6 @@ hasprocessor(o::O) where O = :processor in fieldnames(O) ? HasProcessor() : NoPr
 
 """
 Convert frame matrix to RGB24, using any AbstractFrameProcessor
-$METHODLIST
 """
 function frametoimage end
 @inline frametoimage(o::AbstractOutput, frame::AbstractArray, t) =

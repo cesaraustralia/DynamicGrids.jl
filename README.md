@@ -24,4 +24,4 @@ Pkg.clone("https://github.com/rafaqz/CellularAutomataBase.jl"
 
 ## Documentation
 
-- [**LATEST**](https://rafaqz.github.io/CellularAutomataBase.jl/latest/) &mdash; *in-development version of the documentation.*
+- [**DEV**](https://rafaqz.github.io/CellularAutomataBase.jl/dev/) &mdash; *in-development version of the documentation.*

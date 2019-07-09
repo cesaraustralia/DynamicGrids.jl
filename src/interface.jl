@@ -12,8 +12,6 @@ as defined in the Rule.
 - `args`: additional arguments passed through from user input to [`sim!`](@ref)
 
 Returns a value to be written to the current cell.
-
-$METHODLIST
 """
 function applyrule end
 
@@ -25,8 +23,6 @@ from [`AbstractPartialRule`](@ref).
 
 ### Arguments:
 see [`applyrule`](@ref)
-
-$METHODLIST
 """
 function applyrule! end
 
@@ -36,7 +32,6 @@ function applyrule! end
 
 Checks all cells in neighborhood and combines them according
 to the particular neighborhood type.
-$METHODLIST
 """
 function neighbors end
 

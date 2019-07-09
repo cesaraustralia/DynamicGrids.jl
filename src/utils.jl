@@ -30,9 +30,9 @@ end
 """ 
     distances(a::AbstactMatrix)
 
-Calculate the distances between all cells in a matrix
+Calculate the matrix of distances (in units of cells) between all cells in a matrix
 """
-distances(a) = broadcast(calc_distance, (a,), broadcastable_indices(a))
+distances(a) = broadcast(calc_distance, Ref(a), broadcastable_indices(a))
 
 calc_distance(::AbstractMatrix, index) = calc_distance(index .- 1)
 calc_distance((y, x)) = sqrt(y^2 + x^2)
