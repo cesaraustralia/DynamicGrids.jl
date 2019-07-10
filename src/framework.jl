@@ -215,6 +215,7 @@ end
 """
 Run the rule for all cells, writing the result to the dest array
 The neighborhood is copied to the rules neighborhood buffer array for performance
+# TODO test 1d
 """
 maprule!(data::AbstractSimData{T,1}, rule::Union{AbstractNeighborhoodRule, Tuple{AbstractNeighborhoodRule,Vararg}},
           args...)  where T = begin
@@ -359,13 +360,4 @@ replay(output::AbstractOutput) = begin
         isrunning(output) || break
     end
     setrunning!(output, false)
-end
-
-abstract type MyAbstractType{T <: AbstractFloat} end
-struct MyConcreteType1{T} <: MyAbstractType{T} end
-struct MyConcreteType2{T} <: MyAbstractType{T} end
-
-function fun(x::MyAbstractType{U}, y::MyAbstractType{V}) where {U<:AbstractFloat, V<:AbstractFloat}
-    println(typeof(x) )
-    println(typeof(y) )
 end
