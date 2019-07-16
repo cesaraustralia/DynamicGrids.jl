@@ -14,7 +14,7 @@ the passed in output for each time-step.
 ### Keyword Arguments
 - `tstop`: Any Number. Default: 100
 """
-sim!(output, ruleset; init=nothing, tstop=100, fps=getfps(output)) = begin
+sim!(output, ruleset; init=nothing, tstop=length(output), fps=getfps(output)) = begin
     isrunning(output) && return
     setrunning!(output, true)
 
@@ -40,7 +40,7 @@ chooseinit(rulesetinit, arginit) = arginit
 chooseinit(rulesetinit::Nothing, arginit) = arginit
 chooseinit(rulesetinit, arginit::Nothing) = rulesetinit
 chooseinit(rulesetinit::Nothing, arginit::Nothing) =
-    error("Include an init array: either with the ruleset or the init keyword")
+    error("Include an init array: either in the ruleset or with the `init` keyword")
 
 """
     resume!(output, ruleset; tstop=100)
@@ -62,9 +62,7 @@ resume!(output, ruleset; tadd=100, fps=getfps(output)) = begin
     # Use the last frame of the existing simulation as the init frame
     init = output[curframe(output, cur_t)]
     runsim!(output, ruleset, init, tspan)
-    output
 end
-
 
 
 "run the simulation either directly or asynchronously."
@@ -77,27 +75,24 @@ runsim!(output, args...) =
 
 " Loop over the selected timespan, running the ruleset and displaying the output"
 simloop!(output, ruleset, init, tspan) = begin
-    sze = size(init)
-
     # Set up the output
     initialize!(output)
-
-    # Preallocate arrays. These may be larger than init.
-    source, dest = allocatestorage(ruleset, init)
-
     settimestamp!(output, tspan.start)
 
+    # Preallocate data
+    data = simdata(ruleset, init)
+
+    # Loop over the simulation
     for t in tspan
-        # Collect the data elements for this frame
-        data = simdata(ruleset, source, dest, sze, t)
-        # Run the ruleset on the source array, writing to the dest array and
-        # setting the source and dest arrays for the next iteration.
-        source, dest = sequencerules!(data, ruleset)
+        # Update the timestep
+        data = updatetime(data, t)
+        # Run the ruleset and setup data for the next iteration
+        data = sequencerules!(data, ruleset)
         # Save the the current frame
-        storeframe!(output, source, t)
+        storeframe!(output, source(data), t)
         # Display the current frame
         isshowable(output, t) && showframe(output, ruleset, t)
-        # Let other tasks run (like ui controls)
+        # Let other tasks run (like ui controls) TODO is this needed?
         yield()
         # Stick to the FPS
         delay(output, t)
@@ -110,34 +105,7 @@ simloop!(output, ruleset, init, tspan) = begin
             break
         end
     end
-end
-
-
-"""
-    allocatestorage(ruleset, init)
-
-Define the `source` and `dest` arrays for the ruleset, possibly larger than the `init` array.
-This is an optimisation to avoid the need for bounds checking in `rule`. Their size and
-offset depend on the maximum rule radius in the list of passed-in rules.
-"""
-
-allocatestorage(ruleset, init::AbstractArray) = allocatestorage(maxradius(ruleset), init)
-allocatestorage(r::Integer, init::AbstractArray) = begin
-    # Find the maximum radius required by all rules
-    sze = size(init)
-    newsize = sze .+ 2r
-    # Add a margin around the original init array, offset into the negative
-    # So that the first real cell is still 1, 1
-    newindices = -r + 1:sze[1] + r, -r + 1:sze[2] + r
-    source = OffsetArray(zeros(eltype(init), newsize...), newindices...)
-
-    # Copy the init array to the middle section of the source array
-    for j in 1:sze[2], i in 1:sze[1]
-        source[i, j] = init[i,j]
-    end
-    # The dest array is the same as the source array
-    dest = deepcopy(source)
-    source, dest
+    output
 end
 
 """
@@ -160,54 +128,62 @@ radius(rules::Tuple) = radius(rules[1])
 Iterate over all rules recursively, swapping source and dest arrays.
 Returns a tuple containing the source and dest arrays for the next iteration.
 """
-sequencerules!(data, ruleset::Ruleset) = 
-    sequencerules!(data, ruleset.rules)
+sequencerules!(data, ruleset::Ruleset) = sequencerules!(data, ruleset.rules)
 sequencerules!(data, rules::Tuple) = begin
     # Run the first rule for the whole frame
     maprule!(data, rules[1])
     # Swap the source and dest arrays
-    taildata = swapsource(data)
+    data = swapsource(data)
     # Run the rest of the rules, recursively
-    sequencerules!(taildata, tail(rules))
+    sequencerules!(data, tail(rules))
 end
-sequencerules!(data, rules::Tuple{}) = source(data), dest(data)
+sequencerules!(data, rules::Tuple{}) = SimData(data)
 
 """
 Apply the rule for each cell in the grid, using optimisations 
 allowed for the supertype of the rule.
 """
 maprule!(data::AbstractSimData{T,1}, rule) where T = 
-    for i = 1:size(data)[1]
+    for i = 1:framesize(data)[1]
+        ismasked(data, i) && continue
         @inbounds dest(data)[i] = applyrule(rule, data, source(data)[i], (i))
     end
 maprule!(data::AbstractSimData{T,2}, rule) where T = 
-    for i = 1:size(data)[1], j = 1:size(data)[2]
+    for i = 1:framesize(data)[1], j = 1:framesize(data)[2]
+        ismasked(data, i, j) && continue
         @inbounds dest(data)[i, j] = applyrule(rule, data, source(data)[i, j], (i, j))
     end
 maprule!(data::AbstractSimData{T,3}, rule) where T = 
-    for i = 1:size(data)[1], j = 1:size(data)[2], k = 1:size(data)[3]
+    for i = 1:framesize(data)[1], j = 1:framesize(data)[2], k = 1:framesize(data)[3]
+        ismasked(data, i, j, k) && continue
         @inbounds dest(data)[i, j, k] = applyrule(rule, data, source(data)[i, j, k], (i, j, k))
     end
 
 "Run the rule for all cells, the rule must write to the dest array manually"
 maprule!(data::AbstractSimData{T,1}, rule::AbstractPartialRule) where T = begin
     # Initialise the dest array
+    data = WritableSimData(data)
     dest(data) .= source(data)
-    for i in 1:size(data)[1]
+    for i in 1:framesize(data)[1]
+        ismasked(data, i) && continue
         @inbounds applyrule!(rule, data, source(data)[i], (i,))
     end
 end
 maprule!(data::AbstractSimData{T,2}, rule::AbstractPartialRule) where T = begin
     # Initialise the dest array
+    data = WritableSimData(data)
     dest(data) .= source(data)
-    for i in 1:size(data)[1], j in 1:size(data)[2]
+    for i in 1:framesize(data)[1], j in 1:framesize(data)[2]
+        ismasked(data, i, j) && continue
         @inbounds applyrule!(rule, data, source(data)[i, j], (i, j))
     end
 end
 maprule!(data::AbstractSimData{T,3}, rule::AbstractPartialRule) where T = begin
     # Initialise the dest array
+    data = WritableSimData(data)
     dest(data) .= source(data)
-    for i in 1:size(data)[1], j in 1:size(data)[2], k in 1:size(data)[2]
+    for i in 1:framesize(data)[1], j in 1:size(data)[2], k in 1:framesize(data)[2]
+        ismasked(data, i, j, k) && continue
         @inbounds applyrule!(rule, data, source(data)[i, j, k], (i, j, k))
     end
 end
@@ -224,9 +200,9 @@ maprule!(data::AbstractSimData{T,1}, rule::Union{AbstractNeighborhoodRule, Tuple
     sze = hoodsize(r)
     buf = similar(init(data), sze, sze)
     src, dst = source(data), dest(data)
-    nrows = size(data)
+    nrows = framesize(data)
 
-    handleoverflow!(data, overflow(data), r)
+    handleoverflow!(data, r)
 
     # Setup buffer array between rows
     # Ignore the first column, it wil be copied over in the main loop
@@ -234,12 +210,11 @@ maprule!(data::AbstractSimData{T,1}, rule::Union{AbstractNeighborhoodRule, Tuple
         @inbounds buf[i] = src[i-1-r]
     end
     # Run rule for a row
-    for i in 1:nrows
-        @inbounds copyto!(buf, 1, buf, 2)
-        @inbounds buf[sze] = src[i+r]
-        @inbounds state = buf[r+1]
-        newstate = applyrule(rule, data, state, (i,))
-        @inbounds dst[i] = newstate
+    @inbounds for i in 1:nrows
+        copyto!(buf, 1, buf, 2)
+        buf[sze] = src[i+r]
+        state = buf[r+1]
+        dst[i] = applyrule(rule, data, state, (i,))
     end
 end
 maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule, Tuple{AbstractNeighborhoodRule,Vararg}},
@@ -248,11 +223,10 @@ maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule, Tuple
     r = radius(rule)
     sze = hoodsize(r)
     buf = similar(init(data), sze, sze)
-    data = newbuffer(data, buf)
-    src, dst = source(data), dest(data)
-    nrows, ncols = size(data)
+    src, dst = source(data).parent, dest(data).parent
+    nrows, ncols = framesize(data)
 
-    handleoverflow!(data, overflow(data), r)
+    handleoverflow!(data, r)
 
     # Run the rule row by row. When we move along a row by one cell, we access only
     # a single new column of data same the hight of the nighborhood, and move the existing
@@ -264,40 +238,194 @@ maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule, Tuple
         # Ignore the first column, it wil be copied over in the main loop
         for y = 2:sze
             for x = 1:sze
-                @inbounds buf[x, y] = src[i+x-1-r, y-1-r]
+                @inbounds buf[x, y] = src[i+x-1, y-1]
             end
         end
         # Run rule for a row
         for j = 1:ncols
             # Move the neighborhood buffer accross one column 
             # copyto! uses linear indexing, so 2d dims are transformed manually
-            @inbounds copyto!(buf, 1, buf, sze + 1, (sze - 1) * sze)
+            copyto!(buf, 1, buf, sze + 1, (sze - 1) * sze)
             # Copy a new column to the neighborhood buffer
             for x = 1:sze
-                @inbounds buf[x, sze] = src.parent[i+x-1, j+2r]
+                @inbounds buf[x, sze] = src[i+x-1, j+2r]
             end
+            ismasked(data, i, j) && continue
             # Run the rule using the buffer
             @inbounds state = buf[r+1, r+1]
-            newstate = applyrule(rule, data, state, (i, j))
-            @inbounds dst.parent[i+r, j+r] = newstate
+            newstate = applyrule(rule, data, state, (i, j), buf)
+            @inbounds dst[i+r, j+r] = newstate
         end
     end
 end
+
+# maprule!(data::AbstractSimData{T,2}, rule::Union{NR, Tuple{NR,Vararg}},
+#          args...) where {T,NR<:AbstractNeighborhoodRule{R}} where R = begin
+#     # The rule provides the neighborhood buffer
+#     sze = hoodsize(R)
+#     src, dst = source(data), dest(data)
+#     nrows, ncols = size(data)
+
+#     handleoverflow!(data, overflow(data), R)
+
+#     # Run the rule row by row. When we move along a row by one cell, we access only
+#     # a single new column of data same the hight of the nighborhood, and move the existing
+#     # data in the neighborhood buffer array accross by one column. This saves on reads
+#     # from the main array, and focusses reads and writes in the small buffere array that
+#     # should be in fast local memory.
+#     for i = 1:nrows
+#         # Setup the buffer array for the new row
+#         # Run rule for a row
+#         for j = 1:ncols
+#             # Move the neighborhood buffer accross one column 
+#             @inbounds buf = getbuffer(NR, src.parent, i, j)
+#             # @inbounds buf = shiftbuffer(buf, src.parent, i, j)
+#             ismasked(data, i, j) && continue
+#             # Run the rule using the buffer
+#             @inbounds state = buf[R+1, R+1]
+#             newstate = applyrule(rule, data, state, (i, j), buf)
+#             @inbounds dst.parent[i+R, j+R] = state
+#         end
+#     end
+# end
+
+# Base.@propagate_inbounds @generated getbuffer(::Type{<:AbstractNeighborhoodRule{R}}, src, i, j) where {R} = begin
+#     expr = Expr(:tuple)
+#     X = Y = 2R+1
+#     # for x in 1:X
+#         # push!(expr.args, zero(eltype(src)))
+#     # end
+#     for y in 1:Y, x in 1:X 
+#         push!(expr.args, :(src[i+$x-1, j+$y-1]))
+#     end
+#     :(ConstantFixedSizePaddedArray{Tuple{$X,$Y}}($expr))
+# end
+
+# Base.@propagate_inbounds @generated shiftbuffer(buf::ConstantFixedSizePaddedArray{Tuple{X,Y}}, src, i, j) where {X,Y}  = begin
+#     expr = Expr(:tuple)
+#     len = X * Y
+#     # Fill the first columns from the existing buffer
+#     for n in 1:len - Y
+#         push!(expr.args, :(buf.data[$n + Y]))
+#     end
+#     # Fill the last column from the src array
+#     for n in 1:X
+#         push!(expr.args, :(src[i + $n - 1, j + $Y - 1]))
+#     end
+#     :(ConstantFixedSizePaddedArray{Tuple{$X,$Y}}($expr))
+# end
+# maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule, Tuple{AbstractNeighborhoodRule,Vararg}},
+#          args...) where T = begin
+#     # TODO handle multiple radii in different rules
+    
+#     # The rule provides the neighborhood buffer
+#     r = radius(rule)
+#     src, dst = source(data), dest(data)
+#     hsize = hoodsize(r)
+#     nrows, ncols = size(data)
+#     srcrows, srccols = size(src)
+#     initarray = init(data)
+
+#     buffers = typeof(initarray)[zeros(eltype(initarray), hsize, hsize) for i in 1:nrows]
+#     dataarray = [setbuffer(data, buf) for buf in buffers]
+#     bufcol = zeros(eltype(src), srcrows)
+
+#     handleoverflow!(data, overflow(data), r)
+
+#     # Run rule for a column
+#     @inbounds for j in 1:ncols
+#         # Get a column of data, bypassing offset arrays getindex
+#         for x in 1:srcrows
+#             bufcol[x] = src.parent[x, j+2r]
+#         end
+#         for i in 1:nrows
+#             # Get the buffer for this row
+#             buf = buffers[i]
+#             # Move the neighborhood buffer accross one column 
+#             # copyto! uses linear indexing
+#             copyto!(buf, 1, buf, hsize + 1, (hsize - 1) * hsize)
+#             # Copy a new column to the neighborhood buffer
+#             for x in 1:hsize
+#                 buf[hsize, x] = bufcol[x+i-1]
+#             end
+#             if !ismasked(data, i, j)
+#                 state = buf[r+1, r+1]
+#                 # Run the rule using the data containing this buffer
+#                 dst.parent[i+r, j+2r] = applyrule(rule, dataarray[i], state, (i, j))
+#             end
+#         end
+#     end
+# end
+
+# maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule, Tuple{AbstractNeighborhoodRule,Vararg}},
+#          args...) where T = begin
+#     # TODO handle multiple radii in different rules
+    
+#     # The rule provides the neighborhood buffer
+#     r = radius(rule)
+#     src, dst = source(data), dest(data)
+#     hsize = 2r + 1
+#     nrows, ncols = size(data)
+#     srcrows, srccols = size(src)
+#     initarray = init(data)
+
+#     buf = typeof(initarray)(zeros(hsize, hsize))
+#     data = setbuffer(data, buf)
+#     bufcols = getcols(src.parent, hsize)
+
+#     handleoverflow!(data, overflow(data), r)
+#     newcol = hsize
+
+#     # Run rule for a column
+#     @inbounds for j in 1:ncols
+#         if j != 1 
+#             newcol = rem(newcol-1, hsize) + 1
+#             # Get a column of data, bypassing offset arrays getindex
+#             for x in 1:srcrows
+#                 bufcols[newcol][x] = src.parent[x, j+2r]
+#             end
+#         end
+#         for i in 1:nrows
+#             if !ismasked(data, i, j)
+#                 # Copy columns to the neighborhood buffer
+#                 for y in 1:hsize
+#                     bufcol = bufcols[rem(y+newcol, hsize)]
+#                     for x in 1:hsize
+#                         buf[x, y] = bufcol[x+i-1]
+#                     end
+#                 end
+#                 state = buf[r+1, r+1]
+#                 # Run the rule using the data containing this buffer
+#                 dst.parent[i+r, j+2r] = applyrule(rule, data, state, (i, j))
+#             end
+#         end
+#     end
+# end
 # TODO 3d neighborhood
 
+@inline getcols(src, hsize) = begin
+    hsize == 0 && return ()
+    (getcols(src, hsize-1)..., src[:, hsize])
+end
+
+@inline ismasked(data::AbstractSimData, i, j) = ismasked(mask(data), i, j)
+@inline ismasked(mask::Nothing, i, j) = false
+@inline ismasked(mask::AbstractArray, i, j) = @inbounds return !mask[i, j]
 
 """
 Wrap overflow where required. This optimisation allows us to ignore
 bounds checks on neighborhoods and still use a wraparound grid.
 """
-handleoverflow!(data::AbstractSimData{T,1}, overflow::WrapOverflow, r) where T = begin
+handleoverflow!(data::AbstractSimData, r::Integer) = handleoverflow!(data, overflow(data), r)
+handleoverflow!(data::AbstractSimData{T,1}, overflow::WrapOverflow, r::Integer) where T = begin
     # Copy two sides
     @inbounds copyto!(source, 1-r:0, source, nrows+1-r:nrows)
     @inbounds copyto!(source, nrows+1:nrows+r, source, 1:r)
 end
-handleoverflow!(data::AbstractSimData{T,2}, overflow::WrapOverflow, r) where T = begin
-    nrows, ncols = size(data)
+handleoverflow!(data::AbstractSimData{T,2}, overflow::WrapOverflow, r::Integer) where T = begin
+    # TODO optimise this. Its mostly a placeholder so wrapping still works in GOL tests.
     src = source(data)
+    nrows, ncols = framesize(data)
     # Left
     @inbounds copyto!(src, CartesianIndices((1:nrows, 1-r:0)),
                       src, CartesianIndices((1:nrows, ncols+1-r:ncols)))
@@ -331,6 +459,10 @@ This can have much beter performance as no writes occur between rules, and they 
 essentially compiled together into compound rules. This gives correct results only for
 AbstractCellRule, or for a single AbstractNeighborhoodRule followed by AbstractCellRule.
 """
+@inline applyrule(rules::Tuple, data, state, index, buf) = begin
+    state = applyrule(rules[1], data, state, index, buf)
+    applyrule(tail(rules), data, state, index)
+end
 @inline applyrule(rules::Tuple, data, state, index) = begin
     state = applyrule(rules[1], data, state, index)
     applyrule(tail(rules), data, state, index)

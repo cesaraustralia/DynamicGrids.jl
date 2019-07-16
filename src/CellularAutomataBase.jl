@@ -59,15 +59,16 @@ using Colors,
 using Base: tail
 using Lazy: @forward
 
-import Base: show, getindex, setindex!, lastindex, size, length, push!, append!, broadcast, broadcast!, similar, eltype
+import Base: show, getindex, setindex!, lastindex, size, length, push!, append!, 
+              broadcast, broadcast!, similar, eltype, iterate
 
-import FieldMetadata: @description, description, @limits, limits, @flattenable, flattenable, default
-
+import FieldMetadata: @description, description, @limits, limits, 
+                      @flattenable, flattenable, default
 
 
 export sim!, resume!, replay
 
-export savegif, show_frame
+export savegif, show_frame, ruletypes
 
 export distances, broadcastable_indices, sizefromradius 
 
@@ -84,7 +85,7 @@ export AbstractNeighborhood, RadialNeighborhood, AbstractCustomNeighborhood,
 
 export AbstractOverflow, RemoveOverflow, WrapOverflow
 
-export AbstractOutput, AbstractArrayOutput, ArrayOutput, REPLOutput
+export AbstractOutput, AbstractGraphicOutput, AbstractArrayOutput, ArrayOutput, REPLOutput
 
 export AbstractFrameProcessor, GreyscaleProcessor, GrayscaleProcessor, 
        GreyscaleZerosProcessor, GrayscaleZerosProcessor, 
@@ -105,8 +106,9 @@ const FIELDDOCTABLE = FieldDocTable((:Description, :Default, :Limits),
     """
 
 include("types.jl")
-include("outputs/common.jl")
+include("rulesets.jl")
 include("simulationdata.jl")
+include("outputs/common.jl")
 include("interface.jl")
 include("framework.jl")
 include("neighborhoods.jl")

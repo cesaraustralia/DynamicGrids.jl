@@ -51,3 +51,10 @@ Get the size of a neighborhood dimension from its radius,
 which is always 2r + 1.
 """
 hoodsize(radius::Integer) = 2radius + 1
+
+"""
+Return a tuple of the base types of the rules in the ruleset
+"""
+ruletypes(ruleset::Ruleset) = ruletypes(typeof(Ruleset.rules))
+ruletypes(t::Type) = t.name.wrapper
+ruletypes(ts::Type{<:Tuple}) = (ruletypes.(ts.parameters)...,)

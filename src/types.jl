@@ -30,7 +30,7 @@ Its return value is allways written to the central cell.
 
 Custom Neighborhood rules must return their radius with a `radius()` method.
 """
-abstract type AbstractNeighborhoodRule <: AbstractRule end
+abstract type AbstractNeighborhoodRule{R} <: AbstractRule end
 
 """
 A Rule that only writes to its neighborhood, defined by its radius distance from the current point.
@@ -38,7 +38,7 @@ TODO: should this exist?
 
 Custom PartialNeighborhood rules must return their radius with a `radius()` method.
 """
-abstract type AbstractPartialNeighborhoodRule <: AbstractPartialRule end
+abstract type AbstractPartialNeighborhoodRule{R} <: AbstractPartialRule end
 
 """
 A Rule that only writes and accesses a single cell: its return value is the new
@@ -62,26 +62,3 @@ struct WrapOverflow <: AbstractOverflow end
 
 "Remove coords that overflow boundaries"
 struct RemoveOverflow <: AbstractOverflow end
-
-
-abstract type AbstractRuleset end
-
-"""
-    Ruleset(rules...; init=nothing, overflow=RemoveOverflow(), cellsize=1, timestep=1)
-
-A container for holding a sequence of AbstractRule, an init
-array and other simulaiton details.
-"""
-mutable struct Ruleset{R,I,O<:AbstractOverflow,C<:Number,T<:Number,M} <: AbstractRuleset
-    rules::R
-    init::I
-    overflow::O
-    cellsize::C
-    timestep::T
-    min::M
-    max::M
-end
-Ruleset(args...; init=nothing, overflow=RemoveOverflow(), cellsize=1, timestep=1, 
-        min=nothing, max=nothing) = 
-    Ruleset{typeof.((args, init, overflow, cellsize, timestep, min))...
-           }(args, init, overflow, cellsize, timestep, min, max)

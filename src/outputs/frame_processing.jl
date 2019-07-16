@@ -85,5 +85,13 @@ end
 Write the output array to a gif.
 Saving very large gifs may trigger a bug in imagemagick.
 """
-savegif(filename::String, o::AbstractOutput; kwargs...) =
-    FileIO.save(filename, cat(frametoimage.(Ref(o), o, collect(1:lastindex(o)))..., dims=3); kwargs...)
+savegif(filename::String, o::AbstractOutput; kwargs...) = savegif(filename, o::AbstractOutput, 0, 1; kwargs...)
+savegif(filename::String, o::AbstractOutput, ruleset::AbstractRuleset; kwargs...) =
+    savegif(filename, o, minval(ruleset), maxval(ruleset); kwargs...)
+savegif(filename::String, o::AbstractOutput, minval, maxval; kwargs...) = begin
+    frames = normaliseframe.(o, minval, maxval)
+    images = frametoimage.(Ref(o), frames, collect(firstindex(o):lastindex(o)))
+    array = cat(images..., dims=3)
+    FileIO.save(filename, array; kwargs...)
+end
+

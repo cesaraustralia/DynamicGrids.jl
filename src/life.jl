@@ -2,11 +2,14 @@
 Rule for game-of-life style cellular automata. 
 $(FIELDDOCTABLE)
 """
-@description @limits @flattenable @default_kw struct Life{N,B,S} <: AbstractNeighborhoodRule
-    neighborhood::N | RadialNeighborhood(1) | false | nothing | "Any AbstractNeighborhood"
+@description @limits @flattenable @default_kw struct Life{R,N,B,S} <: AbstractNeighborhoodRule{R}
+    neighborhood::N | RadialNeighborhood{1}() | false | nothing | "Any AbstractNeighborhood"
     b::B | (3, 3) | true | (0, 8) | "Array, Tuple or Iterable of integers to match neighbors when cell is empty"
     s::S | (2, 3) | true | (0, 8) | "Array, Tuple or Iterable of integers to match neighbors cell is full"
 end
+
+Life(neighborhood::N, b::B, s::S) where {N,B,S} = 
+    Life{radius(neighborhood),N,B,S}(neighborhood, b, s) 
 
 """
     rule(model::AbstractLife, state)
@@ -46,9 +49,9 @@ sim!(output, Ruleset(Life(b=(1,3,5,7), s=(1,3,5,7))), init; time=1000)
 ```
 
 """
-applyrule(model::Life, data, state, index) = begin
+applyrule(model::Life, data, state, index, buf) = begin
     # Sum neighborhood
-    cc = neighbors(model.neighborhood, model, data, state, index)
+    cc = neighbors(model.neighborhood, model, buf, state)
     # Determine next state based on current state and neighborhood total
     counts = (model.b, model.s)[state+1]
     for i = 1:length(counts)

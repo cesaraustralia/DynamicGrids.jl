@@ -5,7 +5,7 @@ function __init__()
     terminal = REPL.Terminals.TTYTerminal(get(ENV, "TERM", Base.Sys.iswindows() ? "" : "dumb"), stdin, stdout, stderr)
 end
 
-@premix struct SubType{X} end
+@premix struct UnicodeType{X} end
 
 """
 An output that is displayed directly in the REPL. It can either store or discard
@@ -27,7 +27,7 @@ REPLOutput{:block}(init)
 ```
 The default option is `:block`.
 """
-@FPS @Output @SubType mutable struct REPLOutput{Co,Cu} <: AbstractOutput{T}
+@Graphic @Output @UnicodeType mutable struct REPLOutput{Co,Cu} <: AbstractGraphicOutput{T}
     displayoffset::Array{Int}
     color::Co
     cutoff::Cu
