@@ -9,7 +9,7 @@ end
 """
 Mixin for all outputs that display frames live.
 """
-@premix struct FPS{F,TS,TM}
+@premix struct Graphic{F,TS,TM}
     fps::F
     maxfps::F
     timestamp::TS
@@ -26,28 +26,7 @@ Mixin for outputs that output real images and can use an image processor.
 end
 
 
-# Traits
-
-struct HasFPS end
-struct NoFPS end
-
-hasfps(o::O) where O = :fps in fieldnames(O) ? HasFPS() : NoFPS()
-
-
-struct HasMinMax end
-struct NoMinMax end
-
-hasminmax(ruleset::T) where T = fieldtype(T, :min) <: Number ? HasMinMax() : NoMinMax()
-
-
 # Abstract output type and generic methods
-
-"""
-Output additions that summarise the current frame. 
-This could be a plot or graphic.
-"""
-abstract type AbstractSummary end
-
 """
 All outputs must inherit from AbstractOutput.
 
@@ -60,6 +39,9 @@ abstract type AbstractOutput{T} <: AbstractVector{T} end
 (::Type{F})(init::T, args...; kwargs...) where F <: AbstractOutput where T <: AbstractMatrix = 
     F(T[deepcopy(init)], args...; kwargs...)
 
+abstract type AbstractGraphicOutput{T} <: AbstractOutput{T} end
+
+
 
 " A generic Null output that does nothing "
 @Output struct NullOutput{} <: AbstractOutput{T} end
@@ -68,51 +50,52 @@ NullOutput(args...) = NullOutput{typeof([])}([])
 
 
 # Forward base methods to the frames array
-length(o::AbstractOutput) = length(o.frames)
-size(o::AbstractOutput) = size(o.frames)
-firstindex(o::AbstractOutput) = firstindex(o.frames)
-lastindex(o::AbstractOutput) = lastindex(o.frames)
-getindex(o::AbstractOutput, i) = getindex(o.frames, i)
-setindex!(o::AbstractOutput, x, i) = setindex!(o.frames, x, i)
-push!(o::AbstractOutput, x) = push!(o.frames, x)
-append!(o::AbstractOutput, x) = append!(o.frames, x)
+Base.length(o::AbstractOutput) = length(frames(o))
+Base.size(o::AbstractOutput) = size(frames(o))
+Base.firstindex(o::AbstractOutput) = firstindex(frames(o))
+Base.lastindex(o::AbstractOutput) = lastindex(frames(o))
+Base.getindex(o::AbstractOutput, i) = getindex(frames(o), i)
+Base.setindex!(o::AbstractOutput, x, i) = setindex!(frames(o), x, i)
+Base.push!(o::AbstractOutput, x) = push!(frames(o), x)
+Base.append!(o::AbstractOutput, x) = append!(frames(o), x)
 
+frames(o::AbstractOutput) = o.frames
+timestamp(o::AbstractGraphicOutput) = o.timestamp
+
+isasync(o::AbstractOutput) = false
 
 # Bool getters and setters
 isasync(o::AbstractOutput) = false
 
-isshowable(o::AbstractOutput, t) = isshowable(hasfps(o), o, t)
-isshowable(::HasFPS, o, t) = true # TODO working max fps. o.timestamp + (t - o.tref)/o.maxfps < time()
-isshowable(::NoFPS, o, t) = false 
+isstored(o::AbstractOutput) = true
+isstored(o::AbstractGraphicOutput) = o.store
+
+isshowable(o::AbstractOutput, t) = false 
+isshowable(o::AbstractGraphicOutput, t) = true # TODO working max fps. o.timestamp + (t - o.tref)/o.maxfps < time()
 
 isrunning(o::AbstractOutput) = o.running
 
 setrunning!(o::AbstractOutput, val) = o.running = val
 
 # Getters and setters
-gettlast(o::AbstractOutput) = gettlast(hasfps(o), o)
-gettlast(::HasFPS, o::AbstractOutput) = o.tlast
-gettlast(::NoFPS, o::AbstractOutput) = lastindex(o)
+gettlast(o::AbstractGraphicOutput) = o.tlast
+gettlast(o::AbstractOutput) = lastindex(o)
 
-getfps(o) = getfps(hasfps(o), o) 
-getfps(::HasFPS, o) = o.fps
-getfps(::NoFPS, o) = 0.0
+getfps(o::AbstractGraphicOutput) = o.fps
+getfps(o::AbstractOutput) = nothing
 
-setfps!(o, x) = setfps!(hasfps(o), o, x) 
-setfps!(::HasFPS, o, x) = o.fps = x
-setfps!(::NoFPS, o, x) = nothing
+setfps!(o::AbstractGraphicOutput, x) = o.fps = x
+setfps!(o::AbstractOutput, x) = nothing
 
-settimestamp!(o, t) = settimestamp!(hasfps(o), o, t)
-settimestamp!(::HasFPS, o, t) = begin
+settimestamp!(o::AbstractGraphicOutput, t) = begin
     o.timestamp = time()
     o.tref = t
 end
-settimestamp!(::NoFPS, o, t) = nothing
+settimestamp!(o::AbstractOutput, t) = nothing
 
 
 # Frame handling
-storeframe!(o::AbstractOutput, frame, t) = storeframe!(hasfps(o), o, frame, t)
-storeframe!(::HasFPS, o, frame, t) = begin
+storeframe!(o::AbstractGraphicOutput, frame, t) = begin
     if length(o) == 0
         push!(o, frame)
     elseif o.store
@@ -123,7 +106,7 @@ storeframe!(::HasFPS, o, frame, t) = begin
     end
     o.tlast = t
 end
-storeframe!(::NoFPS, o, frame, t) = updateframe!(o, frame, t)
+storeframe!(o::AbstractOutput, frame, t) = updateframe!(o, frame, t)
 
 updateframe!(o, frame::AbstractArray{T,1}, t) where T = begin
     sze = size(o[1])
@@ -146,13 +129,12 @@ end
 
 
 allocateframes!(o::AbstractOutput, init, tspan) = begin
-    append!(o.frames, [similar(init) for i in tspan])
+    append!(frames(o), [similar(init) for i in tspan])
     nothing
 end
 
-deleteframes!(o::AbstractOutput) = deleteframes!(hasfps(o), o::AbstractOutput)
-deleteframes!(::HasFPS, o::AbstractOutput) = deleteat!(o.frames, 1:length(o))
-deleteframes!(::NoFPS, o::AbstractOutput) = nothing
+deleteframes!(o::AbstractGraphicOutput) = deleteat!(frames(o), 1:length(o))
+deleteframes!(o::AbstractOutput) = nothing
 
 """
     showframe(output::AbstractOutput, [t])
@@ -165,29 +147,22 @@ showframe(o::AbstractOutput, frame::AbstractArray, t) = nothing
 showframe(o::AbstractOutput, ruleset::AbstractRuleset, t) = 
     showframe(o, ruleset, o[curframe(o, t)], t)
 showframe(o::AbstractOutput, ruleset::AbstractRuleset, frame::AbstractArray, t) = 
-    showframe(o::AbstractOutput, normalizeframe(ruleset, frame), t)
+    showframe(o::AbstractOutput, normaliseframe(ruleset, frame), t)
 
-curframe(o::AbstractOutput, t) = curframe(hasfps(o), o, t)
-curframe(::HasFPS, o, t) = o.store ? t : oneunit(t)
-curframe(::NoFPS, o, t) = t
+curframe(o::AbstractOutput, t) = isstored(o) ? t : oneunit(t)
 
-normalizeframe(ruleset, a::AbstractArray) =
-    normalizeframe(hasminmax(ruleset), ruleset, a)
-normalizeframe(::HasMinMax, ruleset, a::AbstractArray) =
-    normalizeframe(a, ruleset.min, ruleset.max)
-normalizeframe(a::AbstractArray, minval::Number, maxval::Number) =
+normaliseframe(ruleset, a::AbstractArray) = normaliseframe(hasminmax(ruleset), ruleset, a)
+normaliseframe(::HasMinMax, ruleset, a::AbstractArray) =
+    normaliseframe(a, minval(ruleset), maxval(ruleset))
+normaliseframe(a::AbstractArray, minval::Number, maxval::Number) =
     min.((a .- minval) ./ (maxval - minval), one(eltype(a)))
-normalizeframe(::NoMinMax, ruleset, a::AbstractArray) = a
+normaliseframe(::NoMinMax, ruleset, a::AbstractArray) = a
 
 
 # Setup and close output
-initialize!(o::AbstractOutput, args...) = initialize!(hasfps(o), o, args...)
-initialize!(::HasFPS, args...) = nothing
-initialize!(::NoFPS, args...) = nothing
-
+initialize!(o::AbstractOutput) = nothing
 finalize!(o::AbstractOutput, args...) = nothing
 
 # Delay output to maintain the frame rate
-delay(o, t) = delay(hasfps(o), o, t)
-delay(::HasFPS, o, t) = sleep(max(0.0, o.timestamp + (t - o.tref)/getfps(o) - time()))
-delay(::NoFPS, o, t) = nothing
+delay(o::AbstractGraphicOutput, t) = sleep(max(0.0, timestamp(o) + (t - o.tref)/getfps(o) - time()))
+delay(o::AbstractOutput, t) = nothing

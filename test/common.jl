@@ -1,12 +1,11 @@
 using CellularAutomataBase, Test
-using CellularAutomataBase: normalizeframe, isshowable, curframe, 
-                            allocateframes!, storeframe!, @Output
+using CellularAutomataBase: normaliseframe, isshowable, curframe, allocateframes!, storeframe!
 
 init = [10.0 11.0;
         0.0   5.0]
 
 output = ArrayOutput(init, false)
-ruleset = Ruleset(; min=0.0, max=10.0)
+ruleset = Ruleset(; minval=0.0, maxval=10.0)
 
 @test curframe(output, 5) == 5 
 @test isshowable(output, 5) == false
@@ -34,6 +33,6 @@ output2 = ArrayOutput(output, false)
 @test length(output2) == 5
 @test output2[3] == update
 
-normed = normalizeframe(ruleset, output[1])
+normed = normaliseframe(ruleset, output[1])
 @test normed == [1.0 1.0
                  0.0 0.5]

@@ -2,7 +2,6 @@ using CellularAutomataBase, Test
 
 # life glider sims
 
-
 init =  [0 0 0 0 0 0;
          0 0 0 0 0 0;
          0 0 0 0 0 0;
@@ -25,8 +24,13 @@ test2 = [0 0 0 0 0 0;
          0 0 0 0 0 0]
 
 ruleset = Ruleset(Life(); init=init, overflow=WrapOverflow())
-output = ArrayOutput(init, 1000)
+output = ArrayOutput(init, 5)
 sim!(output, ruleset; tstop=5)
+output[1]
+output[2]
+output[3]
+output[4]
+output[5]
 
 @testset "stored results match glider behaviour" begin
     @test output[3] == test
