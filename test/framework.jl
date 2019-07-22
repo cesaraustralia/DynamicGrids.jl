@@ -1,5 +1,5 @@
 using CellularAutomataBase, Test
-import CellularAutomataBase: applyrule, applyrule!
+import CellularAutomataBase: applyrule, applyrule!, maprule!, simdata, source, dest
 
 init  = [0 1 1 0;
          0 1 1 0;
@@ -18,9 +18,9 @@ applyrule(::TestRule, data, state, index) = 0
              0 0 0 0]
 
     ruleset = Ruleset(TestRule(); init=init)
-    output = ArrayOutput(init, 10)
-    sim!(output, ruleset; tstop=10)
-    @test output[10] == final
+    data = simdata(ruleset, init)
+    maprule!(data, ruleset.rules[1])
+    @test dest(data) == final
 end
 
 struct TestPartial <: AbstractPartialRule end
@@ -28,10 +28,9 @@ applyrule!(::TestPartial, data, state, index) = 0
 
 @testset "a partial rule that returns zero does nothing" begin
     ruleset = Ruleset(TestPartial(); init=init)
-    output = ArrayOutput(init, 10)
-    sim!(output, ruleset; tstop=10)
-    @test output[1] == init
-    @test output[10] == init
+    data = simdata(ruleset, init)
+    maprule!(data, ruleset.rules[1])
+    @test dest(data) == init
 end
 
 struct TestPartialWrite <: AbstractPartialRule end
@@ -45,11 +44,8 @@ applyrule!(::TestPartialWrite, data, state, index) = data[index[1], 2] = 0
              0 0 1 0]
 
     ruleset = Ruleset(TestPartialWrite(); init=init)
-    output = ArrayOutput(init, 10)
-    sim!(output, ruleset; tstop=10)
-    @test output[1] == init
-    @test output[2] == final
-    @test output[10] == final
-
+    data = simdata(ruleset, init)
+    maprule!(data, ruleset.rules[1])
+    @test dest(data) == final
 end
 

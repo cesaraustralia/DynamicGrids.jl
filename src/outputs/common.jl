@@ -36,7 +36,7 @@ many cases can be used interchangeably.
 abstract type AbstractOutput{T} <: AbstractVector{T} end
 
 "Generic ouput constructor. Converts init array to vector of frames."
-(::Type{F})(init::T, args...; kwargs...) where F <: AbstractOutput where T <: AbstractMatrix = 
+(::Type{F})(init::T, args...; kwargs...) where F <: AbstractOutput where T <: AbstractMatrix =
     F(T[deepcopy(init)], args...; kwargs...)
 
 abstract type AbstractGraphicOutput{T} <: AbstractOutput{T} end
@@ -70,7 +70,7 @@ isasync(o::AbstractOutput) = false
 isstored(o::AbstractOutput) = true
 isstored(o::AbstractGraphicOutput) = o.store
 
-isshowable(o::AbstractOutput, t) = false 
+isshowable(o::AbstractOutput, t) = false
 isshowable(o::AbstractGraphicOutput, t) = true # TODO working max fps. o.timestamp + (t - o.tref)/o.maxfps < time()
 
 isrunning(o::AbstractOutput) = o.running
@@ -96,9 +96,7 @@ settimestamp!(o::AbstractOutput, t) = nothing
 
 # Frame handling
 storeframe!(o::AbstractGraphicOutput, frame, t) = begin
-    if length(o) == 0
-        push!(o, frame)
-    elseif o.store
+    if o.store
         push!(o, similar(o[1]))
         updateframe!(o, frame, t)
     else
@@ -108,24 +106,10 @@ storeframe!(o::AbstractGraphicOutput, frame, t) = begin
 end
 storeframe!(o::AbstractOutput, frame, t) = updateframe!(o, frame, t)
 
-updateframe!(o, frame::AbstractArray{T,1}, t) where T = begin
-    sze = size(o[1])
-    for i in 1:sze[1]
-        @inbounds o[t][i] = frame[i]
-    end
-end
-updateframe!(o, frame::AbstractArray{T,2}, t) where T = begin
-    sze = size(o[1])
-    for j in 1:sze[2], i in 1:sze[1]
+updateframe!(o, frame::AbstractArray{T,2}, t) where T =
+    for j in 1:size(o[1], 2), i in 1:size(o[1], 1)
         @inbounds o[t][i, j] = frame[i, j]
     end
-end
-updateframe!(o, frame::AbstractArray{T,3}, t) where T = begin
-    sze = size(o[1])
-    for i in 1:sze[1], j in 1:sze[2], k in 1:sze[3]
-        @inbounds o[t][i, j, k] = frame[i, j, k]
-    end
-end
 
 
 allocateframes!(o::AbstractOutput, init, tspan) = begin
@@ -133,8 +117,11 @@ allocateframes!(o::AbstractOutput, init, tspan) = begin
     nothing
 end
 
-deleteframes!(o::AbstractGraphicOutput) = deleteat!(frames(o), 1:length(o))
-deleteframes!(o::AbstractOutput) = nothing
+initframes!(o::AbstractGraphicOutput, init) = begin
+    deleteat!(frames(o), 1:length(o))
+    push!(frames(o), init)
+end
+initframes!(o::AbstractOutput, init) = o[1] .= init
 
 """
     showframe(output::AbstractOutput, [t])
@@ -144,9 +131,9 @@ showframe(o::AbstractOutput) = showframe(o, lastindex(o))
 showframe(o::AbstractOutput, t) = showframe(o, o[curframe(o, t)], t)
 showframe(o::AbstractOutput, frame::AbstractArray) = showframe(o, frame, 0)
 showframe(o::AbstractOutput, frame::AbstractArray, t) = nothing
-showframe(o::AbstractOutput, ruleset::AbstractRuleset, t) = 
+showframe(o::AbstractOutput, ruleset::AbstractRuleset, t) =
     showframe(o, ruleset, o[curframe(o, t)], t)
-showframe(o::AbstractOutput, ruleset::AbstractRuleset, frame::AbstractArray, t) = 
+showframe(o::AbstractOutput, ruleset::AbstractRuleset, frame::AbstractArray, t) =
     showframe(o::AbstractOutput, normaliseframe(ruleset, frame), t)
 
 curframe(o::AbstractOutput, t) = isstored(o) ? t : oneunit(t)

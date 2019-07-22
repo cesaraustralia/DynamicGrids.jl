@@ -83,13 +83,15 @@ export AbstractLife, Life
 export AbstractNeighborhood, RadialNeighborhood, AbstractCustomNeighborhood, 
        CustomNeighborhood, LayeredCustomNeighborhood, VonNeumannNeighborhood
 
-export AbstractOverflow, RemoveOverflow, WrapOverflow
+export RemoveOverflow, WrapOverflow
 
 export AbstractOutput, AbstractGraphicOutput, AbstractArrayOutput, ArrayOutput, REPLOutput
 
 export AbstractFrameProcessor, GreyscaleProcessor, GrayscaleProcessor, 
        GreyscaleZerosProcessor, GrayscaleZerosProcessor, 
        ColorSchemeProcessor, ColorSchemeZerosProcessor 
+
+export AbstractCharStyle, Block, Braile
 
 export AbstractSummary
 
@@ -111,6 +113,7 @@ include("simulationdata.jl")
 include("outputs/common.jl")
 include("interface.jl")
 include("framework.jl")
+include("maprules.jl")
 include("neighborhoods.jl")
 include("utils.jl")
 include("life.jl")

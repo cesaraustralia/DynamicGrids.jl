@@ -5,7 +5,9 @@ function __init__()
     terminal = REPL.Terminals.TTYTerminal(get(ENV, "TERM", Base.Sys.iswindows() ? "" : "dumb"), stdin, stdout, stderr)
 end
 
-@premix struct UnicodeType{X} end
+abstract type AbstractCharStyle end
+struct Block <: AbstractCharStyle end
+struct Braile <: AbstractCharStyle end
 
 """
 An output that is displayed directly in the REPL. It can either store or discard
@@ -27,18 +29,21 @@ REPLOutput{:block}(init)
 ```
 The default option is `:block`.
 """
-@Graphic @Output @UnicodeType mutable struct REPLOutput{Co,Cu} <: AbstractGraphicOutput{T}
+@Graphic @Output mutable struct REPLOutput{Co,Cu,CS} <: AbstractGraphicOutput{T}
     displayoffset::Array{Int}
     color::Co
     cutoff::Cu
+    style::CS
 end
 
-REPLOutput(frames::AbstractVector; kwargs...) = REPLOutput{:block}(frames; kwargs...)
-REPLOutput{X}(frames::AbstractVector; fps=25, showfps=fps, store=false, 
-              color=:white, cutoff=0.5) where X = begin
-    timestamp = 0.0; tref = 0; tlast = 1; running = false; displayoffset = [1, 1];
-    REPLOutput{X,typeof.((frames, fps, timestamp, tref, color, cutoff))...}(
-               frames, running, fps, showfps, timestamp, tref, tlast, store, displayoffset, color, cutoff)
+REPLOutput(frames::AbstractVector; fps=25, showfps=fps, store=false, 
+           color=:white, cutoff=0.5, style=:block) where X = begin
+    timestamp = 0.0 
+    tref = 0 
+    tlast = 1 
+    running = false
+    displayoffset = [1, 1]
+    REPLOutput(frames, running, fps, showfps, timestamp, tref, tlast, store, displayoffset, color, cutoff, style)
 end
 
 
@@ -61,13 +66,17 @@ end
 savepos(buf::IO=terminal.out_stream) = print(buf, "\x1b[s")
 restorepos(buf::IO=terminal.out_stream) = print(buf, "\x1b[u")
 movepos(buf::IO, c=(0,0)) = print(buf, "\x1b[$(c[2]);$(c[1])H")
+cursor_hide(buf::IO=terminal.out_stream) = print(buf, "\x1b[?25l")
+cursor_show(buf::IO=terminal.out_stream) = print(buf, "\x1b[?25h")
 
 function put(pos, color::Crayon, str::String)
     buf = terminal.out_stream
     savepos(buf)
+    cursor_hide(buf)
     movepos(buf, pos)
     print(buf, color)
     print(buf, str)
+    cursor_show(buf)
     restorepos(buf)
 end
 put(pos, c::Symbol, s::String) = put(pos, Crayon(foreground=c), s)
@@ -78,9 +87,13 @@ const XBRAILE = 2
 const YBLOCK = 2
 const XBLOCK = 1
 
-replframe(o::REPLOutput{:braile}, frame) = replframe(o, frame, YBRAILE, XBRAILE, brailize)
-replframe(o::REPLOutput{:block}, frame) = replframe(o, frame, YBLOCK, XBLOCK, blockize)
-replframe(o, frame, ystep, xstep, f) = begin
+chartype(o::REPLOutput) = chartype(o.style)
+chartype(s::Braile) = YBRAILE, XBRAILE, brailize
+chartype(s::Block) = YBLOCK, XBLOCK, blockize
+
+replframe(o, frame) = begin
+    ystep, xstep, f = chartype(o)
+    
     # Limit output area to available terminal size.
     dispy, dispx = displaysize(stdout)
     youtput, xoutput = outputsize = size(frame)
