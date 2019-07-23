@@ -102,6 +102,8 @@ maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule, Tuple
 
         b11, b12 = srcstatus[bi,     1], srcstatus[bi,     2]
         b21, b22 = srcstatus[bi + 1, 1], srcstatus[bi + 1, 2]
+        sumstatus[1, 2] = false
+        sumstatus[2, 2] = false
         for bj = 1:size(srcstatus, 2) - 1
             sumstatus[1, 1] = sumstatus[1, 2]
             sumstatus[2, 1] = sumstatus[2, 2]
@@ -185,8 +187,10 @@ maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule, Tuple
                     #                 blocktoind(bj+centerbj-1, blocksize):blocktoind(bj+centerbj-1, blocksize) + blocksize-1])
                     #     error("$ii, $j with state $state has non zero but status but is false time $(currenttime(data))")
                     # end
+                    #
                 end
                 # Combine blocks with the previous rows / cols
+                # TODO only write the first column
                 dststatus[bi, bj] |= sumstatus[1, 1]
                 dststatus[bi, bj+1] |= sumstatus[1, 2]
                 dststatus[bi+1, bj] |= sumstatus[2, 1]
@@ -237,10 +241,14 @@ handleoverflow!(data::AbstractSimData{T,2}, overflow::WrapOverflow, r::Integer) 
 
     # Wrap status
     status = sourcestatus(data)
-    status[:, 1] .|= status[:, end-1]
-    status[:, end] .|= status[:, 2]
-    status[1, :] .|= status[end-1, :]
-    status[end, :] .|= status[2, :]
+    # status[:, 1] .|= status[:, end-1] .| status[:, end-2]
+    # status[1, :] .|= status[end-1, :] .| status[end-2, :]
+    # status[end-1, :] .|= status[1, :]
+    # status[:, end-1] .|= status[:, 1]
+    # status[end-2, :] .|= status[1, :]
+    # status[:, end-2] .|= status[:, 1]
+    # FIXME: Buggy currently, just running all in Wrap mode
+    status .= true
 end
 handleoverflow!(data, overflow::RemoveOverflow, r) = nothing
 
