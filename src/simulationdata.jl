@@ -11,7 +11,7 @@ abstract type AbstractSimData{T,N} <: AbstractArray{T,N} end
     t::Ti
 end
 
-(::Type{T})(data::AbstractSimData) where T <: AbstractSimData = 
+(::Type{T})(data::AbstractSimData) where T <: AbstractSimData =
     T(data.init, data.source, data.dest, data.sourcestatus, data.deststatus, data.radius, data.ruleset, data.t)
 
 # Array interface
@@ -48,15 +48,15 @@ cellsize(d::AbstractSimData) = cellsize(ruleset(d))
 Swap source and dest arrays. Allways returns regular SimData.
 """
 swapsource(data) = begin
-    SimData(init(data), dest(data), source(data), sourcestatus(data), 
+    SimData(init(data), dest(data), source(data), sourcestatus(data),
             deststatus(data), radius(data), ruleset(data), currenttime(data))
 end
 
 """
 Uptate timestamp
 """
-updatetime(data::SimData, t) = 
-    SimData(init(data), source(data), dest(data), sourcestatus(data), 
+updatetime(data::SimData, t) =
+    SimData(init(data), source(data), dest(data), sourcestatus(data),
             deststatus(data), radius(data), ruleset(data), t)
 
 """
@@ -66,10 +66,10 @@ simdata(ruleset::AbstractRuleset, init::AbstractArray) = begin
     r = maxradius(ruleset)
     if r > 0
         source = addpadding(init, r)
-        sourcestatus = initstatus(parent(source), r) 
+        sourcestatus = initstatus(parent(source), r)
     else
         source = deepcopy(init)
-        sourcestatus = true 
+        sourcestatus = true
     end
     dest = deepcopy(source)
     deststatus = deepcopy(sourcestatus)
@@ -100,7 +100,7 @@ This tracks whether anything has to be done in an area of the main array.
 """
 initstatus(source, r) = begin
     blocksize = 2r
-    # We add one extra row/column so we dont have to worry about 
+    # We add one extra row/column so we dont have to worry about
     # special casing the last block
     nblocs = indtoblock.(size(source), blocksize) .+ 1
     blockstatus = BitArray(zeros(Bool, nblocs))
@@ -117,7 +117,7 @@ end
 indtoblock(x, blocksize) = (x - 1) ÷ blocksize + 1
 blocktoind(x, blocksize) = (x - 1) * blocksize + 1
 
-Base.getindex(d::SimData, i...) = getindex(source(d), i...)
+Base.@propagate_inbounds Base.getindex(d::SimData, i...) = getindex(source(d), i...)
 
 " Simulation data and storage is passed to rules for each timestep "
 @SimDataMixin struct WritableSimData{} <: AbstractSimData{T,N} end
@@ -130,4 +130,4 @@ Base.@propagate_inbounds Base.setindex!(d::WritableSimData, x, i...) = begin
     end
     dest(d)[i...] = x
 end
-Base.getindex(d::WritableSimData, i...) = getindex(dest(d), i...)
+Base.@propagate_inbounds Base.getindex(d::WritableSimData, i...) = getindex(dest(d), i...)

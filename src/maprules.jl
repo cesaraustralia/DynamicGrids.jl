@@ -18,20 +18,20 @@ maprule!(data::AbstractSimData, rule::AbstractPartialRule) = begin
         blocksize = 2radius(data)
         status = sourcestatus(data)
 
-        for bj in 1:size(status, 2) - 1, bi in 1:size(status, 1) - 1
+        @inbounds for bj in 1:size(status, 2) - 1, bi in 1:size(status, 1) - 1
             # TODO single block resulution?
             b11, b12 = status[bi,     bj], status[bi,     bj + 1]
             b21, b22 = status[bi + 1, bj], status[bi + 1, bj + 1]
             (b11 | b12 | b21 | b22) || continue
 
+            istart = (bi - 1) * blocksize + 1
+            istop = min(istart + blocksize - 1, nrows)
             jstart = (bj - 1) * blocksize + 1
             jstop = min(jstart + blocksize - 1, ncols)
-            istart = (bi - 1) * blocksize + 1
-            istop = min(istart + blocksize - 1, ncols)
 
             for j in jstart:jstop, i in istart:istop
                 ismasked(data, i, j) && continue
-                @inbounds applyrule!(rule, data, source(data)[i, j], (i, j))
+                applyrule!(rule, data, source(data)[i, j], (i, j))
             end
         end
     else
@@ -100,13 +100,16 @@ maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule, Tuple
         skippedlastblock = true
         freshbuffer = true
 
+        b11, b12 = srcstatus[bi,     1], srcstatus[bi,     2]
+        b21, b22 = srcstatus[bi + 1, 1], srcstatus[bi + 1, 2]
         for bj = 1:size(srcstatus, 2) - 1
             sumstatus[1, 1] = sumstatus[1, 2]
             sumstatus[2, 1] = sumstatus[2, 2]
             sumstatus[1, 2] = false
             sumstatus[2, 2] = false
-            b11, b12 = srcstatus[bi,     bj], srcstatus[bi,     bj + 1]
-            b21, b22 = srcstatus[bi + 1, bj], srcstatus[bi + 1, bj + 1]
+
+            b11, b21 = b12, b22
+            b12, b22 = srcstatus[bi, bj + 1], srcstatus[bi + 1, bj + 1]
 
             jstart = blocktoind(bj, blocksize)
             jstop = min(jstart + blocksize - 1, ncols)
@@ -136,12 +139,15 @@ maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule, Tuple
                 if freshbuffer
                     freshbuffer = false
                 else
-                    # Move the neighborhood buffer accross one column
+                    # Move the neighborhood buffers accross one column
                     for b in 1:rowsinblock
                         buf = buffers[b]
                         # copyto! uses linear indexing, so 2d dims are transformed manually
                         copyto!(buf, 1, buf, hoodsize + 1, (hoodsize - 1) * hoodsize)
-                        # Copy a new column to the neighborhood buffer
+                    end
+                    # Copy a new column to each neighborhood buffer
+                    for b in 1:rowsinblock
+                        buf = buffers[b]
                         for x in 1:hoodsize
                             buf[x, hoodsize] = src[i + b + x - 2, j + 2r]
                         end
