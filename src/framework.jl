@@ -76,13 +76,13 @@ If you ran a simulation with `store=false` there won't be much to replay.
 replay(REPLOutput(output))
 ```
 """
-replay(output::AbstractOutput) = begin
+replay(output::AbstractOutput, ruleset) = begin
     isrunning(output) && return
     setrunning!(output, true)
     initialize!(output)
     for (t, frame) in enumerate(output)
         delay(output, t)
-        showframe(output, t)
+        showframe(output, ruleset, t)
         isrunning(output) || break
     end
     setrunning!(output, false)

@@ -45,9 +45,9 @@ Outputs that display the simulation frames live.
 abstract type AbstractGraphicOutput{T} <: AbstractOutput{T} end
 
 """
-Outputs that display RGB24 images.
+Graphic outputs that display RGB24 images.
 """
-abstract type AbstractImageOutput{T} <: AbstractOutput{T} end
+abstract type AbstractImageOutput{T} <: AbstractGraphicOutput{T} end
 
 
 
@@ -109,20 +109,17 @@ storeframe!(o::AbstractGraphicOutput, data::SimData, t) = begin
         o[end] .= zero(eltype(o[1]))
         updateframe!(o, data, t)
     else
-        o[end] .= zero(eltype(o[1]))
+        o[1] .= zero(eltype(o[1]))
         updateframe!(o, data, 1)
     end
     o.tlast = t
 end
-storeframe!(o::AbstractOutput, data::SimData, t) = begin
-    updateframe!(o, data, t)
-end
+storeframe!(o::AbstractOutput, data::SimData, t) = updateframe!(o, data, t)
 
-updateframe!(output, data::AbstractArray{T,2}, t) where T =
-    blockrun!(data, output, t)
+updateframe!(output, data::AbstractArray, t) = blockrun!(data, output, t)
 
 @inline blockdo!(data, output::AbstractOutput, i, j, t) =
-    @inbounds return output[t][i, j] = data[i, j]
+    return output[t][i, j] = data[i, j]
 
 allocateframes!(o::AbstractOutput, init, tspan) = begin
     append!(frames(o), [similar(init) for i in tspan])
@@ -135,7 +132,7 @@ as performance is often display limited, and this allows runs of any length.
 """
 initframes!(o::AbstractGraphicOutput, init) = begin
     deleteat!(frames(o), 1:length(o))
-    push!(frames(o), init)
+    push!(frames(o), deepcopy(init))
 end
 """
 Frames are preallocated and reused.
@@ -151,16 +148,13 @@ end
     showframe(output::AbstractOutput, [t])
 Show the last frame of the output, or the frame at time t.
 """
-showframe(o::AbstractGraphicOutput) = showframe(o, lastindex(o))
-showframe(o::AbstractGraphicOutput, t) = showframe(o, o[curframe(o, t)], t)
-showframe(o::AbstractGraphicOutput, data::AbstractSimData, t) = showframe(o[curframe(o, t)], o, data, t)
-showframe(frame::AbstractArray, o::AbstractGraphicOutput) = showframe(frame, o, 0)
-showframe(frame::AbstractArray, o::AbstractGraphicOutput, data::AbstractSimData, t) = showframe(frame, o::AbstractOutput, t)
-
-showframe(frame::AbstractArray, o::AbstractImageOutput, data::AbstractSimData, t) =
-    showframe(frametoimage(o, normaliseframe(ruleset(data), t), frame), o::AbstractOutput, t)
-
 showframe(o::AbstractOutput, args...) = nothing
+showframe(o::AbstractGraphicOutput, data::AbstractSimData) = showframe(o, data, lastindex(o))
+showframe(o::AbstractGraphicOutput, data::AbstractSimData, t) = showframe(o[curframe(o, t)], o, data, t)
+showframe(frame::AbstractArray, o::AbstractGraphicOutput, data::AbstractSimData, t) = showframe(frame, o, t)
+showframe(frame::AbstractArray, o::AbstractImageOutput, data::AbstractSimData, t) =
+    showframe(frametoimage(o, normaliseframe(ruleset(data), frame), t), o::AbstractOutput, t)
+
 
 curframe(o::AbstractOutput, t) = isstored(o) ? t : oneunit(t)
 
