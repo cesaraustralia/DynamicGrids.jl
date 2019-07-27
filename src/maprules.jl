@@ -1,47 +1,60 @@
+blockrun!(data, context, args...) = begin
+    nrows, ncols = framesize(data)
+    r = radius(data)
+    if r > 0
+        blocksize = 2r
+        status = sourcestatus(data)
+
+        @inbounds for bj in 1:size(status, 2) - 1, bi in 1:size(status, 1) - 1
+            status[bi, bj] || continue
+            # Convert from padded block to init dimensions
+            istart = blocktoind(bi, blocksize) - r
+            jstart = blocktoind(bj, blocksize) - r
+            # Stop at the init row/column size, not the padding or block multiple
+            istop = min(istart + blocksize - 1, nrows)
+            jstop = min(jstart + blocksize - 1, ncols)
+            # Skip the padding
+            istart = max(istart, 1)
+            jstart = max(jstart, 1)
+
+            for j in jstart:jstop, i in istart:istop
+                ismasked(data, i, j) && continue
+                blockdo!(data, context, i, j, args...)
+            end
+        end
+    else
+        for j in 1:ncols, i in 1:nrows
+            ismasked(data, i, j) && continue
+            blockdo!(data, context, i, j, args...)
+        end
+    end
+end
+
 """
 Apply the rule for each cell in the grid, using optimisations
 allowed for the supertype of the rule.
 """
-maprule!(data::AbstractSimData, rule) = begin
-    for i in CartesianIndices(init(data))
-        ismasked(data, i) && continue
-        @inbounds dest(data)[i] = applyrule(rule, data, source(data)[i], Tuple(i))
-    end
-end
+maprule!(data::AbstractSimData, rule::AbstractRule) = blockrun!(data, rule)
+
+@inline blockdo!(data, rule::AbstractRule, i, j) =
+    @inbounds return dest(data)[i, j] = applyrule(rule, data, source(data)[i, j], (i, j))
+
+struct UpdateDest end
 
 maprule!(data::AbstractSimData, rule::AbstractPartialRule) = begin
-    # Initialise the dest array
-    nrows, ncols = framesize(data)
     data = WritableSimData(data)
+    # Update active blocks in the dest array
     @inbounds parent(dest(data)) .= parent(source(data))
-    if radius(data) > 0
-        blocksize = 2radius(data)
-        status = sourcestatus(data)
-
-        @inbounds for bj in 1:size(status, 2) - 1, bi in 1:size(status, 1) - 1
-            # TODO single block resulution?
-            b11, b12 = status[bi,     bj], status[bi,     bj + 1]
-            b21, b22 = status[bi + 1, bj], status[bi + 1, bj + 1]
-            (b11 | b12 | b21 | b22) || continue
-
-            istart = (bi - 1) * blocksize + 1
-            istop = min(istart + blocksize - 1, nrows)
-            jstart = (bj - 1) * blocksize + 1
-            jstop = min(jstart + blocksize - 1, ncols)
-
-            for j in jstart:jstop, i in istart:istop
-                ismasked(data, i, j) && continue
-                applyrule!(rule, data, source(data)[i, j], (i, j))
-            end
-        end
-    else
-        for i in CartesianIndices(init(data))
-            ismasked(data, i, j) && continue
-            @inbounds applyrule!(rule, data, source(data)[i], Tuple(i))
-        end
-    end
+    # Run the rule for active blocks
+    blockrun!(data, rule)
     updatestatus!(sourcestatus(data), deststatus(data))
 end
+
+@inline blockdo!(data::WritableSimData, ::UpdateDest, i, j) =
+    dest(data)[i, j] = source(data)[i, j]
+
+@inline blockdo!(data::WritableSimData, rule::AbstractPartialRule, i, j) =
+    applyrule!(rule, data, source(data)[i, j], (i, j))
 
 """
 Run the rule for all cells, writing the result to the dest array
@@ -79,12 +92,12 @@ maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule, Tuple
     hoodsize = 2r + 1
     src, dst = parent(source(data)), parent(dest(data))
     srcstatus, dststatus = sourcestatus(data), deststatus(data)
+    sumstatus = localstatus(data)
+    bufs = buffers(data)
     nrows, ncols = framesize(data)
-    buffers = typeof(init(data))[zeros(eltype(init(data)), hoodsize, hoodsize) for i in 1:blocksize]
 
     handleoverflow!(data, r)
     # Use the simplest number type at or above eltype(src) that can be added
-    sumstatus = zeros(Bool, 2, 2)
     center = r + 1
     deststatus(data) .= false
 
@@ -128,7 +141,7 @@ maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule, Tuple
                     for b in 1:rowsinblock
                         for x = 1:hoodsize
                             val = src[i + b + x - 2, jstart + y - 1]
-                            buffers[b][x, y] = val
+                            bufs[b][x, y] = val
                         end
                     end
                 end
@@ -143,13 +156,13 @@ maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule, Tuple
                 else
                     # Move the neighborhood buffers accross one column
                     for b in 1:rowsinblock
-                        buf = buffers[b]
+                        buf = bufs[b]
                         # copyto! uses linear indexing, so 2d dims are transformed manually
                         copyto!(buf, 1, buf, hoodsize + 1, (hoodsize - 1) * hoodsize)
                     end
                     # Copy a new column to each neighborhood buffer
                     for b in 1:rowsinblock
-                        buf = buffers[b]
+                        buf = bufs[b]
                         for x in 1:hoodsize
                             buf[x, hoodsize] = src[i + b + x - 2, j + 2r]
                         end
@@ -162,7 +175,7 @@ maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule, Tuple
                     centerbi = b <= r ? 1 : 2
                     # Run the rule using buffer b
 
-                    buf = buffers[b]
+                    buf = bufs[b]
                     state = buf[center, center]
                     # @assert state == src[ii + r, j + r]
 

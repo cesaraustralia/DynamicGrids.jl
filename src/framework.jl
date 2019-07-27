@@ -14,20 +14,21 @@ the passed in output for each time-step.
 ### Keyword Arguments
 - `tstop`: Any Number. Default: 100
 """
-sim!(output, ruleset; init=nothing, tstop=length(output), fps=getfps(output)) = begin
+sim!(output, ruleset; init=nothing, tstop=length(output), fps=getfps(output), data=nothing) = begin
     isrunning(output) && return
     setrunning!(output, true)
 
     # Copy the init array from the ruleset or keyword arg
-    init = deepcopy(chooseinit(ruleset.init, init))
+    init = chooseinit(ruleset.init, init)
+    data = initdata!(data, ruleset, init)
     # Delete frames output by the previous simulations
     initframes!(output, init)
     # Set the output fps from keyword arg
     setfps!(output, fps)
     # Show the first frame
-    showframe(output, ruleset, 1)
+    showframe(output, data, 1)
     # Run the simulation
-    runsim!(output, ruleset, init, 2:tstop)
+    runsim!(output, ruleset, data, 2:tstop)
     # Return the output object
     output
 end
@@ -48,7 +49,7 @@ Restart the simulation where you stopped last time.
 ### Arguments
 See [`sim!`](@ref).
 """
-resume!(output, ruleset; tadd=100, fps=getfps(output)) = begin
+resume!(output, ruleset; tadd=100, fps=getfps(output), data=nothing) = begin
     isrunning(output) && return
     length(output) > 0 || error("There is no simulation to resume. Run `sim!` first")
     setrunning!(output, true) || return
@@ -59,7 +60,8 @@ resume!(output, ruleset; tadd=100, fps=getfps(output)) = begin
     tspan = cur_t + 1:cur_t + tadd
     # Use the last frame of the existing simulation as the init frame
     init = output[curframe(output, cur_t)]
-    runsim!(output, ruleset, init, tspan)
+    data = initdata!(data, ruleset, init)
+    runsim!(output, ruleset, data, tspan)
 end
 
 """
@@ -96,13 +98,10 @@ runsim!(output, args...) =
     end
 
 " Loop over the selected timespan, running the ruleset and displaying the output"
-simloop!(output, ruleset, init, tspan) = begin
+simloop!(output, ruleset, data, tspan) = begin
     # Set up the output
-    initialize!(output)
+    # initialize!(output)
     settimestamp!(output, tspan.start)
-
-    # Preallocate data
-    data = simdata(ruleset, init)
 
     # Loop over the simulation
     for t in tspan
@@ -111,18 +110,16 @@ simloop!(output, ruleset, init, tspan) = begin
         # Run the ruleset and setup data for the next iteration
         data = sequencerules!(data, ruleset)
         # Save the the current frame
-        storeframe!(output, source(data), t)
+        storeframe!(output, data, t)
         # Display the current frame
-        isshowable(output, t) && showframe(output, ruleset, t)
-        # isshowable(output, t) && showframe(output, ruleset, output[end], t, data)
+        isshowable(output, t) && showframe(output, data, t)
         # Let other tasks run (like ui controls) TODO is this needed?
-        #yield()
+        # yield()
         # Stick to the FPS
         delay(output, t)
         # Exit gracefully
         if !isrunning(output) || t == tspan.stop
-            showframe(output, ruleset, t)
-            # showframe(output, ruleset, output[end], t, data)
+            showframe(output, data, t)
             setrunning!(output, false)
             # Any finithing touches required by the output
             finalize!(output)

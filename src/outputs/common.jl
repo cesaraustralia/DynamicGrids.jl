@@ -39,7 +39,15 @@ abstract type AbstractOutput{T} <: AbstractVector{T} end
 (::Type{F})(init::T, args...; kwargs...) where F <: AbstractOutput where T <: AbstractMatrix =
     F(T[deepcopy(init)], args...; kwargs...)
 
+"""
+Outputs that display the simulation frames live.
+"""
 abstract type AbstractGraphicOutput{T} <: AbstractOutput{T} end
+
+"""
+Outputs that display RGB24 images.
+"""
+abstract type AbstractImageOutput{T} <: AbstractOutput{T} end
 
 
 
@@ -95,46 +103,64 @@ settimestamp!(o::AbstractOutput, t) = nothing
 
 
 # Frame handling
-storeframe!(o::AbstractGraphicOutput, frame, t) = begin
+storeframe!(o::AbstractGraphicOutput, data::SimData, t) = begin
     if o.store
         push!(o, similar(o[1]))
-        updateframe!(o, frame, t)
+        o[end] .= zero(eltype(o[1]))
+        updateframe!(o, data, t)
     else
-        updateframe!(o, frame, 1)
+        o[end] .= zero(eltype(o[1]))
+        updateframe!(o, data, 1)
     end
     o.tlast = t
 end
-storeframe!(o::AbstractOutput, frame, t) = updateframe!(o, frame, t)
+storeframe!(o::AbstractOutput, data::SimData, t) = begin
+    updateframe!(o, data, t)
+end
 
-updateframe!(o, frame::AbstractArray{T,2}, t) where T =
-    for j in 1:size(o[1], 2), i in 1:size(o[1], 1)
-        @inbounds o[t][i, j] = frame[i, j]
-    end
+updateframe!(output, data::AbstractArray{T,2}, t) where T =
+    blockrun!(data, output, t)
 
+@inline blockdo!(data, output::AbstractOutput, i, j, t) =
+    @inbounds return output[t][i, j] = data[i, j]
 
 allocateframes!(o::AbstractOutput, init, tspan) = begin
     append!(frames(o), [similar(init) for i in tspan])
     nothing
 end
 
+"""
+Frames are deleted and reallocated during the simulation,
+as performance is often display limited, and this allows runs of any length.
+"""
 initframes!(o::AbstractGraphicOutput, init) = begin
     deleteat!(frames(o), 1:length(o))
     push!(frames(o), init)
 end
-initframes!(o::AbstractOutput, init) = o[1] .= init
+"""
+Frames are preallocated and reused.
+"""
+initframes!(o::AbstractOutput, init) = begin
+    o[1] .= init
+    for i = 2:lastindex(o)
+        @inbounds o[i] .= zero(eltype(init))
+    end
+end
 
 """
     showframe(output::AbstractOutput, [t])
 Show the last frame of the output, or the frame at time t.
 """
-showframe(o::AbstractOutput) = showframe(o, lastindex(o))
-showframe(o::AbstractOutput, t) = showframe(o, o[curframe(o, t)], t)
-showframe(o::AbstractOutput, frame::AbstractArray) = showframe(o, frame, 0)
-showframe(o::AbstractOutput, frame::AbstractArray, t) = nothing
-showframe(o::AbstractOutput, ruleset::AbstractRuleset, t) =
-    showframe(o, ruleset, o[curframe(o, t)], t)
-showframe(o::AbstractOutput, ruleset::AbstractRuleset, frame::AbstractArray, t) =
-    showframe(o::AbstractOutput, normaliseframe(ruleset, frame), t)
+showframe(o::AbstractGraphicOutput) = showframe(o, lastindex(o))
+showframe(o::AbstractGraphicOutput, t) = showframe(o, o[curframe(o, t)], t)
+showframe(o::AbstractGraphicOutput, data::AbstractSimData, t) = showframe(o[curframe(o, t)], o, data, t)
+showframe(frame::AbstractArray, o::AbstractGraphicOutput) = showframe(frame, o, 0)
+showframe(frame::AbstractArray, o::AbstractGraphicOutput, data::AbstractSimData, t) = showframe(frame, o::AbstractOutput, t)
+
+showframe(frame::AbstractArray, o::AbstractImageOutput, data::AbstractSimData, t) =
+    showframe(frametoimage(o, normaliseframe(ruleset(data), t), frame), o::AbstractOutput, t)
+
+showframe(o::AbstractOutput, args...) = nothing
 
 curframe(o::AbstractOutput, t) = isstored(o) ? t : oneunit(t)
 

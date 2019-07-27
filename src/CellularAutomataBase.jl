@@ -1,12 +1,12 @@
 """
-CellularAutomataBase provides a framework for building grid-based simulations. 
+CellularAutomataBase provides a framework for building grid-based simulations.
 
-The framework is highly customisable, but there are some central ideas that define 
+The framework is highly customisable, but there are some central ideas that define
 how a simulation works: *rules*, *init* arrays and *outputs*.
 
 Rules hold the configuration for a simulation, and trigger a specific `applyrule` method
 that operates on each of the cells in the grid. See [`AbstractRule`](@ref) and
-[`applyrule`](@ref). Rules come in a number of flavours, which allows assumptions to be made 
+[`applyrule`](@ref). Rules come in a number of flavours, which allows assumptions to be made
 about running them that can greatly improve performance. Rules are chained together in
 a [`Ruleset`](@ref) object.
 
@@ -34,8 +34,8 @@ will be run for the whole grid, in sequence.
 sim!(output, Ruleset(rule1, rule2); init=init)
 ```
 
-For better performance, models included in a tuple will be combined into a single model 
-(with only one array write). This is limited to [`AbstractCellRule`](@ref), although 
+For better performance, models included in a tuple will be combined into a single model
+(with only one array write). This is limited to [`AbstractCellRule`](@ref), although
 [`AbstractNeighborhoodRule`](@ref) may be used as the *first* model in the tuple.
 
 ```julia
@@ -44,7 +44,7 @@ sim!(output, Rules(rule1, (rule2, rule3)); init=init)
 """
 module CellularAutomataBase
 
-using Colors, 
+using Colors,
       Crayons,
       DocStringExtensions,
       FieldDefaults,
@@ -54,15 +54,16 @@ using Colors,
       Mixers,
       OffsetArrays,
       REPL,
+      Setfield,
       UnicodeGraphics
 
 using Base: tail
 using Lazy: @forward
 
-import Base: show, getindex, setindex!, lastindex, size, length, push!, append!, 
+import Base: show, getindex, setindex!, lastindex, size, length, push!, append!,
               broadcast, broadcast!, similar, eltype, iterate
 
-import FieldMetadata: @description, description, @limits, limits, 
+import FieldMetadata: @description, description, @limits, limits,
                       @flattenable, flattenable, default
 
 
@@ -70,33 +71,33 @@ export sim!, resume!, replay
 
 export savegif, show_frame, ruletypes
 
-export distances, broadcastable_indices, sizefromradius 
+export distances, broadcastable_indices, sizefromradius
 
 export AbstractRule, AbstractPartialRule,
-       AbstractNeighborhoodRule, AbstractPartialNeighborhoodRule, 
+       AbstractNeighborhoodRule, AbstractPartialNeighborhoodRule,
        AbstractCellRule
 
 export AbstractRuleset, Ruleset
 
 export AbstractLife, Life
 
-export AbstractNeighborhood, RadialNeighborhood, AbstractCustomNeighborhood, 
+export AbstractNeighborhood, RadialNeighborhood, AbstractCustomNeighborhood,
        CustomNeighborhood, LayeredCustomNeighborhood, VonNeumannNeighborhood
 
 export RemoveOverflow, WrapOverflow
 
-export AbstractOutput, AbstractGraphicOutput, AbstractArrayOutput, ArrayOutput, REPLOutput
+export AbstractOutput, AbstractGraphicOutput, AbstractImageOutput, AbstractArrayOutput, ArrayOutput, REPLOutput
 
-export AbstractFrameProcessor, GreyscaleProcessor, GrayscaleProcessor, 
-       GreyscaleZerosProcessor, GrayscaleZerosProcessor, 
-       ColorSchemeProcessor, ColorSchemeZerosProcessor 
+export AbstractFrameProcessor, GreyscaleProcessor, GrayscaleProcessor,
+       GreyscaleZerosProcessor, GrayscaleZerosProcessor,
+       ColorSchemeProcessor, ColorSchemeZerosProcessor
 
 export AbstractCharStyle, Block, Braile
 
 export AbstractSummary
 
 
-const FIELDDOCTABLE = FieldDocTable((:Description, :Default, :Limits), 
+const FIELDDOCTABLE = FieldDocTable((:Description, :Default, :Limits),
                                     (description, default, limits);
                                     truncation=(100,40,100))
 

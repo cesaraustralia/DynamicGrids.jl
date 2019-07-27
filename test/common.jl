@@ -1,5 +1,5 @@
 using CellularAutomataBase, Test
-using CellularAutomataBase: normaliseframe, isshowable, curframe, allocateframes!, storeframe!
+using CellularAutomataBase: normaliseframe, isshowable, curframe, allocateframes!, storeframe!, simdata
 
 init = [10.0 11.0;
         0.0   5.0]
@@ -26,7 +26,8 @@ allocateframes!(output, init, 3:5)
 @test size(output) == (5,)
 
 @test output[3] != update
-storeframe!(output, update, 3)
+data = simdata(ruleset, update)
+storeframe!(output, data, 3)
 @test output[3] == update
 
 output2 = ArrayOutput(output, false)

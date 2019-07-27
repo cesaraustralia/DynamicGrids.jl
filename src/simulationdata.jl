@@ -1,18 +1,23 @@
 abstract type AbstractSimData{T,N} <: AbstractArray{T,N} end
 
-@mix struct SimDataMixin{T,N,I<:AbstractArray{T,N},S,St,Ra,Ru,Ti}
+@mix struct SimDataMixin{T,N,I<:AbstractArray{T,N},S,St,LSt,B,Ra,Ru,Ti}
     init::I
     source::S
     dest::S
     sourcestatus::St
     deststatus::St
+    localstatus::LSt
+    buffers::B
     radius::Ra
     ruleset::Ru
     t::Ti
 end
 
 (::Type{T})(data::AbstractSimData) where T <: AbstractSimData =
-    T(data.init, data.source, data.dest, data.sourcestatus, data.deststatus, data.radius, data.ruleset, data.t)
+    T(data.init, data.source, data.dest, data.sourcestatus, data.deststatus,
+      data.localstatus, data.buffers, data.radius, data.ruleset, data.t)
+
+Setfield.constructor_of(::Type{T}) where T<:AbstractSimData = T
 
 # Array interface
 Base.length(d::AbstractSimData) = length(source(d))
@@ -31,6 +36,8 @@ source(d::AbstractSimData) = d.source
 dest(d::AbstractSimData) = d.dest
 sourcestatus(d::AbstractSimData) = d.sourcestatus
 deststatus(d::AbstractSimData) = d.deststatus
+localstatus(d::AbstractSimData) = d.localstatus
+buffers(d::AbstractSimData) = d.buffers
 radius(d::AbstractSimData) = d.radius
 ruleset(d::AbstractSimData) = d.ruleset
 currenttime(d::AbstractSimData) = d.t
@@ -48,33 +55,47 @@ cellsize(d::AbstractSimData) = cellsize(ruleset(d))
 Swap source and dest arrays. Allways returns regular SimData.
 """
 swapsource(data) = begin
-    SimData(init(data), dest(data), source(data), sourcestatus(data),
-            deststatus(data), radius(data), ruleset(data), currenttime(data))
+    src = data.source
+    dst = data.dest
+    @set! data.dest = src
+    @set! data.source = dst
+    data
 end
 
 """
 Uptate timestamp
 """
-updatetime(data::SimData, t) =
-    SimData(init(data), source(data), dest(data), sourcestatus(data),
-            deststatus(data), radius(data), ruleset(data), t)
+updatetime(data::SimData, t) = begin
+    @set! data.t = t
+    data
+end
 
 """
 Generate simulation data to match a ruleset and init array.
 """
 simdata(ruleset::AbstractRuleset, init::AbstractArray) = begin
     r = maxradius(ruleset)
+    # We add one extra row/column so we dont have to worry about
+    # special casing the last block
     if r > 0
+        blocksize = 2r
+        hoodsize = 2r + 1
         source = addpadding(init, r)
-        sourcestatus = initstatus(parent(source), r)
+        nblocs = indtoblock.(size(source), blocksize) .+ 1
+        sourcestatus = BitArray(zeros(Bool, nblocs))
+        sourcestatus = initstatus!(sourcestatus, parent(source), r)
+        buffers = typeof(init)[zeros(eltype(init), hoodsize, hoodsize) for i in 1:blocksize]
+        localstatus = zeros(Bool, 2, 2)
     else
         source = deepcopy(init)
         sourcestatus = true
+        buffers = nothing
+        localstatus = nothing
     end
     dest = deepcopy(source)
     deststatus = deepcopy(sourcestatus)
 
-    SimData(init, source, dest, sourcestatus, deststatus, r, ruleset, 1)
+    SimData(init, source, dest, sourcestatus, deststatus, localstatus, buffers, r, ruleset, 1)
 end
 
 """
@@ -94,17 +115,27 @@ addpadding(init::AbstractArray{T,N}, r) where {T,N} = begin
     source
 end
 
+
+initdata!(data::AbstractSimData) = begin
+    for j in 1:framesize(data)[2], i in 1:framesize(data)[1]
+        @inbounds source(data)[i, j] = dest(data)[i, j] = init(data)[i, j]
+    end
+    initstatus!(sourcestatus(data), source(data), radius(data))
+    deststatus(data) .= sourcestatus(data)
+    data
+end
+initdata!(data::AbstractSimData, ruleset, init) = initdata!(data)
+initdata!(data::Nothing, ruleset, init) = begin
+    simdata(ruleset, init)
+end
+
 """
 Initialise the block status array.
 This tracks whether anything has to be done in an area of the main array.
 """
-initstatus(source, r) = begin
+initstatus!(blockstatus, source, r) = begin
     blocksize = 2r
-    # We add one extra row/column so we dont have to worry about
-    # special casing the last block
-    nblocs = indtoblock.(size(source), blocksize) .+ 1
-    blockstatus = BitArray(zeros(Bool, nblocs))
-    for i in CartesianIndices(source) 
+    for i in CartesianIndices(source)
         # Mark the status block if there is a non-zero value
         if source[i] != 0
             bi = indtoblock.(Tuple(i), blocksize)

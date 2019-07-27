@@ -16,6 +16,7 @@ Lazy = "50d2b5c4-7a5e-59d5-8109-a42b560f39c0"
 Mixers = "2a8e4939-dab8-5edc-8f64-72a8776f13de"
 OffsetArrays = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
 REPL = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
+Setfield = "efcf1570-3423-57d1-acb7-fd33fddbac46"
 UnicodeGraphics = "ebadf6b4-db70-5817-83da-4a19ad584e34"
 
 [extras]

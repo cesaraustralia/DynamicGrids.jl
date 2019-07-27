@@ -15,7 +15,7 @@ test2 = [0 0 0 0 0 0;
          0 0 0 0 1 1;
          0 0 0 1 0 1;
          0 0 0 0 0 0]
-              
+
 test3 = [0 0 0 0 0 0;
          0 0 0 0 0 0;
          0 0 0 0 1 1;
@@ -63,7 +63,7 @@ end
     replay(output)
 end
 
-@testset "REPLOutput braile works" begin 
+@testset "REPLOutput braile works" begin
     output = REPLOutput(init; style=Braile(), fps=100, store=true)
     sim!(output, ruleset; tstop=2)
     resume!(output, ruleset; tadd=3)
