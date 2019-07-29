@@ -17,7 +17,8 @@ wrapped equivalent, and `true` as it is allways in-bounds.
     b, inbounds_b = inbounds(xs[2], maxs[2], overflow)
     (a, b), inbounds_a & inbounds_b
 end
-@inline inbounds(x::Number, max::Number, overflow::RemoveOverflow) = x, x > zero(x) && x <= max
+@inline inbounds(x::Number, max::Number, overflow::RemoveOverflow) = 
+    x, isinbounds(x, max, overflow)
 @inline inbounds(x::Number, max::Number, overflow::WrapOverflow) =
     if x < oneunit(x)
         max + rem(x, max), true
@@ -27,15 +28,10 @@ end
         x, true
     end
 
-""" 
-    distances(a::AbstactMatrix)
+@inline isinbounds(xs::Tuple, maxs::Tuple, overflow) = all(isinbounds.(xs, maxs, Ref(overflow)))
+@inline isinbounds(x::Number, max::Number, overflow::RemoveOverflow) = 
+    x > zero(x) && x <= max
 
-Calculate the matrix of distances (in units of cells) between all cells in a matrix
-"""
-distances(a) = broadcast(calc_distance, Ref(a), broadcastable_indices(a))
-
-calc_distance(::AbstractMatrix, index) = calc_distance(index .- 1)
-calc_distance((y, x)) = sqrt(y^2 + x^2)
 
 broadcastable_indices(a) = broadcastable_indices(Int, a)
 broadcastable_indices(T::Type, a) = begin
