@@ -87,7 +87,7 @@ Saving very large gifs may trigger a bug in imagemagick.
 """
 savegif(filename::String, o::AbstractOutput; kwargs...) = savegif(filename, o::AbstractOutput, 0, 1; kwargs...)
 savegif(filename::String, o::AbstractOutput, ruleset::AbstractRuleset; kwargs...) =
-    savegif(filename, o, minval(ruleset), maxval(ruleset); kwargs...)
+    savegif(filename, o, minval(ruleset), maxval(ruleset); kwargs...) 
 savegif(filename::String, o::AbstractOutput, minval, maxval; kwargs...) = begin
     frames = normaliseframe.(o, minval, maxval)
     images = frametoimage.(Ref(o), frames, collect(firstindex(o):lastindex(o)))

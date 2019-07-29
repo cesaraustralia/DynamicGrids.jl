@@ -14,9 +14,9 @@ the passed in output for each time-step.
 ### Keyword Arguments
 - `tstop`: Any Number. Default: 100
 """
-sim!(output, ruleset; init=nothing, tstop=length(output), fps=getfps(output), data=nothing) = begin
-    isrunning(output) && return
-    setrunning!(output, true)
+sim!(output, ruleset; init=nothing, tstop=length(output), fps=fps(output), data=nothing) = begin
+    isrunning(output) && error("A simulation is already running in this output")
+    setrunning!(output, true) || error("Could not start the simulation with this output")
 
     # Copy the init array from the ruleset or keyword arg
     init = chooseinit(ruleset.init, init)
@@ -49,10 +49,10 @@ Restart the simulation where you stopped last time.
 ### Arguments
 See [`sim!`](@ref).
 """
-resume!(output, ruleset; tadd=100, fps=getfps(output), data=nothing) = begin
-    isrunning(output) && return
+resume!(output, ruleset; tadd=100, fps=fps(output), data=nothing) = begin
     length(output) > 0 || error("There is no simulation to resume. Run `sim!` first")
-    setrunning!(output, true) || return
+    isrunning(output) && error("A simulation is already running in this output")
+    setrunning!(output, true) || error("Could not start the simulation with this output")
 
     # Set the output fps from keyword arg
     setfps!(output, fps)
@@ -100,7 +100,7 @@ runsim!(output, args...) =
 " Loop over the selected timespan, running the ruleset and displaying the output"
 simloop!(output, ruleset, data, tspan) = begin
     # Set up the output
-    # initialize!(output)
+    initialize!(output)
     settimestamp!(output, tspan.start)
 
     # Loop over the simulation
@@ -114,14 +114,13 @@ simloop!(output, ruleset, data, tspan) = begin
         # Display the current frame
         isshowable(output, t) && showframe(output, data, t)
         # Let other tasks run (like ui controls) TODO is this needed?
-        # yield()
+        yield()
         # Stick to the FPS
         delay(output, t)
         # Exit gracefully
         if !isrunning(output) || t == tspan.stop
             showframe(output, data, t)
             setrunning!(output, false)
-            # Any finithing touches required by the output
             finalize!(output)
             break
         end
