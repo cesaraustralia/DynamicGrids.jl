@@ -78,22 +78,23 @@ simdata(ruleset::AbstractRuleset, init::AbstractArray) = begin
     # We add one extra row/column so we dont have to worry about
     # special casing the last block
     if r > 0
-        blocksize = 2r
         hoodsize = 2r + 1
+        blocksize = 2r
         source = addpadding(init, r)
         nblocs = indtoblock.(size(source), blocksize) .+ 1
         sourcestatus = BitArray(zeros(Bool, nblocs))
-        sourcestatus = initstatus!(sourcestatus, parent(source), r)
+        deststatus = deepcopy(sourcestatus)
+        updatestatus!(parent(source), sourcestatus, deststatus, r)
+
         buffers = typeof(init)[zeros(eltype(init), hoodsize, hoodsize) for i in 1:blocksize]
         localstatus = zeros(Bool, 2, 2)
     else
         source = deepcopy(init)
-        sourcestatus = true
+        sourcestatus = deststatus = true
         buffers = nothing
         localstatus = nothing
     end
     dest = deepcopy(source)
-    deststatus = deepcopy(sourcestatus)
 
     SimData(init, source, dest, sourcestatus, deststatus, localstatus, buffers, r, ruleset, 1)
 end
@@ -115,35 +116,34 @@ addpadding(init::AbstractArray{T,N}, r) where {T,N} = begin
     source
 end
 
+"""
+Initialise the block status array.
+This tracks whether anything has to be done in an area of the main array.
+"""
+updatestatus!(data) = updatestatus!(parent(source(data)), sourcestatus(data), deststatus(data), radius(data))
+updatestatus!(source, sourcestatus::Bool, deststatus::Bool, r) = nothing
+updatestatus!(source, sourcestatus, deststatus, r) = begin
+    blocksize = 2r
+    source = parent(source)
+    for i in CartesianIndices(source)
+        # Mark the status block if there is a non-zero value
+        if source[i] != 0
+            bi = indtoblock.(Tuple(i), blocksize)
+            sourcestatus[bi...] = true
+            deststatus[bi...] = true
+        end
+    end
+end
 
 initdata!(data::AbstractSimData) = begin
     for j in 1:framesize(data)[2], i in 1:framesize(data)[1]
         @inbounds source(data)[i, j] = dest(data)[i, j] = init(data)[i, j]
     end
-    initstatus!(sourcestatus(data), source(data), radius(data))
-    deststatus(data) .= sourcestatus(data)
+    updatestatus!(data)
     data
 end
 initdata!(data::AbstractSimData, ruleset, init) = initdata!(data)
-initdata!(data::Nothing, ruleset, init) = begin
-    simdata(ruleset, init)
-end
-
-"""
-Initialise the block status array.
-This tracks whether anything has to be done in an area of the main array.
-"""
-initstatus!(blockstatus, source, r) = begin
-    blocksize = 2r
-    for i in CartesianIndices(source)
-        # Mark the status block if there is a non-zero value
-        if source[i] != 0
-            bi = indtoblock.(Tuple(i), blocksize)
-            blockstatus[bi...] = true
-        end
-    end
-    blockstatus
-end
+initdata!(data::Nothing, ruleset, init) = simdata(ruleset, init)
 
 indtoblock(x, blocksize) = (x - 1) ÷ blocksize + 1
 blocktoind(x, blocksize) = (x - 1) * blocksize + 1
