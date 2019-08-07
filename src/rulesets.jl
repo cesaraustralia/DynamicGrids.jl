@@ -17,19 +17,20 @@ mutable struct Ruleset{R,I,Ma,O<:AbstractOverflow,C<:Number,T<:Number,M} <: Abst
     maxval::M
 end
 Ruleset(args...; init=nothing, mask=nothing, overflow=RemoveOverflow(), cellsize=1, timestep=1, 
-        minval=nothing, maxval=nothing) = 
+        minval=0, maxval=1) = 
     Ruleset{typeof.((args, init, mask, overflow, cellsize, timestep, minval))...
            }(args, init, mask, overflow, cellsize, timestep, minval, maxval)
 
 # Getters
-rules(ruleset::Ruleset) = ruleset.cellsize
-init(ruleset::Ruleset) = ruleset.init
-mask(ruleset::Ruleset) = ruleset.mask
-overflow(ruleset::Ruleset) = ruleset.overflow
-cellsize(ruleset::Ruleset) = ruleset.cellsize
-timestep(ruleset::Ruleset) = ruleset.timestep
-minval(ruleset::Ruleset) = ruleset.minval
-maxval(ruleset::Ruleset) = ruleset.maxval
+rules(rs::Ruleset) = rs.cellsize
+init(rs::Ruleset) = rs.init
+mask(rs::Ruleset) = rs.mask
+overflow(rs::Ruleset) = rs.overflow
+cellsize(rs::Ruleset) = rs.cellsize
+timestep(rs::Ruleset) = rs.timestep
+minval(rs::Ruleset) = rs.minval
+maxval(rs::Ruleset) = rs.maxval
+ruleset(rs::Ruleset) = rs
 
 
 struct HasMinMax end

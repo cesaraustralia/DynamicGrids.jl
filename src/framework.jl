@@ -14,23 +14,22 @@ the passed in output for each time-step.
 ### Keyword Arguments
 - `tstop`: Any Number. Default: 100
 """
-sim!(output, ruleset; init=nothing, tstop=length(output), fps=fps(output), data=nothing) = begin
+sim!(output, ruleset; init=nothing, tstop=length(output), fps=fps(output), data=nothing, nreplicates=nothing) = begin
     isrunning(output) && error("A simulation is already running in this output")
     setrunning!(output, true) || error("Could not start the simulation with this output")
 
     # Copy the init array from the ruleset or keyword arg
     init = chooseinit(ruleset.init, init)
-    data = initdata!(data, ruleset, init)
+    data = initdata!(data, ruleset, init, nreplicates)
     # Delete frames output by the previous simulations
     initframes!(output, init)
-    # Set the output fps from keyword arg
     setfps!(output, fps)
     # Show the first frame
     showframe(output, data, 1)
+    # Let the init frame show as long as a normal frame
+    delay(output, 1)
     # Run the simulation
     runsim!(output, ruleset, data, 2:tstop)
-    # Return the output object
-    output
 end
 
 # Allows attaching an init array to the ruleset, but also passing in an
@@ -49,18 +48,18 @@ Restart the simulation where you stopped last time.
 ### Arguments
 See [`sim!`](@ref).
 """
-resume!(output, ruleset; tadd=100, fps=fps(output), data=nothing) = begin
+resume!(output, ruleset; tadd=100, fps=fps(output), data=nothing, nreplicates=nothing) = begin
     length(output) > 0 || error("There is no simulation to resume. Run `sim!` first")
     isrunning(output) && error("A simulation is already running in this output")
     setrunning!(output, true) || error("Could not start the simulation with this output")
 
     # Set the output fps from keyword arg
-    setfps!(output, fps)
     cur_t = gettlast(output)
     tspan = cur_t + 1:cur_t + tadd
     # Use the last frame of the existing simulation as the init frame
     init = output[curframe(output, cur_t)]
-    data = initdata!(data, ruleset, init)
+    data = initdata!(data, ruleset, init, nreplicates)
+    setfps!(output, fps)
     runsim!(output, ruleset, data, tspan)
 end
 
@@ -76,45 +75,36 @@ If you ran a simulation with `store=false` there won't be much to replay.
 replay(REPLOutput(output))
 ```
 """
-replay(output::AbstractOutput, ruleset) = begin
-    isrunning(output) && return
-    setrunning!(output, true)
-    initialize!(output)
-    for (t, frame) in enumerate(output)
-        delay(output, t)
-        showframe(output, ruleset, t)
-        isrunning(output) || break
-    end
-    setrunning!(output, false)
-end
-
+# replay(output::AbstractOutput, ruleset) = begin
+#     isrunning(output) && return
+#     setrunning!(output, true)
+#     for (t, frame) in enumerate(output)
+#         delay(output, t)
+#         showframe(output, ruleset, t)
+#         isrunning(output) || break
+#     end
+#     setrunning!(output, false)
+# end
 
 "run the simulation either directly or asynchronously."
 runsim!(output, args...) =
     if isasync(output)
-        @async simloop!(output, args...)
+        simloop!(output, args...)
     else
         simloop!(output, args...)
     end
 
 " Loop over the selected timespan, running the ruleset and displaying the output"
 simloop!(output, ruleset, data, tspan) = begin
-    # Set up the output
-    initialize!(output)
     settimestamp!(output, tspan.start)
-
     # Loop over the simulation
     for t in tspan
         # Update the timestep
         data = updatetime(data, t)
         # Run the ruleset and setup data for the next iteration
         data = sequencerules!(data, ruleset)
-        # Save the the current frame
+        # Save/do something with the the current frame
         storeframe!(output, data, t)
-        # Display the current frame
-        isshowable(output, t) && showframe(output, data, t)
-        # Let other tasks run (like ui controls) TODO is this needed?
-        yield()
         # Stick to the FPS
         delay(output, t)
         # Exit gracefully
@@ -128,13 +118,16 @@ simloop!(output, ruleset, data, tspan) = begin
     output
 end
 
+simframe!(output, ruleset, data, t) = begin
+end
+
 
 """
 Iterate over all rules recursively, swapping source and dest arrays.
 Returns a tuple containing the source and dest arrays for the next iteration.
 """
-sequencerules!(data, ruleset::Ruleset) = sequencerules!(data, ruleset.rules)
-sequencerules!(data, rules::Tuple) = begin
+sequencerules!(data::SimData, ruleset::Ruleset) = sequencerules!(data, ruleset.rules)
+sequencerules!(data::SimData, rules::Tuple) = begin
     # Run the first rule for the whole frame
     maprule!(data, rules[1])
     # Swap the source and dest arrays
@@ -142,4 +135,10 @@ sequencerules!(data, rules::Tuple) = begin
     # Run the rest of the rules, recursively
     sequencerules!(data, tail(rules))
 end
-sequencerules!(data, rules::Tuple{}) = SimData(data)
+sequencerules!(data::SimData, rules::Tuple{}) = SimData(data)
+sequencerules!(data::AbstractVector{<:SimData}, rules) = begin
+    Threads.@threads for i in 1:length(data)
+        sequencerules!(data[i], rules)
+    end
+    data
+end

@@ -63,6 +63,8 @@ Mixin for outputs that output images and can use an image processor.
     processor::IP
 end
 
+processor(o::AbstractImageOutput) = o.processor
+
 
 # Getters and setters
 frames(o::AbstractOutput) = o.frames
@@ -88,7 +90,9 @@ settimestamp!(o::AbstractOutput, t) = nothing
 
 # Bool getters and setters
 isasync(o::AbstractOutput) = false
-isasync(o::AbstractOutput) = false
+
+isrunning(o::AbstractOutput) = o.running
+setrunning!(o::AbstractOutput, val) = o.running = val
 
 isstored(o::AbstractOutput) = true
 isstored(o::AbstractGraphicOutput) = o.store
@@ -96,12 +100,8 @@ isstored(o::AbstractGraphicOutput) = o.store
 isshowable(o::AbstractOutput, t) = false
 isshowable(o::AbstractGraphicOutput, t) = true # TODO working max fps. o.timestamp + (t - o.tref)/o.maxfps < time()
 
-isrunning(o::AbstractOutput) = o.running
-setrunning!(o::AbstractOutput, val) = o.running = val
-
 
 # Setup and close output
-initialize!(o::AbstractOutput) = nothing
 finalize!(o::AbstractOutput, args...) = nothing
 
 # Delay output to maintain the frame rate
@@ -123,13 +123,23 @@ storeframe!(o::AbstractGraphicOutput, data, t) = begin
         updateframe!(o, data, 1)
     end
     o.tlast = t
+    isshowable(o, t) && showframe(o, data, t)
 end
 storeframe!(o::AbstractOutput, data, t) = updateframe!(o, data, t)
 
 updateframe!(output, data::AbstractArray, t) = blockrun!(data, output, t)
+updateframe!(output, data::AbstractVector{<:SimData}, t) = begin
+    for j in 1:size(output[1], 2), i in 1:size(output[1], 1)
+        replicatesum = zero(eltype(output[1]))
+        for d in data
+            replicatesum += d[i, j]
+        end
+        output[t][i, j] = replicatesum / length(data)
+    end
+end
 
 @inline blockdo!(data, output::AbstractOutput, i, j, t) =
-    return output[t][i, j] = data[i, j]
+    return @inbounds output[t][i, j] = data[i, j]
 
 allocateframes!(o::AbstractOutput, init, tspan) = begin
     append!(frames(o), [similar(init) for i in tspan])
@@ -161,15 +171,27 @@ Show the last frame of the output, or the frame at time t.
 showframe(o::AbstractOutput, args...) = nothing
 showframe(o::AbstractGraphicOutput, data::AbstractSimData) = showframe(o, data, lastindex(o))
 showframe(o::AbstractGraphicOutput, data::AbstractSimData, t) = showframe(o[curframe(o, t)], o, data, t)
+showframe(o::AbstractGraphicOutput, data::AbstractVector{<:AbstractSimData}, t) = showframe(o, data[1], t)
+
 showframe(frame, o::AbstractGraphicOutput, data::AbstractSimData, t) = showframe(frame, o, t)
 showframe(frame, o::AbstractImageOutput, data::AbstractSimData, t) = showframe(frame, o, ruleset(data), t)
 showframe(frame, o::AbstractImageOutput, ruleset::AbstractRuleset, t) =
-    showframe(frametoimage(o, normaliseframe(ruleset, frame), t), o::AbstractOutput, t)
+    showframe(frametoimage(o, ruleset, frame, t), o::AbstractOutput, t)
+
+# Manual showframe without data/ruleset
+showframe(frame, o::AbstractImageOutput) = 
+    showframe(frame, o::AbstractImageOutput, minimum(frame), maximum(frame))
+showframe(frame, o::AbstractImageOutput, min::Number, max::Number) =
+    showframe(frame, o, min, max, 1)
+showframe(frame, o::AbstractImageOutput, min::Number, max::Number, t::Integer) =
+    showframe(frametoimage(o, normaliseframe(frame, min, max), t), o::AbstractOutput, t)
 
 
 normaliseframe(ruleset, a::AbstractArray) = normaliseframe(hasminmax(ruleset), ruleset, a)
 normaliseframe(::HasMinMax, ruleset, a::AbstractArray) =
     normaliseframe(a, minval(ruleset), maxval(ruleset))
-normaliseframe(a::AbstractArray, minval::Number, maxval::Number) =
-    min.((a .- minval) ./ (maxval - minval), one(eltype(a)))
+normaliseframe(a::AbstractArray, minval::Number, maxval::Number) = normalise.(a, minval, maxval)
+normaliseframe(a::AbstractArray, minval, maxval) = a
 normaliseframe(::NoMinMax, ruleset, a::AbstractArray) = a
+
+normalise(x::Number, minval::Number, maxval::Number) = min((x - minval) / (maxval - minval), oneunit(eltype(x)))

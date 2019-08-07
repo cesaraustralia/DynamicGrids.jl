@@ -271,10 +271,6 @@ combinestatus(x::Integer, y::Integer) = x | y
 updatestatus!(copyto::AbstractArray, copyfrom::AbstractArray) = @inbounds copyto .= copyfrom
 updatestatus!(copyto, copyfrom) = nothing
 
-@inline ismasked(data::AbstractSimData, i...) = ismasked(mask(data), i...)
-@inline ismasked(mask::Nothing, i...) = false
-@inline ismasked(mask::AbstractArray, i...) = @inbounds return !mask[i...]
-
 """
 Find the largest radius present in the passed in rules.
 """

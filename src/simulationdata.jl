@@ -69,6 +69,7 @@ updatetime(data::SimData, t) = begin
     @set! data.t = t
     data
 end
+updatetime(data::AbstractVector{<:SimData}, t) = updatetime.(data, t)
 
 """
 Generate simulation data to match a ruleset and init array.
@@ -142,8 +143,10 @@ initdata!(data::AbstractSimData) = begin
     updatestatus!(data)
     data
 end
-initdata!(data::AbstractSimData, ruleset, init) = initdata!(data)
-initdata!(data::Nothing, ruleset, init) = simdata(ruleset, init)
+initdata!(data::AbstractSimData, ruleset, init, nreplicates) = initdata!(data)
+initdata!(data::AbstractVector{<:AbstractSimData}, ruleset, init, nreplicates::Integer) = initdata!.(data)
+initdata!(data::Nothing, ruleset, init, nreplicates::Nothing) = simdata(ruleset, init)
+initdata!(data::Nothing, ruleset, init, nreplicates::Integer) = [simdata(ruleset, init) for r in 1:nreplicates]
 
 indtoblock(x, blocksize) = (x - 1) ÷ blocksize + 1
 blocktoind(x, blocksize) = (x - 1) * blocksize + 1

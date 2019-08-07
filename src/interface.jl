@@ -37,6 +37,30 @@ function neighbors end
 
 
 """
-Return the radius of a rule if it has one, otherwise zero.
+Return the radius of a rule or ruleset if it has one, otherwise zero.
 """
 function radius end
+
+# getters for Abstract SimData
+function init end
+function source end
+function dest end
+function sourcestatus end
+function deststatus end
+function localstatus end
+function buffers end
+function radius end
+function ruleset end
+function currenttime end
+function framesize end
+function mask end
+function overflow end
+function timestep end
+function cellsize end
+
+# AbstractOutput
+function isasync end
+function isrunning end
+function setrunning! end
+
+# AbstractGraphicOutput

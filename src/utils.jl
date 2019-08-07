@@ -54,3 +54,7 @@ Return a tuple of the base types of the rules in the ruleset
 ruletypes(ruleset::Ruleset) = ruletypes(typeof(Ruleset.rules))
 ruletypes(t::Type) = t.name.wrapper
 ruletypes(ts::Type{<:Tuple}) = (ruletypes.(ts.parameters)...,)
+
+@inline ismasked(data::AbstractSimData, i...) = ismasked(mask(data), i...)
+@inline ismasked(mask::Nothing, i...) = false
+@inline ismasked(mask::AbstractArray, i...) = @inbounds return !mask[i...]

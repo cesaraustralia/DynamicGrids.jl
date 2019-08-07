@@ -45,6 +45,7 @@ sim!(output, Rules(rule1, (rule2, rule3)); init=init)
 module CellularAutomataBase
 
 using Colors,
+      ColorSchemes,
       Crayons,
       DocStringExtensions,
       FieldDefaults,
@@ -88,9 +89,7 @@ export RemoveOverflow, WrapOverflow
 
 export AbstractOutput, AbstractGraphicOutput, AbstractImageOutput, AbstractArrayOutput, ArrayOutput, REPLOutput
 
-export AbstractFrameProcessor, GreyscaleProcessor, GrayscaleProcessor,
-       GreyscaleZerosProcessor, GrayscaleZerosProcessor,
-       ColorSchemeProcessor, ColorSchemeZerosProcessor
+export AbstractFrameProcessor, ColorProcessor, Greyscale, Grayscale
 
 export AbstractCharStyle, Block, Braile
 
