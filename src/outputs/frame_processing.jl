@@ -19,11 +19,16 @@ function frametoimage end
 @inline frametoimage(o::AbstractImageOutput, args...) = frametoimage(processor(o), o, args...)
 @inline frametoimage(o::AbstractImageOutput, args...) = frametoimage(processor(o), o, args...)
 @inline frametoimage(o::AbstractImageOutput, ruleset::AbstractRuleset, frame, t) = 
-    frametoimage(processor(o), o, ruleset, normaliseframe(ruleset, frame), t)
+    frametoimage(processor(o), o, ruleset, frame, t)
 @inline frametoimage(processor, o::AbstractImageOutput, ruleset::AbstractRuleset, frame, t) = 
     frametoimage(processor, o, frame, t) 
 
-struct Greyscale end
+struct Greyscale{M1,M2}
+    max::M1
+    min::M2
+end
+Greyscale(; min=nothing, max=nothing) = Greyscale(max, min)
+
 const Grayscale = Greyscale
 
 
@@ -43,6 +48,7 @@ ColorProcessor(; scheme=GreyScale(), zerocolor=nothing, maskcolor=nothing) =
 
 
 frametoimage(p::ColorProcessor, o::AbstractImageOutput, ruleset::AbstractRuleset, frame, t) = begin
+    frame = normaliseframe(rulset, frame)
     img = similar(frame, RGB24)
     for i in CartesianIndices(frame)
         x = frame[i]
@@ -50,14 +56,23 @@ frametoimage(p::ColorProcessor, o::AbstractImageOutput, ruleset::AbstractRuleset
             p.maskcolor
         elseif !(p.zerocolor isa Nothing) && x == zero(x) 
             p.zerocolor
-        elseif p.scheme isa Greyscale
-            RGB24(x)
-        elseif p.scheme isa ColorSchemes.ColorScheme
-            RGB24(get(p.scheme, x))
+        else 
+            getrgb(x)
         end
     end
     img
 end
+
+rgb(g::Greyscale, x) = RGB24(scale(x, g.min, g.max))
+rgb(scheme::ColorSchemes.ColorScheme, x) = RGB24(get(scheme, x))
+rgb(c::RGB24) = c
+rgb(c::Tuple) = RGB24(c...)
+rgb(c::Number) = RGB24(c)
+
+scale(x, ::Nothing, max) = x * max
+scale(x, min, ::Nothing) = x * (one(min) - min) + min
+scale(x, ::Nothing, ::Nothing) = x
+scale(x, min, max) = x * (max - min) + min
 
 """
     savegif(filename::String, output::AbstractOutput)
