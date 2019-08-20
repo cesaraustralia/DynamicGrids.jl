@@ -151,17 +151,18 @@ initdata!(data::Nothing, ruleset, init, nreplicates::Integer) = [simdata(ruleset
 indtoblock(x, blocksize) = (x - 1) ÷ blocksize + 1
 blocktoind(x, blocksize) = (x - 1) * blocksize + 1
 
-Base.@propagate_inbounds Base.getindex(d::SimData, i...) = getindex(source(d), i...)
+Base.@propagate_inbounds Base.getindex(d::SimData, I...) = getindex(source(d), I...)
 
 " Simulation data and storage is passed to rules for each timestep "
 @SimDataMixin struct WritableSimData{} <: AbstractSimData{T,N} end
 
-Base.@propagate_inbounds Base.setindex!(d::WritableSimData, x, i...) = begin
+Base.@propagate_inbounds Base.setindex!(d::WritableSimData, x, I...) = begin
     r = radius(d)
     if r > 0
-        bi = indtoblock.(i .+ r, 2r)
+        bi = indtoblock.(I .+ r, 2r)
         deststatus(d)[bi...] = true
     end
-    dest(d)[i...] = x
+    isnan(x) && error("NaN in setindex: ", (d, I)) 
+    dest(d)[I...] = x
 end
-Base.@propagate_inbounds Base.getindex(d::WritableSimData, i...) = getindex(dest(d), i...)
+Base.@propagate_inbounds Base.getindex(d::WritableSimData, I...) = getindex(dest(d), I...)

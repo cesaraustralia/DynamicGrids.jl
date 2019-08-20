@@ -60,7 +60,7 @@ end
     @test output[2] == test2
     @test output[3] == test3
     @test output[5] == test5
-    replay(output, ruleset)
+    # replay(output, ruleset)
 end
 
 @testset "REPLOutput braile works" begin
@@ -70,5 +70,5 @@ end
     @test output[2] == test2
     @test output[3] == test3
     @test output[5] == test5
-    replay(output, ruleset)
+    # replay(output, ruleset)
 end

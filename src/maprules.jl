@@ -19,13 +19,13 @@ blockrun!(data, context, args...) = begin
 
             for j in jstart:jstop, i in istart:istop
                 ismasked(data, i, j) && continue
-                blockdo!(data, context, i, j, args...)
+                blockdo!(data, context, (i, j), args...)
             end
         end
     else
         for j in 1:ncols, i in 1:nrows
             ismasked(data, i, j) && continue
-            blockdo!(data, context, i, j, args...)
+            blockdo!(data, context, (i, j), args...)
         end
     end
 end
@@ -36,8 +36,11 @@ allowed for the supertype of the rule.
 """
 maprule!(data::AbstractSimData, rule::AbstractRule) = blockrun!(data, rule)
 
-@inline blockdo!(data, rule::AbstractRule, i, j) =
-    @inbounds return dest(data)[i, j] = applyrule(rule, data, source(data)[i, j], (i, j))
+@inline blockdo!(data, rule::AbstractRule, I) = begin
+    @inbounds state = source(data)[I...]
+    @inbounds dest(data)[I...] = applyrule(rule, data, state, I)
+    nothing
+end
 
 struct UpdateDest end
 
@@ -50,11 +53,16 @@ maprule!(data::AbstractSimData, rule::AbstractPartialRule) = begin
     updatestatus!(sourcestatus(data), deststatus(data))
 end
 
-@inline blockdo!(data::WritableSimData, ::UpdateDest, i, j) =
-    dest(data)[i, j] = source(data)[i, j]
+@inline blockdo!(data::WritableSimData, ::UpdateDest, I) = begin
+    out = source(data)[I...]
+    dest(data)[I...] = out
+end
 
-@inline blockdo!(data::WritableSimData, rule::AbstractPartialRule, i, j) =
-    applyrule!(rule, data, source(data)[i, j], (i, j))
+@inline blockdo!(data::WritableSimData, rule::AbstractPartialRule, I) = begin
+    state = source(data)[I...]
+    state == zero(state) && return
+    applyrule!(rule, data, state, I)
+end
 
 """
 Run the rule for all cells, writing the result to the dest array
@@ -178,7 +186,6 @@ maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule, Tuple
                     buf = bufs[b]
                     state = buf[center, center]
                     # @assert state == src[ii + r, j + r]
-
                     newstate = applyrule(rule, data, state, (ii, j), buf)
                     sumstatus[centerbi, centerbj] |= newstate != zero(newstate)
                     dst[ii + r, j + r] = newstate
@@ -295,12 +302,13 @@ This can have much beter performance as no writes occur between rules, and they 
 essentially compiled together into compound rules. This gives correct results only for
 AbstractCellRule, or for a single AbstractNeighborhoodRule followed by AbstractCellRule.
 """
-@inline applyrule(rules::Tuple, data, state, index, buf) = begin
+@inline applyrule(rules::Tuple{<:AbstractNeighborhoodRule,Vararg}, data, state, index, buf) = begin
     state = applyrule(rules[1], data, state, index, buf)
     applyrule(tail(rules), data, state, index)
 end
 @inline applyrule(rules::Tuple, data, state, index) = begin
-    state = applyrule(rules[1], data, state, index)
-    applyrule(tail(rules), data, state, index)
+    state == zero(state) && return state
+    newstate = applyrule(rules[1], data, state, index)
+    applyrule(tail(rules), data, newstate, index)
 end
 @inline applyrule(rules::Tuple{}, data, state, index) = state

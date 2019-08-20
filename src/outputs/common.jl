@@ -138,8 +138,8 @@ updateframe!(output, data::AbstractVector{<:SimData}, t) = begin
     end
 end
 
-@inline blockdo!(data, output::AbstractOutput, i, j, t) =
-    return @inbounds output[t][i, j] = data[i, j]
+@inline blockdo!(data, output::AbstractOutput, index, t) =
+    return @inbounds output[t][index...] = data[index...]
 
 allocateframes!(o::AbstractOutput, init, tspan) = begin
     append!(frames(o), [similar(init) for i in tspan])
@@ -169,14 +169,20 @@ end
 Show the last frame of the output, or the frame at time t.
 """
 showframe(o::AbstractOutput, args...) = nothing
-showframe(o::AbstractGraphicOutput, data::AbstractSimData) = showframe(o, data, lastindex(o))
-showframe(o::AbstractGraphicOutput, data::AbstractSimData, t) = showframe(o[curframe(o, t)], o, data, t)
-showframe(o::AbstractGraphicOutput, data::AbstractVector{<:AbstractSimData}, t) = showframe(o, data[1], t)
 
-showframe(frame, o::AbstractGraphicOutput, data::AbstractSimData, t) = showframe(frame, o, t)
-showframe(frame, o::AbstractImageOutput, data::AbstractSimData, t) = showframe(frame, o, ruleset(data), t)
+showframe(o::AbstractGraphicOutput, data::AbstractSimData) = 
+    showframe(o, data, lastindex(o))
+showframe(o::AbstractGraphicOutput, data::AbstractSimData, t) = 
+    showframe(o[curframe(o, t)], o, data, t)
+showframe(o::AbstractGraphicOutput, data::AbstractVector{<:AbstractSimData}, t) = 
+    showframe(o, data[1], t)
+showframe(frame, o::AbstractGraphicOutput, data::AbstractSimData, t) = 
+    showframe(frame, o, t)
+
+showframe(frame, o::AbstractImageOutput, data::AbstractSimData, t) = 
+    showframe(frame, o, ruleset(data), t)
 showframe(frame, o::AbstractImageOutput, ruleset::AbstractRuleset, t) =
-    showframe(frametoimage(o, ruleset, frame, t), o::AbstractOutput, t)
+    showframe(frametoimage(o, ruleset, frame, t), o, t)
 
 # Manual showframe without data/ruleset
 showframe(frame, o::AbstractImageOutput) = 

@@ -74,6 +74,8 @@ export savegif, show_frame, ruletypes
 
 export distances, broadcastable_indices, sizefromradius
 
+export AbstractSimData, SimData
+
 export AbstractRule, AbstractPartialRule,
        AbstractNeighborhoodRule, AbstractPartialNeighborhoodRule,
        AbstractCellRule

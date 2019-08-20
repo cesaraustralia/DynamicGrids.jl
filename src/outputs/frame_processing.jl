@@ -17,11 +17,10 @@ Convert frame matrix to RGB24, using any AbstractFrameProcessor
 function frametoimage end
 
 @inline frametoimage(o::AbstractImageOutput, args...) = frametoimage(processor(o), o, args...)
-@inline frametoimage(o::AbstractImageOutput, args...) = frametoimage(processor(o), o, args...)
-@inline frametoimage(o::AbstractImageOutput, ruleset::AbstractRuleset, frame, t) = 
+@inline frametoimage(o::AbstractImageOutput, ruleset::AbstractRuleset, frame, t) =
     frametoimage(processor(o), o, ruleset, frame, t)
-@inline frametoimage(processor, o::AbstractImageOutput, ruleset::AbstractRuleset, frame, t) = 
-    frametoimage(processor, o, frame, t) 
+@inline frametoimage(processor, o::AbstractImageOutput, ruleset::AbstractRuleset, frame, t) =
+    frametoimage(processor, o, frame, t)
 
 struct Greyscale{M1,M2}
     max::M1
@@ -43,21 +42,21 @@ struct ColorProcessor{S,Z,M} <: AbstractFrameProcessor
     maskcolor::M
 end
 
-ColorProcessor(; scheme=GreyScale(), zerocolor=nothing, maskcolor=nothing) = 
+ColorProcessor(; scheme=Greyscale(), zerocolor=nothing, maskcolor=nothing) =
     ColorProcessor(scheme, zerocolor, maskcolor)
 
 
 frametoimage(p::ColorProcessor, o::AbstractImageOutput, ruleset::AbstractRuleset, frame, t) = begin
-    frame = normaliseframe(rulset, frame)
+    frame = normaliseframe(ruleset, frame)
     img = similar(frame, RGB24)
     for i in CartesianIndices(frame)
         x = frame[i]
-        img[i] = if !(p.maskcolor isa Nothing) && ismasked(mask(ruleset), i) 
+        img[i] = if !(p.maskcolor isa Nothing) && ismasked(mask(ruleset), i)
             p.maskcolor
-        elseif !(p.zerocolor isa Nothing) && x == zero(x) 
+        elseif !(p.zerocolor isa Nothing) && x == zero(x)
             p.zerocolor
-        else 
-            getrgb(x)
+        else
+            rgb(p.scheme, x)
         end
     end
     img
@@ -85,4 +84,3 @@ savegif(filename::String, o::AbstractOutput, ruleset::AbstractRuleset; kwargs...
     array = cat(images..., dims=3)
     FileIO.save(filename, array; kwargs...)
 end
-

@@ -89,7 +89,7 @@ replay(REPLOutput(output))
 "run the simulation either directly or asynchronously."
 runsim!(output, args...) =
     if isasync(output)
-        simloop!(output, args...)
+        @async simloop!(output, args...)
     else
         simloop!(output, args...)
     end
@@ -105,6 +105,7 @@ simloop!(output, ruleset, data, tspan) = begin
         data = sequencerules!(data, ruleset)
         # Save/do something with the the current frame
         storeframe!(output, data, t)
+        isasync(output) && yield()
         # Stick to the FPS
         delay(output, t)
         # Exit gracefully
@@ -118,13 +119,10 @@ simloop!(output, ruleset, data, tspan) = begin
     output
 end
 
-simframe!(output, ruleset, data, t) = begin
-end
-
 
 """
 Iterate over all rules recursively, swapping source and dest arrays.
-Returns a tuple containing the source and dest arrays for the next iteration.
+Returns the data object with source and dest arrays ready for the next iteration.
 """
 sequencerules!(data::SimData, ruleset::Ruleset) = sequencerules!(data, ruleset.rules)
 sequencerules!(data::SimData, rules::Tuple) = begin
@@ -135,7 +133,11 @@ sequencerules!(data::SimData, rules::Tuple) = begin
     # Run the rest of the rules, recursively
     sequencerules!(data, tail(rules))
 end
-sequencerules!(data::SimData, rules::Tuple{}) = SimData(data)
+sequencerules!(data::SimData, rules::Tuple{}) = data
+"""
+Threaded replicate simulations. If nreplicates is set the data object
+will be a vector of replicate data, so we loop over it with threads.
+"""
 sequencerules!(data::AbstractVector{<:SimData}, rules) = begin
     Threads.@threads for i in 1:length(data)
         sequencerules!(data[i], rules)
