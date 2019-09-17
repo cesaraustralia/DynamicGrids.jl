@@ -124,8 +124,19 @@ end
 Iterate over all rules recursively, swapping source and dest arrays.
 Returns the data object with source and dest arrays ready for the next iteration.
 """
-sequencerules!(data::SimData, ruleset::Ruleset) = sequencerules!(data, ruleset.rules)
-sequencerules!(data::SimData, rules::Tuple) = begin
+@inline sequencerules!(data::SimData, ruleset::MultiRuleset) = begin
+    multisequencerules!(data, shared(ruleset))
+end
+@inline multisequencerules!(data::SimData, rules::Tuple) = begin
+    # Run the first rule for the whole frame
+    maprule!(data, rules[1])
+    # Swap the source and dest arrays
+    data = swapsource(data)
+    # Run the rest of the rules, recursively
+    multisequencerules!(data, tail(rules))
+end
+@inline sequencerules!(data::SimData, ruleset::Ruleset) = sequencerules!(data, rules(ruleset))
+@inline sequencerules!(data::SimData, rules::Tuple) = begin
     # Run the first rule for the whole frame
     maprule!(data, rules[1])
     # Swap the source and dest arrays
@@ -133,7 +144,7 @@ sequencerules!(data::SimData, rules::Tuple) = begin
     # Run the rest of the rules, recursively
     sequencerules!(data, tail(rules))
 end
-sequencerules!(data::SimData, rules::Tuple{}) = data
+@inline sequencerules!(data::SimData, rules::Tuple{}) = data
 """
 Threaded replicate simulations. If nreplicates is set the data object
 will be a vector of replicate data, so we loop over it with threads.

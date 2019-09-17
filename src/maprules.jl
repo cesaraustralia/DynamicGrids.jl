@@ -189,25 +189,6 @@ maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule, Tuple
                     newstate = applyrule(rule, data, state, (ii, j), buf)
                     sumstatus[centerbi, centerbj] |= newstate != zero(newstate)
                     dst[ii + r, j + r] = newstate
-
-                    # if state != zero(state) && !(srcstatus[bi+centerbi - 1, bj + centerbj - 1])
-                    #     println("i j: ", (ii, j))
-                    #     println("bi bj: ", (bi, bj))
-                    #     println("indtoblock: ", indtoblock.((ii, j) .+ r, blocksize))
-                    #     println("centerbi: ", (centerbi, centerbj))
-                    #     sstat = srcstatus[bi+centerbi-1:bi+centerbi-1, bj+centerbj-1:bj+centerbj-1]
-                    #     display(sstat)
-                    #     println("source status sum: ", sum(sstat))
-                    #     dstat = dststatus[bi:bi+centerbi-1, bj+centerbj-1:bj+centerbj-1]
-                    #     display(dstat)
-                    #     println("dest status sum: ", sum(dstat))
-                    #     display(src[blocktoind(bi+centerbi-1, blocksize):blocktoind(bi+centerbi-1, blocksize) + blocksize-1,
-                    #                 blocktoind(bj+centerbj-1, blocksize):blocktoind(bj+centerbj-1, blocksize) + blocksize-1])
-                    #     display(dst[blocktoind(bi+centerbi-1, blocksize):blocktoind(bi+centerbi-1, blocksize) + blocksize-1,
-                    #                 blocktoind(bj+centerbj-1, blocksize):blocktoind(bj+centerbj-1, blocksize) + blocksize-1])
-                    #     error("$ii, $j with state $state has non zero but status but is false time $(currenttime(data))")
-                    # end
-                    #
                 end
                 # Combine blocks with the previous rows / cols
                 # TODO only write the first column
@@ -312,3 +293,8 @@ end
     applyrule(tail(rules), data, newstate, index)
 end
 @inline applyrule(rules::Tuple{}, data, state, index) = state
+@inline applyrule(rule::Shared, data, state, index) = applyrule.(Ref(val(rule)), Ref(data), state, Ref(index))
+@inline applyrule(rule::Specific{X}, data, state, index) where X =  
+    @set state[X] = applyrule(val(rule), data, state[X], index)
+@inline applyrule(rule::Combined, data, state, index) where I =  
+    applyrule(val(rule), data, state, index)

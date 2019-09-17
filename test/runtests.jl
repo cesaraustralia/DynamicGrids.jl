@@ -1,5 +1,6 @@
 using SafeTestsets
 
+@time @safetestset "multi" begin include("multi.jl") end
 @time @safetestset "neighborhoods" begin include("neighborhoods.jl") end
 @time @safetestset "mask" begin include("mask.jl") end
 @time @safetestset "framework" begin include("framework.jl") end

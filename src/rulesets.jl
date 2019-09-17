@@ -1,5 +1,15 @@
 abstract type AbstractRuleset end
 
+# Getters
+init(rs::AbstractRuleset) = rs.init
+mask(rs::AbstractRuleset) = rs.mask
+overflow(rs::AbstractRuleset) = rs.overflow
+cellsize(rs::AbstractRuleset) = rs.cellsize
+timestep(rs::AbstractRuleset) = rs.timestep
+minval(rs::AbstractRuleset) = rs.minval
+maxval(rs::AbstractRuleset) = rs.maxval
+ruleset(rs::AbstractRuleset) = rs
+
 """
     Ruleset(rules...; init=nothing, overflow=RemoveOverflow(), cellsize=1, timestep=1)
 
@@ -20,17 +30,20 @@ Ruleset(args...; init=nothing, mask=nothing, overflow=RemoveOverflow(), cellsize
         minval=0, maxval=1) = 
     Ruleset{typeof.((args, init, mask, overflow, cellsize, timestep, minval))...
            }(args, init, mask, overflow, cellsize, timestep, minval, maxval)
+rules(rs::Ruleset) = rs.rules
 
-# Getters
-rules(rs::Ruleset) = rs.cellsize
-init(rs::Ruleset) = rs.init
-mask(rs::Ruleset) = rs.mask
-overflow(rs::Ruleset) = rs.overflow
-cellsize(rs::Ruleset) = rs.cellsize
-timestep(rs::Ruleset) = rs.timestep
-minval(rs::Ruleset) = rs.minval
-maxval(rs::Ruleset) = rs.maxval
-ruleset(rs::Ruleset) = rs
+abstract type RuleMode{T} end
+struct Shared{T} <: RuleMode{T}
+    val::T
+end
+struct Specific{X,T} <: RuleMode{T}
+    val::T
+end
+struct Combined{T} <: RuleMode{T}
+    val::T
+end
+
+val(rm::RuleMode) = rm.val
 
 
 struct HasMinMax end
