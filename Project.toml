@@ -1,4 +1,4 @@
-name = "CellularAutomataBase"
+name = "DynamicGrids"
 uuid = "a5dba43e-3abc-5203-bfc5-584ca68d3f5b"
 authors = ["Rafael Schouten <rafaelschouten@gmail.com>"]
 version = "0.1.0"

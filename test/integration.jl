@@ -1,4 +1,4 @@
-using CellularAutomataBase, Test
+using DynamicGrids, Test
 
 # life glider sims
 

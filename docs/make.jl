@@ -1,10 +1,10 @@
-using Documenter, CellularAutomataBase
+using Documenter, DynamicGrids
 
 makedocs(
-    modules = [CellularAutomataBase],
-    sitename = "CellularAutomataBase.jl",
+    modules = [DynamicGrids],
+    sitename = "DynamicGrids.jl",
 )
 
 deploydocs(
-    repo = "github.com/rafaqz/CellularAutomataBase.jl.git",
+    repo = "github.com/rafaqz/DynamicGrids.jl.git",
 )

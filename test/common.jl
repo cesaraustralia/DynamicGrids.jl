@@ -1,5 +1,5 @@
-using CellularAutomataBase, Test
-using CellularAutomataBase: normaliseframe, isshowable, curframe, allocateframes!, storeframe!, simdata
+using DynamicGrids, Test
+using DynamicGrids: normaliseframe, isshowable, curframe, allocateframes!, storeframe!, simdata
 
 init = [10.0 11.0;
         0.0   5.0]

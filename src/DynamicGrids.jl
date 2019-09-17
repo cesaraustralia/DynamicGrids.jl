@@ -1,5 +1,5 @@
 """
-CellularAutomataBase provides a framework for building grid-based simulations.
+DynamicGrids provides a framework for building grid-based simulations.
 
 The framework is highly customisable, but there are some central ideas that define
 how a simulation works: *rules*, *init* arrays and *outputs*.
@@ -42,7 +42,7 @@ For better performance, models included in a tuple will be combined into a singl
 sim!(output, Rules(rule1, (rule2, rule3)); init=init)
 ```
 """
-module CellularAutomataBase
+module DynamicGrids
 
 using Colors,
       ColorSchemes,

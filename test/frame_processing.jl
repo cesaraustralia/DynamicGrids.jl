@@ -1,5 +1,5 @@
-using CellularAutomataBase, Test, Colors, ColorSchemes
-using CellularAutomataBase: frametoimage, @Output
+using DynamicGrids, Test, Colors, ColorSchemes
+using DynamicGrids: frametoimage, @Output
 using ColorSchemes: leonardo
 
 init = [1.0 1.0;

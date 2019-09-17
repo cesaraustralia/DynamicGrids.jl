@@ -1,4 +1,4 @@
-using CellularAutomataBase, Test
+using DynamicGrids, Test
 
 init = [1.0 4.0 7.0;
         2.0 5.0 8.0;
@@ -11,7 +11,7 @@ mask = Bool[0 1 0;
 output = ArrayOutput(init, 2)
 
 struct DoNothingRule <: AbstractRule end
-CellularAutomataBase.applyrule(::DoNothingRule, data, state, args...) = state
+DynamicGrids.applyrule(::DoNothingRule, data, state, args...) = state
 
 rules = Ruleset(DoNothingRule(); init=init, mask=mask)
 

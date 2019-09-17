@@ -1,5 +1,5 @@
-using CellularAutomataBase, Test
-using CellularAutomataBase: inbounds, broadcastable_indices
+using DynamicGrids, Test
+using DynamicGrids: inbounds, broadcastable_indices
 
 @testset "boundary overflow checks are working" begin
     @testset "inbounds with RemoveOverflow() returns index and false for an overflowed index" begin

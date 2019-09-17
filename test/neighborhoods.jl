@@ -1,5 +1,5 @@
-using CellularAutomataBase, Test
-import CellularAutomataBase: neighbors, SimData
+using DynamicGrids, Test
+import DynamicGrids: neighbors, SimData
 
 init = [0 0 0 1 1 1;
         1 0 1 1 0 1;

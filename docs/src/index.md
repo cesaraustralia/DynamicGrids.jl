@@ -1,7 +1,7 @@
-# CellularAutomataBase.jl
+# DynamicGrids.jl
 
 ```@docs
-CellularAutomataBase
+DynamicGrids
 ```
 
 ## Examples
@@ -12,7 +12,7 @@ game of life and displays it in a REPLOutput.
 
 
 ```@example
-using CellularAutomataBase
+using DynamicGrids
 
 # Build a random starting grid
 init = round.(Int8, max.(0.0, rand(-2.0:0.1:1.0, 70,70)))
@@ -117,6 +117,6 @@ RemoveOverflow
 # Methods
 
 ```@autodocs
-Modules = [CellularAutomataBase]
+Modules = [DynamicGrids]
 Order   = [:function]
 ```

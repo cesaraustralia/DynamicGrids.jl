@@ -1,5 +1,5 @@
-using CellularAutomataBase, Test
-import CellularAutomataBase: applyrule, applyrule!, maprule!, simdata, source, dest
+using DynamicGrids, Test
+import DynamicGrids: applyrule, applyrule!, maprule!, simdata, source, dest
 
 init  = [0 1 1 0;
          0 1 1 0;
