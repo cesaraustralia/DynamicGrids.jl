@@ -1,27 +1,5 @@
-"""
-Frame processors convert frame data into RGB24 images
-They can be passed as `procesor` keyword argument to outputs that have an image display.
 
-To add new processor, define a type that inherits from AbstractFrameProcessor
-and a [`frametoimage`](@ref) method:
-```julia
-frametoimage(p::YourProcessor, output, frame, t) = some_rbg_image
-```
-"""
-abstract type AbstractFrameProcessor end
-
-
-"""
-Convert frame matrix to RGB24, using any AbstractFrameProcessor
-"""
-function frametoimage end
-
-@inline frametoimage(o::AbstractImageOutput, args...) = frametoimage(processor(o), o, args...)
-@inline frametoimage(o::AbstractImageOutput, ruleset::AbstractRuleset, frame, t) =
-    frametoimage(processor(o), o, ruleset, frame, t)
-@inline frametoimage(processor, o::AbstractImageOutput, ruleset::AbstractRuleset, frame, t) =
-    frametoimage(processor, o, frame, t)
-
+# Default colorscheme
 struct Greyscale{M1,M2}
     max::M1
     min::M2
@@ -30,6 +8,21 @@ Greyscale(; min=nothing, max=nothing) = Greyscale(max, min)
 
 const Grayscale = Greyscale
 
+# Greyscale is the default processor
+processor(x) = Greyscale()
+
+"""
+Frame processors convert arrays into RGB24 images for display.
+"""
+abstract type AbstractFrameProcessor end
+
+
+"""
+Convert frame matrix to RGB24, using an AbstractFrameProcessor
+"""
+function frametoimage end
+
+@inline frametoimage(o::AbstractImageOutput, args...) = frametoimage(processor(o), o, args...)
 
 """"
 Converts output frames to a colorsheme.
@@ -46,7 +39,7 @@ ColorProcessor(; scheme=Greyscale(), zerocolor=nothing, maskcolor=nothing) =
     ColorProcessor(scheme, zerocolor, maskcolor)
 
 
-frametoimage(p::ColorProcessor, o::AbstractImageOutput, ruleset::AbstractRuleset, frame, t) = begin
+frametoimage(p::ColorProcessor, o::AbstractOutput, ruleset::AbstractRuleset, frame, t) = begin
     frame = normaliseframe(ruleset, frame)
     img = similar(frame, RGB24)
     for i in CartesianIndices(frame)
@@ -74,13 +67,15 @@ scale(x, ::Nothing, ::Nothing) = x
 scale(x, min, max) = x * (max - min) + min
 
 """
-    savegif(filename::String, output::AbstractOutput)
-Write the output array to a gif.
-Saving very large gifs may trigger a bug in imagemagick.
+    savegif(filename::String, o::AbstractOutput, ruleset::AbstractRuleset; [processor=processor(o)], [kwargs...])
+
+Write the output array to a gif. You must pass a processor keyword argument for any
+`AbstractOutut` objects not in `AbstractImageOutput` (which allready have a processor attached).
+
+Saving very large gifs may trigger a bug in Imagemagick.
 """
-savegif(filename::String, o::AbstractOutput; kwargs...) = savegif(filename, o::AbstractOutput, 0, 1; kwargs...)
-savegif(filename::String, o::AbstractOutput, ruleset::AbstractRuleset; kwargs...) = begin
-    images = frametoimage.(Ref(o), Ref(ruleset), frames(o), collect(firstindex(o):lastindex(o)))
+savegif(filename::String, o::AbstractOutput, ruleset::AbstractRuleset; processor=processor(o), kwargs...) = begin
+    images = frametoimage.(Ref(processor), Ref(o), Ref(ruleset), frames(o), collect(firstindex(o):lastindex(o)))
     array = cat(images..., dims=3)
     FileIO.save(filename, array; kwargs...)
 end
