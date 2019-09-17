@@ -12,10 +12,10 @@ Life(neighborhood::N, b::B, s::S) where {N,B,S} =
     Life{radius(neighborhood),N,B,S}(neighborhood, b, s) 
 
 """
-    rule(model::AbstractLife, state)
+    rule(rule::AbstractLife, state)
 
 Rule for game-of-life style cellular automata. This is a demonstration of 
-Cellular Automata more than a seriously optimised game of life model.
+Cellular Automata more than a seriously optimised game of life rule.
 
 
 Cells becomes active if it is empty and the number of neightbors is a number in
@@ -32,7 +32,7 @@ Use the arrow keys to scroll around, or zoom out if your terminal can do that!
 # Life. 
 init = round.(Int64, max.(0.0, rand(-3.0:0.1:1.0, 300,300)))
 output = REPLOutput{:block}(init; fps=10, color=:red)
-sim!(output, model, init; time=1000)
+sim!(output, rule, init; time=1000)
 
 # Dimoeba
 init = rand(0:1, 400, 300)
@@ -49,11 +49,11 @@ sim!(output, Ruleset(Life(b=(1,3,5,7), s=(1,3,5,7))), init; time=1000)
 ```
 
 """
-applyrule(model::Life, data, state, index, buf) = begin
+applyrule(rule::Life, data, state, index, buf) = begin
     # Sum neighborhood
-    cc = neighbors(model.neighborhood, model, buf, state)
+    cc = neighbors(rule.neighborhood, rule, buf, state)
     # Determine next state based on current state and neighborhood total
-    counts = (model.b, model.s)[state+1]
+    counts = (rule.b, rule.s)[state+1]
     for i = 1:length(counts)
         if counts[i] == cc
             return oneunit(state)
