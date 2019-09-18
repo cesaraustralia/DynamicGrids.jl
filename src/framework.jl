@@ -124,17 +124,6 @@ end
 Iterate over all rules recursively, swapping source and dest arrays.
 Returns the data object with source and dest arrays ready for the next iteration.
 """
-@inline sequencerules!(data::SimData, ruleset::MultiRuleset) = begin
-    multisequencerules!(data, shared(ruleset))
-end
-@inline multisequencerules!(data::SimData, rules::Tuple) = begin
-    # Run the first rule for the whole frame
-    maprule!(data, rules[1])
-    # Swap the source and dest arrays
-    data = swapsource(data)
-    # Run the rest of the rules, recursively
-    multisequencerules!(data, tail(rules))
-end
 @inline sequencerules!(data::SimData, ruleset::Ruleset) = sequencerules!(data, rules(ruleset))
 @inline sequencerules!(data::SimData, rules::Tuple) = begin
     # Run the first rule for the whole frame

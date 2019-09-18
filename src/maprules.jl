@@ -288,13 +288,15 @@ AbstractCellRule, or for a single AbstractNeighborhoodRule followed by AbstractC
     applyrule(tail(rules), data, state, index)
 end
 @inline applyrule(rules::Tuple, data, state, index) = begin
-    state == zero(state) && return state
+    state == zero(state) && return zero(state)
     newstate = applyrule(rules[1], data, state, index)
     applyrule(tail(rules), data, newstate, index)
 end
 @inline applyrule(rules::Tuple{}, data, state, index) = state
-@inline applyrule(rule::Shared, data, state, index) = applyrule.(Ref(val(rule)), Ref(data), state, Ref(index))
-@inline applyrule(rule::Specific{X}, data, state, index) where X =  
+@inline applyrule(rule::Shared, data, state, index) = 
+    applyrule.(Ref(val(rule)), Ref(data), state, Ref(index))
+@inline applyrule(rule::Specific{X,T}, data, state, index) where {X,T} = begin  
     @set state[X] = applyrule(val(rule), data, state[X], index)
+end
 @inline applyrule(rule::Combined, data, state, index) where I =  
     applyrule(val(rule), data, state, index)

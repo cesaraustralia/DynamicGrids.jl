@@ -32,18 +32,18 @@ Ruleset(args...; init=nothing, mask=nothing, overflow=RemoveOverflow(), cellsize
            }(args, init, mask, overflow, cellsize, timestep, minval, maxval)
 rules(rs::Ruleset) = rs.rules
 
+
 abstract type RuleMode{T} end
-struct Shared{T} <: RuleMode{T}
-    val::T
-end
-struct Specific{X,T} <: RuleMode{T}
-    val::T
-end
-struct Combined{T} <: RuleMode{T}
-    val::T
-end
+
+struct Shared{T} <: RuleMode{T} val::T end
+struct Combined{T} <: RuleMode{T} val::T end
+struct Parallel{T} <: RuleMode{T} val::T end
+struct Specific{X,T} <: RuleMode{T} val::T end
+Specific{X}(t) where X = Specific{X,typeof(t)}(t)
+
 
 val(rm::RuleMode) = rm.val
+maxradius(rm::RuleMode) = maxradius(val(rm))
 
 
 struct HasMinMax end
