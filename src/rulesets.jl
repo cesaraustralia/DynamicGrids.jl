@@ -21,6 +21,16 @@ Ruleset(args...; init=nothing, mask=nothing, overflow=RemoveOverflow(), cellsize
     Ruleset{typeof.((args, init, mask, overflow, cellsize, timestep, minval))...
            }(args, init, mask, overflow, cellsize, timestep, minval, maxval)
 
+show(io::IO, ruleset::Ruleset) = begin
+    printstyled(io, Base.nameof(typeof(ruleset)), " :"; color=:blue)
+    println(io)
+    println(IOContext(io, :indent => "    "), "rules:\n", ruleset.rules)
+    for fn in fieldnames(typeof(ruleset))
+        fn == :rules && continue
+        println(io, fn, " = ", repr(getfield(ruleset, fn)))
+    end
+end
+
 # Getters
 rules(rs::Ruleset) = rs.cellsize
 init(rs::Ruleset) = rs.init

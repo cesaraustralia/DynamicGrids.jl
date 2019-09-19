@@ -6,6 +6,16 @@ The output of the rule for an AbstractRule is allways written to the current cel
 """
 abstract type AbstractRule end
 
+show(io::IO, rule::AbstractRule) = begin
+    indent = get(io, :indent, "")
+    println(io)
+    printstyled(io, indent, Base.nameof(typeof(rule)), " :"; color=:red)
+    println(io)
+    for fn in fieldnames(typeof(rule))
+        println(io, indent, "    ", fn, " = ", getfield(rule, fn))
+    end
+end
+
 """
 AbstractPartialRule is for rules that manually write to whichever cells of the grid
 that they choose, instead of updating every cell with their output.
