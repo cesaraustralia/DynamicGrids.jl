@@ -8,11 +8,12 @@ abstract type AbstractRule end
 
 show(io::IO, rule::AbstractRule) = begin
     indent = get(io, :indent, "")
-    println(io)
-    printstyled(io, indent, Base.nameof(typeof(rule)), " :"; color=:red)
-    println(io)
-    for fn in fieldnames(typeof(rule))
-        println(io, indent, "    ", fn, " = ", getfield(rule, fn))
+    printstyled(io, indent, Base.nameof(typeof(rule)); color=:red)
+    if nfields(rule) > 0
+        printstyled(io, " :\n"; color=:red)
+        for fn in fieldnames(typeof(rule))
+            println(io, indent, "    ", fn, " = ", getfield(rule, fn))
+        end
     end
 end
 
@@ -58,17 +59,3 @@ Accessing the `data.source` and `data.dest` arrays directly is not guaranteed to
 correct results, and should not be done.
 """
 abstract type AbstractCellRule <: AbstractRule end
-
-
-"""
-Singleton types for choosing the grid overflow rule used in
-[`inbounds`](@ref). These determine what is done when a neighborhood
-or jump extends outside of the grid.
-"""
-abstract type AbstractOverflow end
-
-"Wrap cords that overflow boundaries back to the opposite side"
-struct WrapOverflow <: AbstractOverflow end
-
-"Remove coords that overflow boundaries"
-struct RemoveOverflow <: AbstractOverflow end

@@ -49,3 +49,21 @@ applyrule!(::TestPartialWrite, data, state, index) = data[index[1], 2] = 0
     @test dest(data) == final
 end
 
+struct TestCellTriple <: AbstractCellRule end
+applyrule(::TestCellTriple, data, state, index) = 3state
+
+struct TestCellSquare <: AbstractCellRule end
+applyrule(::TestCellSquare, data, state, index) = state^2
+
+@testset "a chained cell rull" begin
+    init  = [0 1 2 3;
+             4 5 6 7]
+
+    final = [0 9 36 81;
+             144 225 324 441]
+
+    ruleset = Ruleset(Chain(TestCellTriple(), TestCellSquare()); init=init)
+    data = simdata(ruleset, init)
+    maprule!(data, ruleset.rules[1])
+    @test dest(data) == final
+end

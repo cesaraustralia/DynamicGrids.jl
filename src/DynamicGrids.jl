@@ -38,7 +38,7 @@ export AbstractRule, AbstractPartialRule,
        AbstractNeighborhoodRule, AbstractPartialNeighborhoodRule,
        AbstractCellRule
 
-export AbstractRuleset, Ruleset
+export AbstractRuleset, Ruleset, Chain
 
 export AbstractLife, Life
 
@@ -67,7 +67,8 @@ const FIELDDOCTABLE = FieldDocTable((:Description, :Default, :Limits),
     $(DOCSTRING)
     """
 
-include("types.jl")
+include("rules.jl")
+include("chain.jl")
 include("rulesets.jl")
 include("simulationdata.jl")
 include("outputs/common.jl")

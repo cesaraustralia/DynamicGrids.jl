@@ -23,6 +23,8 @@ Convert frame matrix to RGB24, using an AbstractFrameProcessor
 function frametoimage end
 
 @inline frametoimage(o::AbstractImageOutput, args...) = frametoimage(processor(o), o, args...)
+frametoimage(o::AbstractImageOutput, i::Integer) = frametoimage(processor(o), o, Ruleset(), o[i], i)
+frametoimage(o::AbstractImageOutput, i::Integer) = frametoimage(processor(o), o, Ruleset(), o[i], i)
 
 """"
 Converts output frames to a colorsheme.
@@ -40,7 +42,7 @@ ColorProcessor(; scheme=Greyscale(), zerocolor=nothing, maskcolor=nothing) =
 
 
 frametoimage(p::ColorProcessor, o::AbstractOutput, ruleset::AbstractRuleset, frame, t) = begin
-    frame = normaliseframe(output, frame)
+    frame = normaliseframe(o, frame)
     img = similar(frame, RGB24)
     for i in CartesianIndices(frame)
         x = frame[i]
@@ -74,7 +76,8 @@ Write the output array to a gif. You must pass a processor keyword argument for 
 
 Saving very large gifs may trigger a bug in Imagemagick.
 """
-savegif(filename::String, o::AbstractOutput, ruleset::AbstractRuleset; processor=processor(o), kwargs...) = begin
+savegif(filename::String, o::AbstractOutput, ruleset::AbstractRuleset=Ruleset(); 
+        processor=processor(o), kwargs...) = begin
     images = frametoimage.(Ref(processor), Ref(o), Ref(ruleset), frames(o), collect(firstindex(o):lastindex(o)))
     array = cat(images..., dims=3)
     FileIO.save(filename, array; kwargs...)

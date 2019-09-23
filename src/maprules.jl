@@ -1,3 +1,9 @@
+"""
+Apply the rule for each cell in the grid, using optimisations
+allowed for the supertype of the rule.
+"""
+maprule!(data::AbstractSimData, rule::AbstractRule) = blockrun!(data, rule)
+
 blockrun!(data, context, args...) = begin
     nrows, ncols = framesize(data)
     r = radius(data)
@@ -30,19 +36,12 @@ blockrun!(data, context, args...) = begin
     end
 end
 
-"""
-Apply the rule for each cell in the grid, using optimisations
-allowed for the supertype of the rule.
-"""
-maprule!(data::AbstractSimData, rule::AbstractRule) = blockrun!(data, rule)
-
 @inline blockdo!(data, rule::AbstractRule, I) = begin
     @inbounds state = source(data)[I...]
     @inbounds dest(data)[I...] = applyrule(rule, data, state, I)
     nothing
 end
 
-struct UpdateDest end
 
 maprule!(data::AbstractSimData, rule::AbstractPartialRule) = begin
     data = WritableSimData(data)
@@ -53,15 +52,17 @@ maprule!(data::AbstractSimData, rule::AbstractPartialRule) = begin
     updatestatus!(sourcestatus(data), deststatus(data))
 end
 
-@inline blockdo!(data::WritableSimData, ::UpdateDest, I) = begin
-    out = source(data)[I...]
-    dest(data)[I...] = out
-end
-
 @inline blockdo!(data::WritableSimData, rule::AbstractPartialRule, I) = begin
     state = source(data)[I...]
     state == zero(state) && return
     applyrule!(rule, data, state, I)
+end
+
+
+struct UpdateDest end
+@inline blockdo!(data::WritableSimData, ::UpdateDest, I) = begin
+    out = source(data)[I...]
+    dest(data)[I...] = out
 end
 
 """
@@ -92,8 +93,8 @@ The neighborhood is copied to the rules neighborhood buffer array for performanc
 #     end
 # end
 
-maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule,Chain{<:Tuple{AbstractNeighborhoodRule,Vararg}},
-          args...) where T = begin
+maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule,Chain{<:Tuple{AbstractNeighborhoodRule,Vararg}}}, 
+         args...) where T = begin
     # The rule provides the neighborhood buffer
     r = radius(rule)
     blocksize = 2r
@@ -112,7 +113,7 @@ maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule,Chain{
     # Run the rule row by row. When we move along a row by one cell, we access only
     # a single new column of data same the hight of the nighborhood, and move the existing
     # data in the neighborhood buffer array accross by one column. This saves on reads
-    # from the main array, and focusses reads and writes in the small buffere array that
+    # from the main array, and focusses reads and writes in the small buffer array that
     # should be in fast local memory.
     @inbounds for bi = 1:size(srcstatus, 1) - 1
         sumstatus .= false
@@ -182,7 +183,6 @@ maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule,Chain{
 
                     centerbi = b <= r ? 1 : 2
                     # Run the rule using buffer b
-
                     buf = bufs[b]
                     state = buf[center, center]
                     # @assert state == src[ii + r, j + r]
@@ -196,7 +196,7 @@ maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule,Chain{
                 dststatus[bi, bj+1] |= sumstatus[1, 2]
                 dststatus[bi+1, bj] |= sumstatus[2, 1]
                 # Start new block fresh to remove old status
-                dststatus[bi+1, bj+1] = sumstatus[2, 2]# | srcstatus[bi+1, bj+1]
+                dststatus[bi+1, bj+1] = sumstatus[2, 2]
             end
         end
     end
@@ -264,9 +264,8 @@ Find the largest radius present in the passed in rules.
 """
 maxradius(ruleset::Ruleset) = maxradius(ruleset.rules)
 maxradius(rules::Tuple{T,Vararg}) where T =
-    max(maxradius(rules[1]), maxradius(tail(rules))...)
+    max(radius(rules[1]), maxradius(tail(rules))...)
 maxradius(rules::Tuple{}) = 0
-maxradius(rule::AbstractRule) = radius(rule)
 
 radius(rule::AbstractNeighborhoodRule) = radius(rule.neighborhood)
 radius(rule::AbstractPartialNeighborhoodRule) = radius(rule.neighborhood)
@@ -290,6 +289,6 @@ end
 @inline applyrule(rules::Chain, data, state, index) = begin
     state == zero(state) && return state
     newstate = applyrule(rules[1], data, state, index)
-    applyrule(tail(rules)), data, newstate, index)
+    applyrule(tail(rules), data, newstate, index)
 end
 @inline applyrule(rules::Chain{Tuple{}}, data, state, index) = state

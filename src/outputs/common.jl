@@ -198,6 +198,11 @@ showframe(frame, o::AbstractImageOutput, min::Number, max::Number, t::Integer) =
     showframe(frametoimage(o, normaliseframe(frame, min, max), t), o::AbstractOutput, t)
 
 
+struct HasMinMax end
+struct NoMinMax end
+
+hasminmax(output::T) where T = (:minval in fieldnames(T)) ? HasMinMax() : NoMinMax()
+
 normaliseframe(output::AbstractOutput, a::AbstractArray) = 
     normaliseframe(hasminmax(output), output, a)
 normaliseframe(::HasMinMax, output, a::AbstractArray) =
@@ -207,9 +212,3 @@ normaliseframe(a::AbstractArray, minval, maxval) = a
 normaliseframe(::NoMinMax, output, a::AbstractArray) = a
 
 normalise(x::Number, minval::Number, maxval::Number) = min((x - minval) / (maxval - minval), oneunit(eltype(x)))
-
-
-struct HasMinMax end
-struct NoMinMax end
-
-hasminmax(output::T) where T = (:minval in fieldnames(T)) ? HasMinMax() : NoMinMax()
