@@ -16,6 +16,7 @@ Mixin of basic fields for all outputs
     running::Bool
 end
 
+
 "Generic ouput constructor. Converts init array to vector of frames."
 (::Type{F})(init::T, args...; kwargs...) where F <: AbstractOutput where T <: AbstractMatrix =
     F(T[deepcopy(init)], args...; kwargs...)
@@ -59,11 +60,15 @@ abstract type AbstractImageOutput{T} <: AbstractGraphicOutput{T} end
 """
 Mixin for outputs that output images and can use an image processor.
 """
-@premix struct ImageProc{IP}
+@premix struct Image{IP,Mi,Ma}
     processor::IP
+    minval::Mi
+    maxval::Ma
 end
 
 processor(o::AbstractImageOutput) = o.processor
+minval(o::AbstractImageOutput) = o.minval
+maxval(o::AbstractImageOutput) = o.maxval
 
 
 # Getters and setters
@@ -193,11 +198,18 @@ showframe(frame, o::AbstractImageOutput, min::Number, max::Number, t::Integer) =
     showframe(frametoimage(o, normaliseframe(frame, min, max), t), o::AbstractOutput, t)
 
 
-normaliseframe(ruleset, a::AbstractArray) = normaliseframe(hasminmax(ruleset), ruleset, a)
-normaliseframe(::HasMinMax, ruleset, a::AbstractArray) =
-    normaliseframe(a, minval(ruleset), maxval(ruleset))
+normaliseframe(output::AbstractOutput, a::AbstractArray) = 
+    normaliseframe(hasminmax(output), output, a)
+normaliseframe(::HasMinMax, output, a::AbstractArray) =
+    normaliseframe(a, minval(output), maxval(output))
 normaliseframe(a::AbstractArray, minval::Number, maxval::Number) = normalise.(a, minval, maxval)
 normaliseframe(a::AbstractArray, minval, maxval) = a
-normaliseframe(::NoMinMax, ruleset, a::AbstractArray) = a
+normaliseframe(::NoMinMax, output, a::AbstractArray) = a
 
 normalise(x::Number, minval::Number, maxval::Number) = min((x - minval) / (maxval - minval), oneunit(eltype(x)))
+
+
+struct HasMinMax end
+struct NoMinMax end
+
+hasminmax(output::T) where T = (:minval in fieldnames(T)) ? HasMinMax() : NoMinMax()

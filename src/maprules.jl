@@ -92,7 +92,7 @@ The neighborhood is copied to the rules neighborhood buffer array for performanc
 #     end
 # end
 
-maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule, Tuple{AbstractNeighborhoodRule,Vararg}},
+maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule,Chain{<:Tuple{AbstractNeighborhoodRule,Vararg}},
           args...) where T = begin
     # The rule provides the neighborhood buffer
     r = radius(rule)
@@ -189,25 +189,6 @@ maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule, Tuple
                     newstate = applyrule(rule, data, state, (ii, j), buf)
                     sumstatus[centerbi, centerbj] |= newstate != zero(newstate)
                     dst[ii + r, j + r] = newstate
-
-                    # if state != zero(state) && !(srcstatus[bi+centerbi - 1, bj + centerbj - 1])
-                    #     println("i j: ", (ii, j))
-                    #     println("bi bj: ", (bi, bj))
-                    #     println("indtoblock: ", indtoblock.((ii, j) .+ r, blocksize))
-                    #     println("centerbi: ", (centerbi, centerbj))
-                    #     sstat = srcstatus[bi+centerbi-1:bi+centerbi-1, bj+centerbj-1:bj+centerbj-1]
-                    #     display(sstat)
-                    #     println("source status sum: ", sum(sstat))
-                    #     dstat = dststatus[bi:bi+centerbi-1, bj+centerbj-1:bj+centerbj-1]
-                    #     display(dstat)
-                    #     println("dest status sum: ", sum(dstat))
-                    #     display(src[blocktoind(bi+centerbi-1, blocksize):blocktoind(bi+centerbi-1, blocksize) + blocksize-1,
-                    #                 blocktoind(bj+centerbj-1, blocksize):blocktoind(bj+centerbj-1, blocksize) + blocksize-1])
-                    #     display(dst[blocktoind(bi+centerbi-1, blocksize):blocktoind(bi+centerbi-1, blocksize) + blocksize-1,
-                    #                 blocktoind(bj+centerbj-1, blocksize):blocktoind(bj+centerbj-1, blocksize) + blocksize-1])
-                    #     error("$ii, $j with state $state has non zero but status but is false time $(currenttime(data))")
-                    # end
-                    #
                 end
                 # Combine blocks with the previous rows / cols
                 # TODO only write the first column
@@ -290,25 +271,25 @@ maxradius(rule::AbstractRule) = radius(rule)
 radius(rule::AbstractNeighborhoodRule) = radius(rule.neighborhood)
 radius(rule::AbstractPartialNeighborhoodRule) = radius(rule.neighborhood)
 radius(rule::AbstractRule) = 0
-# For rule chain tuples. Only the first rule can have a radius.
-radius(rules::Tuple) = radius(rules[1])
+# Only the first rule in a chain can have a radius.
+radius(chain::Chain) = radius(chain[1])
 
 
 """
-    applyrule(rules::Tuple, data, state, (i, j))
+    applyrule(rules::Chain, data, state, (i, j))
 
-Subrules. If a tuple of rules is passed to applyrule, run them sequentially for each cell.
-This can have much beter performance as no writes occur between rules, and they are
+Chained rules. If a `Chain` of rules is passed to applyrule, run them sequentially for each 
+cell.  This can have much beter performance as no writes occur between rules, and they are
 essentially compiled together into compound rules. This gives correct results only for
 AbstractCellRule, or for a single AbstractNeighborhoodRule followed by AbstractCellRule.
 """
-@inline applyrule(rules::Tuple{<:AbstractNeighborhoodRule,Vararg}, data, state, index, buf) = begin
+@inline applyrule(rules::Chain{<:Tuple{<:AbstractNeighborhoodRule,Vararg}}, data, state, index, buf) = begin
     state = applyrule(rules[1], data, state, index, buf)
     applyrule(tail(rules), data, state, index)
 end
-@inline applyrule(rules::Tuple, data, state, index) = begin
+@inline applyrule(rules::Chain, data, state, index) = begin
     state == zero(state) && return state
     newstate = applyrule(rules[1], data, state, index)
-    applyrule(tail(rules), data, newstate, index)
+    applyrule(tail(rules)), data, newstate, index)
 end
-@inline applyrule(rules::Tuple{}, data, state, index) = state
+@inline applyrule(rules::Chain{Tuple{}}, data, state, index) = state

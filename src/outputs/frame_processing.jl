@@ -40,7 +40,7 @@ ColorProcessor(; scheme=Greyscale(), zerocolor=nothing, maskcolor=nothing) =
 
 
 frametoimage(p::ColorProcessor, o::AbstractOutput, ruleset::AbstractRuleset, frame, t) = begin
-    frame = normaliseframe(ruleset, frame)
+    frame = normaliseframe(output, frame)
     img = similar(frame, RGB24)
     for i in CartesianIndices(frame)
         x = frame[i]

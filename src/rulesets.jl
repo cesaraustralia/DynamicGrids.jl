@@ -13,8 +13,6 @@ mutable struct Ruleset{R,I,Ma,O<:AbstractOverflow,C<:Number,T<:Number,M} <: Abst
     overflow::O
     cellsize::C
     timestep::T
-    minval::M
-    maxval::M
 end
 Ruleset(args...; init=nothing, mask=nothing, overflow=RemoveOverflow(), cellsize=1, timestep=1, 
         minval=0, maxval=1) = 
@@ -42,8 +40,25 @@ minval(rs::Ruleset) = rs.minval
 maxval(rs::Ruleset) = rs.maxval
 ruleset(rs::Ruleset) = rs
 
+struct Chain{T}
+    val::T
+    Chain{T}(t::Tuple) where T = begin
+        if !(t[1] <: Union{AbstractNeighborhoodRule, AbstractCellRule})
+            throw(ArgumentError("Only `AbstractNeighborhoodRule` or `AbstractCellRule` allowed as first rule in a `Chain`. $(Base.nameof(typeof(r))) found"))
+        end
+        map(tail(t)) do r
+            if !(r <: AbstractCellRule)
+                throw(ArgumentError("Only `AbstractCellRule` allowed in a `Chain`. $(Base.nameof(typeof(r))) found"))
+            end
+        end
+        new{T}(t)
+    end
+end
+Chain(xs::Tuple) = Chain{typeof(xs)}(xs)
+Chain(x) = Chain{typeof((x,))}((x,))
+Chain(args...) = Chain{typeof(args)}(args)
 
-struct HasMinMax end
-struct NoMinMax end
-
-hasminmax(ruleset::T) where T = fieldtype(T, :minval) <: Number ? HasMinMax() : NoMinMax()
+val(chain::Chain) = chain.val
+Base.tail(chain::Chain) = Chain(tail(val(chain)))
+Base.getindex(chain::Chain, I...) = getindex(val(chain), I...)
+Base.size(chain::Chain) = size(val(chain))
