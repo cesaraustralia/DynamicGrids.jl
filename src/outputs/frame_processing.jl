@@ -1,5 +1,7 @@
 
-# Default colorscheme
+"""
+Default colorscheme. Better performance than using a Colorschemes.jl scheme.
+"""
 struct Greyscale{M1,M2}
     max::M1
     min::M2
