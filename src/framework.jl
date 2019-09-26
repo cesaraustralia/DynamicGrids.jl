@@ -1,5 +1,6 @@
 """
-    sim!(output, ruleset, init; tstop=1000)
+sim!(output, ruleset; init=nothing, tstop=length(output), 
+     fps=fps(output), data=nothing, nreplicates=nothing)
 
 Runs the whole simulation, passing the destination aray to
 the passed in output for each time-step.
@@ -7,14 +8,15 @@ the passed in output for each time-step.
 ### Arguments
 - `output`: An [AbstractOutput](@ref) to store frames or display them on the screen.
 - `ruleset`: A Rule() containing one ore more [`AbstractRule`](@ref). These will each be run in sequence.
-- `init`: The initialisation array.
-- `args`: additional args are passed through to [`rule`](@ref) and
-  [`neighbors`](@ref) methods.
 
 ### Keyword Arguments
-- `tstop`: Any Number. Default: 100
+- `init`: the initialisation array. If `nothing`, the Ruleset must contain an `init` array.
+- `tstop`: the number of the frame the simulaiton will run to.
+- `fps`: the frames per second to display. Will be taken from the output if not passed in.
+- `nreplicates`: the number of replicates to combine in stochastic simulations
+- `data`: a SimData object. Can reduce allocations when that is important.
 """
-sim!(output, ruleset; init=nothing, tstop=length(output), fps=fps(output), data=nothing, nreplicates=nothing) = begin
+sim!(output, ruleset; init=nothing, tstop=length(output), fps=fps(output), nreplicates=nothing, data=nothing) = begin
     isrunning(output) && error("A simulation is already running in this output")
     setrunning!(output, true) || error("Could not start the simulation with this output")
 
@@ -41,12 +43,11 @@ chooseinit(rulesetinit::Nothing, arginit::Nothing) =
     error("Include an init array: either in the ruleset or with the `init` keyword")
 
 """
-    resume!(output, ruleset; tstop=100)
+    resume!(output, ruleset; tadd=100, kwargs...)
 
-Restart the simulation where you stopped last time.
-
-### Arguments
-See [`sim!`](@ref).
+Restart the simulation where you stopped last time. For arguments see [`sim!`](@ref).
+The keyword arg `tadd` indicates the number of frames to add, and of course an init
+array will not be accepted.
 """
 resume!(output, ruleset; tadd=100, fps=fps(output), data=nothing, nreplicates=nothing) = begin
     length(output) > 0 || error("There is no simulation to resume. Run `sim!` first")
@@ -62,29 +63,6 @@ resume!(output, ruleset; tadd=100, fps=fps(output), data=nothing, nreplicates=no
     setfps!(output, fps)
     runsim!(output, ruleset, data, tspan)
 end
-
-"""
-    replay(output::AbstractOutput)
-Show a stored simulation again. You can also use this to show a simulation
-in different output type.
-
-If you ran a simulation with `store=false` there won't be much to replay.
-
-### Example
-```julia
-replay(REPLOutput(output))
-```
-"""
-# replay(output::AbstractOutput, ruleset) = begin
-#     isrunning(output) && return
-#     setrunning!(output, true)
-#     for (t, frame) in enumerate(output)
-#         delay(output, t)
-#         showframe(output, ruleset, t)
-#         isrunning(output) || break
-#     end
-#     setrunning!(output, false)
-# end
 
 "run the simulation either directly or asynchronously."
 runsim!(output, args...) =

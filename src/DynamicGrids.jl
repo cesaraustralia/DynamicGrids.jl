@@ -1,6 +1,13 @@
 module DynamicGrids
 # Use the README as the module docs
-@doc read(joinpath(dirname(@__DIR__), "README.md"), String) DynamicGrids
+@doc let 
+    path = joinpath(dirname(@__DIR__), "README.md")
+    include_dependency(path)
+    # Use [`XX`](@ref) in the docs but not the readme
+    replace(read(path, String), r"`(\w+\w)`" => s"[`\1`](@ref)")
+    # Use doctests
+    replace(read(path, String), "```julia" => "```jldoctest")
+end DynamicGrids
 
 using Colors,
       ColorSchemes,

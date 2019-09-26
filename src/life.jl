@@ -26,8 +26,6 @@ Returns: boolean
 
 ## Examples (gleaned from CellularAutomata.jl)
 
-Use the arrow keys to scroll around, or zoom out if your terminal can do that!
-
 ```julia
 # Life. 
 init = round.(Int64, max.(0.0, rand(-3.0:0.1:1.0, 300,300)))
