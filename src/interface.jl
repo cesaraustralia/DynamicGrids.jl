@@ -18,6 +18,7 @@ function applyrule end
 
 """
     applyrule!(rule::AbstractPartialRule, data, state, index)
+
 A rule that manually writes to the dest array, used in rules inheriting
 from [`AbstractPartialRule`](@ref).
 
@@ -25,6 +26,16 @@ from [`AbstractPartialRule`](@ref).
 see [`applyrule`](@ref)
 """
 function applyrule! end
+
+"""
+    precalcrule!(rule, data)
+
+Run any precalculations needed to run a rule for a particular frame.
+
+It may be better to do this in a functional way with an external precalc object
+passed into a rule via the `data` object, but it's done statefully for now for simplicity.
+"""
+function precalcrule! end
 
 
 """

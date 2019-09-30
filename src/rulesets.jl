@@ -33,7 +33,7 @@ Ruleset(args...; init=nothing, mask=nothing, overflow=RemoveOverflow(), cellsize
            }(args, init, mask, overflow, cellsize, timestep)
 
 show(io::IO, ruleset::Ruleset) = begin
-    printstyled(io, Base.nameof(typeof(ruleset)), " :\n"; color=:blue)
+    printstyled(io, Base.nameof(typeof(ruleset)), " =\n"; color=:blue)
     println(io, "rules:")
     for rule in ruleset.rules
         println(IOContext(io, :indent => "    "), rule)
@@ -45,7 +45,7 @@ show(io::IO, ruleset::Ruleset) = begin
 end
 
 # Getters
-rules(rs::Ruleset) = rs.cellsize
+rules(rs::Ruleset) = rs.rules
 init(rs::Ruleset) = rs.init
 mask(rs::Ruleset) = rs.mask
 overflow(rs::Ruleset) = rs.overflow

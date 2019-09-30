@@ -1,5 +1,6 @@
 using DynamicGrids, Test
-import DynamicGrids: applyrule, applyrule!, maprule!, simdata, source, dest
+import DynamicGrids: applyrule, applyrule!, maprule!, precalcrule!, 
+       simdata, source, dest, currenttime
 
 init  = [0 1 1 0;
          0 1 1 0;
@@ -66,4 +67,30 @@ applyrule(::TestCellSquare, data, state, index) = state^2
     data = simdata(ruleset, init)
     maprule!(data, ruleset.rules[1])
     @test dest(data) == final
+end
+
+struct PrecalcRule{P} <: AbstractRule 
+    precalc::P
+end
+precalcrule!(rule::PrecalcRule, data) = rule.precalc[] = begin
+    println(currenttime(data))
+    currenttime(data)
+end
+applyrule(rule::PrecalcRule, data, state, index) = rule.precalc[]
+
+@testset "a rule with precalculations" begin
+    init  = [1 1;
+             1 1]
+
+    out2  = [2 2;
+             2 2]
+
+    out3  = [3 3;
+             3 3]
+
+    ruleset = Ruleset(PrecalcRule(Ref(1)); init=init)
+    output = ArrayOutput(init, 3)
+    sim!(output, ruleset; tstop=3)
+    @test output[2] == out2
+    @test output[3] == out3
 end

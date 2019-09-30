@@ -259,20 +259,6 @@ combinestatus(x::Integer, y::Integer) = x | y
 updatestatus!(copyto::AbstractArray, copyfrom::AbstractArray) = @inbounds copyto .= copyfrom
 updatestatus!(copyto, copyfrom) = nothing
 
-"""
-Find the largest radius present in the passed in rules.
-"""
-maxradius(ruleset::Ruleset) = maxradius(ruleset.rules)
-maxradius(rules::Tuple{T,Vararg}) where T =
-    max(radius(rules[1]), maxradius(tail(rules))...)
-maxradius(rules::Tuple{}) = 0
-
-radius(rule::AbstractNeighborhoodRule) = radius(rule.neighborhood)
-radius(rule::AbstractPartialNeighborhoodRule) = radius(rule.neighborhood)
-radius(rule::AbstractRule) = 0
-# Only the first rule in a chain can have a radius.
-radius(chain::Chain) = radius(chain[1])
-
 
 """
     applyrule(rules::Chain, data, state, (i, j))

@@ -12,7 +12,7 @@ show(io::IO, rule::AbstractRule) = begin
     if nfields(rule) > 0
         printstyled(io, " :\n"; color=:red)
         for fn in fieldnames(typeof(rule))
-            println(io, indent, "    ", fn, " = ", getfield(rule, fn))
+            println(io, indent, "    ", fn, " = ", repr(getfield(rule, fn)))
         end
     end
 end
@@ -43,6 +43,8 @@ Custom Neighborhood rules must return their radius with a `radius()` method.
 """
 abstract type AbstractNeighborhoodRule{R} <: AbstractRule end
 
+neighborhood(rule::AbstractNeighborhoodRule) = rule.neighborhood 
+
 """
 A Rule that only writes to its neighborhood, defined by its radius distance from the current point.
 TODO: should this exist?
@@ -50,6 +52,8 @@ TODO: should this exist?
 Custom PartialNeighborhood rules must return their radius with a `radius()` method.
 """
 abstract type AbstractPartialNeighborhoodRule{R} <: AbstractPartialRule end
+
+neighborhood(rule::AbstractPartialNeighborhoodRule) = rule.neighborhood 
 
 """
 A Rule that only writes and accesses a single cell: its return value is the new

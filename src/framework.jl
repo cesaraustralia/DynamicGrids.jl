@@ -79,6 +79,8 @@ simloop!(output, ruleset, data, tspan) = begin
     for t in tspan
         # Update the timestep
         data = updatetime(data, t)
+        # Do any precalculations the rules need for this frame
+        precalcrule!(ruleset, data)
         # Run the ruleset and setup data for the next iteration
         data = sequencerules!(data, ruleset)
         # Save/do something with the the current frame
@@ -102,7 +104,7 @@ end
 Iterate over all rules recursively, swapping source and dest arrays.
 Returns the data object with source and dest arrays ready for the next iteration.
 """
-sequencerules!(data::SimData, ruleset::Ruleset) = sequencerules!(data, ruleset.rules)
+sequencerules!(data::SimData, ruleset::Ruleset) = sequencerules!(data, rules(ruleset))
 sequencerules!(data::SimData, rules::Tuple) = begin
     # Run the first rule for the whole frame
     maprule!(data, rules[1])
@@ -122,3 +124,12 @@ sequencerules!(data::AbstractVector{<:SimData}, rules) = begin
     end
     data
 end
+
+precalcrule!(ruleset::Ruleset, data) = precalcrule!(rules(ruleset), data) 
+precalcrule!(rules::Tuple, data) = begin
+    precalcrule!(rules[1], data)
+    precalcrule!(tail(rules), data)
+end
+precalcrule!(rules::Tuple{}, data) = nothing
+precalcrule!(chain::Chain, data) = precalcrule!(val(chain), data)
+precalcrule!(rule, data) = nothing

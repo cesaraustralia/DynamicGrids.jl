@@ -84,3 +84,19 @@ multi_neighbors(layeredcoords::Tuple, hood, buf) =
     (custom_neighbors(layeredcoords[1], hood, buf), 
      multi_neighbors(tail(layeredcoords), hood, buf)...)
 multi_neighbors(layeredcoords::Tuple{}, hood, buf) = () 
+
+
+
+"""
+Find the largest radius present in the passed in rules.
+"""
+maxradius(ruleset::Ruleset) = maxradius(rules(ruleset))
+maxradius(rules::Tuple{T,Vararg}) where T =
+    max(radius(rules[1]), maxradius(tail(rules))...)
+maxradius(rules::Tuple{}) = 0
+
+radius(rule::AbstractNeighborhoodRule) = radius(neighborhood(rule))
+radius(rule::AbstractPartialNeighborhoodRule) = radius(neighborhood(rule))
+radius(rule::AbstractRule) = 0
+# Only the first rule in a chain can have a radius.
+radius(chain::Chain) = radius(chain[1])
