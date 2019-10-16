@@ -1,5 +1,5 @@
 """
-sim!(output, ruleset; init=nothing, tstop=length(output), 
+sim!(output, ruleset; init=nothing, tstpan=(1, length(output)), 
      fps=fps(output), data=nothing, nreplicates=nothing)
 
 Runs the whole simulation, passing the destination aray to
@@ -11,27 +11,31 @@ the passed in output for each time-step.
 
 ### Keyword Arguments
 - `init`: the initialisation array. If `nothing`, the Ruleset must contain an `init` array.
-- `tstop`: the number of the frame the simulaiton will run to.
+- `tspan`: the timespan simulaiton will run for.
 - `fps`: the frames per second to display. Will be taken from the output if not passed in.
 - `nreplicates`: the number of replicates to combine in stochastic simulations
 - `data`: a SimData object. Can reduce allocations when that is important.
 """
-sim!(output, ruleset; init=nothing, tstop=length(output), fps=fps(output), nreplicates=nothing, data=nothing) = begin
+sim!(output, ruleset; init=nothing, tspan=(1, length(output)), fps=fps(output), 
+     nreplicates=nothing, data=nothing) = begin
     isrunning(output) && error("A simulation is already running in this output")
     setrunning!(output, true) || error("Could not start the simulation with this output")
 
+    fspan = 1:lastindex(first(tspan):timestep(ruleset):last(tspan))
+    starttime = first(tspan)
+    setproperty!(output, :starttime, starttime)
     # Copy the init array from the ruleset or keyword arg
-    init = chooseinit(ruleset.init, init)
-    data = initdata!(data, ruleset, init, nreplicates)
+    init = chooseinit(DynamicGrids.init(ruleset), init)
+    data = initdata!(data, ruleset, init, starttime, nreplicates)
     # Delete frames output by the previous simulations
     initframes!(output, init)
     setfps!(output, fps)
     # Show the first frame
     showframe(output, data, 1)
-    # Let the init frame show as long as a normal frame
+    # Let the init frame be displayed as long as a normal frame
     delay(output, 1)
     # Run the simulation
-    runsim!(output, ruleset, data, 2:tstop)
+    runsim!(output, ruleset, data, fspan)
 end
 
 # Allows attaching an init array to the ruleset, but also passing in an
@@ -49,19 +53,20 @@ Restart the simulation where you stopped last time. For arguments see [`sim!`](@
 The keyword arg `tadd` indicates the number of frames to add, and of course an init
 array will not be accepted.
 """
-resume!(output, ruleset; tadd=100, fps=fps(output), data=nothing, nreplicates=nothing) = begin
+resume!(output, ruleset; tstop=stoptime(output), fps=fps(output), data=nothing, 
+        nreplicates=nothing) = begin
     length(output) > 0 || error("There is no simulation to resume. Run `sim!` first")
     isrunning(output) && error("A simulation is already running in this output")
     setrunning!(output, true) || error("Could not start the simulation with this output")
-
-    # Set the output fps from keyword arg
-    cur_t = gettlast(output)
-    tspan = cur_t + 1:cur_t + tadd
+    tstart = starttime(output)
+    lastframe = lastindex(tstart:timestep(ruleset):stoptime(output))
+    stopframe = lastindex(tstart:timestep(ruleset):tstop)
+    fspan = lastframe:stopframe
     # Use the last frame of the existing simulation as the init frame
-    init = output[curframe(output, cur_t)]
-    data = initdata!(data, ruleset, init, nreplicates)
+    init = output[lastindex(output)]
+    data = initdata!(data, ruleset, init, tstart, nreplicates)
     setfps!(output, fps)
-    runsim!(output, ruleset, data, tspan)
+    runsim!(output, ruleset, data, fspan)
 end
 
 "run the simulation either directly or asynchronously."
@@ -72,26 +77,32 @@ runsim!(output, args...) =
         simloop!(output, args...)
     end
 
-" Loop over the selected timespan, running the ruleset and displaying the output"
-simloop!(output, ruleset, data, tspan) = begin
-    settimestamp!(output, tspan.start)
+""" 
+Loop over the selected timespan, running the ruleset and displaying the output
+
+Operations on outputs and rulesets are allways mutable and in-place. 
+Operations on rules and data objects are functional as they are used in inner loops 
+where immutability improves performance. 
+"""
+simloop!(output, ruleset, data, fspan) = begin
+    settimestamp!(output, first(fspan))
     # Loop over the simulation
-    for t in tspan
-        # Update the timestep
-        data = updatetime(data, t)
-        # Do any precalculations the rules need for this frame
-        precalcrule!(ruleset, data)
+    for f in fspan[2:end]
+        # Get a data object with updated timestep
+        data = updatetime(data, f)
+        precalcrules!(ruleset, data)
         # Run the ruleset and setup data for the next iteration
         data = sequencerules!(data, ruleset)
         # Save/do something with the the current frame
-        storeframe!(output, data, t)
+        storeframe!(output, data)
         isasync(output) && yield()
         # Stick to the FPS
-        delay(output, t)
+        delay(output, f)
         # Exit gracefully
-        if !isrunning(output) || t == tspan.stop
-            showframe(output, data, t)
+        if !isrunning(output) || f == last(fspan)
+            showframe(output, data, f)
             setrunning!(output, false)
+            setproperty!(output, :stoptime, currenttime(data))
             finalize!(output)
             break
         end
@@ -125,11 +136,9 @@ sequencerules!(data::AbstractVector{<:SimData}, rules) = begin
     data
 end
 
-precalcrule!(ruleset::Ruleset, data) = precalcrule!(rules(ruleset), data) 
-precalcrule!(rules::Tuple, data) = begin
-    precalcrule!(rules[1], data)
-    precalcrule!(tail(rules), data)
-end
-precalcrule!(rules::Tuple{}, data) = nothing
-precalcrule!(chain::Chain, data) = precalcrule!(val(chain), data)
-precalcrule!(rule, data) = nothing
+precalcrules!(ruleset::Ruleset, data) = ruleset.rules = precalcrule(rules(ruleset), data) 
+precalcrule(rules::Tuple, data) = 
+    (precalcrule(rules[1], data), precalcrule(tail(rules), data)...)
+precalcrule(rules::Tuple{}, data) = ()
+precalcrule(chain::Chain, data) = Chain(precalcrule(val(chain), data)...)
+precalcrule(rule, data) = rule

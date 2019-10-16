@@ -1,6 +1,6 @@
 using DynamicGrids, Test
-import DynamicGrids: applyrule, applyrule!, maprule!, precalcrule!, 
-       simdata, source, dest, currenttime
+import DynamicGrids: applyrule, applyrule!, maprule!, 
+       SimData, source, dest, currenttime
 
 init  = [0 1 1 0;
          0 1 1 0;
@@ -19,7 +19,7 @@ applyrule(::TestRule, data, state, index) = 0
              0 0 0 0]
 
     ruleset = Ruleset(TestRule(); init=init)
-    data = simdata(ruleset, init)
+    data = SimData(ruleset, init, 1)
     maprule!(data, ruleset.rules[1])
     @test dest(data) == final
 end
@@ -29,7 +29,7 @@ applyrule!(::TestPartial, data, state, index) = 0
 
 @testset "a partial rule that returns zero does nothing" begin
     ruleset = Ruleset(TestPartial(); init=init)
-    data = simdata(ruleset, init)
+    data = SimData(ruleset, init, 1)
     maprule!(data, ruleset.rules[1])
     @test dest(data) == init
 end
@@ -45,7 +45,7 @@ applyrule!(::TestPartialWrite, data, state, index) = data[index[1], 2] = 0
              0 0 1 0]
 
     ruleset = Ruleset(TestPartialWrite(); init=init)
-    data = simdata(ruleset, init)
+    data = SimData(ruleset, init, 1)
     maprule!(data, ruleset.rules[1])
     @test dest(data) == final
 end
@@ -64,7 +64,7 @@ applyrule(::TestCellSquare, data, state, index) = state^2
              144 225 324 441]
 
     ruleset = Ruleset(Chain(TestCellTriple(), TestCellSquare()); init=init)
-    data = simdata(ruleset, init)
+    data = SimData(ruleset, init, 1)
     maprule!(data, ruleset.rules[1])
     @test dest(data) == final
 end
@@ -72,10 +72,8 @@ end
 struct PrecalcRule{P} <: AbstractRule 
     precalc::P
 end
-precalcrule!(rule::PrecalcRule, data) = rule.precalc[] = begin
-    println(currenttime(data))
-    currenttime(data)
-end
+DynamicGrids.precalcrule(rule::PrecalcRule, data) = 
+    PrecalcRule(currenttime(data))
 applyrule(rule::PrecalcRule, data, state, index) = rule.precalc[]
 
 @testset "a rule with precalculations" begin
@@ -88,9 +86,9 @@ applyrule(rule::PrecalcRule, data, state, index) = rule.precalc[]
     out3  = [3 3;
              3 3]
 
-    ruleset = Ruleset(PrecalcRule(Ref(1)); init=init)
+    ruleset = Ruleset(PrecalcRule(1); init=init)
     output = ArrayOutput(init, 3)
-    sim!(output, ruleset; tstop=3)
+    sim!(output, ruleset; tspan=(1, 3))
     @test output[2] == out2
     @test output[3] == out3
 end

@@ -1,4 +1,4 @@
-using DynamicGrids, Test, Colors, ColorSchemes
+using DynamicGrids, Test, Colors, ColorSchemes, FieldDefaults
 using DynamicGrids: normaliseframe, frametoimage, @Image, @Output
 using ColorSchemes: leonardo
 
@@ -7,9 +7,8 @@ init = [8.0 10.0;
 
 # Define a simple image output
 @Image @Output struct ImageOutput{} <: AbstractImageOutput{T} end
-minva, maxval = 0.0, 10.0
 processor = Nothing
-output = ImageOutput(init, false, processor, minva, maxval)
+output = ImageOutput(init, minval=0.0, maxval=10.0)
 
 ruleset = Ruleset()
 

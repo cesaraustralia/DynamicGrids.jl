@@ -6,4 +6,4 @@ using SafeTestsets
 @time @safetestset "outputs" begin include("outputs.jl") end
 @time @safetestset "utils" begin include("utils.jl") end
 @time @safetestset "integration" begin include("integration.jl") end
-@time @safetestset "frame processing" begin include("frame_processing.jl") end
+@time @safetestset "image" begin include("image.jl") end
