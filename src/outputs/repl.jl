@@ -30,22 +30,11 @@ REPLOutput{:block}(init)
 The default option is `:block`.
 """
 @Graphic @Output mutable struct REPLOutput{Co,Cu,CS} <: AbstractGraphicOutput{T}
-    displayoffset::Array{Int}
-    color::Co
-    cutoff::Cu
-    style::CS
+    displayoffset::Array{Int} | [1, 1]
+    color::Co                 | :white
+    cutoff::Cu                | 0.5
+    style::CS                 | :block
 end
-
-REPLOutput(frames::AbstractVector; fps=25, showfps=fps, store=false, 
-           color=:white, cutoff=0.5, style=:block) where X = begin
-    timestamp = 0.0 
-    tref = 0 
-    tlast = 1 
-    running = false
-    displayoffset = [1, 1]
-    REPLOutput(frames, running, fps, showfps, timestamp, tref, tlast, store, displayoffset, color, cutoff, style)
-end
-
 
 initialize!(o::REPLOutput, args...) = begin
     o.displayoffset .= (1, 1)
@@ -62,7 +51,7 @@ showframe(frame::AbstractArray, o::REPLOutput, t) = begin
     put((0,0), o.color, string(t)) 
 end
 
-
+# Terminal commands
 savepos(buf::IO=terminal.out_stream) = print(buf, "\x1b[s")
 restorepos(buf::IO=terminal.out_stream) = print(buf, "\x1b[u")
 movepos(buf::IO, c=(0,0)) = print(buf, "\x1b[$(c[2]);$(c[1])H")
@@ -103,6 +92,8 @@ replframe(o, frame) = begin
     xrange = max(1, xstep * xoffset):min(xoutput, xstep * (dispx + xoffset - 1))
     f(view(Array(frame), yrange, xrange), o.cutoff)
 end
+
+# Keyboard scrolling: currently broken
 
 # const XSCROLL = 4
 # const YSCROLL = 8
