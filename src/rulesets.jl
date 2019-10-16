@@ -20,17 +20,15 @@ abstract type AbstractRuleset end
 A container for holding a sequence of AbstractRule, an init
 array and other simulaiton details.
 """
-mutable struct Ruleset{R,I,Ma,O<:AbstractOverflow,C<:Number,T<:Number,M} <: AbstractRuleset
-    rules::R
-    init::I
-    mask::Ma
-    overflow::O
-    cellsize::C
-    timestep::T
+@default_kw mutable struct Ruleset{R,I,M,O<:AbstractOverflow,C,T} <: AbstractRuleset
+    rules::R     | ()
+    init::I      | nothing
+    mask::M      | nothing
+    overflow::O  | RemoveOverflow() 
+    cellsize::C  | 1
+    timestep::T  | 1
 end
-Ruleset(args...; init=nothing, mask=nothing, overflow=RemoveOverflow(), cellsize=1, timestep=1) = 
-    Ruleset{typeof.((args, init, mask, overflow, cellsize, timestep, minval))...
-           }(args, init, mask, overflow, cellsize, timestep)
+Ruleset(rules...; kwargs...) = FieldDefaults.default_kw(Ruleset; rules=rules, kwargs...)
 
 show(io::IO, ruleset::Ruleset) = begin
     printstyled(io, Base.nameof(typeof(ruleset)), " =\n"; color=:blue)
