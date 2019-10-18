@@ -34,15 +34,18 @@ Mixin of basic fields for all outputs
     frames::T      | []
     running::Bool  | false
     starttime::Any | 1
-    stoptime::Any   | 1
+    stoptime::Any  | 1
 end
 
 # Getters and setters
 frames(o::AbstractOutput) = o.frames
 starttime(o::AbstractOutput) = o.starttime
 stoptime(o::AbstractOutput) = o.stoptime
+tspan(o::AbstractOutput) = (stoptime(o), starttime(o))
 isrunning(o::AbstractOutput) = o.running
 setrunning!(o::AbstractOutput, val) = o.running = val
+setstarttime!(output, x) = output.starttime = x
+setstoptime!(output, x) = output.stoptime = x
 
 # Placeholder methods for graphic functions that are
 # ignored in simple outputs

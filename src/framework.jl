@@ -20,10 +20,9 @@ sim!(output, ruleset; init=nothing, tspan=(1, length(output)), fps=fps(output),
      nreplicates=nothing, data=nothing) = begin
     isrunning(output) && error("A simulation is already running in this output")
     setrunning!(output, true) || error("Could not start the simulation with this output")
-
-    fspan = 1:lastindex(first(tspan):timestep(ruleset):last(tspan))
     starttime = first(tspan)
-    setproperty!(output, :starttime, starttime)
+    fspan = tspan2fspan(tspan, timestep(ruleset))
+    setstarttime!(output, starttime)
     # Copy the init array from the ruleset or keyword arg
     init = chooseinit(DynamicGrids.init(ruleset), init)
     data = initdata!(data, ruleset, init, starttime, nreplicates)
@@ -37,6 +36,8 @@ sim!(output, ruleset; init=nothing, tspan=(1, length(output)), fps=fps(output),
     # Run the simulation
     runsim!(output, ruleset, data, fspan)
 end
+
+tspan2fspan(tspan, tstep) = 1:lastindex(first(tspan):tstep:last(tspan))
 
 # Allows attaching an init array to the ruleset, but also passing in an
 # alternate array as a keyword arg (which will take preference).
@@ -102,7 +103,7 @@ simloop!(output, ruleset, data, fspan) = begin
         if !isrunning(output) || f == last(fspan)
             showframe(output, data, f)
             setrunning!(output, false)
-            setproperty!(output, :stoptime, currenttime(data))
+            setstoptime!(output, currenttime(data))
             finalize!(output)
             break
         end

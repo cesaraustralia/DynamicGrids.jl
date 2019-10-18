@@ -11,12 +11,12 @@ abstract type AbstractGraphicOutput{T} <: AbstractOutput{T} end
 """
 Mixin for all graphic outputs
 """
-@premix @default_kw struct Graphic{FPS,SFPS,TStamp,StampFrame}
-    fps::FPS               | 25.0
-    showfps::SFPS          | 25.0
-    timestamp::TStamp      | 0.0
-    stampframe::StampFrame | 1
-    store::Bool            | false
+@premix @default_kw struct Graphic{FPS,SFPS,TS,SF}
+    fps::FPS       | 25.0
+    showfps::SFPS  | 25.0
+    timestamp::TS  | 0.0
+    stampframe::SF | 1
+    store::Bool    | false
 end
 
 fps(o::AbstractGraphicOutput) = o.fps
@@ -32,7 +32,7 @@ settimestamp!(o::AbstractGraphicOutput, f) = begin
 end
 
 # Delay output to maintain the frame rate
-delay(o::AbstractGraphicOutput, f::Integer) = 
+delay(o::AbstractGraphicOutput, f) = 
     sleep(max(0.0, timestamp(o) + (f - stampframe(o))/fps(o) - time()))
 isshowable(o::AbstractGraphicOutput, f) = true # TODO working max fps. o.timestamp + (t - tlast(o))/o.maxfps < time()
 
@@ -66,3 +66,4 @@ showframe(o::AbstractGraphicOutput, data::AbstractVector{<:AbstractSimData}, f) 
     showframe(o, data[1], f)
 showframe(frame, o::AbstractGraphicOutput, data::AbstractSimData, f) = 
     showframe(frame, o, f)
+showframe(o::AbstractGraphicOutput, f=firstindex(o)) = showframe(o[f], o, f)

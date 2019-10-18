@@ -12,10 +12,10 @@ abstract type AbstractImageOutput{T} <: AbstractGraphicOutput{T} end
 """
 Mixin for outputs that output images and can use an image processor.
 """
-@premix @default_kw struct Image{IP,Mi,Ma}
-    processor::IP | Greyscale()
-    minval::Mi    | 0.0
-    maxval::Ma    | 1.0
+@premix @default_kw struct Image{P,Mi,Ma}
+    processor::P | ColorProcessor()
+    minval::Mi   | 0.0
+    maxval::Ma   | 1.0
 end
 
 processor(o::AbstractImageOutput) = o.processor
@@ -29,12 +29,9 @@ showframe(frame, o::AbstractImageOutput, ruleset::AbstractRuleset, f) =
     showframe(frametoimage(o, ruleset, frame, f), o, f)
 
 # Manual showframe without data/ruleset
-showframe(frame, o::AbstractImageOutput) = 
-    showframe(frame, o::AbstractImageOutput, minimum(frame), maximum(frame))
-showframe(frame, o::AbstractImageOutput, min::Number, max::Number) =
-    showframe(frame, o, min, max, 1)
-showframe(frame, o::AbstractImageOutput, min::Number, max::Number, f::Integer) =
-    showframe(frametoimage(o, normaliseframe(frame, min, max), f), o::AbstractOutput, f)
+showframe(o::AbstractImageOutput, f=lastindex(o)) = showframe(o[f], o::AbstractImageOutput, f) 
+showframe(frame, o::AbstractImageOutput, f) =
+    showframe(frametoimage(o, normaliseframe(o, frame), f), o::AbstractOutput, f)
 
 
 """
@@ -62,9 +59,10 @@ Convert frame matrix to RGB24, using an AbstractFrameProcessor
 """
 function frametoimage end
 
-@inline frametoimage(o::AbstractImageOutput, args...) = frametoimage(processor(o), o, args...)
-frametoimage(o::AbstractImageOutput, i::Integer) = frametoimage(processor(o), o, Ruleset(), o[i], i)
-frametoimage(o::AbstractImageOutput, i::Integer) = frametoimage(processor(o), o, Ruleset(), o[i], i)
+frametoimage(o::AbstractImageOutput, i::Integer) = frametoimage(o, o[i], i)
+frametoimage(o::AbstractImageOutput, frame::AbstractArray, i::Integer) = 
+    frametoimage(processor(o), o, Ruleset(), o[i], i)
+frametoimage(o::AbstractImageOutput, args...) = frametoimage(processor(o), o, args...)
 
 """"
 Converts output frames to a colorsheme.

@@ -105,7 +105,7 @@ end
 """
 Uptate timestamp
 """
-updatetime(data::SimData, f) = begin
+updatetime(data::SimData, f::Integer) = begin
     @set! data.currentframe = f
     @set! data.currenttime = timefromframe(data, f)
     data
