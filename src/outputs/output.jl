@@ -69,7 +69,10 @@ frameindex(o::AbstractOutput, f) = isstored(o) ? f : oneunit(f)
     return @inbounds output[f][index...] = data[index...]
 
 storeframe!(output, data) = storeframe!(output, data, frameindex(output, data))
-storeframe!(output, data::AbstractArray, f) = blockrun!(data, output, f)
+storeframe!(output, data::AbstractArray, f) = begin
+    checkbounds(output, f)
+    blockrun!(data, output, f)
+end
 # Replicated frames
 storeframe!(output, data::AbstractVector{<:SimData}, f) = begin
     for j in 1:size(output[1], 2), i in 1:size(output[1], 1)

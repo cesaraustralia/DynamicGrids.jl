@@ -72,7 +72,7 @@ end
 struct PrecalcRule{P} <: AbstractRule 
     precalc::P
 end
-DynamicGrids.precalcrule(rule::PrecalcRule, data) = 
+DynamicGrids.precalcrules(rule::PrecalcRule, data) = 
     PrecalcRule(currenttime(data))
 applyrule(rule::PrecalcRule, data, state, index) = rule.precalc[]
 

@@ -10,7 +10,7 @@ init = [8.0 10.0;
 processor = Nothing
 output = ImageOutput(init, minval=0.0, maxval=10.0)
 
-ruleset = Ruleset()
+ruleset = Ruleset(Life())
 
 # Test level normalisation
 normed = normaliseframe(output, output[1])

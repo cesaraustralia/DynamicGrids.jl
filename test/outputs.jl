@@ -5,7 +5,7 @@ init = [10.0 11.0;
         0.0   5.0]
 
 output = ArrayOutput(init)
-ruleset = Ruleset()
+ruleset = Ruleset(Life())
 
 @test frameindex(output, 5) == 5 
 @test isshowable(output, 5) == false

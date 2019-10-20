@@ -49,12 +49,19 @@ starttime(d::AbstractSimData) = d.starttime
 currenttime(d::AbstractSimData) = d.currenttime
 currentframe(d::AbstractSimData) = d.currentframe
 
+
 # Getters forwarded to ruleset
 framesize(d::AbstractSimData) = size(init(d))
 mask(d::AbstractSimData) = mask(ruleset(d))
 overflow(d::AbstractSimData) = overflow(ruleset(d))
 timestep(d::AbstractSimData) = timestep(ruleset(d))
 cellsize(d::AbstractSimData) = cellsize(ruleset(d))
+rules(d::AbstractSimData) = rules(ruleset(d))
+
+"""
+Get the actual current timestep, ie. not variable periods like Month
+"""
+currenttimestep(d::AbstractSimData) = currenttime(d) + timestep(d) - currenttime(d)
 
 " Simulation data and storage is passed to rules for each timestep "
 @SimDataMixin struct SimData{} <: AbstractSimData{T,N} end
@@ -75,7 +82,7 @@ SimData(ruleset::AbstractRuleset, init::AbstractArray, starttime) = begin
         deststatus = deepcopy(sourcestatus)
         updatestatus!(parent(source), sourcestatus, deststatus, r)
 
-        buffers = typeof(init)[zeros(eltype(init), hoodsize, hoodsize) for i in 1:blocksize]
+        buffers = [zeros(eltype(init), hoodsize, hoodsize) for i in 1:blocksize]
         localstatus = zeros(Bool, 2, 2)
     else
         source = deepcopy(init)
