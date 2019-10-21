@@ -1,51 +1,17 @@
-"""
-DynamicGrids provides a framework for building grid-based simulations.
-
-The framework is highly customisable, but there are some central ideas that define
-how a simulation works: *rules*, *init* arrays and *outputs*.
-
-Rules hold the configuration for a simulation, and trigger a specific `applyrule` method
-that operates on each of the cells in the grid. See [`AbstractRule`](@ref) and
-[`applyrule`](@ref). Rules come in a number of flavours, which allows assumptions to be made
-about running them that can greatly improve performance. Rules are chained together in
-a [`Ruleset`](@ref) object.
-
-The init array may be any AbstractArray, containing whatever initialisation data
-is required to start the simulation. The Array type and element type of the init
-array determine the types used in the simulation, as well as providing the initial conditions.
-
-Outputs are ways of storing of viewing a simulation, and can be used interchangeably
-depending on your needs. See [`AbstractOutput`](@ref).
-
-A typical simulation is run with a script like:
-
-```julia
-init = my_array
-rules = Ruleset(Life())
-output = ArrayOutput(init)
-
-sim!(output, rules; init=init)
-```
-
-Multiple models can be passed to [`sim!`](@ref) in a [`Ruleset`](@ref). Each rule
-will be run for the whole grid, in sequence.
-
-```julia
-sim!(output, Ruleset(rule1, rule2); init=init)
-```
-
-For better performance, models included in a tuple will be combined into a single model
-(with only one array write). This is limited to [`AbstractCellRule`](@ref), although
-[`AbstractNeighborhoodRule`](@ref) may be used as the *first* model in the tuple.
-
-```julia
-sim!(output, Rules(rule1, (rule2, rule3)); init=init)
-```
-"""
 module DynamicGrids
+# Use the README as the module docs
+@doc let 
+    path = joinpath(dirname(@__DIR__), "README.md")
+    include_dependency(path)
+    # Use [`XX`](@ref) in the docs but not the readme
+    replace(read(path, String), r"`(\w+\w)`" => s"[`\1`](@ref)")
+    # Use doctests
+    replace(read(path, String), "```julia" => "```jldoctest")
+end DynamicGrids
 
 using Colors,
       ColorSchemes,
+      ConstructionBase,
       Crayons,
       DocStringExtensions,
       FieldDefaults,
@@ -80,7 +46,7 @@ export AbstractRule, AbstractPartialRule,
        AbstractNeighborhoodRule, AbstractPartialNeighborhoodRule,
        AbstractCellRule
 
-export AbstractRuleset, Ruleset
+export AbstractRuleset, Ruleset, Chain
 
 export AbstractLife, Life
 
@@ -109,18 +75,20 @@ const FIELDDOCTABLE = FieldDocTable((:Description, :Default, :Limits),
     $(DOCSTRING)
     """
 
-include("types.jl")
+include("rules.jl")
+include("chain.jl")
 include("rulesets.jl")
 include("simulationdata.jl")
-include("outputs/common.jl")
+include("outputs/output.jl")
+include("outputs/graphic.jl")
+include("outputs/image.jl")
+include("outputs/array.jl")
+include("outputs/repl.jl")
 include("interface.jl")
 include("framework.jl")
 include("maprules.jl")
 include("neighborhoods.jl")
 include("utils.jl")
 include("life.jl")
-include("outputs/frame_processing.jl")
-include("outputs/array.jl")
-include("outputs/repl.jl")
 
 end

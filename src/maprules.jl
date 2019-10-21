@@ -1,3 +1,9 @@
+"""
+Apply the rule for each cell in the grid, using optimisations
+allowed for the supertype of the rule.
+"""
+maprule!(data::AbstractSimData, rule::AbstractRule) = blockrun!(data, rule)
+
 blockrun!(data, context, args...) = begin
     nrows, ncols = framesize(data)
     r = radius(data)
@@ -30,19 +36,12 @@ blockrun!(data, context, args...) = begin
     end
 end
 
-"""
-Apply the rule for each cell in the grid, using optimisations
-allowed for the supertype of the rule.
-"""
-maprule!(data::AbstractSimData, rule::AbstractRule) = blockrun!(data, rule)
-
 @inline blockdo!(data, rule::AbstractRule, I) = begin
     @inbounds state = source(data)[I...]
     @inbounds dest(data)[I...] = applyrule(rule, data, state, I)
     nothing
 end
 
-struct UpdateDest end
 
 maprule!(data::AbstractSimData, rule::AbstractPartialRule) = begin
     data = WritableSimData(data)
@@ -53,15 +52,17 @@ maprule!(data::AbstractSimData, rule::AbstractPartialRule) = begin
     updatestatus!(sourcestatus(data), deststatus(data))
 end
 
-@inline blockdo!(data::WritableSimData, ::UpdateDest, I) = begin
-    out = source(data)[I...]
-    dest(data)[I...] = out
-end
-
 @inline blockdo!(data::WritableSimData, rule::AbstractPartialRule, I) = begin
     state = source(data)[I...]
     state == zero(state) && return
     applyrule!(rule, data, state, I)
+end
+
+
+struct UpdateDest end
+@inline blockdo!(data::WritableSimData, ::UpdateDest, I) = begin
+    out = source(data)[I...]
+    dest(data)[I...] = out
 end
 
 """
@@ -92,8 +93,8 @@ The neighborhood is copied to the rules neighborhood buffer array for performanc
 #     end
 # end
 
-maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule, Tuple{AbstractNeighborhoodRule,Vararg}},
-          args...) where T = begin
+maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule,Chain{<:Tuple{AbstractNeighborhoodRule,Vararg}}}, 
+         args...) where T = begin
     # The rule provides the neighborhood buffer
     r = radius(rule)
     blocksize = 2r
@@ -112,7 +113,7 @@ maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule, Tuple
     # Run the rule row by row. When we move along a row by one cell, we access only
     # a single new column of data same the hight of the nighborhood, and move the existing
     # data in the neighborhood buffer array accross by one column. This saves on reads
-    # from the main array, and focusses reads and writes in the small buffere array that
+    # from the main array, and focusses reads and writes in the small buffer array that
     # should be in fast local memory.
     @inbounds for bi = 1:size(srcstatus, 1) - 1
         sumstatus .= false
@@ -182,7 +183,6 @@ maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule, Tuple
 
                     centerbi = b <= r ? 1 : 2
                     # Run the rule using buffer b
-
                     buf = bufs[b]
                     state = buf[center, center]
                     # @assert state == src[ii + r, j + r]
@@ -196,7 +196,7 @@ maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule, Tuple
                 dststatus[bi, bj+1] |= sumstatus[1, 2]
                 dststatus[bi+1, bj] |= sumstatus[2, 1]
                 # Start new block fresh to remove old status
-                dststatus[bi+1, bj+1] = sumstatus[2, 2]# | srcstatus[bi+1, bj+1]
+                dststatus[bi+1, bj+1] = sumstatus[2, 2]
             end
         end
     end
@@ -259,44 +259,28 @@ combinestatus(x::Integer, y::Integer) = x | y
 updatestatus!(copyto::AbstractArray, copyfrom::AbstractArray) = @inbounds copyto .= copyfrom
 updatestatus!(copyto, copyfrom) = nothing
 
-"""
-Find the largest radius present in the passed in rules.
-"""
-maxradius(ruleset::Ruleset) = maxradius(ruleset.rules)
-maxradius(rules::Tuple{T,Vararg}) where T =
-    max(maxradius(rules[1]), maxradius(tail(rules))...)
-maxradius(rules::Tuple{}) = 0
-maxradius(rule::AbstractRule) = radius(rule)
-
-radius(rule::AbstractNeighborhoodRule) = radius(rule.neighborhood)
-radius(rule::AbstractPartialNeighborhoodRule) = radius(rule.neighborhood)
-radius(rule::AbstractRule) = 0
-# For rule chain tuples. Only the first rule can have a radius.
-radius(rules::Tuple) = radius(rules[1])
-
 
 """
-    applyrule(rules::Tuple, data, state, (i, j))
+    applyrule(rules::Chain, data, state, (i, j))
 
-Subrules. If a tuple of rules is passed to applyrule, run them sequentially for each cell.
-This can have much beter performance as no writes occur between rules, and they are
+Chained rules. If a `Chain` of rules is passed to applyrule, run them sequentially for each 
+cell.  This can have much beter performance as no writes occur between rules, and they are
 essentially compiled together into compound rules. This gives correct results only for
 AbstractCellRule, or for a single AbstractNeighborhoodRule followed by AbstractCellRule.
 """
-@inline applyrule(rules::Tuple{<:AbstractNeighborhoodRule,Vararg}, data, state, index, buf) = begin
+@inline applyrule(rules::Chain{<:Tuple{<:AbstractNeighborhoodRule,Vararg}}, data, state, index, buf) = begin
     state = applyrule(rules[1], data, state, index, buf)
     applyrule(tail(rules), data, state, index)
 end
-@inline applyrule(rules::Tuple, data, state, index) = begin
-    state == zero(state) && return zero(state)
+@inline applyrule(rules::Chain, data, state, index) = begin
+    state == zero(state) && return state
     newstate = applyrule(rules[1], data, state, index)
     applyrule(tail(rules), data, newstate, index)
 end
-@inline applyrule(rules::Tuple{}, data, state, index) = state
-@inline applyrule(rule::Shared, data, state, index) = 
-    applyrule.(Ref(val(rule)), Ref(data), state, Ref(index))
-@inline applyrule(rule::Specific{X,T}, data, state, index) where {X,T} = begin  
+@inline applyrule(rules::Chain{Tuple{}}, data, state, index) = state
+
+@inline applyrule(rule::Independent{X,T}, data, state, index) where {X,T} = begin  
     @set state[X] = applyrule(val(rule), data, state[X], index)
 end
-@inline applyrule(rule::Combined, data, state, index) where I =  
+@inline applyrule(rule::Interactive, data, state, index) where I =  
     applyrule(val(rule), data, state, index)

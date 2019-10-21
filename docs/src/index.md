@@ -100,10 +100,8 @@ REPLOutput
 
 ```@docs
 AbstractFrameProcessor
-GreyscaleProcessor
-GreyscaleZerosProcessor
-ColorSchemeProcessor
-ColorSchemeZerosProcessor
+ColorProcessor
+Greyscale
 ```
 
 ## Overflow

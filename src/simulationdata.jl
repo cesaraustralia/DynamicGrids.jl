@@ -1,6 +1,6 @@
 abstract type AbstractSimData{T,N} <: AbstractArray{T,N} end
 
-@mix struct SimDataMixin{T,N,I<:AbstractArray{T,N},S,St,LSt,B,Ra,Ru,Ti}
+@mix struct SimDataMixin{T,N,I<:AbstractArray{T,N},S,St,LSt,B,Ra,Ru,STi,CTi,CFr}
     init::I
     source::S
     dest::S
@@ -10,12 +10,17 @@ abstract type AbstractSimData{T,N} <: AbstractArray{T,N} end
     buffers::B
     radius::Ra
     ruleset::Ru
-    t::Ti
+    starttime::STi
+    currenttime::CTi
+    currentframe::CFr
 end
 
+SimDataOrReps = Union{AbstractSimData, Vector{<:AbstractSimData}}
+
 (::Type{T})(data::AbstractSimData) where T <: AbstractSimData =
-    T(data.init, data.source, data.dest, data.sourcestatus, data.deststatus,
-      data.localstatus, data.buffers, data.radius, data.ruleset, data.t)
+    T(init(data), source(data), dest(data), sourcestatus(data), deststatus(data),
+      localstatus(data), buffers(data), radius(data), ruleset(data), starttime(data), 
+      currenttime(data), currentframe(data))
 
 Setfield.constructor_of(::Type{T}) where T<:AbstractSimData = T
 
@@ -40,16 +45,58 @@ localstatus(d::AbstractSimData) = d.localstatus
 buffers(d::AbstractSimData) = d.buffers
 radius(d::AbstractSimData) = d.radius
 ruleset(d::AbstractSimData) = d.ruleset
-currenttime(d::AbstractSimData) = d.t
+starttime(d::AbstractSimData) = d.starttime
+currenttime(d::AbstractSimData) = d.currenttime
+currentframe(d::AbstractSimData) = d.currentframe
 
+
+# Getters forwarded to ruleset
 framesize(d::AbstractSimData) = size(init(d))
 mask(d::AbstractSimData) = mask(ruleset(d))
 overflow(d::AbstractSimData) = overflow(ruleset(d))
 timestep(d::AbstractSimData) = timestep(ruleset(d))
 cellsize(d::AbstractSimData) = cellsize(ruleset(d))
+rules(d::AbstractSimData) = rules(ruleset(d))
+
+"""
+Get the actual current timestep, ie. not variable periods like Month
+"""
+currenttimestep(d::AbstractSimData) = currenttime(d) + timestep(d) - currenttime(d)
 
 " Simulation data and storage is passed to rules for each timestep "
 @SimDataMixin struct SimData{} <: AbstractSimData{T,N} end
+
+"""
+Generate simulation data to match a ruleset and init array.
+"""
+SimData(ruleset::AbstractRuleset, init::AbstractArray, starttime) = begin
+    r = maxradius(ruleset)
+    # We add one extra row/column so we dont have to worry about
+    # special casing the last block
+    if r > 0
+        hoodsize = 2r + 1
+        blocksize = 2r
+        source = addpadding(init, r)
+        nblocs = indtoblock.(size(source), blocksize) .+ 1
+        sourcestatus = BitArray(zeros(Bool, nblocs))
+        deststatus = deepcopy(sourcestatus)
+        updatestatus!(parent(source), sourcestatus, deststatus, r)
+
+        buffers = [zeros(eltype(init), hoodsize, hoodsize) for i in 1:blocksize]
+        localstatus = zeros(Bool, 2, 2)
+    else
+        source = deepcopy(init)
+        sourcestatus = deststatus = true
+        buffers = nothing
+        localstatus = nothing
+    end
+    dest = deepcopy(source)
+    currentframe = 1
+    currenttime = starttime
+
+    SimData(init, source, dest, sourcestatus, deststatus, localstatus, buffers, r, 
+            ruleset, starttime, currenttime, currentframe)
+end
 
 """
 Swap source and dest arrays. Allways returns regular SimData.
@@ -65,40 +112,14 @@ end
 """
 Uptate timestamp
 """
-updatetime(data::SimData, t) = begin
-    @set! data.t = t
+updatetime(data::SimData, f::Integer) = begin
+    @set! data.currentframe = f
+    @set! data.currenttime = timefromframe(data, f)
     data
 end
-updatetime(data::AbstractVector{<:SimData}, t) = updatetime.(data, t)
+updatetime(data::AbstractVector{<:SimData}, f) = updatetime.(data, f)
 
-"""
-Generate simulation data to match a ruleset and init array.
-"""
-simdata(ruleset::AbstractRuleset, init::AbstractArray) = begin
-    r = maxradius(ruleset)
-    # We add one extra row/column so we dont have to worry about
-    # special casing the last block
-    if r > 0
-        hoodsize = 2r + 1
-        blocksize = 2r
-        source = addpadding(init, r)
-        nblocs = indtoblock.(size(source), blocksize) .+ 1
-        sourcestatus = BitArray(zeros(Bool, nblocs))
-        deststatus = deepcopy(sourcestatus)
-        updatestatus!(parent(source), sourcestatus, deststatus, r)
-
-        buffers = typeof(init)[[zero(eltype(init)) for a in hoodsize, b in hoodsize] for i in 1:blocksize]
-        localstatus = zeros(Bool, 2, 2)
-    else
-        source = deepcopy(init)
-        sourcestatus = deststatus = true
-        buffers = nothing
-        localstatus = nothing
-    end
-    dest = deepcopy(source)
-
-    SimData(init, source, dest, sourcestatus, deststatus, localstatus, buffers, r, ruleset, 1)
-end
+timefromframe(data::AbstractSimData, f) = starttime(data) + (f - 1) * timestep(data)
 
 """
 Find the maximum radius required by all rules
@@ -137,17 +158,23 @@ updatestatus!(source, sourcestatus, deststatus, r) = begin
     end
 end
 
-initdata!(data::AbstractSimData) = begin
+initdata!(data::AbstractSimData, ruleset, init, starttime, nreplicates) = 
+    initdata!(data, ruleset, starttime)
+initdata!(data::AbstractVector{<:AbstractSimData}, ruleset, init, starttime, nreplicates::Integer) = 
+    initdata!.(data)
+initdata!(data::Nothing, ruleset, init, starttime, nreplicates::Nothing) = 
+    SimData(ruleset, init, starttime)
+initdata!(data::Nothing, ruleset, init, starttime, nreplicates::Integer) = 
+    [SimData(ruleset, init, starttime) for r in 1:nreplicates]
+initdata!(data::AbstractSimData, ruleset, starttime) = begin
     for j in 1:framesize(data)[2], i in 1:framesize(data)[1]
         @inbounds source(data)[i, j] = dest(data)[i, j] = init(data)[i, j]
     end
     updatestatus!(data)
+    @set! data.ruleset = ruleset
+    @set! data.starttime = starttime
     data
 end
-initdata!(data::AbstractSimData, ruleset, init, nreplicates) = initdata!(data)
-initdata!(data::AbstractVector{<:AbstractSimData}, ruleset, init, nreplicates::Integer) = initdata!.(data)
-initdata!(data::Nothing, ruleset, init, nreplicates::Nothing) = simdata(ruleset, init)
-initdata!(data::Nothing, ruleset, init, nreplicates::Integer) = [simdata(ruleset, init) for r in 1:nreplicates]
 
 indtoblock(x, blocksize) = (x - 1) ÷ blocksize + 1
 blocktoind(x, blocksize) = (x - 1) * blocksize + 1

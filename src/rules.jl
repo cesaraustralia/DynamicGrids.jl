@@ -6,6 +6,17 @@ The output of the rule for an AbstractRule is allways written to the current cel
 """
 abstract type AbstractRule end
 
+show(io::IO, rule::AbstractRule) = begin
+    indent = get(io, :indent, "")
+    printstyled(io, indent, Base.nameof(typeof(rule)); color=:red)
+    if nfields(rule) > 0
+        printstyled(io, " :\n"; color=:red)
+        for fn in fieldnames(typeof(rule))
+            println(io, indent, "    ", fn, " = ", repr(getfield(rule, fn)))
+        end
+    end
+end
+
 """
 AbstractPartialRule is for rules that manually write to whichever cells of the grid
 that they choose, instead of updating every cell with their output.
@@ -32,6 +43,8 @@ Custom Neighborhood rules must return their radius with a `radius()` method.
 """
 abstract type AbstractNeighborhoodRule{R} <: AbstractRule end
 
+neighborhood(rule::AbstractNeighborhoodRule) = rule.neighborhood 
+
 """
 A Rule that only writes to its neighborhood, defined by its radius distance from the current point.
 TODO: should this exist?
@@ -39,6 +52,8 @@ TODO: should this exist?
 Custom PartialNeighborhood rules must return their radius with a `radius()` method.
 """
 abstract type AbstractPartialNeighborhoodRule{R} <: AbstractPartialRule end
+
+neighborhood(rule::AbstractPartialNeighborhoodRule) = rule.neighborhood 
 
 """
 A Rule that only writes and accesses a single cell: its return value is the new
@@ -48,17 +63,3 @@ Accessing the `data.source` and `data.dest` arrays directly is not guaranteed to
 correct results, and should not be done.
 """
 abstract type AbstractCellRule <: AbstractRule end
-
-
-"""
-Singleton types for choosing the grid overflow rule used in
-[`inbounds`](@ref). These determine what is done when a neighborhood
-or jump extends outside of the grid.
-"""
-abstract type AbstractOverflow end
-
-"Wrap cords that overflow boundaries back to the opposite side"
-struct WrapOverflow <: AbstractOverflow end
-
-"Remove coords that overflow boundaries"
-struct RemoveOverflow <: AbstractOverflow end

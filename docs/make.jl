@@ -6,5 +6,5 @@ makedocs(
 )
 
 deploydocs(
-    repo = "github.com/rafaqz/DynamicGrids.jl.git",
+    repo = "github.com/cesaraustralia/DynamicGrids.jl.git",
 )
