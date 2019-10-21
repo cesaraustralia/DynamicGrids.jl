@@ -67,8 +67,10 @@ show(io::IO, ruleset::Ruleset) = begin
     end
 end
 
+abstract type AbstractRuleGroup <: AbstractRule end
 
-abstract type RuleMode{T} end
+
+abstract type AbstractRuleMode{T} <: AbstractRuleGroup end
 
 struct Independent{T} <: RuleMode{T} val::T end
 struct Interactive{Keys,T} <: RuleMode{T} 

@@ -128,7 +128,7 @@ sequencerules!(data::SimData, rules::Tuple) = begin
 end
 @inline sequencerules!(data::SimData, rules::Tuple{}) = data
 """
-Threaded replicate simulations. If nreplicates is set the data object
+Threaded replicate simulations. If `nreplicates` is set the data object
 will be a vector of replicate data, so we loop over it with threads.
 """
 sequencerules!(data::AbstractVector{<:SimData}, rules) = begin
@@ -138,9 +138,18 @@ sequencerules!(data::AbstractVector{<:SimData}, rules) = begin
     data
 end
 
+"""
+    precalcrules(rule, data) = rule
+
+Rule precalculation. This is a functional approach rebuilding rules recursively.
+@set from Setfield.jl helps in specific rule implementations.
+
+The default is to return the existing rule
+"""
+precalcrules(rule, data) = rule
+
 precalcrules(data::SimData) = @set data.ruleset.rules = precalcrules(rules(data), data)
 precalcrules(rules::Tuple, data) =
     (precalcrules(rules[1], data), precalcrules(tail(rules), data)...)
 precalcrules(rules::Tuple{}, data) = ()
 precalcrules(chain::Chain, data) = Chain(precalcrules(val(chain), data)...)
-precalcrules(rule, data) = rule

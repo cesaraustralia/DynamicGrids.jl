@@ -3,7 +3,7 @@ Chains allow chaining rules together to be completed in a single processing step
 without intermediate writes, and potentially compiled together into a single function call. 
 These can either be all AbstractCellRule or AbstractNeighborhoodRule followed by AbstractCellRule.
 """
-struct Chain{T} <: AbstractRule
+struct Chain{T} <: AbstractRuleGroup{T}
     val::T
 end
 Chain(t::Tuple) = begin
