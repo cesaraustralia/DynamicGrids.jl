@@ -44,9 +44,11 @@ export AbstractSimData, SimData
 
 export AbstractRule, AbstractPartialRule,
        AbstractNeighborhoodRule, AbstractPartialNeighborhoodRule,
-       AbstractCellRule
+       AbstractCellRule, Chain
 
-export AbstractRuleset, Ruleset, Chain
+export AbstractInteraction
+
+export AbstractRuleset, Ruleset, MultiRuleset
 
 export AbstractLife, Life
 
@@ -76,6 +78,7 @@ const FIELDDOCTABLE = FieldDocTable((:Description, :Default, :Limits),
     """
 
 include("rules.jl")
+include("interactions.jl")
 include("chain.jl")
 include("rulesets.jl")
 include("simulationdata.jl")
@@ -86,7 +89,9 @@ include("outputs/array.jl")
 include("outputs/repl.jl")
 include("interface.jl")
 include("framework.jl")
+include("sequencerules.jl")
 include("maprules.jl")
+include("mapinteractions.jl")
 include("neighborhoods.jl")
 include("utils.jl")
 include("life.jl")

@@ -1,5 +1,5 @@
 using DynamicGrids, Test
-using DynamicGrids: inbounds, broadcastable_indices
+using DynamicGrids: inbounds
 
 @testset "boundary overflow checks are working" begin
     @testset "inbounds with RemoveOverflow() returns index and false for an overflowed index" begin
@@ -18,9 +18,4 @@ using DynamicGrids: inbounds, broadcastable_indices
         @test inbounds((22,0), (10, 10), WrapOverflow()) == ((2,10),true)
         @test inbounds((-22,0), (10, 10), WrapOverflow()) == ((8,10),true)
     end
-end
-
-
-@testset "builds indices matrix" begin
-    @test broadcastable_indices([1 2 3; 3 4 5]) == [(1, 1) (1, 2) (1, 3); (2, 1) (2, 2) (2, 3)]
 end

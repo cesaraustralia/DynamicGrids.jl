@@ -58,7 +58,6 @@ end
     applyrule!(rule, data, state, I)
 end
 
-
 struct UpdateDest end
 @inline blockdo!(data::WritableSimData, ::UpdateDest, I) = begin
     out = source(data)[I...]
@@ -93,7 +92,7 @@ The neighborhood is copied to the rules neighborhood buffer array for performanc
 #     end
 # end
 
-maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule,Chain{<:Tuple{AbstractNeighborhoodRule,Vararg}}}, 
+maprule!(data::AbstractSingleSimData{T,2}, rule::Union{AbstractNeighborhoodRule,Chain{<:Tuple{AbstractNeighborhoodRule,Vararg}}}, 
          args...) where T = begin
     # The rule provides the neighborhood buffer
     r = radius(rule)
@@ -106,12 +105,12 @@ maprule!(data::AbstractSimData{T,2}, rule::Union{AbstractNeighborhoodRule,Chain{
     nrows, ncols = framesize(data)
 
     handleoverflow!(data, r)
-    # Use the simplest number type at or above eltype(src) that can be added
+    # Center of the buffer for both axes
     center = r + 1
     deststatus(data) .= false
 
     # Run the rule row by row. When we move along a row by one cell, we access only
-    # a single new column of data same the hight of the nighborhood, and move the existing
+    # a single new column of data the same hight of the nighborhood, and move the existing
     # data in the neighborhood buffer array accross by one column. This saves on reads
     # from the main array, and focusses reads and writes in the small buffer array that
     # should be in fast local memory.
@@ -207,13 +206,13 @@ end
 Wrap overflow where required. This optimisation allows us to ignore
 bounds checks on neighborhoods and still use a wraparound grid.
 """
-handleoverflow!(data::AbstractSimData, r::Integer) = handleoverflow!(data, overflow(data), r)
-handleoverflow!(data::AbstractSimData{T,1}, overflow::WrapOverflow, r::Integer) where T = begin
+handleoverflow!(data::AbstractSingleSimData, r::Integer) = handleoverflow!(data, overflow(data), r)
+handleoverflow!(data::AbstractSingleSimData{T,1}, overflow::WrapOverflow, r::Integer) where T = begin
     # Copy two sides
     @inbounds copyto!(source, 1-r:0, source, nrows+1-r:nrows)
     @inbounds copyto!(source, nrows+1:nrows+r, source, 1:r)
 end
-handleoverflow!(data::AbstractSimData{T,2}, overflow::WrapOverflow, r::Integer) where T = begin
+handleoverflow!(data::AbstractSingleSimData{T,2}, overflow::WrapOverflow, r::Integer) where T = begin
     # TODO optimise this. Its mostly a placeholder so wrapping still works in GOL tests.
     src = source(data)
     nrows, ncols = framesize(data)
@@ -256,7 +255,8 @@ handleoverflow!(data, overflow::RemoveOverflow, r) = nothing
 combinestatus(x::Number, y::Number) = x + y
 combinestatus(x::Integer, y::Integer) = x | y
 
-updatestatus!(copyto::AbstractArray, copyfrom::AbstractArray) = @inbounds copyto .= copyfrom
+updatestatus!(copyto::AbstractArray, copyfrom::AbstractArray) = 
+    @inbounds copyto .= copyfrom
 updatestatus!(copyto, copyfrom) = nothing
 
 
@@ -278,9 +278,3 @@ end
     applyrule(tail(rules), data, newstate, index)
 end
 @inline applyrule(rules::Chain{Tuple{}}, data, state, index) = state
-
-@inline applyrule(rule::Independent{X,T}, data, state, index) where {X,T} = begin  
-    @set state[X] = applyrule(val(rule), data, state[X], index)
-end
-@inline applyrule(rule::Interactive, data, state, index) where I =  
-    applyrule(val(rule), data, state, index)

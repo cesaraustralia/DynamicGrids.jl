@@ -9,7 +9,6 @@ as defined in the Rule.
 - `data` : [`FrameData`](@ref)
 - `state`: the value of the current cell
 - `index`: a (row, column) tuple of Int for the current cell coordinates - `t`: the current time step
-- `args`: additional arguments passed through from user input to [`sim!`](@ref)
 
 Returns a value to be written to the current cell.
 """
@@ -26,6 +25,15 @@ from [`AbstractPartialRule`](@ref).
 see [`applyrule`](@ref)
 """
 function applyrule! end
+
+"""
+    applyinteraction!(interacttion::AbstractPartialRule, data, state, index)
+
+Applay an interation that manually writes to the passed in dest arrays.
+### Arguments:
+see [`applyrule`](@ref)
+"""
+function applyinteraction! end
 
 """
     precalcrule!(rule, data)

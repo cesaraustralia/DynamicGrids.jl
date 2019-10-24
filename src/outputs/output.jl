@@ -8,8 +8,10 @@ many cases can be used interchangeably.
 abstract type AbstractOutput{T} <: AbstractVector{T} end
 
 "Generic ouput constructor. Converts init array to vector of frames."
-(::Type{F})(init::T; kwargs...) where F <: AbstractOutput where T <: AbstractMatrix =
-    F(; frames=T[deepcopy(init)], kwargs...)
+(::Type{F})(init::AbstractMatrix; kwargs...) where F <: AbstractOutput =
+    F(; frames=[deepcopy(init)], kwargs...)
+(::Type{F})(init::NamedTuple; kwargs...) where F <: AbstractOutput =
+    F(; frames=[deepcopy(init)], kwargs...)
 
 (::Type{F})(o::T; kwargs...) where F <: AbstractOutput where T <: AbstractOutput =
     F(; frames=frames(o), starttime=starttime(o), stoptime=stoptime(o), kwargs...)
@@ -65,13 +67,26 @@ showframe(o::AbstractOutput, args...) = nothing
 frameindex(o::AbstractOutput, data::AbstractSimData) = frameindex(o, currentframe(data))
 frameindex(o::AbstractOutput, f) = isstored(o) ? f : oneunit(f)
 
+zeroframes(init::AbstractArray, nframes) = [zero(init) for f in 1:nframes]
+zeroframes(init::NamedTuple, nframes) = 
+    [map(layer -> zero(layer), init) for f in 1:nframes]
+
+
 @inline blockdo!(data, output::AbstractOutput, index, f) =
     return @inbounds output[f][index...] = data[index...]
 
 storeframe!(output, data) = storeframe!(output, data, frameindex(output, data))
-storeframe!(output, data::AbstractArray, f) = begin
+storeframe!(output, data, f) = begin
     checkbounds(output, f)
     blockrun!(data, output, f)
+end
+storeframe!(output, multidata::MultiSimData, f) = begin
+    println("OUOUTTTTTTTTPPPPPPPPUUUUUUUUUUUUUUUUUT", typeof(output))
+    checkbounds(output, f)
+
+    for key in keys(multidata)
+        blockrun!(data[key], output[key], f)
+    end
 end
 # Replicated frames
 storeframe!(output, data::AbstractVector{<:SimData}, f) = begin
@@ -96,6 +111,17 @@ initframes!(o::AbstractOutput, init) = begin
     first(o) .= init
     for f = (firstindex(o) + 1):lastindex(o)
         @inbounds o[f] .= zero(eltype(init))
+    end
+    o
+end
+initframes!(o::AbstractOutput, init::NamedTuple) = begin
+    for key in keys(init)
+        first(o)[key] .= init[key]
+    end
+    for f = (firstindex(o) + 1):lastindex(o)
+        for key in keys(init)
+            @inbounds o[f][key] .= zero(eltype(init[key]))
+        end
     end
     o
 end

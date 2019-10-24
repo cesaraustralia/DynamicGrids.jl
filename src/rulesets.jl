@@ -40,20 +40,14 @@ array and other simulaiton details.
 end
 Ruleset(rules::Vararg{<:AbstractRule}; kwargs...) = Ruleset(; rules=rules, kwargs...)
 
-Ruleset(args...; init=nothing, mask=nothing, overflow=RemoveOverflow(), cellsize=1, timestep=1, 
-        minval=0, maxval=1) = 
+Ruleset(args...; init=nothing, mask=nothing, overflow=RemoveOverflow(), cellsize=1, timestep=1,
+        minval=0, maxval=1) =
     Ruleset{typeof.((args, init, mask, overflow, cellsize, timestep, minval))...
            }(args, init, mask, overflow, cellsize, timestep, minval, maxval)
 rules(rs::Ruleset) = rs.rules
 
 # Getters
 rules(rs::Ruleset) = rs.rules
-init(rs::Ruleset) = rs.init
-mask(rs::Ruleset) = rs.mask
-overflow(rs::Ruleset) = rs.overflow
-cellsize(rs::Ruleset) = rs.cellsize
-timestep(rs::Ruleset) = rs.timestep
-ruleset(rs::Ruleset) = rs
 
 show(io::IO, ruleset::Ruleset) = begin
     printstyled(io, Base.nameof(typeof(ruleset)), " =\n"; color=:blue)
@@ -67,26 +61,39 @@ show(io::IO, ruleset::Ruleset) = begin
     end
 end
 
-abstract type AbstractRuleGroup <: AbstractRule end
 
-
-abstract type AbstractRuleMode{T} <: AbstractRuleGroup end
-
-struct Independent{T} <: RuleMode{T} val::T end
-struct Interactive{Keys,T} <: RuleMode{T} 
-    val::T 
+struct MultiRuleset{R<:NamedTuple, X<:Tuple{AbstractInteraction,Vararg},I,M,O,C,T} <: AbstractRuleset
+    rulesets::R
+    interactions::X
+    init::I
+    mask::M
+    overflow::O
+    cellsize::C
+    timestep::T
 end
-Interactive{Keys}(t) where Keys = Interactive{Keys,typeof(t)}(t)
+MultiRuleset(; rulesets=(), interactions=(), init=map(init, rulesets), 
+             mask=nothing, overflow=RemoveOverflow(), cellsize=1, timestep=1) = begin
+    rulesets = map(r -> standardise_ruleset(r, mask, overflow, cellsize, timestep), rulesets)
+    MultiRuleset(rulesets, interactions, init, mask, overflow, cellsize, timestep)
+end
 
-# Provide a constructor for generic rule reconstruction
-ConstructionBase.constructorof(::Type{Interactive{Keys}}) where Keys = Interactive{Keys} 
+ruleset(mrs::MultiRuleset) = mrs.rulesets
+interactions(mrs::MultiRuleset) = mrs.interactions
+
+Base.getindex(mrs::MultiRuleset, key) = getindex(ruleset(mrs), key)
+Base.keys(mrs::MultiRuleset) = keys(ruleset(mrs))
+
+standardise_ruleset(ruleset, mask, overflow, cellsize, timestep) = begin
+    @set! ruleset.mask = mask 
+    @set! ruleset.overflow = overflow 
+    @set! ruleset.cellsize = cellsize 
+    @set! ruleset.timestep = timestep 
+    ruleset
+end
 
 
-val(rm::RuleMode) = rm.val
-maxradius(rm::RuleMode) = maxradius(val(rm))
 
+# struct HasMinMax end
+# struct NoMinMax end
 
-struct HasMinMax end
-struct NoMinMax end
-
-hasminmax(ruleset::T) where T = fieldtype(T, :minval) <: Number ? HasMinMax() : NoMinMax()
+# hasminmax(ruleset::T) where T = fieldtype(T, :minval) <: Number ? HasMinMax() : NoMinMax()
