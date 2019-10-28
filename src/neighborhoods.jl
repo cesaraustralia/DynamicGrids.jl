@@ -100,3 +100,21 @@ radius(rule::AbstractPartialNeighborhoodRule) = radius(neighborhood(rule))
 radius(rule::AbstractRule) = 0
 # Only the first rule in a chain can have a radius.
 radius(chain::Chain) = radius(chain[1])
+
+@inline mapsetneighbor!(data, hood::RadialNeighborhood, rule::AbstractPartialNeighborhoodRule, state, index) = begin
+    r = radius(hood)
+    exported = zero(state)
+    # Loop over dispersal kernel grid dimensions
+    for x = one(r):2r + one(r)
+        xdest = x + index[2] - r - one(r)
+        @simd for y = one(r):2r + one(r)
+            ydest = y + index[1] - r - one(r)
+            hood_index = (y, x)
+            dest_index = (ydest, xdest)
+            exported += setneighbor!(data, hood, rule, state, hood_index, dest_index)
+        end
+    end
+    updateexported!(data, hood, rule, state, index, exported)
+    exported
+end
+@inline update_exported!(data, hood, rule, state, index, exported) = nothing
