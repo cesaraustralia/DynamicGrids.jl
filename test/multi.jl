@@ -1,33 +1,35 @@
 using DynamicGrids, Test
-import DynamicGrids: applyrule, applyinteraction!
+import DynamicGrids: applyrule, applyinteraction!, Interaction
 
 struct Double <: AbstractCellRule end
 applyrule(rule::Double, data, state, index) = state * 2
 
-struct Squared <: AbstractCellRule end
-applyrule(rule::Squared, data, state, index) = state^2
+struct Flat <: AbstractCellRule end
+applyrule(rule::Flat, data, state, index) = state
 
-struct Product{Keys} <: AbstractInteraction{Keys} end
-applyinteraction!(::Product, data, (state1, state2), index) = 
-    data[1][index...] = state1 * state2 
-
-struct Swap{Keys} <: AbstractInteraction{Keys} end
-applyinteraction!(::Swap, data, (state1, state2), index) = begin
-    data[1][index...] = state2
-    data[2][index...] = state1
+struct Predation{Keys} <: Interaction{Keys} end
+Predation(; prey=:prey, predator=:predator) = Predation{(prey, predator)}()
+applyinteraction!(::Predation, data, (prey, predator), index) = begin
+    caught = prey / 10
+    conversion = 0.1
+    data[1][index...] -= caught 
+    data[2][index...] += caught * 0.1
 end
 
-preyarray = [0 0 1; 0 1 1]
-predatorarray = [0 0 0; 0 0 1]
+preyarray = [10.0 20.0 10.0; 20.0 10.0 10.0]
+predatorarray = [2.0 2.0 2.0; 2.0 2.0 1.0]
 
 init = (prey = preyarray, predator = predatorarray)
 
 output = ArrayOutput(init, 5)
-ruleset = MultiRuleset(rulesets=(prey=Ruleset(Squared()), 
-                                 predator=Ruleset(Squared())
-                                ),
-                       interactions=(Swap{(:prey, :predator)}(), Product{(:prey, :predator)}())
-                      )
+rulesets=(prey=Ruleset(Double()), predator=Ruleset(Flat()))
+interactions=((Predation(prey=:prey, predator=:predator),)) 
+ruleset = MultiRuleset(rulesets=rulesets, interactions=interactions; init=init)
+
+output = ArrayOutput(init, 5)
+sim!(output, ruleset; init=init)
+
+
 # ruleset.rulesets
 # init
 
@@ -38,5 +40,3 @@ ruleset = MultiRuleset(rulesets=(prey=Ruleset(Squared()),
 # Display ideas
 # output(init; show=Combine((:prey, :predator), (:red, :green)))
 # output(init; show=Layout([:prey :predator; :superpredator nothing]))
-
-sim!(output, ruleset; init=init)

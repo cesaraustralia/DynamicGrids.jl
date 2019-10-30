@@ -90,14 +90,20 @@ multi_neighbors(layeredcoords::Tuple{}, hood, buf) = ()
 """
 Find the largest radius present in the passed in rules.
 """
+maxradius(set::Ruleset) = max(maxradius(rules(ruleset)))
+maxradius(set::MultiRuleset) = begin
+    ruleradius = map(maxradius, map(rules, ruleset(set)))
+    intradius = map(key -> maxradius(interactions(set), key), map(Val, keys(set)))
+    map(max, Tuple(ruleradius), Tuple(intradius)) 
+end
 maxradius(ruleset::Ruleset) = maxradius(rules(ruleset))
-maxradius(rules::Tuple{T,Vararg}) where T =
-    max(radius(rules[1]), maxradius(tail(rules))...)
-maxradius(rules::Tuple{}) = 0
+maxradius(rules::Tuple) = mapreduce(radius, max, rules)
+maxradius(rules::Tuple, key) = mapreduce(rule -> radius(rule, key), max, rules)
+
 
 radius(rule::AbstractNeighborhoodRule) = radius(neighborhood(rule))
 radius(rule::AbstractPartialNeighborhoodRule) = radius(neighborhood(rule))
-radius(rule::AbstractRule) = 0
+radius(rule::AbstractRule, args...) = 0
 # Only the first rule in a chain can have a radius.
 radius(chain::Chain) = radius(chain[1])
 
@@ -114,7 +120,5 @@ radius(chain::Chain) = radius(chain[1])
             exported += setneighbor!(data, hood, rule, state, hood_index, dest_index)
         end
     end
-    updateexported!(data, hood, rule, state, index, exported)
-    exported
 end
-@inline update_exported!(data, hood, rule, state, index, exported) = nothing
+@inline update_exported!(data, hood, rule, state, index, exported) = exported

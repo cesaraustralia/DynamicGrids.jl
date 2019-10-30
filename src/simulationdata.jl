@@ -36,27 +36,27 @@ Base.ndims(::AbstractSingleSimData{T,N}) where {T,N} = N
 Base.eltype(::AbstractSingleSimData{T}) where T = T
 
 # Getters
-init(d::AbstractSimData) = d.init
-source(d::AbstractSimData) = d.source
-dest(d::AbstractSimData) = d.dest
-sourcestatus(d::AbstractSimData) = d.sourcestatus
-deststatus(d::AbstractSimData) = d.deststatus
-localstatus(d::AbstractSimData) = d.localstatus
-buffers(d::AbstractSimData) = d.buffers
-radius(d::AbstractSimData) = d.radius
-ruleset(d::AbstractSimData) = d.ruleset
-starttime(d::AbstractSimData) = d.starttime
-currenttime(d::AbstractSimData) = d.currenttime
-currentframe(d::AbstractSimData) = d.currentframe
+init(d::AbstractSingleSimData) = d.init
+source(d::AbstractSingleSimData) = d.source
+dest(d::AbstractSingleSimData) = d.dest
+sourcestatus(d::AbstractSingleSimData) = d.sourcestatus
+deststatus(d::AbstractSingleSimData) = d.deststatus
+localstatus(d::AbstractSingleSimData) = d.localstatus
+buffers(d::AbstractSingleSimData) = d.buffers
+radius(d::AbstractSingleSimData) = d.radius
+ruleset(d::AbstractSingleSimData) = d.ruleset
+starttime(d::AbstractSingleSimData) = d.starttime
+currenttime(d::AbstractSingleSimData) = d.currenttime
+currentframe(d::AbstractSingleSimData) = d.currentframe
 
 
 # Getters forwarded to ruleset
 framesize(d::AbstractSingleSimData) = size(init(d))
-mask(d::AbstractSimData) = mask(ruleset(d))
-overflow(d::AbstractSimData) = overflow(ruleset(d))
-timestep(d::AbstractSimData) = timestep(ruleset(d))
-cellsize(d::AbstractSimData) = cellsize(ruleset(d))
-rules(d::AbstractSimData) = rules(ruleset(d))
+rules(d::AbstractSingleSimData) = rules(ruleset(d))
+mask(d::AbstractSingleSimData) = mask(ruleset(d))
+overflow(d::AbstractSingleSimData) = overflow(ruleset(d))
+timestep(d::AbstractSingleSimData) = timestep(ruleset(d))
+cellsize(d::AbstractSingleSimData) = cellsize(ruleset(d))
 
 """
 Get the actual current timestep, ie. not variable periods like Month
@@ -72,8 +72,7 @@ ConstructionBase.constructorof(::Type{SimData}) =
 """
 Generate simulation data to match a ruleset and init array.
 """
-SimData(ruleset::AbstractRuleset, init::AbstractArray, starttime) = begin
-    r = maxradius(ruleset)
+SimData(ruleset::Ruleset, init::AbstractArray, starttime, r=maxradius(ruleset)) = begin
     # We add one extra row/column so we dont have to worry about
     # special casing the last block
     if r > 0
@@ -105,7 +104,8 @@ end
 """
 MultipleSimData is used for MultiRuleset models
 """
-struct MultiSimData{D,Ru} <: AbstractSimData
+struct MultiSimData{I,D<:NamedTuple,Ru} <: AbstractSimData
+    init::I
     data::D
     ruleset::Ru
 end
@@ -116,11 +116,36 @@ framesize(d::MultiSimData) = framesize(first(data(d)))
 interactions(d::MultiSimData) = interactions(ruleset(d))
 
 Base.getindex(d::MultiSimData, key) = begin
-    println(typeof(d))
-    println(keys(data(d)))
     getindex(data(d), key)
 end
 Base.keys(d::MultiSimData) = keys(data(d))
+
+# Getters
+init(d::MultiSimData) = d.init
+ruleset(d::MultiSimData) = d.ruleset
+data(d::MultiSimData) = d.data
+
+firstruleset(d::MultiSimData) = first(ruleset(ruleset(d)))
+firstdata(d::MultiSimData) = first(data(d))
+source(d::MultiSimData) = firstdata(d).source
+dest(d::MultiSimData) = firstdata(d).dest
+sourcestatus(d::MultiSimData) = firstdata(d).sourcestatus
+deststatus(d::MultiSimData) = firstdata(d).deststatus
+localstatus(d::MultiSimData) = firstdata(d).localstatus
+buffers(d::MultiSimData) = firstdata(d).buffers
+radius(d::MultiSimData) = firstdata(d).radius
+starttime(d::MultiSimData) = firstdata(d).starttime
+currenttime(d::MultiSimData) = firstdata(d).currenttime
+currentframe(d::MultiSimData) = firstdata(d).currentframe
+
+
+# Getters forwarded to ruleset
+framesize(d::MultiSimData) = size(first(init(d)))
+# rules(d::MultiSimData) = map(rules, ruleset(d))
+mask(d::MultiSimData) = mask(firstruleset(d))
+overflow(d::MultiSimData) = overflow(firstruleset(d))
+timestep(d::MultiSimData) = timestep(firstruleset(d))
+cellsize(d::MultiSimData) = cellsize(firstruleset(d))
 
 """
 Swap source and dest arrays. Allways returns regular SimData.
@@ -184,16 +209,19 @@ updatestatus!(source, sourcestatus, deststatus, r) = begin
 end
 
 # TODO document these behaviours
-initdata!(data::AbstractSimData, ruleset, init, starttime, nreplicates) =
+initdata!(data::AbstractSimData, ruleset, init::AbstractArray, starttime, nreplicates) =
     initdata!(data, ruleset, starttime)
-initdata!(data::AbstractVector{<:AbstractSimData}, ruleset, init, starttime, nreplicates::Integer) =
+initdata!(data::AbstractVector{<:AbstractSimData}, ruleset, init::AbstractArray, starttime, nreplicates::Integer) =
     map(d -> initdata!(d, ruleset, init, starttime, nreplicates), data)
 initdata!(data::Nothing, ruleset::Ruleset, init, starttime, nreplicates::Nothing) =
     SimData(ruleset, init, starttime)
-initdata!(data::Nothing, ruleset::Ruleset, init, starttime, nreplicates::Integer) =
-    [SimData(ruleset, init, starttime) for r in 1:nreplicates]
-initdata!(data::Nothing, multiruleset::MultiRuleset, init, starttime, nreplicates::Nothing) =
-    MultiSimData(map((rs, i) -> SimData(rs, i, starttime), ruleset(multiruleset), init), multiruleset)
+# initdata!(data::Nothing, ruleset::Ruleset, init, starttime, nreplicates::Integer) =
+    # [SimData(ruleset, init, starttime) for r in 1:nreplicates]
+initdata!(data::Nothing, multiruleset::MultiRuleset, init::NamedTuple, starttime, nreplicates::Nothing) = begin
+    radii = NamedTuple{keys(init)}(maxradius(multiruleset))
+    data = map((rs, ra, in) -> SimData(rs, in, starttime, ra), ruleset(multiruleset), radii, init) 
+    MultiSimData(init, data, multiruleset)
+end
 # initdata!(multidata::MultiSimData, multiruleset::MultiRuleset, init, starttime, nreplicates::Nothing) =
     # MultiSimData(map((d, rs) -> initdata!(d, rs, starttime), data(MultiSimData), ruleset(multiruleset))),
                  # interactions(multiruleset))

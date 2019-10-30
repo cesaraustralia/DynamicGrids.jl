@@ -1,7 +1,16 @@
-abstract type Interaction{Keys} <: Rule end
+"""
+Rules that involved the interaction between
+two grids
+"""
+abstract type Interaction{Keys} <: AbstractRule end
 
-keys(::Interaction{Keys}) where Keys = Keys
+Base.keys(::Interaction{Keys}) where Keys = Keys
 
 # Provide a constructor for generic rule reconstruction in Flatten.jl and Setfield.jl
-ConstructionBase.constructorof(::Type{T}) where T<:AbstractInteracton{Keys} where Keys = 
+ConstructionBase.constructorof(::Type{T}) where T<:Interaction{Keys} where Keys = 
     T{Keys} 
+
+"""
+Interactions that use a neighborhood
+"""
+abstract type NeighborhoodInteraction{Keys} <: Interaction{Keys} end

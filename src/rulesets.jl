@@ -62,7 +62,7 @@ show(io::IO, ruleset::Ruleset) = begin
 end
 
 
-struct MultiRuleset{R<:NamedTuple, X<:Tuple{AbstractInteraction,Vararg},I,M,O,C,T} <: AbstractRuleset
+struct MultiRuleset{R<:NamedTuple, X<:Tuple{Interaction,Vararg},I,M,O,C,T} <: AbstractRuleset
     rulesets::R
     interactions::X
     init::I

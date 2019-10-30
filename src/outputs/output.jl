@@ -72,20 +72,18 @@ zeroframes(init::NamedTuple, nframes) =
     [map(layer -> zero(layer), init) for f in 1:nframes]
 
 
-@inline blockdo!(data, output::AbstractOutput, index, f) =
-    return @inbounds output[f][index...] = data[index...]
+@inline blockdo!(data::SimData, frame::Array, index, f) =
+    return @inbounds frame[index...] = data[index...]
 
 storeframe!(output, data) = storeframe!(output, data, frameindex(output, data))
-storeframe!(output, data, f) = begin
+storeframe!(output, data::SimData, f) = begin
     checkbounds(output, f)
-    blockrun!(data, output, f)
+    blockrun!(data, output[f], f)
 end
 storeframe!(output, multidata::MultiSimData, f) = begin
-    println("OUOUTTTTTTTTPPPPPPPPUUUUUUUUUUUUUUUUUT", typeof(output))
     checkbounds(output, f)
-
     for key in keys(multidata)
-        blockrun!(data[key], output[key], f)
+        blockrun!(data(multidata)[key], output[f][key], f)
     end
 end
 # Replicated frames

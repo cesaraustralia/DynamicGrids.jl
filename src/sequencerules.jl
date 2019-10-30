@@ -40,4 +40,4 @@ sequenceinteractions!(multidata::MultiSimData, interactions::Tuple) = begin
     # Run the rest of the interactions, recursively
     sequenceinteractions!(multidata, tail(interactions))
 end
-sequenceinteractions!(multidata::MultiSimData, interactions::Tuple{}) = nothing
+sequenceinteractions!(multidata::MultiSimData, interactions::Tuple{}) = multidata

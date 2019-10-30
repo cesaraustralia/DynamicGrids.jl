@@ -115,8 +115,9 @@ Write the output array to a gif. You must pass a processor keyword argument for 
 Saving very large gifs may trigger a bug in Imagemagick.
 """
 savegif(filename::String, o::AbstractOutput, ruleset::AbstractRuleset=Ruleset(); 
-        processor=processor(o), kwargs...) = begin
-    images = frametoimage.(Ref(processor), Ref(o), Ref(ruleset), frames(o), collect(firstindex(o):lastindex(o)))
+        processor=processor(o), minval=0, maxval=1, kwargs...) = begin
+    fr = normaliseframe.(frames(o), minval, maxval)
+    images = frametoimage.(Ref(processor), Ref(o), Ref(ruleset), fr, collect(firstindex(o):lastindex(o)))
     array = cat(images..., dims=3)
     FileIO.save(filename, array; kwargs...)
 end
