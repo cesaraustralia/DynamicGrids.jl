@@ -72,7 +72,7 @@ zeroframes(init::NamedTuple, nframes) =
     [map(layer -> zero(layer), init) for f in 1:nframes]
 
 
-@inline blockdo!(data::SimData, frame::Array, index, f) =
+@inline blockdo!(data::SimData, frame::AbstractArray, index, f) =
     return @inbounds frame[index...] = data[index...]
 
 storeframe!(output, data) = storeframe!(output, data, frameindex(output, data))
@@ -83,7 +83,11 @@ end
 storeframe!(output, multidata::MultiSimData, f) = begin
     checkbounds(output, f)
     for key in keys(multidata)
-        blockrun!(data(multidata)[key], output[f][key], f)
+        # TODO use blocks for MutiSimData?
+        # blockrun!(data(multidata)[key], output[f][key], f)
+        for i in CartesianIndices(output[f][key])
+            output[f][key][i] = data(multidata)[key][i]
+        end
     end
 end
 # Replicated frames

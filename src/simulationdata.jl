@@ -249,12 +249,12 @@ ConstructionBase.constructorof(::Type{WritableSimData}) =
     (init, args...) -> SimData{eltype(init),ndims(init),typeof(init),typeof.(args)...}(init, args...)
 
 Base.@propagate_inbounds Base.setindex!(d::WritableSimData, x, I...) = begin
-    r = radius(d)
-    if r > 0
+    if (r = radius(d)) > 0
         bi = indtoblock.(I .+ r, 2r)
         deststatus(d)[bi...] = true
     end
     isnan(x) && error("NaN in setindex: ", (d, I))
+    println(I)
     dest(d)[I...] = x
 end
 Base.@propagate_inbounds Base.getindex(d::WritableSimData, I...) = getindex(dest(d), I...)

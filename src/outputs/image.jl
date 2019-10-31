@@ -53,6 +53,7 @@ Frame processors convert arrays into RGB24 images for display.
 """
 abstract type AbstractFrameProcessor end
 
+abstract type MultiFrameProcessor <: AbstractFrameProcessor end
 
 """
 Convert frame matrix to RGB24, using an AbstractFrameProcessor
@@ -60,7 +61,7 @@ Convert frame matrix to RGB24, using an AbstractFrameProcessor
 function frametoimage end
 
 frametoimage(o::AbstractImageOutput, i::Integer) = frametoimage(o, o[i], i)
-frametoimage(o::AbstractImageOutput, frame::AbstractArray, i::Integer) = 
+frametoimage(o::AbstractImageOutput, frame, i::Integer) = 
     frametoimage(processor(o), o, Ruleset(), o[i], i)
 frametoimage(o::AbstractImageOutput, args...) = frametoimage(processor(o), o, args...)
 
@@ -74,26 +75,83 @@ struct ColorProcessor{S,Z,M} <: AbstractFrameProcessor
     zerocolor::Z
     maskcolor::M
 end
-
 ColorProcessor(; scheme=Greyscale(), zerocolor=nothing, maskcolor=nothing) =
     ColorProcessor(scheme, zerocolor, maskcolor)
 
+scheme(processor::ColorProcessor) = processor.scheme
+zerocolor(processor::ColorProcessor) = processor.zerocolor
+maskcolor(processor::ColorProcessor) = processor.maskcolor
 
-frametoimage(p::ColorProcessor, o::AbstractOutput, ruleset::AbstractRuleset, frame, t) = begin
-    frame = normaliseframe(o, frame)
+frametoimage(p::ColorProcessor, o::AbstractOutput, 
+             ruleset::AbstractRuleset, frame::AbstractArray, t) = begin
     img = similar(frame, RGB24)
     for i in CartesianIndices(frame)
-        x = frame[i]
-        img[i] = if !(p.maskcolor isa Nothing) && ismasked(mask(ruleset), i)
-            p.maskcolor
-        elseif !(p.zerocolor isa Nothing) && x == zero(x)
-            p.zerocolor
+        img[i] = if !(maskcolor(p) isa Nothing) && ismasked(mask(ruleset), i)
+            maskcolor(p)
         else
-            rgb(p.scheme, x)
+            x = frame[i]
+            if hasminmax(output) isa HasMinMax
+                x = normalise(x, minval(o), maxval(o))
+            end
+            if !(zerocolor(p) isa Nothing) && x == zero(x)
+                zerocolor(p)
+            else
+                rgb(scheme(p), x)
+            end
         end
     end
     img
 end
+
+abstract type BandColor end
+
+struct Red <: BandColor end
+struct Green <: BandColor end
+struct Blue <: BandColor end
+
+struct ThreeColor{C<:Tuple,Z,M} <: MultiFrameProcessor
+    colors::C
+    zerocolor::Z
+    maskcolor::M
+end
+ThreeColor(; colors=(Red(), Green(), Blue()), zerocolor=nothing, maskcolor=nothing) =
+    ThreeColor(colors, zerocolor, maskcolor)
+
+colors(processor::ThreeColor) = processor.colors
+zerocolor(processor::ThreeColor) = processor.zerocolor
+maskcolor(processor::ThreeColor) = processor.maskcolor
+
+frametoimage(p::ThreeColor, o::AbstractOutput, ruleset::MultiRuleset, bands::NamedTuple, t) = begin
+    img = similar(first(bands), RGB24)
+    ncols = length(colors(p))
+    nbands = length(bands) 
+    nbands == ncols || throw(ArgumentError("$nbands layers in model but $ncols colors"))
+
+    for i in CartesianIndices(first(bands))
+        img[i] = if !(maskcolor(p) isa Nothing) && ismasked(mask(ruleset), i)
+            maskcolor(p)
+        else
+            if hasminmax(o) isa HasMinMax
+                xs = map((f, mi, ma) -> normalise(f[i], mi, ma), values(bands), minval(o), maxval(o))
+            else
+                xs = map(f -> f[i], values(bands))
+            end
+            if !(zerocolor(p) isa Nothing) && all(map(x -> x .== zero(x), xs))
+                zerocolor(p)
+            else
+                acc = (0.0, 0.0, 0.0)
+                combine(colors(p), acc, xs)
+            end
+        end
+    end
+    img
+end
+
+combine(c::Tuple{Red,Vararg}, acc, xs) = combine(tail(c), (acc[1] + xs[1], acc[2], acc[3]), tail(xs))
+combine(c::Tuple{Green,Vararg}, acc, xs) = combine(tail(c), (acc[1], acc[2] + xs[1], acc[3]), tail(xs))
+combine(c::Tuple{Blue,Vararg}, acc, xs) = combine(tail(c), (acc[1], acc[2], acc[3] + xs[1]), tail(xs))
+combine(c::Tuple{Nothing,Vararg}, acc, xs) = combine(tail(c), acc, tail(xs))
+combine(c::Tuple{}, acc, xs) = RGB24(acc...)
 
 rgb(g::Greyscale, x) = RGB24(scale(x, g.min, g.max))
 rgb(scheme::ColorSchemes.ColorScheme, x) = RGB24(get(scheme, x))
@@ -128,12 +186,15 @@ struct NoMinMax end
 
 hasminmax(output::T) where T = (:minval in fieldnames(T)) ? HasMinMax() : NoMinMax()
 
-normaliseframe(output::AbstractOutput, a::AbstractArray) = 
+normaliseframe(output::AbstractOutput, a) = 
     normaliseframe(hasminmax(output), output, a)
+normaliseframe(::HasMinMax, output, a::NamedTuple) =
+    map(normaliseframe, values(a), minval(output), maxval(output))
 normaliseframe(::HasMinMax, output, a::AbstractArray) =
     normaliseframe(a, minval(output), maxval(output))
+normaliseframe(::NoMinMax, output, a) = a
 normaliseframe(a::AbstractArray, minval::Number, maxval::Number) = normalise.(a, minval, maxval)
 normaliseframe(a::AbstractArray, minval, maxval) = a
-normaliseframe(::NoMinMax, output, a::AbstractArray) = a
 
-normalise(x::Number, minval::Number, maxval::Number) = min((x - minval) / (maxval - minval), oneunit(eltype(x)))
+normalise(x::Number, minval::Number, maxval::Number) = 
+    min((x - minval) / (maxval - minval), oneunit(eltype(x)))

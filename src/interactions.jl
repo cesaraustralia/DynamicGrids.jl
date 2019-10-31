@@ -10,11 +10,20 @@ Base.keys(::Interaction{Keys}) where Keys = Keys
 ConstructionBase.constructorof(::Type{T}) where T<:Interaction{Keys} where Keys = 
     T{Keys} 
 
-abstract type CellInteraction{Keys} <: AbstractRule end
+abstract type CellInteraction{Keys} <: Interaction{Keys} end
 
-abstract type PartialInteraction{Keys} <: AbstractRule end
+abstract type PartialInteraction{Keys} <: Interaction{Keys} end
 
 """
-Interactions that use a neighborhood
+Interactions that use a neighborhood and write to the current cell.
 """
 abstract type NeighborhoodInteraction{Keys} <: Interaction{Keys} end
+
+neighborhood(interaction::NeighborhoodInteraction) = interaction.neighborhood 
+
+"""
+Interactions that write to a neighborhood.
+"""
+abstract type PartialNeighborhoodInteraction{Keys} <: PartialInteraction{Keys} end
+
+neighborhood(interaction::PartialInteraction) = interaction.neighborhood 

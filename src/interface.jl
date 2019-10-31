@@ -63,6 +63,11 @@ to the particular neighborhood type.
 """
 function neighbors end
 
+"""
+Set all the cells in the neighborhood.
+Usually called in `mapsetneighbor!`.
+"""
+function setneighbor! end
 
 """
 Return the radius of a rule or ruleset if it has one, otherwise zero.

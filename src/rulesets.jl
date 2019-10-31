@@ -31,7 +31,7 @@ A container for holding a sequence of AbstractRule, an init
 array and other simulaiton details.
 """
 @default_kw mutable struct Ruleset{R<:Tuple,I,M,O<:AbstractOverflow,C,T} <: AbstractRuleset
-    rules::R     | nothing
+    rules::R     | ()
     init::I      | nothing
     mask::M      | nothing
     overflow::O  | RemoveOverflow()
@@ -40,10 +40,7 @@ array and other simulaiton details.
 end
 Ruleset(rules::Vararg{<:AbstractRule}; kwargs...) = Ruleset(; rules=rules, kwargs...)
 
-Ruleset(args...; init=nothing, mask=nothing, overflow=RemoveOverflow(), cellsize=1, timestep=1,
-        minval=0, maxval=1) =
-    Ruleset{typeof.((args, init, mask, overflow, cellsize, timestep, minval))...
-           }(args, init, mask, overflow, cellsize, timestep, minval, maxval)
+Ruleset(args...; kwargs...) = Ruleset(; rules=args, kwargs...)
 rules(rs::Ruleset) = rs.rules
 
 # Getters

@@ -4,9 +4,6 @@ import DynamicGrids: applyrule, applyinteraction!, applyinteraction,  Interactio
 struct Double <: AbstractCellRule end
 applyrule(rule::Double, data, state, index) = state * 2
 
-struct Flat <: AbstractCellRule end
-applyrule(rule::Flat, data, state, index) = state
-
 struct Predation{Keys} <: Interaction{Keys} end
 Predation(; prey=:prey, predator=:predator) = Predation{(prey, predator)}()
 applyinteraction(::Predation, data, (prey, predators), index) = begin
@@ -16,18 +13,19 @@ applyinteraction(::Predation, data, (prey, predators), index) = begin
     max(prey - caught, zero(prey)), predators + caught * 0.1 - predators * mortality
 end
 
-preyarray = [10.0 20.0 10.0; 20.0 10.0 10.0]
-predatorarray = [2.0 2.0 2.0; 2.0 2.0 1.0]
+preyarray = rand(300, 300) .* 20
+predatorarray = rand(300, 300) .* 2 
 init = (prey=preyarray, predator=predatorarray)
 
-output = ArrayOutput(init, 5)
-rulesets=(prey=Ruleset(Double()), predator=Ruleset(Flat()))
+output = ArrayOutput(init, 20)
+rulesets=(prey=Ruleset(Double()), predator=Ruleset());
 interactions=(Predation(prey=:prey, predator=:predator),) 
-# interactions=()
 ruleset = MultiRuleset(rulesets=rulesets, interactions=interactions; init=init)
 
-output = ArrayOutput(init, 15)
-sim!(output, ruleset; init=init)
+using DynamicGridsGtk
+processor=DynamicGrids.ThreeColor(colors=(DynamicGrids.Blue(), DynamicGrids.Red()))
+output = GtkOutput(init; processor=processor, minval=(0, 0), maxval=(1000, 100), store=true)
+sim!(output, ruleset; init=init, tspan=(1, 60), fps=50)
 
 
 # ruleset.rulesets
@@ -38,5 +36,5 @@ sim!(output, ruleset; init=init)
 # typeof(msd)
 
 # Display ideas
-# output(init; show=Combine((:prey, :predator), (:red, :green)))
-# output(init; show=Layout([:prey :predator; :superpredator nothing]))
+# output(init; processor=ThreeColor((:prey, :predator), (:red, :green)))
+# output(init; processor=Layout([:prey :predator; :superpredator nothing]))

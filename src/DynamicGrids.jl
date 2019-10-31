@@ -46,7 +46,8 @@ export AbstractRule, AbstractPartialRule,
        AbstractNeighborhoodRule, AbstractPartialNeighborhoodRule,
        AbstractCellRule, Chain
 
-export AbstractInteraction
+export Interaction, NeighborhoodInteraction, CellInteraction,
+       PartialInteraction, PartialNeighborhoodInteraction
 
 export AbstractRuleset, Ruleset, MultiRuleset
 
