@@ -27,6 +27,15 @@ see [`applyrule`](@ref)
 function applyrule! end
 
 """
+    applyinteraction(interacttion::AbstractPartialRule, data, state, index)
+
+Applay an interation that returns a tuple of values.
+### Arguments:
+see [`applyrule`](@ref)
+"""
+function applyinteraction end
+
+"""
     applyinteraction!(interacttion::AbstractPartialRule, data, state, index)
 
 Applay an interation that manually writes to the passed in dest arrays.

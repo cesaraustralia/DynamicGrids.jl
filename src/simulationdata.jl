@@ -127,16 +127,17 @@ data(d::MultiSimData) = d.data
 
 firstruleset(d::MultiSimData) = first(ruleset(ruleset(d)))
 firstdata(d::MultiSimData) = first(data(d))
-source(d::MultiSimData) = firstdata(d).source
-dest(d::MultiSimData) = firstdata(d).dest
-sourcestatus(d::MultiSimData) = firstdata(d).sourcestatus
-deststatus(d::MultiSimData) = firstdata(d).deststatus
-localstatus(d::MultiSimData) = firstdata(d).localstatus
-buffers(d::MultiSimData) = firstdata(d).buffers
-radius(d::MultiSimData) = firstdata(d).radius
-starttime(d::MultiSimData) = firstdata(d).starttime
-currenttime(d::MultiSimData) = firstdata(d).currenttime
-currentframe(d::MultiSimData) = firstdata(d).currentframe
+
+source(d::MultiSimData) = source(firstdata(d))
+dest(d::MultiSimData) = dest(firstdata(d))
+sourcestatus(d::MultiSimData) = sourcestatus(firstdata(d))
+deststatus(d::MultiSimData) = deststatus(firstdata(d))
+localstatus(d::MultiSimData) = localstatus(firstdata(d))
+buffers(d::MultiSimData) = buffers(firstdata(d))
+radius(d::MultiSimData) = radius(firstdata(d))
+starttime(d::MultiSimData) = starttime(firstdata(d))
+currenttime(d::MultiSimData) = currenttime(firstdata(d))
+currentframe(d::MultiSimData) = currentframe(firstdata(d))
 
 
 # Getters forwarded to ruleset
@@ -219,6 +220,7 @@ initdata!(data::Nothing, ruleset::Ruleset, init, starttime, nreplicates::Nothing
     # [SimData(ruleset, init, starttime) for r in 1:nreplicates]
 initdata!(data::Nothing, multiruleset::MultiRuleset, init::NamedTuple, starttime, nreplicates::Nothing) = begin
     radii = NamedTuple{keys(init)}(maxradius(multiruleset))
+    # println(typeof.(
     data = map((rs, ra, in) -> SimData(rs, in, starttime, ra), ruleset(multiruleset), radii, init) 
     MultiSimData(init, data, multiruleset)
 end

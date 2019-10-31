@@ -99,6 +99,7 @@ end
 maxradius(ruleset::Ruleset) = maxradius(rules(ruleset))
 maxradius(rules::Tuple) = mapreduce(radius, max, rules)
 maxradius(rules::Tuple, key) = mapreduce(rule -> radius(rule, key), max, rules)
+maxradius(rules::Tuple{}, args...) = 0
 
 
 radius(rule::AbstractNeighborhoodRule) = radius(neighborhood(rule))

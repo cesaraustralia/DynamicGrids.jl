@@ -10,6 +10,10 @@ Base.keys(::Interaction{Keys}) where Keys = Keys
 ConstructionBase.constructorof(::Type{T}) where T<:Interaction{Keys} where Keys = 
     T{Keys} 
 
+abstract type CellInteraction{Keys} <: AbstractRule end
+
+abstract type PartialInteraction{Keys} <: AbstractRule end
+
 """
 Interactions that use a neighborhood
 """

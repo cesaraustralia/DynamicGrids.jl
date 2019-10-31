@@ -1,5 +1,5 @@
 using DynamicGrids, Test
-import DynamicGrids: applyrule, applyinteraction!, Interaction
+import DynamicGrids: applyrule, applyinteraction!, applyinteraction,  Interaction
 
 struct Double <: AbstractCellRule end
 applyrule(rule::Double, data, state, index) = state * 2
@@ -9,24 +9,24 @@ applyrule(rule::Flat, data, state, index) = state
 
 struct Predation{Keys} <: Interaction{Keys} end
 Predation(; prey=:prey, predator=:predator) = Predation{(prey, predator)}()
-applyinteraction!(::Predation, data, (prey, predator), index) = begin
-    caught = prey / 10
-    conversion = 0.1
-    data[1][index...] -= caught 
-    data[2][index...] += caught * 0.1
+applyinteraction(::Predation, data, (prey, predators), index) = begin
+    caught = prey * 0.02 * predators
+    conversion = 0.2
+    mortality = 0.1
+    max(prey - caught, zero(prey)), predators + caught * 0.1 - predators * mortality
 end
 
 preyarray = [10.0 20.0 10.0; 20.0 10.0 10.0]
 predatorarray = [2.0 2.0 2.0; 2.0 2.0 1.0]
-
-init = (prey = preyarray, predator = predatorarray)
+init = (prey=preyarray, predator=predatorarray)
 
 output = ArrayOutput(init, 5)
 rulesets=(prey=Ruleset(Double()), predator=Ruleset(Flat()))
-interactions=((Predation(prey=:prey, predator=:predator),)) 
+interactions=(Predation(prey=:prey, predator=:predator),) 
+# interactions=()
 ruleset = MultiRuleset(rulesets=rulesets, interactions=interactions; init=init)
 
-output = ArrayOutput(init, 5)
+output = ArrayOutput(init, 15)
 sim!(output, ruleset; init=init)
 
 

@@ -32,11 +32,10 @@ end
 sequenceinteractions!(multidata::MultiSimData) = 
     sequenceinteractions!(multidata, interactions(multidata))
 sequenceinteractions!(multidata::MultiSimData, interactions::Tuple) = begin
-    interaction = interactions[1]
     # Run the first rule for the whole frame
-    mapinteraction!(multidata, interaction)
-    # Swap all the source and dest arrays
+    mapinteraction!(multidata, interactions[1])
     @set! multidata.data = map(swapsource, data(multidata))
+
     # Run the rest of the interactions, recursively
     sequenceinteractions!(multidata, tail(interactions))
 end
