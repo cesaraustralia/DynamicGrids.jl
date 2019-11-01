@@ -26,14 +26,10 @@ mapinteraction!(multidata::MultiSimData, interaction::PartialInteraction) = begi
         dest(d) .= source(d) 
     end
 
-    # println(typeof(data(interactiondata)))
     for j in 1:ncols, i in 1:nrows
         ismasked(multidata, i, j) && continue
         state = map(d -> source(d)[i, j], data(interactiondata)) 
         applyinteraction!(interaction, interactiondata, state, (i, j))
     end
-    println()
-    display(source(data(interactiondata)[2]))
-    display(dest(data(interactiondata)[2]))
 end
 

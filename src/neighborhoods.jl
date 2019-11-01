@@ -23,13 +23,18 @@ Sums moore nieghborhoods of any dimension.
 """
 neighbors(hood::RadialNeighborhood, model, buf, state) = sum(buf) - state
 
+"""
+Set neighborhood cells using a `setneighbor!` method.
+
+Returns the sum of alla `setneighbor!` return values. 
+"""
 @inline mapsetneighbor!(data::AbstractSimData, hood::RadialNeighborhood, rule, state, index) = begin
     r = radius(hood)
     sum = zero(state)
     # Loop over dispersal kernel grid dimensions
     for x = one(r):2r + one(r)
         xdest = x + index[2] - r - one(r)
-        @simd for y = one(r):2r + one(r)
+        for y = one(r):2r + one(r)
             ydest = y + index[1] - r - one(r)
             hood_index = (y, x)
             dest_index = (ydest, xdest)
@@ -38,6 +43,8 @@ neighbors(hood::RadialNeighborhood, model, buf, state) = sum(buf) - state
     end
     sum
 end
+
+@inline update_sum!(data, hood, rule, state, index, exported) = sum
 
 
 """ 
@@ -108,7 +115,6 @@ maxradius(set::Ruleset) = max(maxradius(rules(ruleset)))
 maxradius(set::MultiRuleset) = begin
     ruleradius = map(maxradius, map(rules, ruleset(set)))
     intradius = map(key -> maxradius(interactions(set), key), map(Val, keys(set)))
-    println((ruleradius, intradius))
     map(max, Tuple(ruleradius), Tuple(intradius)) 
 end
 maxradius(ruleset::Ruleset) = maxradius(rules(ruleset))

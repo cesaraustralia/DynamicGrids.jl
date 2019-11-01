@@ -220,7 +220,6 @@ initdata!(data::Nothing, ruleset::Ruleset, init, starttime, nreplicates::Nothing
     # [SimData(ruleset, init, starttime) for r in 1:nreplicates]
 initdata!(data::Nothing, multiruleset::MultiRuleset, init::NamedTuple, starttime, nreplicates::Nothing) = begin
     radii = NamedTuple{keys(init)}(maxradius(multiruleset))
-    # println(typeof.(
     data = map((rs, ra, in) -> SimData(rs, in, starttime, ra), ruleset(multiruleset), radii, init) 
     MultiSimData(init, data, multiruleset)
 end
@@ -254,7 +253,6 @@ Base.@propagate_inbounds Base.setindex!(d::WritableSimData, x, I...) = begin
         deststatus(d)[bi...] = true
     end
     isnan(x) && error("NaN in setindex: ", (d, I))
-    println(I)
     dest(d)[I...] = x
 end
 Base.@propagate_inbounds Base.getindex(d::WritableSimData, I...) = getindex(dest(d), I...)
