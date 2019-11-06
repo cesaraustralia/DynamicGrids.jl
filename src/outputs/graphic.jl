@@ -9,7 +9,7 @@ abstract type AbstractGraphicOutput{T} <: AbstractOutput{T} end
       kwargs...)
 
 """
-Mixin for all graphic outputs
+Mixin for graphic output fields
 """
 @premix @default_kw struct Graphic{FPS,SFPS,TS,SF}
     fps::FPS       | 25.0
@@ -19,6 +19,7 @@ Mixin for all graphic outputs
     store::Bool    | false
 end
 
+# Field getters and setters
 fps(o::AbstractGraphicOutput) = o.fps
 setfps!(o::AbstractGraphicOutput, x) = o.fps = x
 showfps(o::AbstractGraphicOutput) = o.showfps
@@ -31,31 +32,48 @@ settimestamp!(o::AbstractGraphicOutput, f) = begin
     o.stampframe = f
 end
 
+# Output interface
 # Delay output to maintain the frame rate
 delay(o::AbstractGraphicOutput, f) = 
     sleep(max(0.0, timestamp(o) + (f - stampframe(o))/fps(o) - time()))
 isshowable(o::AbstractGraphicOutput, f) = true # TODO working max fps. o.timestamp + (t - tlast(o))/o.maxfps < time()
 
-storeframe!(o::AbstractGraphicOutput, data::SimDataOrReps) = begin
-    f = currentframe(data)
-    if isstored(o)
-        push!(o, similar(o[1]))
-        o[end] .= zero(eltype(o[1]))
-        storeframe!(o, data, f)
-    else
-        o[1] .= zero(eltype(o[1]))
-        storeframe!(o, data, 1)
-    end
-    isshowable(o, f) && showframe(o, data, f)
-end
 
 """
 Frames are deleted and reallocated during the simulation,
-as performance is often display limited, and this allows runs of any length.
+which this allows runs of any length.
 """
 initframes!(o::AbstractGraphicOutput, init) = begin
     deleteat!(frames(o), 1:length(o))
     push!(frames(o), deepcopy(init))
+end
+initframes!(o::AbstractGraphicOutput, init::NamedTuple) = begin
+    deleteat!(frames(o), 1:length(o))
+    push!(frames(o), deepcopy(init))
+end
+
+
+storeframe!(o::AbstractGraphicOutput, data) = begin
+    f = currentframe(data)
+    if isstored(o)
+        push!(o, fill!(similar(o[1]), zero(eltype(o[1]))))
+        storeframe!(o, data, f)
+    else
+        fill!(o[1], zero(eltype(o[1])))
+        storeframe!(o, data, 1)
+    end
+    isshowable(o, f) && showframe(o, data, f)
+end
+storeframe!(o::AbstractGraphicOutput, data::MultiSimData) = begin
+    f = currentframe(data)
+    if isstored(o)
+        push!(o, map(l -> fill!(similar(l), zero(eltype(l))), o[1]))
+        storeframe!(o, data, f)
+    else
+        map(l -> fill!(l, zero(eltype(l))), o[1])
+        storeframe!(o, data, 1)
+    end
+    isshowable(o, f) && showframe(o, data, f)
 end
 
 showframe(o::AbstractGraphicOutput, data::AbstractSimData) = 

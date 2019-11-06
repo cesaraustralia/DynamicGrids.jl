@@ -11,6 +11,7 @@ end DynamicGrids
 
 using Colors,
       ColorSchemes,
+      ConstructionBase,
       Crayons,
       DocStringExtensions,
       FieldDefaults,
@@ -39,18 +40,22 @@ export savegif, show_frame, ruletypes
 
 export distances, broadcastable_indices, sizefromradius
 
-export AbstractSimData, SimData
+export AbstractSimData, SimData, MultiSimData
 
 export AbstractRule, AbstractPartialRule,
        AbstractNeighborhoodRule, AbstractPartialNeighborhoodRule,
-       AbstractCellRule
+       AbstractCellRule, Chain
 
-export AbstractRuleset, Ruleset, Chain
+export Interaction, NeighborhoodInteraction, CellInteraction,
+       PartialInteraction, PartialNeighborhoodInteraction
+
+export AbstractRuleset, Ruleset, MultiRuleset
 
 export AbstractLife, Life
 
-export AbstractNeighborhood, RadialNeighborhood, AbstractCustomNeighborhood,
-       CustomNeighborhood, LayeredCustomNeighborhood, VonNeumannNeighborhood
+export AbstractNeighborhood, AbstractRadialNeighborhood, RadialNeighborhood, 
+       AbstractCustomNeighborhood, CustomNeighborhood, LayeredCustomNeighborhood, 
+       VonNeumannNeighborhood
 
 export RemoveOverflow, WrapOverflow
 
@@ -75,6 +80,7 @@ const FIELDDOCTABLE = FieldDocTable((:Description, :Default, :Limits),
     """
 
 include("rules.jl")
+include("interactions.jl")
 include("chain.jl")
 include("rulesets.jl")
 include("simulationdata.jl")
@@ -85,7 +91,9 @@ include("outputs/array.jl")
 include("outputs/repl.jl")
 include("interface.jl")
 include("framework.jl")
+include("sequencerules.jl")
 include("maprules.jl")
+include("mapinteractions.jl")
 include("neighborhoods.jl")
 include("utils.jl")
 include("life.jl")

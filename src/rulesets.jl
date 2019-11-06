@@ -14,14 +14,24 @@ struct RemoveOverflow <: AbstractOverflow end
 
 abstract type AbstractRuleset end
 
+# Getters
+init(rs::AbstractRuleset) = rs.init
+mask(rs::AbstractRuleset) = rs.mask
+overflow(rs::AbstractRuleset) = rs.overflow
+cellsize(rs::AbstractRuleset) = rs.cellsize
+timestep(rs::AbstractRuleset) = rs.timestep
+minval(rs::AbstractRuleset) = rs.minval
+maxval(rs::AbstractRuleset) = rs.maxval
+ruleset(rs::AbstractRuleset) = rs
+
 """
     Ruleset(rules...; init=nothing, overflow=RemoveOverflow(), cellsize=1, timestep=1)
 
 A container for holding a sequence of AbstractRule, an init
 array and other simulaiton details.
 """
-@default_kw mutable struct Ruleset{R<:Tuple{AbstractRule,Vararg},I,M,O<:AbstractOverflow,C,T} <: AbstractRuleset
-    rules::R     | nothing
+@default_kw mutable struct Ruleset{R<:Tuple,I,M,O<:AbstractOverflow,C,T} <: AbstractRuleset
+    rules::R     | ()
     init::I      | nothing
     mask::M      | nothing
     overflow::O  | RemoveOverflow()
@@ -29,6 +39,12 @@ array and other simulaiton details.
     timestep::T  | 1
 end
 Ruleset(rules::Vararg{<:AbstractRule}; kwargs...) = Ruleset(; rules=rules, kwargs...)
+
+Ruleset(args...; kwargs...) = Ruleset(; rules=args, kwargs...)
+rules(rs::Ruleset) = rs.rules
+
+# Getters
+rules(rs::Ruleset) = rs.rules
 
 show(io::IO, ruleset::Ruleset) = begin
     printstyled(io, Base.nameof(typeof(ruleset)), " =\n"; color=:blue)
@@ -42,11 +58,39 @@ show(io::IO, ruleset::Ruleset) = begin
     end
 end
 
-# Getters
-rules(rs::Ruleset) = rs.rules
-init(rs::Ruleset) = rs.init
-mask(rs::Ruleset) = rs.mask
-overflow(rs::Ruleset) = rs.overflow
-cellsize(rs::Ruleset) = rs.cellsize
-timestep(rs::Ruleset) = rs.timestep
-ruleset(rs::Ruleset) = rs
+
+struct MultiRuleset{R<:NamedTuple, X<:Tuple,I,M,O,C,T} <: AbstractRuleset
+    rulesets::R
+    interactions::X
+    init::I
+    mask::M
+    overflow::O
+    cellsize::C
+    timestep::T
+end
+MultiRuleset(; rulesets=(), interactions=(), init=map(init, rulesets), 
+             mask=nothing, overflow=RemoveOverflow(), cellsize=1, timestep=1) = begin
+    rulesets = map(r -> standardise_ruleset(r, mask, overflow, cellsize, timestep), rulesets)
+    MultiRuleset(rulesets, interactions, init, mask, overflow, cellsize, timestep)
+end
+
+ruleset(mrs::MultiRuleset) = mrs.rulesets
+interactions(mrs::MultiRuleset) = mrs.interactions
+
+Base.getindex(mrs::MultiRuleset, key) = getindex(ruleset(mrs), key)
+Base.keys(mrs::MultiRuleset) = keys(ruleset(mrs))
+
+standardise_ruleset(ruleset, mask, overflow, cellsize, timestep) = begin
+    @set! ruleset.mask = mask 
+    @set! ruleset.overflow = overflow 
+    @set! ruleset.cellsize = cellsize 
+    @set! ruleset.timestep = timestep 
+    ruleset
+end
+
+
+
+# struct HasMinMax end
+# struct NoMinMax end
+
+# hasminmax(ruleset::T) where T = fieldtype(T, :minval) <: Number ? HasMinMax() : NoMinMax()

@@ -9,7 +9,6 @@ as defined in the Rule.
 - `data` : [`FrameData`](@ref)
 - `state`: the value of the current cell
 - `index`: a (row, column) tuple of Int for the current cell coordinates - `t`: the current time step
-- `args`: additional arguments passed through from user input to [`sim!`](@ref)
 
 Returns a value to be written to the current cell.
 """
@@ -26,6 +25,24 @@ from [`AbstractPartialRule`](@ref).
 see [`applyrule`](@ref)
 """
 function applyrule! end
+
+"""
+    applyinteraction(interacttion::AbstractPartialRule, data, state, index)
+
+Applay an interation that returns a tuple of values.
+### Arguments:
+see [`applyrule`](@ref)
+"""
+function applyinteraction end
+
+"""
+    applyinteraction!(interacttion::AbstractPartialRule, data, state, index)
+
+Applay an interation that manually writes to the passed in dest arrays.
+### Arguments:
+see [`applyrule`](@ref)
+"""
+function applyinteraction! end
 
 """
     precalcrule!(rule, data)
@@ -46,6 +63,20 @@ to the particular neighborhood type.
 """
 function neighbors end
 
+"""
+    mapreduceneighbors(f, data, neighborhood, rule, state, index)
+
+Run `f` over all cells in the neighborhood and sums its return values. 
+`f` is a function or functor with the form:
+`f(data, neighborhood, rule, state, hood_index, dest_index)`. 
+"""
+function mapreduceneighbors end
+
+"""
+Set value of a cell in the neighborhood.
+Usually called in `mapreduceneighbors`.
+"""
+function setneighbor! end
 
 """
 Return the radius of a rule or ruleset if it has one, otherwise zero.

@@ -6,13 +6,18 @@ The output of the rule for an AbstractRule is allways written to the current cel
 """
 abstract type AbstractRule end
 
-show(io::IO, rule::AbstractRule) = begin
+show(io::IO, rule::R) where R <: AbstractRule = begin
     indent = get(io, :indent, "")
     printstyled(io, indent, Base.nameof(typeof(rule)); color=:red)
     if nfields(rule) > 0
         printstyled(io, " :\n"; color=:red)
-        for fn in fieldnames(typeof(rule))
-            println(io, indent, "    ", fn, " = ", repr(getfield(rule, fn)))
+        for fn in fieldnames(R)
+            if fieldtype(R, fn) <: Union{Number,Symbol,String}
+                println(io, indent, "    ", fn, " = ", repr(getfield(rule, fn)))
+            else
+                # Avoid prining arrays etc. Just show the type.
+                println(io, indent, "    ", fn, " = ", fieldtype(R, fn))
+            end
         end
     end
 end

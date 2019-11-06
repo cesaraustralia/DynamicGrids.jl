@@ -88,7 +88,7 @@ where immutability improves performance.
 simloop!(output, data, fspan) = begin
     settimestamp!(output, first(fspan))
     # Initialise types etc
-    data = updatetime(data, 1) |> precalcrules
+    data = updatetime(data, 1)# |> precalcrules
     # Loop over the simulation
     for f in fspan[2:end]
         # Get a data object with updated timestep and precalculated rules
@@ -114,33 +114,18 @@ end
 
 
 """
-Iterate over all rules recursively, swapping source and dest arrays.
-Returns the data object with source and dest arrays ready for the next iteration.
+    precalcrules(rule, data) = rule
+
+Rule precalculation. This is a functional approach rebuilding rules recursively.
+@set from Setfield.jl helps in specific rule implementations.
+
+The default is to return the existing rule
 """
-sequencerules!(data::SimData) = sequencerules!(data, rules(data))
-sequencerules!(data::SimData, rules::Tuple) = begin
-    # Run the first rule for the whole frame
-    maprule!(data, rules[1])
-    # Swap the source and dest arrays
-    data = swapsource(data)
-    # Run the rest of the rules, recursively
-    sequencerules!(data, tail(rules))
-end
-sequencerules!(data::SimData, rules::Tuple{}) = data
-"""
-Threaded replicate simulations. If nreplicates is set the data object
-will be a vector of replicate data, so we loop over it with threads.
-"""
-sequencerules!(data::AbstractVector{<:SimData}, rules) = begin
-    Threads.@threads for i in 1:length(data)
-        sequencerules!(data[i], rules)
-    end
-    data
-end
+precalcrules(rule, data) = rule
 
 precalcrules(data::SimData) = @set data.ruleset.rules = precalcrules(rules(data), data)
+precalcrules(data::MultiSimData) = @set data.data = map(precalcrules, data.data)
 precalcrules(rules::Tuple, data) =
     (precalcrules(rules[1], data), precalcrules(tail(rules), data)...)
 precalcrules(rules::Tuple{}, data) = ()
-precalcrules(chain::Chain, data) = Chain(precalcrules(val(chain), data)...)
-precalcrules(rule, data) = rule
+precalcrules(chain::Chain, data) = Chain(precalcrules(val(chain), data))

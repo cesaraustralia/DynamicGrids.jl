@@ -1,4 +1,6 @@
-abstract type AbstractSimData{T,N} <: AbstractArray{T,N} end
+abstract type AbstractSimData end
+
+abstract type AbstractSingleSimData{T,N,I} <: AbstractSimData end
 
 @mix struct SimDataMixin{T,N,I<:AbstractArray{T,N},S,St,LSt,B,Ra,Ru,STi,CTi,CFr}
     init::I
@@ -19,44 +21,42 @@ SimDataOrReps = Union{AbstractSimData, Vector{<:AbstractSimData}}
 
 (::Type{T})(data::AbstractSimData) where T <: AbstractSimData =
     T(init(data), source(data), dest(data), sourcestatus(data), deststatus(data),
-      localstatus(data), buffers(data), radius(data), ruleset(data), starttime(data), 
+      localstatus(data), buffers(data), radius(data), ruleset(data), starttime(data),
       currenttime(data), currentframe(data))
 
-Setfield.constructor_of(::Type{T}) where T<:AbstractSimData = T
-
 # Array interface
-Base.length(d::AbstractSimData) = length(source(d))
-Base.firstindex(d::AbstractSimData) = firstindex(source(d))
-Base.lastindex(d::AbstractSimData) = lastindex(source(d))
-Base.size(d::AbstractSimData) = size(source(d))
-Base.broadcast(d::AbstractSimData, args...) = broadcast(source(d), args...)
-Base.broadcast!(d::AbstractSimData, args...) = broadcast!(dest(d), args...)
-Base.iterate(d::AbstractSimData, args...) = iterate(source(d), args...)
-Base.ndims(::AbstractSimData{T,N}) where {T,N} = N
-Base.eltype(::AbstractSimData{T}) where T = T
+Base.length(d::AbstractSingleSimData) = length(source(d))
+Base.firstindex(d::AbstractSingleSimData) = firstindex(source(d))
+Base.lastindex(d::AbstractSingleSimData) = lastindex(source(d))
+Base.size(d::AbstractSingleSimData) = size(source(d))
+Base.broadcast(d::AbstractSingleSimData, args...) = broadcast(source(d), args...)
+Base.broadcast!(d::AbstractSingleSimData, args...) = broadcast!(dest(d), args...)
+Base.iterate(d::AbstractSingleSimData, args...) = iterate(source(d), args...)
+Base.ndims(::AbstractSingleSimData{T,N}) where {T,N} = N
+Base.eltype(::AbstractSingleSimData{T}) where T = T
 
 # Getters
-init(d::AbstractSimData) = d.init
-source(d::AbstractSimData) = d.source
-dest(d::AbstractSimData) = d.dest
-sourcestatus(d::AbstractSimData) = d.sourcestatus
-deststatus(d::AbstractSimData) = d.deststatus
-localstatus(d::AbstractSimData) = d.localstatus
-buffers(d::AbstractSimData) = d.buffers
-radius(d::AbstractSimData) = d.radius
-ruleset(d::AbstractSimData) = d.ruleset
-starttime(d::AbstractSimData) = d.starttime
-currenttime(d::AbstractSimData) = d.currenttime
-currentframe(d::AbstractSimData) = d.currentframe
+init(d::AbstractSingleSimData) = d.init
+source(d::AbstractSingleSimData) = d.source
+dest(d::AbstractSingleSimData) = d.dest
+sourcestatus(d::AbstractSingleSimData) = d.sourcestatus
+deststatus(d::AbstractSingleSimData) = d.deststatus
+localstatus(d::AbstractSingleSimData) = d.localstatus
+buffers(d::AbstractSingleSimData) = d.buffers
+radius(d::AbstractSingleSimData) = d.radius
+ruleset(d::AbstractSingleSimData) = d.ruleset
+starttime(d::AbstractSingleSimData) = d.starttime
+currenttime(d::AbstractSingleSimData) = d.currenttime
+currentframe(d::AbstractSingleSimData) = d.currentframe
 
 
 # Getters forwarded to ruleset
-framesize(d::AbstractSimData) = size(init(d))
-mask(d::AbstractSimData) = mask(ruleset(d))
-overflow(d::AbstractSimData) = overflow(ruleset(d))
-timestep(d::AbstractSimData) = timestep(ruleset(d))
-cellsize(d::AbstractSimData) = cellsize(ruleset(d))
-rules(d::AbstractSimData) = rules(ruleset(d))
+framesize(d::AbstractSingleSimData) = size(init(d))
+rules(d::AbstractSingleSimData) = rules(ruleset(d))
+mask(d::AbstractSingleSimData) = mask(ruleset(d))
+overflow(d::AbstractSingleSimData) = overflow(ruleset(d))
+timestep(d::AbstractSingleSimData) = timestep(ruleset(d))
+cellsize(d::AbstractSingleSimData) = cellsize(ruleset(d))
 
 """
 Get the actual current timestep, ie. not variable periods like Month
@@ -64,13 +64,15 @@ Get the actual current timestep, ie. not variable periods like Month
 currenttimestep(d::AbstractSimData) = currenttime(d) + timestep(d) - currenttime(d)
 
 " Simulation data and storage is passed to rules for each timestep "
-@SimDataMixin struct SimData{} <: AbstractSimData{T,N} end
+@SimDataMixin struct SimData{} <: AbstractSingleSimData{T,N,I} end
+
+ConstructionBase.constructorof(::Type{SimData}) =
+    (init, args...) -> SimData{eltype(init),ndims(init),typeof(init),typeof.(args)...}(init, args...)
 
 """
 Generate simulation data to match a ruleset and init array.
 """
-SimData(ruleset::AbstractRuleset, init::AbstractArray, starttime) = begin
-    r = maxradius(ruleset)
+SimData(ruleset::Ruleset, init::AbstractArray, starttime, r=radius(ruleset)) = begin
     # We add one extra row/column so we dont have to worry about
     # special casing the last block
     if r > 0
@@ -94,30 +96,79 @@ SimData(ruleset::AbstractRuleset, init::AbstractArray, starttime) = begin
     currentframe = 1
     currenttime = starttime
 
-    SimData(init, source, dest, sourcestatus, deststatus, localstatus, buffers, r, 
+    SimData(init, source, dest, sourcestatus, deststatus, localstatus, buffers, r,
             ruleset, starttime, currenttime, currentframe)
 end
+
+
+"""
+MultipleSimData is used for MultiRuleset models
+"""
+struct MultiSimData{I,D<:NamedTuple,Ru} <: AbstractSimData
+    init::I
+    data::D
+    ruleset::Ru
+end
+
+data(d::MultiSimData) = d.data
+ruleset(d::MultiSimData) = d.ruleset
+framesize(d::MultiSimData) = framesize(first(data(d)))
+interactions(d::MultiSimData) = interactions(ruleset(d))
+
+Base.getindex(d::MultiSimData, key) = begin
+    getindex(data(d), key)
+end
+Base.keys(d::MultiSimData) = keys(data(d))
+
+# Getters
+init(d::MultiSimData) = d.init
+ruleset(d::MultiSimData) = d.ruleset
+data(d::MultiSimData) = d.data
+
+firstruleset(d::MultiSimData) = first(ruleset(ruleset(d)))
+firstdata(d::MultiSimData) = first(data(d))
+
+source(d::MultiSimData) = source(firstdata(d))
+dest(d::MultiSimData) = dest(firstdata(d))
+sourcestatus(d::MultiSimData) = sourcestatus(firstdata(d))
+deststatus(d::MultiSimData) = deststatus(firstdata(d))
+localstatus(d::MultiSimData) = localstatus(firstdata(d))
+buffers(d::MultiSimData) = buffers(firstdata(d))
+radius(d::MultiSimData) = radius(firstdata(d))
+starttime(d::MultiSimData) = starttime(firstdata(d))
+currenttime(d::MultiSimData) = currenttime(firstdata(d))
+currentframe(d::MultiSimData) = currentframe(firstdata(d))
+
+
+# Getters forwarded to ruleset
+framesize(d::MultiSimData) = size(first(init(d)))
+# rules(d::MultiSimData) = map(rules, ruleset(d))
+mask(d::MultiSimData) = mask(firstruleset(d))
+overflow(d::MultiSimData) = overflow(firstruleset(d))
+timestep(d::MultiSimData) = timestep(firstruleset(d))
+cellsize(d::MultiSimData) = cellsize(firstruleset(d))
 
 """
 Swap source and dest arrays. Allways returns regular SimData.
 """
-swapsource(data) = begin
+swapsource(data::AbstractSingleSimData) = begin
     src = data.source
     dst = data.dest
     @set! data.dest = src
-    @set! data.source = dst
-    data
+    @set data.source = dst
 end
+swapsource(d::MultiSimData) = @set d.data = map(swapsource, d.data)
 
 """
 Uptate timestamp
 """
 updatetime(data::SimData, f::Integer) = begin
     @set! data.currentframe = f
-    @set! data.currenttime = timefromframe(data, f)
-    data
+    @set data.currenttime = timefromframe(data, f)
 end
 updatetime(data::AbstractVector{<:SimData}, f) = updatetime.(data, f)
+updatetime(multidata::MultiSimData, f) =
+    @set multidata.data = map(d -> updatetime(d, f), data(multidata))
 
 timefromframe(data::AbstractSimData, f) = starttime(data) + (f - 1) * timestep(data)
 
@@ -130,8 +181,10 @@ addpadding(init::AbstractArray{T,N}, r) where {T,N} = begin
     sze = size(init)
     paddedsize = sze .+ 2r
     paddedindices = -r + 1:sze[1] + r, -r + 1:sze[2] + r
-    source = OffsetArray(zeros(eltype(init), paddedsize...), paddedindices...)
-    # Copy the init array to the middle section of the source array
+    sourceparent = similar(init, paddedsize...)
+    source = OffsetArray(sourceparent, paddedindices...)
+    source .= zero(eltype(source))
+    # Copy the init array to he middle section of the source array
     for j in 1:size(init, 2), i in 1:size(init, 1)
         source[i, j] = init[i, j]
     end
@@ -157,15 +210,24 @@ updatestatus!(source, sourcestatus, deststatus, r) = begin
     end
 end
 
-initdata!(data::AbstractSimData, ruleset, init, starttime, nreplicates) = 
+# TODO document these behaviours
+initdata!(data::AbstractSimData, ruleset, init::AbstractArray, starttime, nreplicates) =
     initdata!(data, ruleset, starttime)
-initdata!(data::AbstractVector{<:AbstractSimData}, ruleset, init, starttime, nreplicates::Integer) = 
-    initdata!.(data)
-initdata!(data::Nothing, ruleset, init, starttime, nreplicates::Nothing) = 
+initdata!(data::AbstractVector{<:AbstractSimData}, ruleset, init::AbstractArray, starttime, nreplicates::Integer) =
+    map(d -> initdata!(d, ruleset, init, starttime, nreplicates), data)
+initdata!(data::Nothing, ruleset::Ruleset, init, starttime, nreplicates::Nothing) =
     SimData(ruleset, init, starttime)
-initdata!(data::Nothing, ruleset, init, starttime, nreplicates::Integer) = 
-    [SimData(ruleset, init, starttime) for r in 1:nreplicates]
-initdata!(data::AbstractSimData, ruleset, starttime) = begin
+# initdata!(data::Nothing, ruleset::Ruleset, init, starttime, nreplicates::Integer) =
+    # [SimData(ruleset, init, starttime) for r in 1:nreplicates]
+initdata!(data::Nothing, multiruleset::MultiRuleset, init::NamedTuple, starttime, nreplicates::Nothing) = begin
+    radii = NamedTuple{keys(init)}(radius(multiruleset))
+    data = map((rs, ra, in) -> SimData(rs, in, starttime, ra), ruleset(multiruleset), radii, init) 
+    MultiSimData(init, data, multiruleset)
+end
+# initdata!(multidata::MultiSimData, multiruleset::MultiRuleset, init, starttime, nreplicates::Nothing) =
+    # MultiSimData(map((d, rs) -> initdata!(d, rs, starttime), data(MultiSimData), ruleset(multiruleset))),
+                 # interactions(multiruleset))
+initdata!(data::AbstractSimData, ruleset::Ruleset, starttime) = begin
     for j in 1:framesize(data)[2], i in 1:framesize(data)[1]
         @inbounds source(data)[i, j] = dest(data)[i, j] = init(data)[i, j]
     end
@@ -181,7 +243,10 @@ blocktoind(x, blocksize) = (x - 1) * blocksize + 1
 Base.@propagate_inbounds Base.getindex(d::SimData, I...) = getindex(source(d), I...)
 
 " Simulation data and storage is passed to rules for each timestep "
-@SimDataMixin struct WritableSimData{} <: AbstractSimData{T,N} end
+@SimDataMixin struct WritableSimData{} <: AbstractSingleSimData{T,N,I} end
+
+ConstructionBase.constructorof(::Type{WritableSimData}) =
+    (init, args...) -> SimData{eltype(init),ndims(init),typeof(init),typeof.(args)...}(init, args...)
 
 Base.@propagate_inbounds Base.setindex!(d::WritableSimData, x, I...) = begin
     r = radius(d)
@@ -189,7 +254,7 @@ Base.@propagate_inbounds Base.setindex!(d::WritableSimData, x, I...) = begin
         bi = indtoblock.(I .+ r, 2r)
         deststatus(d)[bi...] = true
     end
-    isnan(x) && error("NaN in setindex: ", (d, I)) 
+    isnan(x) && error("NaN in setindex: ", (d, I))
     dest(d)[I...] = x
 end
 Base.@propagate_inbounds Base.getindex(d::WritableSimData, I...) = getindex(dest(d), I...)

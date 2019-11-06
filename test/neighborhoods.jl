@@ -42,7 +42,7 @@ buf = [0 1 0 0 1
 state = buf[3, 3]
 custom1 = CustomNeighborhood(((-1,-1), (2,-2), (2,2), (-1,2), (0,0)))
 custom2 = CustomNeighborhood(((-1,-1), (0,-1), (1,-1), (2,-1), (0,0)))
-layered = LayeredCustomNeighborhood((((-1,1), (-2,2)), ((1,2), (2,2))))
+layered = LayeredCustomNeighborhood((CustomNeighborhood((-1,1), (-2,2)), CustomNeighborhood((1,2), (2,2))))
 
 @test neighbors(custom1, nothing, buf, state) == 2
 @test neighbors(custom2, nothing, buf, state) == 0
