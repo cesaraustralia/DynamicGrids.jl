@@ -1,6 +1,6 @@
 abstract type AbstractSimData end
 
-abstract type AbstractSingleSimData{T,N,I} <: AbstractSimData end
+abstract type SingleSimData{T,N,I} <: AbstractSimData end
 
 @mix struct SimDataMixin{T,N,I<:AbstractArray{T,N},S,St,LSt,B,Ra,Ru,STi,CTi,CFr}
     init::I
@@ -25,38 +25,38 @@ SimDataOrReps = Union{AbstractSimData, Vector{<:AbstractSimData}}
       currenttime(data), currentframe(data))
 
 # Array interface
-Base.length(d::AbstractSingleSimData) = length(source(d))
-Base.firstindex(d::AbstractSingleSimData) = firstindex(source(d))
-Base.lastindex(d::AbstractSingleSimData) = lastindex(source(d))
-Base.size(d::AbstractSingleSimData) = size(source(d))
-Base.broadcast(d::AbstractSingleSimData, args...) = broadcast(source(d), args...)
-Base.broadcast!(d::AbstractSingleSimData, args...) = broadcast!(dest(d), args...)
-Base.iterate(d::AbstractSingleSimData, args...) = iterate(source(d), args...)
-Base.ndims(::AbstractSingleSimData{T,N}) where {T,N} = N
-Base.eltype(::AbstractSingleSimData{T}) where T = T
+Base.length(d::SingleSimData) = length(source(d))
+Base.firstindex(d::SingleSimData) = firstindex(source(d))
+Base.lastindex(d::SingleSimData) = lastindex(source(d))
+Base.size(d::SingleSimData) = size(source(d))
+Base.broadcast(d::SingleSimData, args...) = broadcast(source(d), args...)
+Base.broadcast!(d::SingleSimData, args...) = broadcast!(dest(d), args...)
+Base.iterate(d::SingleSimData, args...) = iterate(source(d), args...)
+Base.ndims(::SingleSimData{T,N}) where {T,N} = N
+Base.eltype(::SingleSimData{T}) where T = T
 
 # Getters
-init(d::AbstractSingleSimData) = d.init
-source(d::AbstractSingleSimData) = d.source
-dest(d::AbstractSingleSimData) = d.dest
-sourcestatus(d::AbstractSingleSimData) = d.sourcestatus
-deststatus(d::AbstractSingleSimData) = d.deststatus
-localstatus(d::AbstractSingleSimData) = d.localstatus
-buffers(d::AbstractSingleSimData) = d.buffers
-radius(d::AbstractSingleSimData) = d.radius
-ruleset(d::AbstractSingleSimData) = d.ruleset
-starttime(d::AbstractSingleSimData) = d.starttime
-currenttime(d::AbstractSingleSimData) = d.currenttime
-currentframe(d::AbstractSingleSimData) = d.currentframe
+init(d::SingleSimData) = d.init
+source(d::SingleSimData) = d.source
+dest(d::SingleSimData) = d.dest
+sourcestatus(d::SingleSimData) = d.sourcestatus
+deststatus(d::SingleSimData) = d.deststatus
+localstatus(d::SingleSimData) = d.localstatus
+buffers(d::SingleSimData) = d.buffers
+radius(d::SingleSimData) = d.radius
+ruleset(d::SingleSimData) = d.ruleset
+starttime(d::SingleSimData) = d.starttime
+currenttime(d::SingleSimData) = d.currenttime
+currentframe(d::SingleSimData) = d.currentframe
 
 
 # Getters forwarded to ruleset
-framesize(d::AbstractSingleSimData) = size(init(d))
-rules(d::AbstractSingleSimData) = rules(ruleset(d))
-mask(d::AbstractSingleSimData) = mask(ruleset(d))
-overflow(d::AbstractSingleSimData) = overflow(ruleset(d))
-timestep(d::AbstractSingleSimData) = timestep(ruleset(d))
-cellsize(d::AbstractSingleSimData) = cellsize(ruleset(d))
+framesize(d::SingleSimData) = size(init(d))
+rules(d::SingleSimData) = rules(ruleset(d))
+mask(d::SingleSimData) = mask(ruleset(d))
+overflow(d::SingleSimData) = overflow(ruleset(d))
+timestep(d::SingleSimData) = timestep(ruleset(d))
+cellsize(d::SingleSimData) = cellsize(ruleset(d))
 
 """
 Get the actual current timestep, ie. not variable periods like Month
@@ -64,7 +64,7 @@ Get the actual current timestep, ie. not variable periods like Month
 currenttimestep(d::AbstractSimData) = currenttime(d) + timestep(d) - currenttime(d)
 
 " Simulation data and storage is passed to rules for each timestep "
-@SimDataMixin struct SimData{} <: AbstractSingleSimData{T,N,I} end
+@SimDataMixin struct SimData{} <: SingleSimData{T,N,I} end
 
 ConstructionBase.constructorof(::Type{SimData}) =
     (init, args...) -> SimData{eltype(init),ndims(init),typeof(init),typeof.(args)...}(init, args...)
@@ -151,7 +151,7 @@ cellsize(d::MultiSimData) = cellsize(firstruleset(d))
 """
 Swap source and dest arrays. Allways returns regular SimData.
 """
-swapsource(data::AbstractSingleSimData) = begin
+swapsource(data::SingleSimData) = begin
     src = data.source
     dst = data.dest
     @set! data.dest = src
@@ -243,7 +243,7 @@ blocktoind(x, blocksize) = (x - 1) * blocksize + 1
 Base.@propagate_inbounds Base.getindex(d::SimData, I...) = getindex(source(d), I...)
 
 " Simulation data and storage is passed to rules for each timestep "
-@SimDataMixin struct WritableSimData{} <: AbstractSingleSimData{T,N,I} end
+@SimDataMixin struct WritableSimData{} <: SingleSimData{T,N,I} end
 
 ConstructionBase.constructorof(::Type{WritableSimData}) =
     (init, args...) -> SimData{eltype(init),ndims(init),typeof(init),typeof.(args)...}(init, args...)

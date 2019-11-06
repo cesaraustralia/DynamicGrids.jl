@@ -1,32 +1,32 @@
 
 """
-All outputs must inherit from AbstractOutput.
+All outputs must inherit from Output.
 
 Simulation outputs are decoupled from simulation behaviour and in
 many cases can be used interchangeably.
 """
-abstract type AbstractOutput{T} <: AbstractVector{T} end
+abstract type Output{T} <: AbstractVector{T} end
 
 "Generic ouput constructor. Converts init array to vector of frames."
-(::Type{F})(init::AbstractMatrix; kwargs...) where F <: AbstractOutput =
+(::Type{F})(init::AbstractMatrix; kwargs...) where F <: Output =
     F(; frames=[deepcopy(init)], kwargs...)
-(::Type{F})(init::NamedTuple; kwargs...) where F <: AbstractOutput =
+(::Type{F})(init::NamedTuple; kwargs...) where F <: Output =
     F(; frames=[deepcopy(init)], kwargs...)
 
-(::Type{F})(o::T; kwargs...) where F <: AbstractOutput where T <: AbstractOutput =
+(::Type{F})(o::T; kwargs...) where F <: Output where T <: Output =
     F(; frames=frames(o), starttime=starttime(o), stoptime=stoptime(o), kwargs...)
 
 # Forward base methods to the frames array
-Base.parent(o::AbstractOutput) = frames(o)
-Base.length(o::AbstractOutput) = length(frames(o))
-Base.size(o::AbstractOutput) = size(frames(o))
-Base.firstindex(o::AbstractOutput) = firstindex(frames(o))
-Base.lastindex(o::AbstractOutput) = lastindex(frames(o))
-Base.@propagate_inbounds Base.getindex(o::AbstractOutput, i) = 
+Base.parent(o::Output) = frames(o)
+Base.length(o::Output) = length(frames(o))
+Base.size(o::Output) = size(frames(o))
+Base.firstindex(o::Output) = firstindex(frames(o))
+Base.lastindex(o::Output) = lastindex(frames(o))
+Base.@propagate_inbounds Base.getindex(o::Output, i) = 
     getindex(frames(o), i)
-Base.@propagate_inbounds Base.setindex!(o::AbstractOutput, x, i) = setindex!(frames(o), x, i)
-Base.push!(o::AbstractOutput, x) = push!(frames(o), x)
-Base.append!(o::AbstractOutput, x) = append!(frames(o), x)
+Base.@propagate_inbounds Base.setindex!(o::Output, x, i) = setindex!(frames(o), x, i)
+Base.push!(o::Output, x) = push!(frames(o), x)
+Base.append!(o::Output, x) = append!(frames(o), x)
 
 
 """
@@ -40,32 +40,32 @@ Mixin of basic fields for all outputs
 end
 
 # Getters and setters
-frames(o::AbstractOutput) = o.frames
-starttime(o::AbstractOutput) = o.starttime
-stoptime(o::AbstractOutput) = o.stoptime
-tspan(o::AbstractOutput) = (stoptime(o), starttime(o))
-isrunning(o::AbstractOutput) = o.running
-setrunning!(o::AbstractOutput, val) = o.running = val
+frames(o::Output) = o.frames
+starttime(o::Output) = o.starttime
+stoptime(o::Output) = o.stoptime
+tspan(o::Output) = (stoptime(o), starttime(o))
+isrunning(o::Output) = o.running
+setrunning!(o::Output, val) = o.running = val
 setstarttime!(output, x) = output.starttime = x
 setstoptime!(output, x) = output.stoptime = x
 
 # Placeholder methods for graphic functions that are
 # ignored in simple outputs
-settimestamp!(o::AbstractOutput, f) = nothing
-fps(o::AbstractOutput) = nothing
-setfps!(o::AbstractOutput, x) = nothing
-showfps(o::AbstractOutput) = nothing
-isasync(o::AbstractOutput) = false
-isstored(o::AbstractOutput) = true
-isshowable(o::AbstractOutput, f) = false
-finalize!(o::AbstractOutput, args...) = nothing
-delay(o::AbstractOutput, f) = nothing
-showframe(o::AbstractOutput, args...) = nothing
+settimestamp!(o::Output, f) = nothing
+fps(o::Output) = nothing
+setfps!(o::Output, x) = nothing
+showfps(o::Output) = nothing
+isasync(o::Output) = false
+isstored(o::Output) = true
+isshowable(o::Output, f) = false
+finalize!(o::Output, args...) = nothing
+delay(o::Output, f) = nothing
+showframe(o::Output, args...) = nothing
 
 
 # Frame strorage and updating
-frameindex(o::AbstractOutput, data::AbstractSimData) = frameindex(o, currentframe(data))
-frameindex(o::AbstractOutput, f) = isstored(o) ? f : oneunit(f)
+frameindex(o::Output, data::AbstractSimData) = frameindex(o, currentframe(data))
+frameindex(o::Output, f) = isstored(o) ? f : oneunit(f)
 
 zeroframes(init::AbstractArray, nframes) = [zero(init) for f in 1:nframes]
 zeroframes(init::NamedTuple, nframes) = 
@@ -101,7 +101,7 @@ storeframe!(output, data::AbstractVector{<:SimData}, f) = begin
     end
 end
 
-allocateframes!(o::AbstractOutput, init, framerange) = begin
+allocateframes!(o::Output, init, framerange) = begin
     append!(frames(o), [similar(init) for f in framerange])
     o
 end
@@ -109,14 +109,14 @@ end
 """
 Frames are preallocated and reused.
 """
-initframes!(o::AbstractOutput, init) = begin
+initframes!(o::Output, init) = begin
     first(o) .= init
     for f = (firstindex(o) + 1):lastindex(o)
         @inbounds o[f] .= zero(eltype(init))
     end
     o
 end
-initframes!(o::AbstractOutput, init::NamedTuple) = begin
+initframes!(o::Output, init::NamedTuple) = begin
     for key in keys(init)
         first(o)[key] .= init[key]
     end

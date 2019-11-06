@@ -1,5 +1,3 @@
-abstract type AbstractArrayOutput{T} <: AbstractOutput{T} end
-
 """
 A simple output that stores each step of the simulation in a vector of arrays.
 
@@ -7,7 +5,7 @@ A simple output that stores each step of the simulation in a vector of arrays.
 - `frames`: Single init array or vector of arrays
 - `length`: The length of the output.
 """
-@Output mutable struct ArrayOutput{} <: AbstractArrayOutput{T} end
+@Output mutable struct ArrayOutput{} <: Output{T} end
 
 ArrayOutput(init, length::Integer; kwargs...) = begin
     frames = [deepcopy(init)]

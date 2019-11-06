@@ -2,7 +2,7 @@
 Rules that involved the interaction between
 two grids
 """
-abstract type Interaction{Keys} <: AbstractRule end
+abstract type Interaction{Keys} <: Rule end
 
 Base.keys(::Interaction{Keys}) where Keys = Keys
 

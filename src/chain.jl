@@ -1,18 +1,18 @@
 """
 Chains allow chaining rules together to be completed in a single processing step
 without intermediate writes, and potentially compiled together into a single function call. 
-These can either be all AbstractCellRule or AbstractNeighborhoodRule followed by AbstractCellRule.
+These can either be all CellRule or NeighborhoodRule followed by CellRule.
 """
-struct Chain{T} <: AbstractRule
+struct Chain{T} <: Rule
     val::T
 end
 Chain(t::Tuple) = begin
-    if !(t[1] isa Union{AbstractNeighborhoodRule, AbstractCellRule})
-        throw(ArgumentError("Only `AbstractNeighborhoodRule` or `AbstractCellRule` allowed as first rule in a `Chain`. $(Base.nameof(typeof(r))) found"))
+    if !(t[1] isa Union{NeighborhoodRule, CellRule})
+        throw(ArgumentError("Only `NeighborhoodRule` or `CellRule` allowed as first rule in a `Chain`. $(Base.nameof(typeof(r))) found"))
     end
     map(tail(t)) do r
-        if !(r isa AbstractCellRule)
-            throw(ArgumentError("Only `AbstractCellRule` allowed in a `Chain`. $(Base.nameof(typeof(r))) found"))
+        if !(r isa CellRule)
+            throw(ArgumentError("Only `CellRule` allowed in a `Chain`. $(Base.nameof(typeof(r))) found"))
         end
     end
     Chain{typeof(t)}(t)

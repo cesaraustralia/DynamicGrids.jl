@@ -1,11 +1,11 @@
 """
-    applyrule(rule::AbstractRule, data, state, index)
+    applyrule(rule::Rule, data, state, index)
 
 Updates cell values based on their current state and the state of other cells
 as defined in the Rule.
 
 ### Arguments:
-- `rule` : [`AbstractRule`](@ref)
+- `rule` : [`Rule`](@ref)
 - `data` : [`FrameData`](@ref)
 - `state`: the value of the current cell
 - `index`: a (row, column) tuple of Int for the current cell coordinates - `t`: the current time step
@@ -16,10 +16,10 @@ function applyrule end
 
 
 """
-    applyrule!(rule::AbstractPartialRule, data, state, index)
+    applyrule!(rule::PartialRule, data, state, index)
 
 A rule that manually writes to the dest array, used in rules inheriting
-from [`AbstractPartialRule`](@ref).
+from [`PartialRule`](@ref).
 
 ### Arguments:
 see [`applyrule`](@ref)
@@ -27,7 +27,7 @@ see [`applyrule`](@ref)
 function applyrule! end
 
 """
-    applyinteraction(interacttion::AbstractPartialRule, data, state, index)
+    applyinteraction(interacttion::PartialRule, data, state, index)
 
 Applay an interation that returns a tuple of values.
 ### Arguments:
@@ -36,7 +36,7 @@ see [`applyrule`](@ref)
 function applyinteraction end
 
 """
-    applyinteraction!(interacttion::AbstractPartialRule, data, state, index)
+    applyinteraction!(interacttion::PartialRule, data, state, index)
 
 Applay an interation that manually writes to the passed in dest arrays.
 ### Arguments:
@@ -56,7 +56,7 @@ function precalcrule! end
 
 
 """
-    neighbors(hood::AbstractNeighborhood, state, indices, t, source, args...)
+    neighbors(hood::Neighborhood, state, indices, t, source, args...)
 
 Checks all cells in neighborhood and combines them according
 to the particular neighborhood type.
