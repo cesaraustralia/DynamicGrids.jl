@@ -1,14 +1,14 @@
 using DynamicGrids, Test, Colors, ColorSchemes, FieldDefaults
-using DynamicGrids: normaliseframe, frametoimage, @Image, @Output
+using DynamicGrids: normaliseframe, frametoimage, @Image, @Graphic, @Output
 using ColorSchemes: leonardo
 
 init = [8.0 10.0;
         0.0  5.0]
 
 # Define a simple image output
-@Image @Output struct ImageOutput{} <: AbstractImageOutput{T} end
+@Image @Graphic @Output struct TestImageOutput{} <: ImageOutput{T} end
 processor = Nothing
-output = ImageOutput(init, minval=0.0, maxval=10.0)
+output = TestImageOutput(init, minval=0.0, maxval=10.0)
 
 ruleset = Ruleset(Life())
 

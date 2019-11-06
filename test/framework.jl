@@ -8,7 +8,7 @@ init  = [0 1 1 0;
          0 1 1 0;
          0 1 1 0]
 
-struct TestRule <: AbstractRule end
+struct TestRule <: Rule end
 applyrule(::TestRule, data, state, index) = 0
 
 @testset "a rule that returns zero gives zero outputs" begin
@@ -24,7 +24,7 @@ applyrule(::TestRule, data, state, index) = 0
     @test dest(data) == final
 end
 
-struct TestPartial <: AbstractPartialRule end
+struct TestPartial <: PartialRule end
 applyrule!(::TestPartial, data, state, index) = 0
 
 @testset "a partial rule that returns zero does nothing" begin
@@ -34,7 +34,7 @@ applyrule!(::TestPartial, data, state, index) = 0
     @test dest(data) == init
 end
 
-struct TestPartialWrite <: AbstractPartialRule end
+struct TestPartialWrite <: PartialRule end
 applyrule!(::TestPartialWrite, data, state, index) = data[index[1], 2] = 0
 
 @testset "a partial rule that writes to dest affects output" begin
@@ -50,10 +50,10 @@ applyrule!(::TestPartialWrite, data, state, index) = data[index[1], 2] = 0
     @test dest(data) == final
 end
 
-struct TestCellTriple <: AbstractCellRule end
+struct TestCellTriple <: CellRule end
 applyrule(::TestCellTriple, data, state, index) = 3state
 
-struct TestCellSquare <: AbstractCellRule end
+struct TestCellSquare <: CellRule end
 applyrule(::TestCellSquare, data, state, index) = state^2
 
 @testset "a chained cell rull" begin
@@ -69,7 +69,7 @@ applyrule(::TestCellSquare, data, state, index) = state^2
     @test dest(data) == final
 end
 
-struct PrecalcRule{P} <: AbstractRule 
+struct PrecalcRule{P} <: Rule 
     precalc::P
 end
 DynamicGrids.precalcrules(rule::PrecalcRule, data) = 

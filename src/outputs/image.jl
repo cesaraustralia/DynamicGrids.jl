@@ -1,9 +1,9 @@
 """
 Graphic outputs that display frames as RGB24 images.
 """
-abstract type AbstractImageOutput{T} <: AbstractGraphicOutput{T} end
+abstract type ImageOutput{T} <: GraphicOutput{T} end
 
-(::Type{F})(o::T; kwargs...) where F <: AbstractImageOutput where T <: AbstractImageOutput =
+(::Type{F})(o::T; kwargs...) where F <: ImageOutput where T <: ImageOutput =
     F(; frames=frames(o), starttime=starttime(o), endtime=endtime(o), 
       fps=fps(o), showfps=showfps(o), timestamp=timestamp(o), stampframe=stampframe(o), store=store(o),
       processor=processor(o), minval=minval(o), maxval=maxval(o),
@@ -18,20 +18,18 @@ Mixin for outputs that output images and can use an image processor.
     maxval::Ma   | 1.0
 end
 
-processor(o::AbstractImageOutput) = o.processor
-minval(o::AbstractImageOutput) = o.minval
-maxval(o::AbstractImageOutput) = o.maxval
+processor(o::ImageOutput) = o.processor
+minval(o::ImageOutput) = o.minval
+maxval(o::ImageOutput) = o.maxval
 
 
-showframe(frame, o::AbstractImageOutput, data::AbstractSimData, f) = 
+showframe(frame, o::ImageOutput, data::AbstractSimData, f) = 
     showframe(frame, o, ruleset(data), f)
-showframe(frame, o::AbstractImageOutput, ruleset::AbstractRuleset, f) =
+showframe(frame, o::ImageOutput, ruleset::AbstractRuleset, f) =
     showframe(frametoimage(o, ruleset, frame, f), o, f)
 
 # Manual showframe without data/ruleset
-showframe(o::AbstractImageOutput, f=lastindex(o)) = showframe(o[f], o::AbstractImageOutput, f) 
-showframe(frame, o::AbstractImageOutput, f) =
-    showframe(frametoimage(o, normaliseframe(o, frame), f), o::AbstractOutput, f)
+showframe(o::ImageOutput, f=lastindex(o)) = showframe(o[f], o::ImageOutput, f) 
 
 
 """
@@ -51,26 +49,26 @@ processor(x) = Greyscale()
 """
 Frame processors convert arrays into RGB24 images for display.
 """
-abstract type AbstractFrameProcessor end
+abstract type FrameProcessor end
 
-abstract type MultiFrameProcessor <: AbstractFrameProcessor end
+abstract type MultiFrameProcessor <: FrameProcessor end
 
 """
-Convert frame matrix to RGB24, using an AbstractFrameProcessor
+Convert frame matrix to RGB24, using an FrameProcessor
 """
 function frametoimage end
 
-frametoimage(o::AbstractImageOutput, i::Integer) = frametoimage(o, o[i], i)
-frametoimage(o::AbstractImageOutput, frame, i::Integer) = 
+frametoimage(o::ImageOutput, i::Integer) = frametoimage(o, o[i], i)
+frametoimage(o::ImageOutput, frame, i::Integer) = 
     frametoimage(processor(o), o, Ruleset(), o[i], i)
-frametoimage(o::AbstractImageOutput, args...) = frametoimage(processor(o), o, args...)
+frametoimage(o::ImageOutput, args...) = frametoimage(processor(o), o, args...)
 
 """"
 Converts output frames to a colorsheme.
 # Arguments
 `scheme`: a ColorSchemes.jl colorscheme.
 """
-struct ColorProcessor{S,Z,M} <: AbstractFrameProcessor
+struct ColorProcessor{S,Z,M} <: FrameProcessor
     scheme::S
     zerocolor::Z
     maskcolor::M
@@ -82,7 +80,7 @@ scheme(processor::ColorProcessor) = processor.scheme
 zerocolor(processor::ColorProcessor) = processor.zerocolor
 maskcolor(processor::ColorProcessor) = processor.maskcolor
 
-frametoimage(p::ColorProcessor, o::AbstractOutput, 
+frametoimage(p::ColorProcessor, o::Output, 
              ruleset::AbstractRuleset, frame::AbstractArray, t) = begin
     img = fill(RGB24(0), size(frame))
     for i in CartesianIndices(frame)
@@ -121,8 +119,8 @@ colors(processor::ThreeColor) = processor.colors
 zerocolor(processor::ThreeColor) = processor.zerocolor
 maskcolor(processor::ThreeColor) = processor.maskcolor
 
-frametoimage(p::ThreeColor, o::AbstractOutput, ruleset, bands::NamedTuple, t) = begin
-    img = zeros(RGB24, size(first(bands)))
+frametoimage(p::ThreeColor, o::Output, ruleset, bands::NamedTuple, t) = begin
+    img = fill(RGB24(0), size(first(bands)))
     ncols = length(colors(p))
     nbands = length(bands) 
     nbands == ncols || throw(ArgumentError("$nbands layers in model but $ncols colors"))
@@ -165,14 +163,14 @@ scale(x, ::Nothing, ::Nothing) = x
 scale(x, min, max) = x * (max - min) + min
 
 """
-    savegif(filename::String, o::AbstractOutput, ruleset::AbstractRuleset; [processor=processor(o)], [kwargs...])
+    savegif(filename::String, o::Output, ruleset; [processor=processor(o)], [kwargs...])
 
 Write the output array to a gif. You must pass a processor keyword argument for any
-`AbstractOutut` objects not in `AbstractImageOutput` (which allready have a processor attached).
+`Output` objects not in `ImageOutput` (which allready have a processor attached).
 
 Saving very large gifs may trigger a bug in Imagemagick.
 """
-savegif(filename::String, o::AbstractOutput, ruleset::AbstractRuleset=Ruleset(); 
+savegif(filename::String, o::Output, ruleset=Ruleset(); 
         processor=processor(o), minval=0, maxval=1, kwargs...) = begin
     # fr = normaliseframe.(frames(o), minval, maxval)
     images = frametoimage.(Ref(processor), Ref(o), Ref(ruleset), frames(o), collect(firstindex(o):lastindex(o)))
@@ -186,7 +184,7 @@ struct NoMinMax end
 
 hasminmax(output::T) where T = (:minval in fieldnames(T)) ? HasMinMax() : NoMinMax()
 
-normaliseframe(output::AbstractOutput, a) = 
+normaliseframe(output::Output, a) = 
     normaliseframe(hasminmax(output), output, a)
 normaliseframe(::HasMinMax, output, a::NamedTuple) =
     map(normaliseframe, values(a), minval(output), maxval(output))

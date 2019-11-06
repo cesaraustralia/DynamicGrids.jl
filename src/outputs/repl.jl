@@ -5,9 +5,9 @@ function __init__()
     terminal = REPL.Terminals.TTYTerminal(get(ENV, "TERM", Base.Sys.iswindows() ? "" : "dumb"), stdin, stdout, stderr)
 end
 
-abstract type AbstractCharStyle end
-struct Block <: AbstractCharStyle end
-struct Braile <: AbstractCharStyle end
+abstract type CharStyle end
+struct Block <: CharStyle end
+struct Braile <: CharStyle end
 
 """
 An output that is displayed directly in the REPL. It can either store or discard
@@ -29,7 +29,7 @@ REPLOutput{:block}(init)
 ```
 The default option is `:block`.
 """
-@Graphic @Output mutable struct REPLOutput{Co,Cu,CS} <: AbstractGraphicOutput{T}
+@Graphic @Output mutable struct REPLOutput{Co,Cu,CS} <: GraphicOutput{T}
     displayoffset::Array{Int} | [1, 1]
     color::Co                 | :white
     cutoff::Cu                | 0.5

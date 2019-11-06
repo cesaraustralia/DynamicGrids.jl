@@ -4,15 +4,15 @@ Neighborhoods define how surrounding cells are related to the current cell.
 The `neighbors` function returns the sum of surrounding cells, as defined
 by the neighborhood.
 """
-abstract type AbstractNeighborhood{R} end
+abstract type Neighborhood{R} end
 
-radius(hood::AbstractNeighborhood{R}) where R = R
+radius(hood::Neighborhood{R}) where R = R
 
 """
-A neighborhood where a square are with a center radius `(D - 1) / 2`
+A Moore-style neighborhood where a square are with a center radius `(D - 1) / 2`
 where D is the diameter.
 """
-abstract type AbstractRadialNeighborhood{R} <: AbstractNeighborhood{R} end
+abstract type AbstractRadialNeighborhood{R} <: Neighborhood{R} end
 
 """
 Radial neighborhoods calculate the surrounding neighborood
@@ -22,11 +22,11 @@ is ommitted.
 struct RadialNeighborhood{R} <: AbstractRadialNeighborhood{R} end
 
 """
-    neighbors(hood::RadialNeighborhood, buf, state)
+    neighbors(hood::AbstractRadialNeighborhood, buf, state)
 
-Sums moore nieghborhoods of any dimension.
+Sums radial Moore nieghborhoods of any dimension.
 """
-neighbors(hood::RadialNeighborhood, model, buf, state) = sum(buf) - state
+neighbors(hood::AbstractRadialNeighborhood, model, buf, state) = sum(buf) - state
 
 @inline mapreduceneighbors(f, data, hood::AbstractRadialNeighborhood, rule, state, index) = begin
     r = radius(hood)
@@ -46,10 +46,11 @@ neighbors(hood::RadialNeighborhood, model, buf, state) = sum(buf) - state
 end
 
 """
-Custom neighborhoods are tuples of custom coordinates in relation to the central point
-of the current cell. They can be any arbitrary shape or size.
+Custom neighborhoods are tuples of custom coordinates (also tuples) specified in relation 
+to the central point of the current cell. They can be any arbitrary shape or size, but
+should be listed in column-major order for performance.
 """
-abstract type AbstractCustomNeighborhood{R} <: AbstractNeighborhood{R} end
+abstract type AbstractCustomNeighborhood{R} <: Neighborhood{R} end
 
 """
 Allows completely arbitrary neighborhood shapes by specifying each coordinate
@@ -64,10 +65,7 @@ CustomNeighborhood(coords) = CustomNeighborhood{absmaxcoord(coords), typeof(coor
 coords(hood::CustomNeighborhood) = hood.coords
 # Calculate the maximum absolute value in the coords to use as the radius
 absmaxcoord(coords) = maximum((x -> maximum(abs.(x))).(coords))
-"""
-    neighbors(hood::CustomNeighborhood, buf, state)
-Sum a single custom neighborhood.
-"""
+
 neighbors(hood::CustomNeighborhood, rule, buf, state) = begin
     r = radius(hood); sum = zero(state)
     for coord in coords(hood)
@@ -102,6 +100,11 @@ LayeredCustomNeighborhood(l::Tuple) =
 @inline mapreduceneighbors(f, data, hood::LayeredCustomNeighborhood, rule, state, index) = 
     map(layer -> mapreduceneighbors(f, data, layer, rule, state, index), hood.layers)
 
+"""
+A convenience wrapper to build a VonNeumann neighborhoods as a `CustomNeighborhood`.
+
+# TODO: variable radius
+"""
 VonNeumannNeighborhood() = CustomNeighborhood(((0,-1), (-1,0), (1,0), (0,1)))
 
 
@@ -119,8 +122,8 @@ radius(rules::Tuple) = mapreduce(radius, max, rules)
 radius(rules::Tuple, key) = mapreduce(rule -> radius(rule, key), max, rules)
 radius(rules::Tuple{}, args...) = 0
 
-radius(rule::AbstractNeighborhoodRule) = radius(neighborhood(rule))
-radius(rule::AbstractPartialNeighborhoodRule) = radius(neighborhood(rule))
-radius(rule::AbstractRule, args...) = 0
-# Only the first rule in a chain can have a radius.
+radius(rule::NeighborhoodRule) = radius(neighborhood(rule))
+radius(rule::PartialNeighborhoodRule) = radius(neighborhood(rule))
+radius(rule::Rule, args...) = 0
+# Only the first rule in a chain can have a radius larger than zero.
 radius(chain::Chain) = radius(chain[1])

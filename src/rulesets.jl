@@ -3,13 +3,13 @@ Singleton types for choosing the grid overflow rule used in
 [`inbounds`](@ref). These determine what is done when a neighborhood
 or jump extends outside of the grid.
 """
-abstract type AbstractOverflow end
+abstract type Overflow end
 
 "Wrap cords that overflow boundaries back to the opposite side"
-struct WrapOverflow <: AbstractOverflow end
+struct WrapOverflow <: Overflow end
 
 "Remove coords that overflow boundaries"
-struct RemoveOverflow <: AbstractOverflow end
+struct RemoveOverflow <: Overflow end
 
 
 abstract type AbstractRuleset end
@@ -27,10 +27,10 @@ ruleset(rs::AbstractRuleset) = rs
 """
     Ruleset(rules...; init=nothing, overflow=RemoveOverflow(), cellsize=1, timestep=1)
 
-A container for holding a sequence of AbstractRule, an init
+A container for holding a sequence of `Rule`, an `init`
 array and other simulaiton details.
 """
-@default_kw mutable struct Ruleset{R<:Tuple,I,M,O<:AbstractOverflow,C,T} <: AbstractRuleset
+@default_kw mutable struct Ruleset{R<:Tuple,I,M,O<:Overflow,C,T} <: AbstractRuleset
     rules::R     | ()
     init::I      | nothing
     mask::M      | nothing
@@ -38,7 +38,7 @@ array and other simulaiton details.
     cellsize::C  | 1
     timestep::T  | 1
 end
-Ruleset(rules::Vararg{<:AbstractRule}; kwargs...) = Ruleset(; rules=rules, kwargs...)
+Ruleset(rules::Vararg{<:Rule}; kwargs...) = Ruleset(; rules=rules, kwargs...)
 
 Ruleset(args...; kwargs...) = Ruleset(; rules=args, kwargs...)
 rules(rs::Ruleset) = rs.rules

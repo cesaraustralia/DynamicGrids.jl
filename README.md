@@ -25,31 +25,38 @@ assumptions to be made about running them that can greatly improve performance.
 Rules are joined in a `Ruleset` object and run in sequence:
 
 ```
-rule = Life(2, 3)
-ruleset = Ruleset(rule)
+ruleset = Ruleset(Life(2, 3))
 ```
 
-This seems a little redundant here, but multiple models can be combined in a
-`Ruleset`. Each rule will be run for the whole grid, in sequence, using
-appropriate optimisations depending on the parent types of each rule:
+The `Rulset` wrapper seems a little redundant here, but multiple models can be
+combined in a `Ruleset`. Each rule will be run for the whole grid, in sequence,
+using appropriate optimisations depending on the parent types of each rule:
 
 ```julia
-sim!(output, Ruleset(rule1, rule2))
+ruleset = Ruleset(rule1, rule2)
 ```
 
 For better performance (often ~2x), models included in a `Chain` object will be
 combined into a single model, using only one array read and write. This
-optimisation is limited to `AbstractCellRule`, or an `AbstractNeighborhoodRule`
-followed by `AbstractCellRule`. If the `@inline` compiler macro is used on all
+optimisation is limited to `CellRule`, or an `NeighborhoodRule`
+followed by `CellRule`. If the `@inline` compiler macro is used on all
 `applyrule` methods, all rules in a `Chain` will be compiled together with the
 looping code into a single, efficient function call.
 
 ```julia
-Rules(rule1, Chain(rule2, rule3))
+ruleset = Ruleset(rule1, Chain(rule2, rule3))
 ```
 
-An `Interaction` is a rule that operates on multiple grids, linking multiple
-discrete `Ruleset`s into a larger model.
+A `MultiRuleset` holds, as the name suggests, multiple rulesets. These may
+either run side by side independently (say for comparative analysis), or
+interact using `Interaction` rules. An `Interaction` is a rule that operates on
+multiple grids, linking multiple discrete `Ruleset`s into a larger model, such
+as this hypothetical spatial predator/prey model:
+
+```julia
+MuliRuleset(rules=(predator=predatordispersal, prey=Chain(popgrowth, preydispersal)),
+            interactions=(predation,))
+```
 
 
 ## Init
@@ -75,7 +82,7 @@ or passed into a simulation, where it will take preference over the `Ruleset` in
 sim!(output, rulset; init=init)
 ```
 
-For `InteractionRuleset`, `init` is a `NamedTuple` of equal-sized arrays
+For `MultiRuleset`, `init` is a `NamedTuple` of equal-sized arrays
 matching the names given to each `Ruleset` :
 
 ```julia
@@ -86,13 +93,13 @@ Handling and passing of the correct arrays is automated by DynamicGrids.jl.
 `Interaction` rules must specify which grids they require in what order.
 
 
-## Outputs 
+## Output 
 
-Outputs (subtypes of `AbstractOuput`) are ways of storing of viewing a simulation. They
-can be used interchangeably depending on your needs: `ArrayOutput` is a simple
-storage structure for high performance-simulations. As with most outputs, it is
-initialised with the `init` array, but in this case it also requires the number of
-simulation frames to preallocate.
+Outputs are ways of storing or viewing a simulation. They can be used
+interchangeably depending on your needs: `ArrayOutput` is a simple storage
+structure for high performance-simulations. As with most outputs, it is
+initialised with the `init` array, but in this case it also requires the number
+of simulation frames to preallocate before the simulation runs.
 
 ```julia
 output = ArrayOutput(init, 10)
@@ -112,10 +119,11 @@ provides simulation interfaces for use in Juno, Jupyter, web pages or electron
 apps, with live interactive control over parameters.
 [DynamicGridsGtk.jl](https://github.com/cesaraustralia/DynamicGridsGtk.jl) is a
 simple graphical output for Gtk. These packages are kept separate to avoid
-dependencies when being used in non-graphical simulations. Outputs are also easy
-to write, and high performance or applications may benefit from writing a custom
-output to reduce memory use, while custom frame processors can help developing
-specialised visualisations.
+dependencies when being used in non-graphical simulations. 
+
+Outputs are also easy to write, and high performance or applications may benefit
+from writing a custom output to reduce memory use, while custom frame processors
+can help developing specialised visualisations.
 
 
 ## Simulations
@@ -125,7 +133,8 @@ A typical simulation is run with a script like:
 ```julia
 init = my_array
 rules = Ruleset(Life(); init=init)
-output = ArrayOutput(init)
+output = ArrayOutput(init, 10)
 
 sim!(output, rules)
 ```
+

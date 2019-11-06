@@ -42,30 +42,26 @@ export distances, broadcastable_indices, sizefromradius
 
 export AbstractSimData, SimData, MultiSimData
 
-export AbstractRule, AbstractPartialRule,
-       AbstractNeighborhoodRule, AbstractPartialNeighborhoodRule,
-       AbstractCellRule, Chain
+export Rule, PartialRule, NeighborhoodRule, PartialNeighborhoodRule, CellRule, Chain
 
 export Interaction, NeighborhoodInteraction, CellInteraction,
        PartialInteraction, PartialNeighborhoodInteraction
 
 export AbstractRuleset, Ruleset, MultiRuleset
 
-export AbstractLife, Life
+export Life
 
-export AbstractNeighborhood, AbstractRadialNeighborhood, RadialNeighborhood, 
+export Neighborhood, AbstractRadialNeighborhood, RadialNeighborhood, 
        AbstractCustomNeighborhood, CustomNeighborhood, LayeredCustomNeighborhood, 
        VonNeumannNeighborhood
 
 export RemoveOverflow, WrapOverflow
 
-export AbstractOutput, AbstractGraphicOutput, AbstractImageOutput, AbstractArrayOutput, ArrayOutput, REPLOutput
+export Output, GraphicOutput, ImageOutput, ArrayOutput, REPLOutput
 
-export AbstractFrameProcessor, ColorProcessor, Greyscale, Grayscale
+export FrameProcessor, ColorProcessor, Greyscale, Grayscale
 
-export AbstractCharStyle, Block, Braile
-
-export AbstractSummary
+export CharStyle, Block, Braile
 
 
 const FIELDDOCTABLE = FieldDocTable((:Description, :Default, :Limits),

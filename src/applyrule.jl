@@ -4,9 +4,9 @@
 Chained rules. If a `Chain` of rules is passed to applyrule, run them sequentially for each 
 cell.  This can have much beter performance as no writes occur between rules, and they are
 essentially compiled together into compound rules. This gives correct results only for
-AbstractCellRule, or for a single AbstractNeighborhoodRule followed by AbstractCellRule.
+CellRule, or for a single NeighborhoodRule followed by CellRule.
 """
-@inline applyrule(rules::Chain{<:Tuple{<:AbstractNeighborhoodRule,Vararg}}, data, state, index, buf) = begin
+@inline applyrule(rules::Chain{<:Tuple{<:NeighborhoodRule,Vararg}}, data, state, index, buf) = begin
     state = applyrule(rules[1], data, state, index, buf)
     applyrule(tail(rules), data, state, index)
 end

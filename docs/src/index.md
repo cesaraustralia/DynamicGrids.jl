@@ -62,11 +62,11 @@ Rules can be chained together arbitrarily to make composite simulations.
 ### Types and Constructors
 
 ```@docs
-AbstractRule
-AbstractCellRule
-AbstractNeighborhoodRule
-AbstractPartialRule
-AbstractPartialNeighborhoodRule
+Rule
+CellRule
+NeighborhoodRule
+PartialRule
+PartialNeighborhoodRule
 Life
 ```
 
@@ -78,7 +78,7 @@ and how they are combined to update the value of the current cell.
 ### Types and Constructors
 
 ```@docs
-AbstractNeighborhood
+Neighborhood
 RadialNeighborhood
 AbstractCustomNeighborhood
 CustomNeighborhood
@@ -91,7 +91,7 @@ LayeredCustomNeighborhood
 ### Output Types and Constructors
 
 ```@docs
-AbstractOutput
+Output
 ArrayOutput
 REPLOutput
 ```
@@ -99,7 +99,7 @@ REPLOutput
 ### Frame processors
 
 ```@docs
-AbstractFrameProcessor
+FrameProcessor
 ColorProcessor
 Greyscale
 ```
@@ -107,7 +107,7 @@ Greyscale
 ## Overflow
 
 ```@docs
-AbstractOverflow
+Overflow
 WrapOverflow
 RemoveOverflow
 ```

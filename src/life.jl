@@ -2,8 +2,8 @@
 Rule for game-of-life style cellular automata. 
 $(FIELDDOCTABLE)
 """
-@description @limits @flattenable @default_kw struct Life{R,N,B,S} <: AbstractNeighborhoodRule{R}
-    neighborhood::N | RadialNeighborhood{1}() | false | nothing | "Any AbstractNeighborhood"
+@description @limits @flattenable @default_kw struct Life{R,N,B,S} <: NeighborhoodRule{R}
+    neighborhood::N | RadialNeighborhood{1}() | false | nothing | "Any Neighborhood"
     b::B | (3, 3) | true | (0, 8) | "Array, Tuple or Iterable of integers to match neighbors when cell is empty"
     s::S | (2, 3) | true | (0, 8) | "Array, Tuple or Iterable of integers to match neighbors cell is full"
 end
@@ -12,7 +12,7 @@ Life(neighborhood::N, b::B, s::S) where {N,B,S} =
     Life{radius(neighborhood),N,B,S}(neighborhood, b, s) 
 
 """
-    rule(rule::AbstractLife, state)
+    rule(rule::Life, state)
 
 Rule for game-of-life style cellular automata. This is a demonstration of 
 Cellular Automata more than a seriously optimised game of life rule.

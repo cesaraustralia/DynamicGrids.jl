@@ -1,10 +1,13 @@
-using DynamicGrids, Test
-import DynamicGrids: applyrule, applyinteraction!, applyinteraction,  Interaction
+using DynamicGrids, FieldDefaults, FieldMetadata, Test
+import DynamicGrids: applyrule, applyinteraction!, applyinteraction, 
+                     Interaction, @Image, @Graphic, @Output
+import FieldMetadata: @description, description, @limits, limits,
+                      @flattenable, flattenable, default
 
-struct Double <: AbstractCellRule end
+struct Double <: CellRule end
 applyrule(rule::Double, data, state, index) = state * 2
 
-struct Predation{Keys} <: Interaction{Keys} end
+struct Predation{Keys} <: CellInteraction{Keys} end
 Predation(; prey=:prey, predator=:predator) = Predation{(prey, predator)}()
 applyinteraction(::Predation, data, (prey, predators), index) = begin
     caught = prey * 0.02 * predators
@@ -23,19 +26,11 @@ interactions=(Predation(prey=:prey, predator=:predator),)
 ruleset = MultiRuleset(rulesets=rulesets, interactions=interactions; init=init)
 sim!(output, ruleset; init=init, tspan=(1, 20))
 
-# using DynamicGridsGtk
-# processor=DynamicGrids.ThreeColor(colors=(DynamicGrids.Blue(), DynamicGrids.Red()))
-# output = GtkOutput(init; processor=processor, minval=(0, 0), maxval=(1000, 100), store=true)
-# sim!(output, ruleset; init=init, tspan=(1, 60), fps=50)
+# Color processor runs
+@Image @Graphic @Output mutable struct TestImageOutput{} <: ImageOutput{T} end
+processor=DynamicGrids.ThreeColor(colors=(DynamicGrids.Blue(), DynamicGrids.Red()))
+imageoutput = TestImageOutput(init; processor=processor, minval=(0, 0), maxval=(1000, 100), store=true)
+DynamicGrids.showframe(::TestImageOutput, ::AbstractSimData, args...) = nothing 
+sim!(imageoutput, ruleset; init=init, tspan=(1, 20))
 
-
-# ruleset.rulesets
-# init
-
-# msd = DynamicGrids.MultiSimData(map((rs, i) -> SimData(rs, i, 1), ruleset.rulesets, init),
-             # DynamicGrids.interactions(ruleset))
-# typeof(msd)
-
-# Display ideas
-# output(init; processor=ThreeColor((:prey, :predator), (:red, :green)))
-# output(init; processor=Layout([:prey :predator; :superpredator nothing]))
+output[20] == imageoutput[20]
