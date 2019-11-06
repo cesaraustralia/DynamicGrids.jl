@@ -64,8 +64,17 @@ to the particular neighborhood type.
 function neighbors end
 
 """
-Set all the cells in the neighborhood.
-Usually called in `mapsetneighbor!`.
+    mapreduceneighbors(f, data, neighborhood, rule, state, index)
+
+Run `f` over all cells in the neighborhood and sums its return values. 
+`f` is a function or functor with the form:
+`f(data, neighborhood, rule, state, hood_index, dest_index)`. 
+"""
+function mapreduceneighbors end
+
+"""
+Set value of a cell in the neighborhood.
+Usually called in `mapreduceneighbors`.
 """
 function setneighbor! end
 

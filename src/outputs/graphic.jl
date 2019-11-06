@@ -56,6 +56,17 @@ end
 storeframe!(o::AbstractGraphicOutput, data) = begin
     f = currentframe(data)
     if isstored(o)
+        push!(o, fill!(similar(o[1]), zero(eltype(o[1]))))
+        storeframe!(o, data, f)
+    else
+        fill!(o[1], zero(eltype(o[1])))
+        storeframe!(o, data, 1)
+    end
+    isshowable(o, f) && showframe(o, data, f)
+end
+storeframe!(o::AbstractGraphicOutput, data::MultiSimData) = begin
+    f = currentframe(data)
+    if isstored(o)
         push!(o, map(l -> fill!(similar(l), zero(eltype(l))), o[1]))
         storeframe!(o, data, f)
     else

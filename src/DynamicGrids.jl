@@ -53,8 +53,9 @@ export AbstractRuleset, Ruleset, MultiRuleset
 
 export AbstractLife, Life
 
-export AbstractNeighborhood, RadialNeighborhood, AbstractCustomNeighborhood,
-       CustomNeighborhood, LayeredCustomNeighborhood, VonNeumannNeighborhood
+export AbstractNeighborhood, AbstractRadialNeighborhood, RadialNeighborhood, 
+       AbstractCustomNeighborhood, CustomNeighborhood, LayeredCustomNeighborhood, 
+       VonNeumannNeighborhood
 
 export RemoveOverflow, WrapOverflow
 

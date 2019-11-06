@@ -21,11 +21,12 @@ output = ArrayOutput(init, 20)
 rulesets=(prey=Ruleset(Double()), predator=Ruleset());
 interactions=(Predation(prey=:prey, predator=:predator),) 
 ruleset = MultiRuleset(rulesets=rulesets, interactions=interactions; init=init)
+sim!(output, ruleset; init=init, tspan=(1, 20))
 
-using DynamicGridsGtk
-processor=DynamicGrids.ThreeColor(colors=(DynamicGrids.Blue(), DynamicGrids.Red()))
-output = GtkOutput(init; processor=processor, minval=(0, 0), maxval=(1000, 100), store=true)
-sim!(output, ruleset; init=init, tspan=(1, 60), fps=50)
+# using DynamicGridsGtk
+# processor=DynamicGrids.ThreeColor(colors=(DynamicGrids.Blue(), DynamicGrids.Red()))
+# output = GtkOutput(init; processor=processor, minval=(0, 0), maxval=(1000, 100), store=true)
+# sim!(output, ruleset; init=init, tspan=(1, 60), fps=50)
 
 
 # ruleset.rulesets

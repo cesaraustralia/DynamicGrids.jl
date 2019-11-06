@@ -84,13 +84,13 @@ maskcolor(processor::ColorProcessor) = processor.maskcolor
 
 frametoimage(p::ColorProcessor, o::AbstractOutput, 
              ruleset::AbstractRuleset, frame::AbstractArray, t) = begin
-    img = similar(frame, RGB24)
+    img = fill(RGB24(0), size(frame))
     for i in CartesianIndices(frame)
         img[i] = if !(maskcolor(p) isa Nothing) && ismasked(mask(ruleset), i)
             maskcolor(p)
         else
             x = frame[i]
-            if hasminmax(output) isa HasMinMax
+            if hasminmax(o) isa HasMinMax
                 x = normalise(x, minval(o), maxval(o))
             end
             if !(zerocolor(p) isa Nothing) && x == zero(x)
@@ -121,8 +121,8 @@ colors(processor::ThreeColor) = processor.colors
 zerocolor(processor::ThreeColor) = processor.zerocolor
 maskcolor(processor::ThreeColor) = processor.maskcolor
 
-frametoimage(p::ThreeColor, o::AbstractOutput, ruleset::MultiRuleset, bands::NamedTuple, t) = begin
-    img = similar(first(bands), RGB24)
+frametoimage(p::ThreeColor, o::AbstractOutput, ruleset, bands::NamedTuple, t) = begin
+    img = zeros(RGB24, size(first(bands)))
     ncols = length(colors(p))
     nbands = length(bands) 
     nbands == ncols || throw(ArgumentError("$nbands layers in model but $ncols colors"))
@@ -174,8 +174,8 @@ Saving very large gifs may trigger a bug in Imagemagick.
 """
 savegif(filename::String, o::AbstractOutput, ruleset::AbstractRuleset=Ruleset(); 
         processor=processor(o), minval=0, maxval=1, kwargs...) = begin
-    fr = normaliseframe.(frames(o), minval, maxval)
-    images = frametoimage.(Ref(processor), Ref(o), Ref(ruleset), fr, collect(firstindex(o):lastindex(o)))
+    # fr = normaliseframe.(frames(o), minval, maxval)
+    images = frametoimage.(Ref(processor), Ref(o), Ref(ruleset), frames(o), collect(firstindex(o):lastindex(o)))
     array = cat(images..., dims=3)
     FileIO.save(filename, array; kwargs...)
 end

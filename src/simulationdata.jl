@@ -72,7 +72,7 @@ ConstructionBase.constructorof(::Type{SimData}) =
 """
 Generate simulation data to match a ruleset and init array.
 """
-SimData(ruleset::Ruleset, init::AbstractArray, starttime, r=maxradius(ruleset)) = begin
+SimData(ruleset::Ruleset, init::AbstractArray, starttime, r=radius(ruleset)) = begin
     # We add one extra row/column so we dont have to worry about
     # special casing the last block
     if r > 0
@@ -181,7 +181,8 @@ addpadding(init::AbstractArray{T,N}, r) where {T,N} = begin
     sze = size(init)
     paddedsize = sze .+ 2r
     paddedindices = -r + 1:sze[1] + r, -r + 1:sze[2] + r
-    source = OffsetArray(similar(init, paddedsize...), paddedindices...)
+    sourceparent = similar(init, paddedsize...)
+    source = OffsetArray(sourceparent, paddedindices...)
     source .= zero(eltype(source))
     # Copy the init array to he middle section of the source array
     for j in 1:size(init, 2), i in 1:size(init, 1)
@@ -219,7 +220,7 @@ initdata!(data::Nothing, ruleset::Ruleset, init, starttime, nreplicates::Nothing
 # initdata!(data::Nothing, ruleset::Ruleset, init, starttime, nreplicates::Integer) =
     # [SimData(ruleset, init, starttime) for r in 1:nreplicates]
 initdata!(data::Nothing, multiruleset::MultiRuleset, init::NamedTuple, starttime, nreplicates::Nothing) = begin
-    radii = NamedTuple{keys(init)}(maxradius(multiruleset))
+    radii = NamedTuple{keys(init)}(radius(multiruleset))
     data = map((rs, ra, in) -> SimData(rs, in, starttime, ra), ruleset(multiruleset), radii, init) 
     MultiSimData(init, data, multiruleset)
 end
@@ -248,7 +249,8 @@ ConstructionBase.constructorof(::Type{WritableSimData}) =
     (init, args...) -> SimData{eltype(init),ndims(init),typeof(init),typeof.(args)...}(init, args...)
 
 Base.@propagate_inbounds Base.setindex!(d::WritableSimData, x, I...) = begin
-    if (r = radius(d)) > 0
+    r = radius(d)
+    if r > 0
         bi = indtoblock.(I .+ r, 2r)
         deststatus(d)[bi...] = true
     end
