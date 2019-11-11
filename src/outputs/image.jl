@@ -29,7 +29,7 @@ showframe(frame, o::ImageOutput, ruleset::AbstractRuleset, f) =
     showframe(frametoimage(o, ruleset, frame, f), o, f)
 
 # Manual showframe without data/ruleset
-showframe(o::ImageOutput, f=lastindex(o)) = showframe(o[f], o::ImageOutput, f) 
+showframe(o::ImageOutput, f=lastindex(o)) = showframe(o[f], o, Ruleset(), f) 
 
 
 """
