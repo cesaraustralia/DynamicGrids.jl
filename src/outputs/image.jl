@@ -41,6 +41,13 @@ struct Greyscale{M1,M2}
 end
 Greyscale(; min=nothing, max=nothing) = Greyscale(max, min)
 
+Base.get(scheme::Greyscale, x) = scale(x, scheme.min, scheme.max)
+
+scale(x, ::Nothing, max) = x * max
+scale(x, min, ::Nothing) = x * (one(min) - min) + min
+scale(x, ::Nothing, ::Nothing) = x
+scale(x, min, max) = x * (max - min) + min
+
 const Grayscale = Greyscale
 
 # Greyscale is the default processor
@@ -151,16 +158,11 @@ combine(c::Tuple{Blue,Vararg}, acc, xs) = combine(tail(c), (acc[1], acc[2], acc[
 combine(c::Tuple{Nothing,Vararg}, acc, xs) = combine(tail(c), acc, tail(xs))
 combine(c::Tuple{}, acc, xs) = RGB24(acc...)
 
-rgb(g::Greyscale, x) = RGB24(scale(x, g.min, g.max))
-rgb(scheme::ColorSchemes.ColorScheme, x) = RGB24(get(scheme, x))
+rgb(scheme, x) = RGB24(get(scheme, x))
 rgb(c::RGB24) = c
 rgb(c::Tuple) = RGB24(c...)
 rgb(c::Number) = RGB24(c)
 
-scale(x, ::Nothing, max) = x * max
-scale(x, min, ::Nothing) = x * (one(min) - min) + min
-scale(x, ::Nothing, ::Nothing) = x
-scale(x, min, max) = x * (max - min) + min
 
 """
     savegif(filename::String, o::Output, ruleset; [processor=processor(o)], [kwargs...])

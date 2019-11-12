@@ -10,7 +10,6 @@ module DynamicGrids
 end DynamicGrids
 
 using Colors,
-      ColorSchemes,
       ConstructionBase,
       Crayons,
       DocStringExtensions,
