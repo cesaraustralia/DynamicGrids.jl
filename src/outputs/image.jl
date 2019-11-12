@@ -36,10 +36,10 @@ showframe(o::ImageOutput, f=lastindex(o)) = showframe(o[f], o, Ruleset(), f)
 Default colorscheme. Better performance than using a Colorschemes.jl scheme.
 """
 struct Greyscale{M1,M2}
-    max::M1
-    min::M2
+    min::M1
+    max::M2
 end
-Greyscale(; min=nothing, max=nothing) = Greyscale(max, min)
+Greyscale(; min=nothing, max=nothing) = Greyscale(min, max)
 
 Base.get(scheme::Greyscale, x) = scale(x, scheme.min, scheme.max)
 
@@ -68,18 +68,27 @@ function frametoimage end
 frametoimage(o::ImageOutput, i::Integer) = frametoimage(o, o[i], i)
 frametoimage(o::ImageOutput, frame, i::Integer) = 
     frametoimage(processor(o), o, Ruleset(), o[i], i)
+frametoimage(processor::FrameProcessor, o::ImageOutput, ruleset, frame, i) =
+    frametoimage(processor::FrameProcessor, maxval(o), minval(o), ruleset, frame, i)
+
 frametoimage(o::ImageOutput, args...) = frametoimage(processor(o), o, args...)
 
 """"
 Converts output frames to a colorsheme.
-# Arguments
-`scheme`: a ColorSchemes.jl colorscheme.
+
+## Arguments
+- `scheme`: a ColorSchemes.jl colorscheme.
+- `zerocolor`: an `RGB24` color to use when values are zero, or `nothing` to ignore.
+- `maskcolor`: an `RGB24` color to use when cells are masked, or `nothing` to ignore.
 """
 struct ColorProcessor{S,Z,M} <: FrameProcessor
     scheme::S
     zerocolor::Z
     maskcolor::M
 end
+"""
+    ColorProcessor(; scheme=Greyscale(), zerocolor=nothing, maskcolor=nothing)
+"""
 ColorProcessor(; scheme=Greyscale(), zerocolor=nothing, maskcolor=nothing) =
     ColorProcessor(scheme, zerocolor, maskcolor)
 
@@ -87,20 +96,26 @@ scheme(processor::ColorProcessor) = processor.scheme
 zerocolor(processor::ColorProcessor) = processor.zerocolor
 maskcolor(processor::ColorProcessor) = processor.maskcolor
 
-frametoimage(p::ColorProcessor, o::Output, 
+frametoimage(p::ColorProcessor, minval, maxval,
              ruleset::AbstractRuleset, frame::AbstractArray, t) = begin
     img = fill(RGB24(0), size(frame))
     for i in CartesianIndices(frame)
         img[i] = if !(maskcolor(p) isa Nothing) && ismasked(mask(ruleset), i)
             maskcolor(p)
         else
-            x = frame[i]
-            if hasminmax(o) isa HasMinMax
-                x = normalise(x, minval(o), maxval(o))
+            x = if isnothing(minval) || isnothing(maxval)
+                frame[i]
+            else
+                normalise(frame[i], minval, maxval)
             end
             if !(zerocolor(p) isa Nothing) && x == zero(x)
                 zerocolor(p)
             else
+                if x < 0 
+                    println(i)
+                    println(t)
+                    println(x)
+                end
                 rgb(scheme(p), x)
             end
         end
@@ -108,17 +123,40 @@ frametoimage(p::ColorProcessor, o::Output,
     img
 end
 
+rgb(scheme, x) = RGB24(get(scheme, x))
+rgb(c::RGB24) = c
+rgb(c::Tuple) = RGB24(c...)
+rgb(c::Number) = RGB24(c)
+
+
+
 abstract type BandColor end
 
 struct Red <: BandColor end
 struct Green <: BandColor end
 struct Blue <: BandColor end
 
+
+"""
+ThreeColor processor. Assigns `Red()`, `Blue()`, `Green()` or `nothing` to 
+any number of dynamic grids in any order. Duplicate colors will be summed.
+The final color sums are combined into a composite color image for display.
+
+## Arguments
+- `colors`: a tuple or `Red()`, `Green()`, `Blue()`, or `nothing` matching the number of grids.
+- `zerocolor`: an `RGB24` color to use when values are zero, or `nothing` to ignore.
+- `maskcolor`: an `RGB24` color to use when cells are masked, or `nothing` to ignore.
+"""
 struct ThreeColor{C<:Tuple,Z,M} <: MultiFrameProcessor
     colors::C
     zerocolor::Z
     maskcolor::M
 end
+"""
+    ThreeColor(; colors=(Red(), Green(), Blue()), zerocolor=nothing, maskcolor=nothing)
+
+Kewyword argument constructor for the ThreeColor processor.
+"""
 ThreeColor(; colors=(Red(), Green(), Blue()), zerocolor=nothing, maskcolor=nothing) =
     ThreeColor(colors, zerocolor, maskcolor)
 
@@ -126,20 +164,23 @@ colors(processor::ThreeColor) = processor.colors
 zerocolor(processor::ThreeColor) = processor.zerocolor
 maskcolor(processor::ThreeColor) = processor.maskcolor
 
-frametoimage(p::ThreeColor, o::Output, ruleset, bands::NamedTuple, t) = begin
+frametoimage(p::ThreeColor, minvals::Tuple, maxvals::Tuple, ruleset, bands::NamedTuple, t) = begin
     img = fill(RGB24(0), size(first(bands)))
     ncols = length(colors(p))
     nbands = length(bands) 
-    nbands == ncols || throw(ArgumentError("$nbands layers in model but $ncols colors"))
+    if !(nbands == ncols == length(minvals) == length(maxvals)) 
+        throw(ArgumentError("Number of grids ($nbands), processor colors ($ncols), minimum values ($(minval(o))) 
+                             and maximum values ($(maxval(o))) must all be the same"))
+    end
 
     for i in CartesianIndices(first(bands))
         img[i] = if !(maskcolor(p) isa Nothing) && ismasked(mask(ruleset), i)
             maskcolor(p)
         else
-            if hasminmax(o) isa HasMinMax
-                xs = map((f, mi, ma) -> normalise(f[i], mi, ma), values(bands), minval(o), maxval(o))
+            xs = if isnothing(minval) || isnothing(maxval)
+                map((f, mi, ma) -> normalise(f[i], mi, ma), values(bands), minvals, maxvals)
             else
-                xs = map(f -> f[i], values(bands))
+                map(f -> f[i], values(bands))
             end
             if !(zerocolor(p) isa Nothing) && all(map(x -> x .== zero(x), xs))
                 zerocolor(p)
@@ -158,11 +199,43 @@ combine(c::Tuple{Blue,Vararg}, acc, xs) = combine(tail(c), (acc[1], acc[2], acc[
 combine(c::Tuple{Nothing,Vararg}, acc, xs) = combine(tail(c), acc, tail(xs))
 combine(c::Tuple{}, acc, xs) = RGB24(acc...)
 
-rgb(scheme, x) = RGB24(get(scheme, x))
-rgb(c::RGB24) = c
-rgb(c::Tuple) = RGB24(c...)
-rgb(c::Number) = RGB24(c)
+"""
 
+## Arguments
+- `processors`: a list of color processors, defaulting to Greyscale()
+- `layout`
+"""
+struct LayoutProcessor{L<:AbstractMatrix,P<:Tuple} <: MultiFrameProcessor
+    layout::L
+    processors::P
+end
+LayoutProcessor(layout::Vector, processors) = 
+    LayoutProcessor(reshape(layout, length(layout), 1), processors)
+
+layout(p::LayoutProcessor) = p.layout
+processors(p::LayoutProcessor) = p.processors
+
+LayoutProcessor(; layout=throw(ArgumentError("must include an Array for the layout keyword")), 
+                processors=Tuple(ColorProcessor() for l in 1:maximum(layout))) =
+    LayoutProcessor(layout, processors)
+
+frametoimage(p::LayoutProcessor, minvals::Tuple, maxvals::Tuple, ruleset, frames::NamedTuple, t) = begin
+    l = layout(p)
+    if maximum(l) > length(frames)
+        throw(ArgumentError("layout $(max(layout)) does not exist"))
+    end
+    sze = size(first(frames))
+    img = fill(RGB24(0), sze .* size(l))
+    for i in 1:size(l, 1), j in 1:size(l, 2)
+        n = l[i, j]
+        n == 0 && continue
+        section = frametoimage(processors(p)[n], minvals[n], maxvals[n], ruleset, frames[n], t)
+        for x in 1:size(section, 1), y in 1:size(section, 2)
+            img[x + (i - 1) * sze[1], y + (j - 1) * sze[2]] = section[x, y]
+        end
+    end
+    img
+end
 
 """
     savegif(filename::String, o::Output, ruleset; [processor=processor(o)], [kwargs...])
