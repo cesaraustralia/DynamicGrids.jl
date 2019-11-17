@@ -23,7 +23,7 @@ UnicodeGraphics = "ebadf6b4-db70-5817-83da-4a19ad584e34"
 [compat]
 julia = "1"
 Colors = "^0.9"
-ConstructionBase = "^0.1"
+ConstructionBase = "1"
 Crayons = "^4"
 DocStringExtensions = "^0.8"
 FieldDefaults = "^0.1"
