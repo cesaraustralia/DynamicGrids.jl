@@ -96,7 +96,7 @@ Converts output frames to a colorsheme.
 - `maskcolor`: an `RGB24` color to use when cells are masked, or `nothing` to ignore.
 """
 @default_kw struct ColorProcessor{S,Z,M} <: SingleFrameProcessor
-    scheme::S    | scheme=Greyscale()
+    scheme::S    | Greyscale()
     zerocolor::Z | nothing
     maskcolor::M | nothing
 end
