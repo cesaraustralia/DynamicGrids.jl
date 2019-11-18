@@ -112,7 +112,7 @@ frametoimage(p::ColorProcessor, minval, maxval,
         img[i] = if !(maskcolor(p) isa Nothing) && ismasked(mask(ruleset), i)
             maskcolor(p)
         else
-            x = if isnothing(minval) || isnothing(maxval)
+            x = if minval === nothing || maxval === nothing
                 frame[i]
             else
                 normalise(frame[i], minval, maxval)
@@ -174,7 +174,7 @@ frametoimage(p::ThreeColor, minvals::Tuple, maxvals::Tuple, ruleset, bands::Name
         img[i] = if !(maskcolor(p) isa Nothing) && ismasked(mask(ruleset), i)
             maskcolor(p)
         else
-            xs = if isnothing(minval) || isnothing(maxval)
+            xs = if minval === nothing || maxval === nothing
                 map(f -> f[i], values(bands))
             else
                 map((f, mi, ma) -> normalise(f[i], mi, ma), values(bands), minvals, maxvals)
@@ -226,10 +226,10 @@ frametoimage(p::LayoutProcessor, minvals::Tuple, maxvals::Tuple, ruleset, grids:
     for i in 1:size(sections, 1), j in 1:size(gridids, 2)
         gridid = gridids[i, j]
         # Accept symbol keys and numbers, skip missing/nothing/0
-        (ismissing(gridid) || isnothing(gridid) || n == 0)  && continue
+        (ismissing(gridid) || gridid === nothing || n == 0)  && continue
         n = if gridid isa Symbol
             found = findfirst(k -> k === frameid, keys(grids)) 
-            isnothing(found) && throw(ArgumentError("$frameid is not in $(keys(grids))"))
+            found === nothing && throw(ArgumentError("$frameid is not in $(keys(grids))"))
             found 
         else
             gridid
