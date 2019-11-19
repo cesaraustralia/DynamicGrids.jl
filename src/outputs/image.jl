@@ -219,20 +219,20 @@ layout(p::LayoutProcessor) = p.layout
 processors(p::LayoutProcessor) = p.processors
 
 frametoimage(p::LayoutProcessor, minvals::Tuple, maxvals::Tuple, ruleset, grids::NamedTuple, t) = begin
-    gridids = layout(p)
+    grid_ids = layout(p)
     sze = size(first(grids))
-    img = fill(RGB24(0), sze .* size(l))
+    img = fill(RGB24(0), sze .* size(grid_ids))
     # Loop over the layout matrix
-    for i in 1:size(sections, 1), j in 1:size(gridids, 2)
-        gridid = gridids[i, j]
+    for i in 1:size(grid_ids, 1), j in 1:size(grid_ids, 2)
+        grid_id = grid_ids[i, j]
         # Accept symbol keys and numbers, skip missing/nothing/0
-        (ismissing(gridid) || gridid === nothing || n == 0)  && continue
-        n = if gridid isa Symbol
-            found = findfirst(k -> k === frameid, keys(grids)) 
-            found === nothing && throw(ArgumentError("$frameid is not in $(keys(grids))"))
+        (ismissing(grid_id) || grid_id === nothing || grid_id == 0)  && continue
+        n = if grid_id isa Symbol
+            found = findfirst(k -> k === grid_id, keys(grids)) 
+            found === nothing && throw(ArgumentError("$grid_id is not in $(keys(grids))"))
             found 
         else
-            gridid
+            grid_id
         end
         # Run processor for section
         section = frametoimage(processors(p)[n], minvals[n], maxvals[n], ruleset, grids[n], t)
