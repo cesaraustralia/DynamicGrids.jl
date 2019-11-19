@@ -12,6 +12,20 @@ similar grid-based spatial models. It is extended by
 [Dispersal.jl](https://github.com/cesaraustralia/Dispersal.jl) for modelling
 organism dispersal processes.
 
+
+A DynamicGrids.jl simulation is run with a script like this one
+running the included game of life model `Life()`:
+
+```julia
+init = my_array
+rules = Ruleset(Life(); init=init)
+output = ArrayOutput(init, 10)
+
+sim!(output, rules)
+```
+
+
+
 The framework is highly customisable, but there are some central ideas that define
 how a simulation works: *rules*, *init* arrays and *outputs*.
 
@@ -124,17 +138,3 @@ dependencies when being used in non-graphical simulations.
 Outputs are also easy to write, and high performance or applications may benefit
 from writing a custom output to reduce memory use, while custom frame processors
 can help developing specialised visualisations.
-
-
-## Simulations
-
-A typical simulation is run with a script like:
-
-```julia
-init = my_array
-rules = Ruleset(Life(); init=init)
-output = ArrayOutput(init, 10)
-
-sim!(output, rules)
-```
-
