@@ -16,16 +16,16 @@ end
 
 mapinteraction!(multidata::MultiSimData, interaction::PartialInteraction) = begin
     nrows, ncols = framesize(multidata)
+
+    # Copy the sources to dests
+    map(data(multidata)) do d 
+        @inbounds parent(dest(d)) .= parent(source(d))
+    end
      
     # Only pass in the data that the interaction wants, in that order
     keys_ = keys(interaction)
     interactiondata = @set multidata.data = 
         NamedTuple{keys_}(map(key -> WritableSimData(multidata[key]), keys_))
-
-    # Copy all the source and dest arrays
-    map(data(interactiondata)) do d 
-        @inbounds parent(dest(d)) .= parent(source(d))
-    end
 
     # Loop manually. TODO: use blockrun?
     for j in 1:ncols, i in 1:nrows
@@ -35,6 +35,5 @@ mapinteraction!(multidata::MultiSimData, interaction::PartialInteraction) = begi
     end
 
     map(d -> updatestatus!(sourcestatus(d), deststatus(d)), data(interactiondata))
-
 end
 
