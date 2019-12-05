@@ -1,5 +1,5 @@
 """
-Graphic outputs that display frames as RGB24 images.
+Graphic outputs that displays an output frame as an RGB24 images.
 """
 abstract type ImageOutput{T} <: GraphicOutput{T} end
 
@@ -14,13 +14,17 @@ Mixin for outputs that output images and can use an image processor.
 """
 @premix @default_kw struct Image{P,Mi,Ma}
     processor::P | ColorProcessor()
-    minval::Mi   | 0.0
-    maxval::Ma   | 1.0
+    minval::Mi   | 0
+    maxval::Ma   | 1
 end
 
 processor(o::ImageOutput) = o.processor
 minval(o::ImageOutput) = o.minval
 maxval(o::ImageOutput) = o.maxval
+
+processor(o::Output) = Greyscale()
+minval(o::Output) = 0
+maxval(o::Output) = 1
 
 
 showframe(frame, o::ImageOutput, data::AbstractSimData, f) = 
@@ -36,10 +40,10 @@ showframe(o::ImageOutput, f=lastindex(o)) = showframe(o[f], o, Ruleset(), f)
 Default colorscheme. Better performance than using a Colorschemes.jl scheme.
 """
 struct Greyscale{M1,M2}
-    max::M1
-    min::M2
+    min::M1
+    max::M2
 end
-Greyscale(; min=nothing, max=nothing) = Greyscale(max, min)
+Greyscale(; min=nothing, max=nothing) = Greyscale(min, max)
 
 Base.get(scheme::Greyscale, x) = scale(x, scheme.min, scheme.max)
 
@@ -48,55 +52,70 @@ scale(x, min, ::Nothing) = x * (one(min) - min) + min
 scale(x, ::Nothing, ::Nothing) = x
 scale(x, min, max) = x * (max - min) + min
 
+"Alternate name for Greyscale()"
 const Grayscale = Greyscale
 
-# Greyscale is the default processor
-processor(x) = Greyscale()
+
 
 """
-Frame processors convert arrays into RGB24 images for display.
+Frame processors convert a frame of the grid simulation into an RGB24 image for display.
 """
 abstract type FrameProcessor end
 
+"""
+Processors for converting one frame of a single grid model to an image.
+"""
+abstract type SingleFrameProcessor <: FrameProcessor end
+
+"""
+Processors for converting frames from multiple grids to a single image.
+"""
 abstract type MultiFrameProcessor <: FrameProcessor end
 
 """
-Convert frame matrix to RGB24, using an FrameProcessor
+Convert a frame to an RGB24 image, using a FrameProcessor
 """
 function frametoimage end
 
 frametoimage(o::ImageOutput, i::Integer) = frametoimage(o, o[i], i)
 frametoimage(o::ImageOutput, frame, i::Integer) = 
     frametoimage(processor(o), o, Ruleset(), o[i], i)
+frametoimage(processor::FrameProcessor, o::ImageOutput, ruleset, frame, i) =
+    frametoimage(processor::FrameProcessor, minval(o), maxval(o), ruleset, frame, i)
+
 frametoimage(o::ImageOutput, args...) = frametoimage(processor(o), o, args...)
 
 """"
+    ColorProcessor(; scheme=Greyscale(), zerocolor=nothing, maskcolor=nothing)
+
 Converts output frames to a colorsheme.
-# Arguments
-`scheme`: a ColorSchemes.jl colorscheme.
+
+## Arguments / Keyword Arguments
+- `scheme`: a ColorSchemes.jl colorscheme.
+- `zerocolor`: an `RGB24` color to use when values are zero, or `nothing` to ignore.
+- `maskcolor`: an `RGB24` color to use when cells are masked, or `nothing` to ignore.
 """
-struct ColorProcessor{S,Z,M} <: FrameProcessor
-    scheme::S
-    zerocolor::Z
-    maskcolor::M
+@default_kw struct ColorProcessor{S,Z,M} <: SingleFrameProcessor
+    scheme::S    | Greyscale()
+    zerocolor::Z | nothing
+    maskcolor::M | nothing
 end
-ColorProcessor(; scheme=Greyscale(), zerocolor=nothing, maskcolor=nothing) =
-    ColorProcessor(scheme, zerocolor, maskcolor)
 
 scheme(processor::ColorProcessor) = processor.scheme
 zerocolor(processor::ColorProcessor) = processor.zerocolor
 maskcolor(processor::ColorProcessor) = processor.maskcolor
 
-frametoimage(p::ColorProcessor, o::Output, 
+frametoimage(p::ColorProcessor, minval, maxval,
              ruleset::AbstractRuleset, frame::AbstractArray, t) = begin
     img = fill(RGB24(0), size(frame))
     for i in CartesianIndices(frame)
         img[i] = if !(maskcolor(p) isa Nothing) && ismasked(mask(ruleset), i)
             maskcolor(p)
         else
-            x = frame[i]
-            if hasminmax(o) isa HasMinMax
-                x = normalise(x, minval(o), maxval(o))
+            x = if minval === nothing || maxval === nothing
+                frame[i]
+            else
+                normalise(frame[i], minval, maxval)
             end
             if !(zerocolor(p) isa Nothing) && x == zero(x)
                 zerocolor(p)
@@ -108,38 +127,57 @@ frametoimage(p::ColorProcessor, o::Output,
     img
 end
 
+rgb(scheme, x) = RGB24(get(scheme, x))
+rgb(c::RGB24) = c
+rgb(c::Tuple) = RGB24(c...)
+rgb(c::Number) = RGB24(c)
+
+
 abstract type BandColor end
 
 struct Red <: BandColor end
 struct Green <: BandColor end
 struct Blue <: BandColor end
 
-struct ThreeColor{C<:Tuple,Z,M} <: MultiFrameProcessor
-    colors::C
-    zerocolor::Z
-    maskcolor::M
+
+"""
+    ThreeColor(; colors=(Red(), Green(), Blue()), zerocolor=nothing, maskcolor=nothing)
+
+ThreeColor processor. Assigns `Red()`, `Blue()`, `Green()` or `nothing` to 
+any number of dynamic grids in any order. Duplicate colors will be summed.
+The final color sums are combined into a composite color image for display.
+
+## Arguments / Keyword Arguments
+- `colors`: a tuple or `Red()`, `Green()`, `Blue()`, or `nothing` matching the number of grids.
+- `zerocolor`: an `RGB24` color to use when values are zero, or `nothing` to ignore.
+- `maskcolor`: an `RGB24` color to use when cells are masked, or `nothing` to ignore.
+"""
+@default_kw struct ThreeColor{C<:Tuple,Z,M} <: MultiFrameProcessor
+    colors::C    | (Red(), Green(), Blue())
+    zerocolor::Z | nothing
+    maskcolor::M | nothing
 end
-ThreeColor(; colors=(Red(), Green(), Blue()), zerocolor=nothing, maskcolor=nothing) =
-    ThreeColor(colors, zerocolor, maskcolor)
 
 colors(processor::ThreeColor) = processor.colors
 zerocolor(processor::ThreeColor) = processor.zerocolor
 maskcolor(processor::ThreeColor) = processor.maskcolor
 
-frametoimage(p::ThreeColor, o::Output, ruleset, bands::NamedTuple, t) = begin
+frametoimage(p::ThreeColor, minvals::Tuple, maxvals::Tuple, ruleset, bands::NamedTuple, t) = begin
     img = fill(RGB24(0), size(first(bands)))
     ncols = length(colors(p))
     nbands = length(bands) 
-    nbands == ncols || throw(ArgumentError("$nbands layers in model but $ncols colors"))
-
+    if !(nbands == ncols == length(minvals) == length(maxvals)) 
+        throw(ArgumentError("Number of grids ($nbands), processor colors ($ncols), minimum values ($(minval(o))) 
+                             and maximum values ($(maxval(o))) must all be the same"))
+    end
     for i in CartesianIndices(first(bands))
         img[i] = if !(maskcolor(p) isa Nothing) && ismasked(mask(ruleset), i)
             maskcolor(p)
         else
-            if hasminmax(o) isa HasMinMax
-                xs = map((f, mi, ma) -> normalise(f[i], mi, ma), values(bands), minval(o), maxval(o))
+            xs = if minval === nothing || maxval === nothing
+                map(f -> f[i], values(bands))
             else
-                xs = map(f -> f[i], values(bands))
+                map((f, mi, ma) -> normalise(f[i], mi, ma), values(bands), minvals, maxvals)
             end
             if !(zerocolor(p) isa Nothing) && all(map(x -> x .== zero(x), xs))
                 zerocolor(p)
@@ -158,10 +196,53 @@ combine(c::Tuple{Blue,Vararg}, acc, xs) = combine(tail(c), (acc[1], acc[2], acc[
 combine(c::Tuple{Nothing,Vararg}, acc, xs) = combine(tail(c), acc, tail(xs))
 combine(c::Tuple{}, acc, xs) = RGB24(acc...)
 
-rgb(scheme, x) = RGB24(get(scheme, x))
-rgb(c::RGB24) = c
-rgb(c::Tuple) = RGB24(c...)
-rgb(c::Number) = RGB24(c)
+
+"""
+LayoutProcessor(layout::Array, processors)
+    LayoutProcessor(reshape(layout, length(layout), 1), processors)
+
+## Arguments / Keyword arguments
+- `layout`: A Vector or Matrix containing the keyes or numbers of frames in the locations to
+  display them. `nothing`, `missing` or `0` values will be skipped.
+- `processors`: tuple of SingleFrameProcessor, one for each grid in the simulation. 
+  Can be `nothing` for unused grids.
+"""
+@default_kw struct LayoutProcessor{L<:AbstractMatrix,P} <: MultiFrameProcessor
+    layout::L     | throw(ArgumentError("must include an Array for the layout keyword")) 
+    processors::P | throw(ArgumentError("include a tuple of processors for each grid"))
+end
+# Convenience constructor to convert Vector input to a column Matrix
+LayoutProcessor(layout::AbstractVector, processors) = 
+    LayoutProcessor(reshape(layout, length(layout), 1), processors)
+
+layout(p::LayoutProcessor) = p.layout
+processors(p::LayoutProcessor) = p.processors
+
+frametoimage(p::LayoutProcessor, minvals::Tuple, maxvals::Tuple, ruleset, grids::NamedTuple, t) = begin
+    grid_ids = layout(p)
+    sze = size(first(grids))
+    img = fill(RGB24(0), sze .* size(grid_ids))
+    # Loop over the layout matrix
+    for i in 1:size(grid_ids, 1), j in 1:size(grid_ids, 2)
+        grid_id = grid_ids[i, j]
+        # Accept symbol keys and numbers, skip missing/nothing/0
+        (ismissing(grid_id) || grid_id === nothing || grid_id == 0)  && continue
+        n = if grid_id isa Symbol
+            found = findfirst(k -> k === grid_id, keys(grids)) 
+            found === nothing && throw(ArgumentError("$grid_id is not in $(keys(grids))"))
+            found 
+        else
+            grid_id
+        end
+        # Run processor for section
+        section = frametoimage(processors(p)[n], minvals[n], maxvals[n], ruleset, grids[n], t)
+        # Copy section into image
+        for x in 1:size(section, 1), y in 1:size(section, 2)
+            img[x + (i - 1) * sze[1], y + (j - 1) * sze[2]] = section[x, y]
+        end
+    end
+    img
+end
 
 
 """
@@ -173,8 +254,7 @@ Write the output array to a gif. You must pass a processor keyword argument for 
 Saving very large gifs may trigger a bug in Imagemagick.
 """
 savegif(filename::String, o::Output, ruleset=Ruleset(); 
-        processor=processor(o), minval=0, maxval=1, kwargs...) = begin
-    # fr = normaliseframe.(frames(o), minval, maxval)
+        processor=processor(o), minval=minval(o), maxval=maxval(o), kwargs...) = begin
     images = frametoimage.(Ref(processor), Ref(o), Ref(ruleset), frames(o), collect(firstindex(o):lastindex(o)))
     array = cat(images..., dims=3)
     FileIO.save(filename, array; kwargs...)

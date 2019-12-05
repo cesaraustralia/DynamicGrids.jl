@@ -33,7 +33,7 @@ The default option is `:block`.
     displayoffset::Array{Int} | [1, 1]
     color::Co                 | :white
     cutoff::Cu                | 0.5
-    style::CS                 | :block
+    style::CS                 | Block()
 end
 
 initialize!(o::REPLOutput, args...) = begin
