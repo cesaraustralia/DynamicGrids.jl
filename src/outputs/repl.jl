@@ -22,10 +22,10 @@ simulation frames.
 - `store::Bool`: store frames or not
 - `color`: a color from Crayons.jl
 - `cutoff::Real`: the cutoff point to display a full or empty cell. Default is `0.5`
+- `style::CharStyle`: `Block()` or `Braile()` style printing. `Braile` uses 1/4 the screen space.
 
-To choose the display type can pass `:braile` or `:block` to the constructor:
 ```julia
-REPLOutput{:block}(init)
+REPLOutput(init)
 ```
 The default option is `:block`.
 """

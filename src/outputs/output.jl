@@ -7,7 +7,7 @@ many cases can be used interchangeably.
 """
 abstract type Output{T} <: AbstractVector{T} end
 
-"Generic ouput constructor. Converts init array to vector of frames."
+# Generic ouput constructor. Converts init array to vector of frames.
 (::Type{F})(init::AbstractMatrix; kwargs...) where F <: Output =
     F(; frames=[deepcopy(init)], kwargs...)
 (::Type{F})(init::NamedTuple; kwargs...) where F <: Output =

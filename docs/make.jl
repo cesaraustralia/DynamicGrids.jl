@@ -1,4 +1,5 @@
 using Documenter, DynamicGrids
+using DynamicGrids: @Output, @Graphic, @Image, applyinteraction, applyinteraction!
 
 makedocs(
     modules = [DynamicGrids],

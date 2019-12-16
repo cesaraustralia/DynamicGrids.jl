@@ -6,8 +6,8 @@ Runs the whole simulation, passing the destination aray to
 the passed in output for each time-step.
 
 ### Arguments
-- `output`: An [AbstractOutput](@ref) to store frames or display them on the screen.
-- `ruleset`: A Rule() containing one ore more [`AbstractRule`](@ref). These will each be run in sequence.
+- `output`: An [Output](@ref) to store frames or display them on the screen.
+- `ruleset`: A Rule() containing one ore more [`Rule`](@ref). These will each be run in sequence.
 
 ### Keyword Arguments
 - `init`: the initialisation array. If `nothing`, the Ruleset must contain an `init` array.
@@ -95,6 +95,7 @@ simloop!(output, data, fspan) = begin
         data = updatetime(data, f) |> precalcrules
         # Run the ruleset and setup data for the next iteration
         data = sequencerules!(data)
+        println(typeof(data))
         # Save/do something with the the current frame
         storeframe!(output, data)
         isasync(output) && yield()
