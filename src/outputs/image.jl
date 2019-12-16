@@ -63,12 +63,12 @@ Frame processors convert a frame of the grid simulation into an RGB24 image for 
 abstract type FrameProcessor end
 
 """
-Processors for converting one frame of a single grid model to an image.
+Processors that convert one frame of a single grid model to an image.
 """
 abstract type SingleFrameProcessor <: FrameProcessor end
 
 """
-Processors for converting frames from multiple grids to a single image.
+Processors that convert frames from multiple grids to a single image.
 """
 abstract type MultiFrameProcessor <: FrameProcessor end
 
@@ -141,9 +141,9 @@ struct Blue <: BandColor end
 
 
 """
-    ThreeColor(; colors=(Red(), Green(), Blue()), zerocolor=nothing, maskcolor=nothing)
+    ThreeColorProcessor(; colors=(Red(), Green(), Blue()), zerocolor=nothing, maskcolor=nothing)
 
-ThreeColor processor. Assigns `Red()`, `Blue()`, `Green()` or `nothing` to 
+Assigns `Red()`, `Blue()`, `Green()` or `nothing` to 
 any number of dynamic grids in any order. Duplicate colors will be summed.
 The final color sums are combined into a composite color image for display.
 
@@ -152,17 +152,17 @@ The final color sums are combined into a composite color image for display.
 - `zerocolor`: an `RGB24` color to use when values are zero, or `nothing` to ignore.
 - `maskcolor`: an `RGB24` color to use when cells are masked, or `nothing` to ignore.
 """
-@default_kw struct ThreeColor{C<:Tuple,Z,M} <: MultiFrameProcessor
+@default_kw struct ThreeColorProcessor{C<:Tuple,Z,M} <: MultiFrameProcessor
     colors::C    | (Red(), Green(), Blue())
     zerocolor::Z | nothing
     maskcolor::M | nothing
 end
 
-colors(processor::ThreeColor) = processor.colors
-zerocolor(processor::ThreeColor) = processor.zerocolor
-maskcolor(processor::ThreeColor) = processor.maskcolor
+colors(processor::ThreeColorProcessor) = processor.colors
+zerocolor(processor::ThreeColorProcessor) = processor.zerocolor
+maskcolor(processor::ThreeColorProcessor) = processor.maskcolor
 
-frametoimage(p::ThreeColor, minvals::Tuple, maxvals::Tuple, ruleset, bands::NamedTuple, t) = begin
+frametoimage(p::ThreeColorProcessor, minvals::Tuple, maxvals::Tuple, ruleset, bands::NamedTuple, t) = begin
     img = fill(RGB24(0), size(first(bands)))
     ncols = length(colors(p))
     nbands = length(bands) 

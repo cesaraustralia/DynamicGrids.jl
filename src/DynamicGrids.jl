@@ -1,6 +1,6 @@
 module DynamicGrids
 # Use the README as the module docs
-@doc let 
+@doc let
     path = joinpath(dirname(@__DIR__), "README.md")
     include_dependency(path)
     # Use [`XX`](@ref) in the docs but not the readme
@@ -50,15 +50,18 @@ export AbstractRuleset, Ruleset, MultiRuleset
 
 export Life
 
-export Neighborhood, AbstractRadialNeighborhood, RadialNeighborhood, 
-       AbstractCustomNeighborhood, CustomNeighborhood, LayeredCustomNeighborhood, 
+export Neighborhood, AbstractRadialNeighborhood, RadialNeighborhood,
+       AbstractCustomNeighborhood, CustomNeighborhood, LayeredCustomNeighborhood,
        VonNeumannNeighborhood
 
-export RemoveOverflow, WrapOverflow
+export Overflow, RemoveOverflow, WrapOverflow
 
 export Output, GraphicOutput, ImageOutput, ArrayOutput, REPLOutput
 
-export FrameProcessor, ColorProcessor, Greyscale, Grayscale
+export FrameProcessor, SingleFrameProcessor, ColorProcessor,
+       MultiFrameProcessor, ThreeColorProcessor, LayoutProcessor
+
+export Greyscale, Grayscale
 
 export CharStyle, Block, Braile
 

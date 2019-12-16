@@ -21,9 +21,9 @@ init = round.(Int8, max.(0.0, rand(-2.0:0.1:1.0, 70,70)))
 model = Ruleset(Life())
 
 # Use an output that shows the cellular automata as blocks in the REPL
-output = REPLOutput{:block}(init; fps=100)
+output = REPLOutput(init; fps=100)
 
-sim!(output, model, init; tstop=5)
+sim!(output, model, init; tspan=(1, 5))
 ```
 
 More life-like examples:
@@ -59,15 +59,28 @@ Rules define simulation behaviour. They hold data relevant to the simulation,
 and trigger dispatch of particular [`applyrule`](@ref) or [`applyrule!`](@ref) methods.
 Rules can be chained together arbitrarily to make composite simulations.
 
+
 ### Types and Constructors
 
 ```@docs
+Ruleset
 Rule
 CellRule
 NeighborhoodRule
 PartialRule
 PartialNeighborhoodRule
 Life
+Chain
+```
+
+`Interaction` rules specify interactions between multiple dynamic grids.
+
+```@docs
+Interaction
+NeighborhoodInteraction
+CellInteraction
+PartialInteraction
+PartialNeighborhoodInteraction
 ```
 
 ## Neighborhoods
@@ -79,6 +92,7 @@ and how they are combined to update the value of the current cell.
 
 ```@docs
 Neighborhood
+AbstractRadialNeighborhood
 RadialNeighborhood
 AbstractCustomNeighborhood
 CustomNeighborhood
@@ -93,15 +107,38 @@ LayeredCustomNeighborhood
 ```@docs
 Output
 ArrayOutput
+GraphicOutput
 REPLOutput
+ImageOutput
+```
+
+
+Dynamic grids uses [Mixers.jl](https://github.com/rafaqz/Mixers.jl) mixins
+to simplify specifying custom outputs with the required fields.
+
+```@docs
+@Output
+@Graphic
+@Image
 ```
 
 ### Frame processors
 
 ```@docs
 FrameProcessor
+SingleFrameProcessor 
 ColorProcessor
+MultiFrameProcessor
+ThreeColorProcessor
+LayoutProcessor
 Greyscale
+```
+
+### Internal data handling
+
+```@docs
+SimData
+MultiSimData
 ```
 
 ## Overflow

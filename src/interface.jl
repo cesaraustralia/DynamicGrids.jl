@@ -1,5 +1,5 @@
 """
-    applyrule(rule::Rule, data, state, index)
+    applyrule(rule::Rule, data, state, index, [buffer])
 
 Updates cell values based on their current state and the state of other cells
 as defined in the Rule.
@@ -9,6 +9,7 @@ as defined in the Rule.
 - `data` : [`FrameData`](@ref)
 - `state`: the value of the current cell
 - `index`: a (row, column) tuple of Int for the current cell coordinates - `t`: the current time step
+- `buffer`: a neighborhood burrer array passed to [`NeighborhoodRule`].
 
 Returns a value to be written to the current cell.
 """
