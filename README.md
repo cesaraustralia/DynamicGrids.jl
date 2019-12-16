@@ -39,7 +39,7 @@ how a simulation works: *rules* and *interactions*, *init* arrays and *outputs*.
 ## Rules and Interactions
 
 Rules hold the parameters for running a simulation. Each rule triggers a
-specific `applyrule` method that operates on each of the cells in the grid.
+specific `applyrule` method that operates on each of the active cells in the grid.
 Rules come in a number of flavours (outlined in the 
 [docs](https://cesaraustralia.github.io/DynamicGrids.jl/stable/#Rules-1), which allow
 assumptions to be made about running them that can greatly improve performance.
