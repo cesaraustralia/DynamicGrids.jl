@@ -6,34 +6,42 @@
 [![Coverage Status](https://coveralls.io/repos/cesaraustralia/DynamicGrids.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/cesaraustralia/DynamicGrids.jl?branch=master) 
 [![codecov.io](http://codecov.io/github/cesaraustralia/DynamicGrids.jl/coverage.svg?branch=master)](http://codecov.io/github/cesaraustralia/DynamicGrids.jl?branch=master)
 
-DynamicGrids is a generalised modular framework for cellular automata and
-similar grid-based spatial models. It is extended by
-[Dispersal.jl](https://github.com/cesaraustralia/Dispersal.jl) for modelling
-organism dispersal processes.
+DynamicGrids is a generalised framework for building high-performance grid-based spatial models, including celluara automata, but also allowing arbitrary behviours such as long distance jumps and interactions between multiple grids. It is extended by [Dispersal.jl](https://github.com/cesaraustralia/Dispersal.jl) for modelling organism dispersal processes.
 
+![Dispersal quarantine](https://raw.githubusercontent.com/cesaraustralia/DynamicGrids.jl/media/dispersal_quarantine.gif)
+
+*A dispersal simulation with quarantine interactions, using Dispersal.jl, custom rules and the 
+GtkOuput from [DynamicGridsGtk](https://github.com/cesaraustralia/DynamicGridsGtk.jl). 
+Note that this is indicative of the real-time frame-rate on a laptop.*
 
 A DynamicGrids.jl simulation is run with a script like this one
 running the included game of life model `Life()`:
 
 ```julia
-init = my_array
-rules = Ruleset(Life(); init=init)
-output = ArrayOutput(init, 10)
-
-sim!(output, rules)
+using DynamicGrids, Crayons
+init = rand(Bool, 150, 200)
+output = REPLOutput(init; fps=30, color=Crayon(foreground=:red, background=:black, bold=true))
+ruleset = Ruleset(Life(); init=init)
+sim!(output, ruleset; tspan=(1, 200))
 ```
 
+![REPL life](https://github.com/cesaraustralia/DynamicGrids.jl/blob/media/life.gif?raw=true)
 
+*A game of life simulation being displayed directly in a terminal.*
+
+
+# Concepts
 
 The framework is highly customisable, but there are some central ideas that define
-how a simulation works: *rules*, *init* arrays and *outputs*.
+how a simulation works: *rules* and *interactions*, *init* arrays and *outputs*.
 
 
-## Rules, and Interactions
+## Rules and Interactions
 
 Rules hold the parameters for running a simulation. Each rule triggers a
 specific `applyrule` method that operates on each of the cells in the grid.
-Rules come in a number of flavours (outlined in the docs), which allows
+Rules come in a number of flavours (outlined in the 
+[docs](https://cesaraustralia.github.io/DynamicGrids.jl/stable/#Rules-1), which allow
 assumptions to be made about running them that can greatly improve performance.
 Rules are joined in a `Ruleset` object and run in sequence:
 
@@ -51,17 +59,17 @@ ruleset = Ruleset(rule1, rule2)
 
 For better performance (often ~2x), models included in a `Chain` object will be
 combined into a single model, using only one array read and write. This
-optimisation is limited to `CellRule`, or an `NeighborhoodRule`
+optimisation is limited to `CellRule`, or a `NeighborhoodRule`
 followed by `CellRule`. If the `@inline` compiler macro is used on all
-`applyrule` methods, all rules in a `Chain` will be compiled together with the
-looping code into a single, efficient function call.
+`applyrule` methods, all rules in a `Chain` will be compiled together into a single, 
+efficient function call.
 
 ```julia
-ruleset = Ruleset(rule1, Chain(rule2, rule3))
+ruleset = Ruleset(rule1, Chain(rule2, rule3, rule4))
 ```
 
 A `MultiRuleset` holds, as the name suggests, multiple rulesets. These may
-either run side by side independently (say for comparative analysis), or
+either run side by side independently (say for live comparative analysis), or
 interact using `Interaction` rules. An `Interaction` is a rule that operates on
 multiple grids, linking multiple discrete `Ruleset`s into a larger model, such
 as this hypothetical spatial predator/prey model:
@@ -103,12 +111,17 @@ init = (predator=rand(100, 100), prey=(rand(100, 100))
 ```
 
 Handling and passing of the correct arrays is automated by DynamicGrids.jl.
-`Interaction` rules must specify which grids they require in what order.
+`Interaction` rules must specify which grids they require in what order. 
 
+Passing spatial `init` arrays from [GeoData.jl](https://github.com/rafaqz/GeoData.jl) 
+will propagate through the model to give spatially explicit output. This will plot 
+correctly as a map using [Plots.jl](https://github.com/JuliaPlots/Plots.jl), 
+to which shape files and observation points can be easily added.
 
 ## Output 
 
-Outputs are ways of storing or viewing a simulation. They can be used
+[Outputs](https://cesaraustralia.github.io/DynamicGrids.jl/stable/#Output-1)
+are ways of storing or viewing a simulation. They can be used
 interchangeably depending on your needs: `ArrayOutput` is a simple storage
 structure for high performance-simulations. As with most outputs, it is
 initialised with the `init` array, but in this case it also requires the number
@@ -118,7 +131,7 @@ of simulation frames to preallocate before the simulation runs.
 output = ArrayOutput(init, 10)
 ```
 
-The `REPLOutput` is a `GraphicOutput` that can be useful for checking a
+The `REPLOutput` shown above is an inbuilt `GraphicOutput` that can be useful for checking a
 simulation when working in a terminal or over ssh:
 
 ```julia
@@ -126,7 +139,9 @@ output = REPLOutput(init)
 ```
 
 `ImageOutput` is the most complex class of outputs, allowing full color visual
-simulations and even interactions.
+simulations using COlorSchemes.jl. It can also display interactions using color 
+composites or layouts, as shown above in the quarantine simulation.
+
 [DynamicGridsInteract.jl](https://github.com/cesaraustralia/DynamicGridsInteract.jl)
 provides simulation interfaces for use in Juno, Jupyter, web pages or electron
 apps, with live interactive control over parameters.
@@ -135,5 +150,8 @@ simple graphical output for Gtk. These packages are kept separate to avoid
 dependencies when being used in non-graphical simulations. 
 
 Outputs are also easy to write, and high performance or applications may benefit
-from writing a custom output to reduce memory use, while custom frame processors
-can help developing specialised visualisations.
+from writing a custom output to reduce memory use, such as running a loss function on the fly
+instead of storing the array. Performance of DynamicGrids.jl is dominated by cache
+interactions, and reducing memory use has significant positive effects. Custom 
+[frame processors](https://cesaraustralia.github.io/DynamicGrids.jl/stable/#Frame-processors-1)
+can also be written, which can help developing specialised visualisations.
