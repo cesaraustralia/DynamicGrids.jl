@@ -95,7 +95,6 @@ simloop!(output, data, fspan) = begin
         data = updatetime(data, f) |> precalcrules
         # Run the ruleset and setup data for the next iteration
         data = sequencerules!(data)
-        println(typeof(data))
         # Save/do something with the the current frame
         storeframe!(output, data)
         isasync(output) && yield()
