@@ -6,7 +6,7 @@
 [![Coverage Status](https://coveralls.io/repos/cesaraustralia/DynamicGrids.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/cesaraustralia/DynamicGrids.jl?branch=master) 
 [![codecov.io](http://codecov.io/github/cesaraustralia/DynamicGrids.jl/coverage.svg?branch=master)](http://codecov.io/github/cesaraustralia/DynamicGrids.jl?branch=master)
 
-DynamicGrids is a generalised framework for building high-performance grid-based spatial models, including celluara automata, but also allowing arbitrary behviours such as long distance jumps and interactions between multiple grids. It is extended by [Dispersal.jl](https://github.com/cesaraustralia/Dispersal.jl) for modelling organism dispersal processes.
+DynamicGrids is a generalised framework for building high-performance grid-based spatial models, including celluar automata, but also allowing arbitrary behviours such as long distance jumps and interactions between multiple grids. It is extended by [Dispersal.jl](https://github.com/cesaraustralia/Dispersal.jl) for modelling organism dispersal processes.
 
 ![Dispersal quarantine](https://raw.githubusercontent.com/cesaraustralia/DynamicGrids.jl/media/dispersal_quarantine.gif)
 
@@ -41,7 +41,7 @@ how a simulation works: *rules* and *interactions*, *init* arrays and *outputs*.
 Rules hold the parameters for running a simulation. Each rule triggers a
 specific `applyrule` method that operates on each of the active cells in the grid.
 Rules come in a number of flavours (outlined in the 
-[docs](https://cesaraustralia.github.io/DynamicGrids.jl/stable/#Rules-1), which allow
+[docs](https://cesaraustralia.github.io/DynamicGrids.jl/stable/#Rules-1)), which allow
 assumptions to be made about running them that can greatly improve performance.
 Rules are joined in a `Ruleset` object and run in sequence:
 
