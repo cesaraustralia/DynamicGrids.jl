@@ -6,18 +6,9 @@ These can either be all CellRule or NeighborhoodRule followed by CellRule.
 struct Chain{T} <: Rule
     val::T
 end
-Chain(t::Tuple) = begin
-    if !(t[1] isa Union{NeighborhoodRule, CellRule})
-        throw(ArgumentError("Only `NeighborhoodRule` or `CellRule` allowed as first rule in a `Chain`. $(Base.nameof(typeof(r))) found"))
-    end
-    map(tail(t)) do r
-        if !(r isa CellRule)
-            throw(ArgumentError("Only `CellRule` allowed in a `Chain`. $(Base.nameof(typeof(r))) found"))
-        end
-    end
+Chain(x::Union{NeighborhoodRule,CellRule}) = Chain{typeof(x)}((x,))
+Chain(t::Tuple{<:Union{NeighborhoodRule,CellRule},Vararg{<:CellRule}}) = 
     Chain{typeof(t)}(t)
-end
-Chain(x) = Chain((x,))
 Chain(args...) = Chain(args)
 
 
