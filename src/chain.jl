@@ -1,16 +1,12 @@
 """
 Chains allow chaining rules together to be completed in a single processing step
-without intermediate writes, and potentially compiled together into a single function call. 
+without intermediate writes, and potentially compiled together into a single function call.
 These can either be all CellRule or NeighborhoodRule followed by CellRule.
 """
-struct Chain{T} <: Rule
+struct Chain{T<:Union{Tuple{},Tuple{<:Union{NeighborhoodRule,CellRule},Vararg{<:CellRule}}}} <: Rule
     val::T
 end
-Chain(x::Union{NeighborhoodRule,CellRule}) = Chain{typeof(x)}((x,))
-Chain(t::Tuple{<:Union{NeighborhoodRule,CellRule},Vararg{<:CellRule}}) = 
-    Chain{typeof(t)}(t)
 Chain(args...) = Chain(args)
-
 
 val(chain::Chain) = chain.val
 
