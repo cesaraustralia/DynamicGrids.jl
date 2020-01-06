@@ -30,13 +30,13 @@ ruleset(rs::AbstractRuleset) = rs
 A container for holding a sequence of `Rule`, an `init`
 array and other simulaiton details.
 """
-@default_kw mutable struct Ruleset{R<:Tuple,I,M,O<:Overflow,C,T} <: AbstractRuleset
-    rules::R     | ()
-    init::I      | nothing
-    mask::M      | nothing
-    overflow::O  | RemoveOverflow()
-    cellsize::C  | 1
-    timestep::T  | 1
+@flattenable @default_kw mutable struct Ruleset{R<:Tuple,I,M,O<:Overflow,C,T} <: AbstractRuleset
+    rules::R     | ()               | true
+    init::I      | nothing          | false
+    mask::M      | nothing          | false
+    overflow::O  | RemoveOverflow() | false
+    cellsize::C  | 1                | false
+    timestep::T  | 1                | false
 end
 Ruleset(rules::Vararg{<:Rule}; kwargs...) = Ruleset(; rules=rules, kwargs...)
 
@@ -44,12 +44,11 @@ Ruleset(args...; kwargs...) = Ruleset(; rules=args, kwargs...)
 rules(rs::Ruleset) = rs.rules
 
 # Getters
-rules(rs::Ruleset) = rs.rules
 
 show(io::IO, ruleset::Ruleset) = begin
     printstyled(io, Base.nameof(typeof(ruleset)), " =\n"; color=:blue)
     println(io, "rules:")
-    for rule in ruleset.rules
+    for rule in rules(ruleset)
         println(IOContext(io, :indent => "    "), rule)
     end
     for fn in fieldnames(typeof(ruleset))
@@ -59,23 +58,23 @@ show(io::IO, ruleset::Ruleset) = begin
 end
 
 
-struct MultiRuleset{R<:NamedTuple, X<:Tuple,I,M,O,C,T} <: AbstractRuleset
-    rulesets::R
-    interactions::X
-    init::I
-    mask::M
-    overflow::O
-    cellsize::C
-    timestep::T
+@flattenable struct MultiRuleset{R<:Tuple{<:NamedTuple,<:Tuple},I,M,O,C,T} <: AbstractRuleset
+    rules::R     | true
+    init::I      | false
+    mask::M      | false
+    overflow::O  | false
+    cellsize::C  | false
+    timestep::T  | false
 end
 MultiRuleset(; rulesets=(), interactions=(), init=map(init, rulesets), 
              mask=nothing, overflow=RemoveOverflow(), cellsize=1, timestep=1) = begin
     rulesets = map(r -> standardise_ruleset(r, mask, overflow, cellsize, timestep), rulesets)
-    MultiRuleset(rulesets, interactions, init, mask, overflow, cellsize, timestep)
+    MultiRuleset((rulesets, interactions), init, mask, overflow, cellsize, timestep)
 end
 
-ruleset(mrs::MultiRuleset) = mrs.rulesets
-interactions(mrs::MultiRuleset) = mrs.interactions
+rules(rs::MultiRuleset) = rs.rules
+ruleset(mrs::MultiRuleset) = mrs.rules[1]
+interactions(mrs::MultiRuleset) = mrs.rules[2]
 
 Base.getindex(mrs::MultiRuleset, key) = getindex(ruleset(mrs), key)
 Base.keys(mrs::MultiRuleset) = keys(ruleset(mrs))
