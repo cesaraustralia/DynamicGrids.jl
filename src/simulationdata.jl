@@ -110,24 +110,22 @@ struct MultiSimData{I,D<:NamedTuple,Ru} <: AbstractSimData
     ruleset::Ru
 end
 
-data(d::MultiSimData) = d.data
+# Getters
+init(d::MultiSimData) = d.init
 ruleset(d::MultiSimData) = d.ruleset
-framesize(d::MultiSimData) = framesize(first(data(d)))
-interactions(d::MultiSimData) = interactions(ruleset(d))
+data(d::MultiSimData) = d.data
 
 Base.getindex(d::MultiSimData, key) = begin
     getindex(data(d), key)
 end
 Base.keys(d::MultiSimData) = keys(data(d))
 
-# Getters
-init(d::MultiSimData) = d.init
-ruleset(d::MultiSimData) = d.ruleset
-data(d::MultiSimData) = d.data
 
-firstruleset(d::MultiSimData) = first(ruleset(ruleset(d)))
+# Getters forwarded to data
 firstdata(d::MultiSimData) = first(data(d))
 
+interactions(d::MultiSimData) = interactions(ruleset(d))
+framesize(d::MultiSimData) = framesize(firstdata(d))
 source(d::MultiSimData) = source(firstdata(d))
 dest(d::MultiSimData) = dest(firstdata(d))
 sourcestatus(d::MultiSimData) = sourcestatus(firstdata(d))
@@ -141,7 +139,8 @@ currentframe(d::MultiSimData) = currentframe(firstdata(d))
 
 
 # Getters forwarded to ruleset
-framesize(d::MultiSimData) = size(first(init(d)))
+firstruleset(d::MultiSimData) = first(ruleset(ruleset(d)))
+
 # rules(d::MultiSimData) = map(rules, ruleset(d))
 mask(d::MultiSimData) = mask(firstruleset(d))
 overflow(d::MultiSimData) = overflow(firstruleset(d))
