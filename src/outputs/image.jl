@@ -80,6 +80,8 @@ function frametoimage end
 frametoimage(o::ImageOutput, i::Integer) = frametoimage(o, o[i], i)
 frametoimage(o::ImageOutput, frame, i::Integer) = 
     frametoimage(processor(o), o, Ruleset(), o[i], i)
+frametoimage(o::ImageOutput, ruleset::AbstractRuleset, i::Integer) = 
+    frametoimage(processor(o), o, ruleset, o[i], i)
 frametoimage(processor::FrameProcessor, o::ImageOutput, ruleset, frame, i) =
     frametoimage(processor::FrameProcessor, minval(o), maxval(o), ruleset, frame, i)
 
@@ -162,13 +164,13 @@ colors(processor::ThreeColorProcessor) = processor.colors
 zerocolor(processor::ThreeColorProcessor) = processor.zerocolor
 maskcolor(processor::ThreeColorProcessor) = processor.maskcolor
 
-frametoimage(p::ThreeColorProcessor, minvals::Tuple, maxvals::Tuple, ruleset, bands::NamedTuple, t) = begin
+frametoimage(p::ThreeColorProcessor, minval::Tuple, maxval::Tuple, ruleset, grids::NamedTuple, t) = begin
     img = fill(RGB24(0), size(first(bands)))
     ncols = length(colors(p))
     nbands = length(bands) 
-    if !(nbands == ncols == length(minvals) == length(maxvals)) 
-        throw(ArgumentError("Number of grids ($nbands), processor colors ($ncols), minimum values ($(minval(o))) 
-                             and maximum values ($(maxval(o))) must all be the same"))
+    if !(nbands == ncols == length(minval) == length(maxval)) 
+        throw(ArgumentError("Number of grids ($nbands), processor colors ($ncols), minval ($(minval)) 
+                             and maxival ($(maxval)) must be the same"))
     end
     for i in CartesianIndices(first(bands))
         img[i] = if !(maskcolor(p) isa Nothing) && ismasked(mask(ruleset), i)
@@ -177,7 +179,7 @@ frametoimage(p::ThreeColorProcessor, minvals::Tuple, maxvals::Tuple, ruleset, ba
             xs = if minval === nothing || maxval === nothing
                 map(f -> f[i], values(bands))
             else
-                map((f, mi, ma) -> normalise(f[i], mi, ma), values(bands), minvals, maxvals)
+                map((f, mi, ma) -> normalise(f[i], mi, ma), values(bands), minval, maxval)
             end
             if !(zerocolor(p) isa Nothing) && all(map(x -> x .== zero(x), xs))
                 zerocolor(p)
@@ -218,7 +220,12 @@ LayoutProcessor(layout::AbstractVector, processors) =
 layout(p::LayoutProcessor) = p.layout
 processors(p::LayoutProcessor) = p.processors
 
-frametoimage(p::LayoutProcessor, minvals::Tuple, maxvals::Tuple, ruleset, grids::NamedTuple, t) = begin
+frametoimage(p::LayoutProcessor, minval::Tuple, maxval::Tuple, ruleset, grids::NamedTuple, t) = begin
+    if !(length(grids) == length(minval) == length(maxval)) 
+        throw(ArgumentError("Number of grids ($(length(grids)), minval ($(length(minval))) 
+                            and maxival ($(length((maxval))) must be the same"))
+    end
+
     grid_ids = layout(p)
     sze = size(first(grids))
     img = fill(RGB24(0), sze .* size(grid_ids))
@@ -235,7 +242,7 @@ frametoimage(p::LayoutProcessor, minvals::Tuple, maxvals::Tuple, ruleset, grids:
             grid_id
         end
         # Run processor for section
-        section = frametoimage(processors(p)[n], minvals[n], maxvals[n], ruleset, grids[n], t)
+        section = frametoimage(processors(p)[n], minval[n], maxval[n], ruleset, grids[n], t)
         # Copy section into image
         for x in 1:size(section, 1), y in 1:size(section, 2)
             img[x + (i - 1) * sze[1], y + (j - 1) * sze[2]] = section[x, y]
