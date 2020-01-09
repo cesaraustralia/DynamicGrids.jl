@@ -215,4 +215,4 @@ output = ArrayOutput(init, 50)
 
 ## Alternatives
 
-[Agents.jl](https://github.com/JuliaDynamics/Agents.jl) can also do cellular-automata style simulations. The design of Agents.jl is to iterate over a list of agents, instead of broadcasting over an array of cells. This approach is better suited  when you need to track the movement of individual agents throughout the simulation. However, it is two orders of magnitude slower the DynamicGrids.jl for the forest fire model above, and does not allow chaining multiple models, or live simulation and interaction.
+[Agents.jl](https://github.com/JuliaDynamics/Agents.jl) can also do cellular-automata style simulations. The design of Agents.jl is to iterate over a list of agents, instead of broadcasting over an array of cells. This approach is better suited  when you need to track the movement of individual agents throughout the simulation. However, it is two orders of magnitude slower the DynamicGrids.jl for the forest fire model above, and does not allow chaining multiple models, or live simulation and interaction. If you don't need to track individual agents, use DynamicGrids.jl.
