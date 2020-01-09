@@ -165,21 +165,21 @@ zerocolor(processor::ThreeColorProcessor) = processor.zerocolor
 maskcolor(processor::ThreeColorProcessor) = processor.maskcolor
 
 frametoimage(p::ThreeColorProcessor, minval::Tuple, maxval::Tuple, ruleset, grids::NamedTuple, t) = begin
-    img = fill(RGB24(0), size(first(bands)))
+    img = fill(RGB24(0), size(first(grids)))
     ncols = length(colors(p))
-    nbands = length(bands) 
-    if !(nbands == ncols == length(minval) == length(maxval)) 
-        throw(ArgumentError("Number of grids ($nbands), processor colors ($ncols), minval ($(minval)) 
-                             and maxival ($(maxval)) must be the same"))
+    ngrids = length(grids) 
+    if !(ngrids == ncols == length(minval) == length(maxval)) 
+        throw(ArgumentError("Number of grids ($ngrids), processor colors ($ncols), minval ($(length(minval))) 
+                            and maxival ($(length(maxval))) must be the same"))
     end
-    for i in CartesianIndices(first(bands))
+    for i in CartesianIndices(first(grids))
         img[i] = if !(maskcolor(p) isa Nothing) && ismasked(mask(ruleset), i)
             maskcolor(p)
         else
             xs = if minval === nothing || maxval === nothing
-                map(f -> f[i], values(bands))
+                map(f -> f[i], values(grids))
             else
-                map((f, mi, ma) -> normalise(f[i], mi, ma), values(bands), minval, maxval)
+                map((f, mi, ma) -> normalise(f[i], mi, ma), values(grids), minval, maxval)
             end
             if !(zerocolor(p) isa Nothing) && all(map(x -> x .== zero(x), xs))
                 zerocolor(p)
