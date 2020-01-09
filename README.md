@@ -155,3 +155,65 @@ instead of storing the array. Performance of DynamicGrids.jl is dominated by cac
 interactions, and reducing memory use has significant positive effects. Custom 
 [frame processors](https://cesaraustralia.github.io/DynamicGrids.jl/stable/#Frame-processors-1)
 can also be written, which can help developing specialised visualisations.
+
+## Example
+
+This example implements a very simple forest fire model:
+
+```julia
+using DynamicGrids, DynamicGridsGtk, ColorSchemes, Colors
+
+const DEAD = 1
+const ALIVE = 2
+const BURNING = 3
+
+# Define the Rule struct
+struct ForestFire{R,N,PC,PR} <: NeighborhoodRule{R}
+    neighborhood::N
+    prob_combustion::PC
+    prob_regrowth::PR
+end
+ForestFire(; neighborhood=RadialNeighborhood{1}(), prob_combustion=0.0001, prob_regrowth=0.01) =
+    ForestFire{DynamicGrids.radius(neighborhood),typeof.((neighborhood, prob_combustion, prob_regrowth))...
+              }(neighborhood, prob_combustion, prob_regrowth)
+
+# Define the `applyrule` method
+@inline DynamicGrids.applyrule(rule::ForestFire, data, state::Integer, index, hood_buffer) =
+    if state == ALIVE
+        if BURNING in hood_buffer
+            BURNING
+        else
+            rand() <= rule.prob_combustion ? BURNING : ALIVE
+        end
+    elseif state in BURNING
+        DEAD
+    else
+        rand() <= rule.prob_regrowth ? ALIVE : DEAD
+    end
+
+# Set up the init array, ruleset and output (using a Gtk window)
+init = fill(ALIVE, 400, 400)
+ruleset = Ruleset(ForestFire(); init=init)
+output = GtkOutput(init; fps=25, minval=DEAD, maxval=BURNING,
+                   processor=ColorProcessor(scheme=ColorSchemes.rainbow, zerocolor=RGB24(0.0)))
+
+# Run the simulation
+sim!(output, ruleset; tspan=(1, 200))
+
+# Save the output aas a gif
+savegif("forestfire.gif", output)
+```
+![forestfire_fixed](https://user-images.githubusercontent.com/2534009/72052469-5450c580-3319-11ea-8948-5196d1c6fd33.gif)
+
+Timing the simulation for 50 steps, the performance is quite good:
+
+```
+output = ArrayOutput(init, 50)
+@time sim!(output, ruleset; tspan=(1, 50))
+  0.318592 seconds (190 allocations: 2.530 MiB, 1.79% gc time)
+```
+
+
+## Alternatives
+
+[Agents.jl](https://github.com/JuliaDynamics/Agents.jl) can also do cellular-automata style simulations. The design of Agents.jl is to iterate over a list of agents, instead of broadcasting over an array of cells. This approach is better suited  when you need to track the movement of individual agents throughout the simulation. However, it is two orders of magnitude slower the DynamicGrids.jl for the forest fire model above, and does not allow chaining multiple models, or live simulation and interaction.
