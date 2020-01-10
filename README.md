@@ -168,14 +168,13 @@ const ALIVE = 2
 const BURNING = 3
 
 # Define the Rule struct
-struct ForestFire{R,N,PC,PR} <: NeighborhoodRule{R}
+struct ForestFire{N,PC,PR} <: NeighborhoodRule
     neighborhood::N
     prob_combustion::PC
     prob_regrowth::PR
 end
 ForestFire(; neighborhood=RadialNeighborhood{1}(), prob_combustion=0.0001, prob_regrowth=0.01) =
-    ForestFire{DynamicGrids.radius(neighborhood),typeof.((neighborhood, prob_combustion, prob_regrowth))...
-              }(neighborhood, prob_combustion, prob_regrowth)
+    ForestFire(neighborhood, prob_combustion, prob_regrowth)
 
 # Define the `applyrule` method
 @inline DynamicGrids.applyrule(rule::ForestFire, data, state::Integer, index, hood_buffer) =

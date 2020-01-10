@@ -46,7 +46,7 @@ Its return value is allways written to the central cell.
 
 Custom Neighborhood rules must return their radius with a `radius()` method.
 """
-abstract type NeighborhoodRule{R} <: Rule end
+abstract type NeighborhoodRule <: Rule end
 
 neighborhood(rule::NeighborhoodRule) = rule.neighborhood 
 
@@ -56,7 +56,7 @@ TODO: should this exist?
 
 Custom PartialNeighborhood rules must return their radius with a `radius()` method.
 """
-abstract type PartialNeighborhoodRule{R} <: PartialRule end
+abstract type PartialNeighborhoodRule <: PartialRule end
 
 neighborhood(rule::PartialNeighborhoodRule) = rule.neighborhood 
 
