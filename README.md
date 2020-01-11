@@ -176,10 +176,10 @@ end
 ForestFire(; neighborhood=RadialNeighborhood{1}(), prob_combustion=0.0001, prob_regrowth=0.01) =
     ForestFire(neighborhood, prob_combustion, prob_regrowth)
 
-# Define the `applyrule` method
-@inline DynamicGrids.applyrule(rule::ForestFire, data, state::Integer, index, hood_buffer) =
+# Define an `applyrule` method to be broadcasted over the grid for the `ForestFire` rule
+@inline DynamicGrids.applyrule(rule::ForestFire, data, state::Integer, index, hoodbuffer) =
     if state == ALIVE
-        if BURNING in hood_buffer
+        if BURNING in neighbors(rule, hoodbuffer)
             BURNING
         else
             rand() <= rule.prob_combustion ? BURNING : ALIVE
@@ -201,8 +201,22 @@ sim!(output, ruleset; tspan=(1, 200))
 
 # Save the output aas a gif
 savegif("forestfire.gif", output)
+
 ```
-![forestfire_fixed](https://user-images.githubusercontent.com/2534009/72052469-5450c580-3319-11ea-8948-5196d1c6fd33.gif)
+![forestfire](https://user-images.githubusercontent.com/2534009/72052469-5450c580-3319-11ea-8948-5196d1c6fd33.gif)
+
+
+We could also use a "windy" custom neighborhood:
+
+```
+windyhood = CustomNeighborhood((1,1), (1,2), (1,3), (2,1), (3,1))
+ruleset = Ruleset(ForestFire(; neighborhood=windyhood); init=init)
+sim!(output, ruleset; tspan=(1, 200))
+savegif("windy_forestfire.gif", output)
+```
+
+![windy_forestfire](https://user-images.githubusercontent.com/2534009/72198637-a95d1a80-3484-11ea-8b77-25a4a94b3943.gif)
+
 
 Timing the simulation for 50 steps, the performance is quite good:
 

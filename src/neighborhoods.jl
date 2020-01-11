@@ -21,14 +21,12 @@ is ommitted.
 """
 struct RadialNeighborhood{R} <: AbstractRadialNeighborhood{R} end
 
-"""
-    neighbors(hood::AbstractRadialNeighborhood, buf, state)
+neighbors(hood::AbstractRadialNeighborhood, buf) =
+    (buf[i] for i in 1:hoodsize(hood)^2)
 
-Sums radial Moore nieghborhoods of any dimension.
-"""
-neighbors(hood::AbstractRadialNeighborhood, model, buf, state) = sum(buf) - state
+sumneighbors(hood::AbstractRadialNeighborhood, buf, state) = sum(buf) - state
 
-@inline mapreduceneighbors(f, data, hood::AbstractRadialNeighborhood, rule, state, index) = begin
+@inline mapsetneighbor!(data::AbstractSimData, hood::AbstractRadialNeighborhood, rule, state, index) = begin
     r = radius(hood)
     sum = zero(state)
     # Loop over dispersal kernel grid dimensions
@@ -39,7 +37,7 @@ neighbors(hood::AbstractRadialNeighborhood, model, buf, state) = sum(buf) - stat
             ydest = y + index[1] - r - one(r)
             hood_index = (y, x)
             dest_index = (ydest, xdest)
-            sum += f(data, hood, rule, state, hood_index, dest_index)
+            sum += setneighbor!(data, hood, rule, state, hood_index, dest_index)
         end
     end
     sum
@@ -66,21 +64,21 @@ coords(hood::CustomNeighborhood) = hood.coords
 # Calculate the maximum absolute value in the coords to use as the radius
 absmaxcoord(coords) = maximum((x -> maximum(abs.(x))).(coords))
 
-neighbors(hood::CustomNeighborhood, rule, buf, state) = begin
-    r = radius(hood); sum = zero(state)
-    for coord in coords(hood)
-        sum += buf[(coord .+ r .+ 1)...]
-    end
-    sum
-end
+neighbors(rule::NeighborhoodRule, buf) = 
+    neighbors(neighborhood(rule), buf)
+neighbors(hood::CustomNeighborhood, buf) =
+    (buf[(coord .+ radius(hood) .+ 1)...] for coord in coords(hood))
 
-@inline mapreduceneighbors(f, data, hood::CustomNeighborhood, rule, state, index) = begin
+sumneighbors(hood::CustomNeighborhood, buf, state) = 
+    sum(neighbors(hood, buf))
+
+@inline mapsetneighbor!(data::AbstractSimData, hood::CustomNeighborhood, rule, state, index) = begin
     r = radius(hood); sum = zero(state)
     # Loop over dispersal kernel grid dimensions
     for coord in coords(hood)
         hood_index = coord .+ r
         dest_index = index .+ coord
-        sum += f(data, hood, rule, state, hood_index, dest_index)
+        sum += setneighbor!(data, hood, rule, state, hood_index, dest_index)
     end
     sum
 end
@@ -94,11 +92,14 @@ end
 LayeredCustomNeighborhood(l::Tuple) =
     LayeredCustomNeighborhood{maximum(absmaxcoord.(coords.(l))), typeof(l)}(l)
 
-@inline neighbors(hood::LayeredCustomNeighborhood, rule, buf, state) = 
-    map(layer -> neighbors(layer, rule, buf, state), hood.layers)
+@inline neighbors(hood::LayeredCustomNeighborhood, buf) = 
+    map(layer -> neighbors(layer, buf), hood.layers)
 
-@inline mapreduceneighbors(f, data, hood::LayeredCustomNeighborhood, rule, state, index) = 
-    map(layer -> mapreduceneighbors(f, data, layer, rule, state, index), hood.layers)
+@inline sumneighbors(hood::LayeredCustomNeighborhood, buf, state) = 
+    map(layer -> sumneighbors(layer, buf, state), hood.layers)
+
+@inline mapsetneighbor!(data::AbstractSimData, hood::LayeredCustomNeighborhood, rule, state, index) = 
+    map(layer -> mapsetneighbor!(data, layer, rule, state, index), hood.layers)
 
 """
 A convenience wrapper to build a VonNeumann neighborhoods as a `CustomNeighborhood`.

@@ -34,11 +34,12 @@ end
 
 
 """
-    sizefromradius(radius)
+    hoodsize(radius)
 
 Get the size of a neighborhood dimension from its radius, 
 which is always 2r + 1.
 """
+hoodsize(hood::Neighborhood) = hoodsize(radius(hood))
 hoodsize(radius::Integer) = 2radius + 1
 
 """

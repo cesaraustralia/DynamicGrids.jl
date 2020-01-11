@@ -39,14 +39,11 @@ $(FIELDDOCTABLE)
 end
 
 applyrule(rule::Life, data, state, index, buf) = begin
-    # Sum neighborhood
-    cc = neighbors(rule.neighborhood, rule, buf, state)
-    # Determine next state based on current state and neighborhood total
-    counts = (rule.b, rule.s)[state+1]
-    for i = 1:length(counts)
-        if counts[i] == cc
-            return oneunit(state)
-        end
+    sum = sumneighbors(rule.neighborhood, buf, state)
+    # Check if neighborhood sum matches rule for the current state
+    if sum in (rule.b, rule.s)[state+1]
+        oneunit(state)
+    else
+        zero(state)
     end
-    return zero(state)
 end

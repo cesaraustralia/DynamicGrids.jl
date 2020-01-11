@@ -257,3 +257,9 @@ Base.@propagate_inbounds Base.setindex!(d::WritableSimData, x, I...) = begin
     dest(d)[I...] = x
 end
 Base.@propagate_inbounds Base.getindex(d::WritableSimData, I...) = getindex(dest(d), I...)
+
+@SimDataMixin struct NeighborhoodData{NB}
+    neighborhoodbuffer::NB
+end
+
+neighborhoodbuffer(data::NeighborhoodData) = data.neighborhoodbuffer

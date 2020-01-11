@@ -33,11 +33,7 @@ import FieldMetadata: @description, description, @limits, limits,
                       @flattenable, flattenable, default
 
 
-export sim!, resume!, replay
-
-export savegif, show_frame, ruletypes
-
-export distances, broadcastable_indices, sizefromradius
+export sim!, resume!, replay, savegif
 
 export AbstractSimData, SimData, MultiSimData
 

@@ -55,23 +55,26 @@ passed into a rule via the `data` object, but it's done statefully for now for s
 """
 function precalcrule! end
 
-
 """
-    neighbors(hood::Neighborhood, state, indices, t, source, args...)
+neighbors(hood::Neighborhood, hoodbuffer)
 
-Checks all cells in neighborhood and combines them according
-to the particular neighborhood type.
+Returns an iterator over all cells in the neighborhood.
 """
 function neighbors end
 
 """
-    mapreduceneighbors(f, data, neighborhood, rule, state, index)
+sumneighbors(hood::Neighborhood, hoodbuffer, state)
 
-Run `f` over all cells in the neighborhood and sums its return values. 
-`f` is a function or functor with the form:
-`f(data, neighborhood, rule, state, hood_index, dest_index)`. 
+Sums all cells in the neighborhood.
 """
-function mapreduceneighbors end
+function sumneighbors end
+
+"""
+    mapsetneighbor!(data, hood, rule, state, index)
+
+Run `setneighbors` over all cells in the neighborhood and sums its return values. 
+"""
+function mapsetneighbor! end
 
 """
 Set value of a cell in the neighborhood.

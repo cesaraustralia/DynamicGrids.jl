@@ -58,40 +58,11 @@ end
     applyrule!(rule, data, state, I)
 end
 
-# struct UpdateDest end
-# @inline blockdo!(data::WritableSimData, ::UpdateDest, I) = begin
-    # out = source(data)[I...]
-    # dest(data)[I...] = out
-# end
-
 """
 Run the rule for all cells, writing the result to the dest array
 The neighborhood is copied to the rules neighborhood buffer array for performance
 # TODO test 1d
 """
-# maprule!(data::AbstractSimData{T,1}, rule::Union{NeighborhoodRule, Tuple{NeighborhoodRule,Vararg}},
-#           args...)  where T = begin
-#     # The rule provides the neighborfdood buffer
-#     r = radius(data)
-#     sze = hoodsize(r)
-#     buf = similar(init(data), sze, sze)
-#     src, dst = source(data), dest(data)
-#     nrows = framesize(data)
-#     handleoverflow!(data, r)
-#     # Setup buffer array between rows
-#     # Ignore the first column, it wil be copied over in the main loop
-#     for i in 2:sze
-#         @inbounds buf[i] = src[i-1-r]
-#     end
-#     # Run rule for a row
-#     @inbounds for i in 1:nrows
-#         copyto!(buf, 1, buf, 2)
-#         buf[sze] = src[i+r]
-#         state = buf[r+1]
-#         dst[i] = applyrule(rule, data, state, (i,))
-#     end
-# end
-
 maprule!(data::SingleSimData{T,2}, rule::Union{NeighborhoodRule,Chain{<:Tuple{NeighborhoodRule,Vararg}}}, 
          args...) where T = begin
     # The rule provides the neighborhood buffer
