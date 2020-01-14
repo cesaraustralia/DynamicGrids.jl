@@ -179,7 +179,7 @@ ForestFire(; neighborhood=RadialNeighborhood{1}(), prob_combustion=0.0001, prob_
 # Define an `applyrule` method to be broadcasted over the grid for the `ForestFire` rule
 @inline DynamicGrids.applyrule(rule::ForestFire, data, state::Integer, index, hoodbuffer) =
     if state == ALIVE
-        if BURNING in neighbors(rule, hoodbuffer)
+        if BURNING in DynamicGrids.neighbors(rule, hoodbuffer)
             BURNING
         else
             rand() <= rule.prob_combustion ? BURNING : ALIVE
@@ -193,14 +193,15 @@ ForestFire(; neighborhood=RadialNeighborhood{1}(), prob_combustion=0.0001, prob_
 # Set up the init array, ruleset and output (using a Gtk window)
 init = fill(ALIVE, 400, 400)
 ruleset = Ruleset(ForestFire(); init=init)
-output = GtkOutput(init; fps=25, minval=DEAD, maxval=BURNING,
-                   processor=ColorProcessor(scheme=ColorSchemes.rainbow, zerocolor=RGB24(0.0)))
+processor = ColorProcessor(scheme=ColorSchemes.rainbow, zerocolor=RGB24(0.0))
+output = GtkOutput(init; fps=25, minval=DEAD, maxval=BURNING, processor=processor)
 
 # Run the simulation
 sim!(output, ruleset; tspan=(1, 200))
 
-# Save the output aas a gif
+# Save the output as a gif
 savegif("forestfire.gif", output)
+
 
 ```
 ![forestfire](https://user-images.githubusercontent.com/2534009/72052469-5450c580-3319-11ea-8948-5196d1c6fd33.gif)
@@ -218,12 +219,17 @@ savegif("windy_forestfire.gif", output)
 ![windy_forestfire](https://user-images.githubusercontent.com/2534009/72198637-a95d1a80-3484-11ea-8b77-25a4a94b3943.gif)
 
 
-Timing the simulation for 50 steps, the performance is quite good:
+Timing the simulation for 200 steps, the performance is quite good:
 
 ```
-output = ArrayOutput(init, 50)
-@time sim!(output, ruleset; tspan=(1, 50))
-  0.318592 seconds (190 allocations: 2.530 MiB, 1.79% gc time)
+output = ArrayOutput(init, 200)
+@time sim!(output, ruleset; tspan=(1, 200))
+ 1.384755 seconds (640 allocations: 2.569 MiB)
+
+# To save a gif of the ArrayOutput we need to pass in a processor and the min and max
+# values used in the simulation:
+
+savegif("forestfire.gif", output; minval=DEAD, maxval=BURNING, processor=processor)
 ```
 
 
