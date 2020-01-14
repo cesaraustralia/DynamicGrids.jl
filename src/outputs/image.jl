@@ -262,7 +262,9 @@ Saving very large gifs may trigger a bug in Imagemagick.
 """
 savegif(filename::String, o::Output, ruleset=Ruleset(); 
         processor=processor(o), minval=minval(o), maxval=maxval(o), kwargs...) = begin
-    images = frametoimage.(Ref(processor), Ref(o), Ref(ruleset), frames(o), collect(firstindex(o):lastindex(o)))
+    images = map(frames(o), collect(firstindex(o):lastindex(o))) do frame, t 
+        frametoimage(processor, minval, maxval, ruleset, frame, t) 
+    end
     array = cat(images..., dims=3)
     FileIO.save(filename, array; kwargs...)
 end
