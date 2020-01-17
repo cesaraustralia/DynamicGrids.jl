@@ -4,7 +4,7 @@ Graphic outputs that displays an output frame as an RGB24 images.
 abstract type ImageOutput{T} <: GraphicOutput{T} end
 
 (::Type{F})(o::T; kwargs...) where F <: ImageOutput where T <: ImageOutput =
-    F(; frames=frames(o), starttime=starttime(o), endtime=endtime(o), 
+    F(; frames=frames(o), starttime=starttime(o), endtime=endtime(o),
       fps=fps(o), showfps=showfps(o), timestamp=timestamp(o), stampframe=stampframe(o), store=store(o),
       processor=processor(o), minval=minval(o), maxval=maxval(o),
       kwargs...)
@@ -27,14 +27,10 @@ minval(o::Output) = 0
 maxval(o::Output) = 1
 
 
-showframe(frame, o::ImageOutput, data::AbstractSimData, f) = 
-    showframe(frame, o, ruleset(data), f)
-showframe(frame, o::ImageOutput, ruleset::AbstractRuleset, f) =
-    showframe(frametoimage(o, ruleset, frame, f), o, f)
-
-# Manual showframe without data/ruleset
-showframe(o::ImageOutput, f=lastindex(o)) = showframe(o[f], o, Ruleset(), f) 
-
+# Allow construcing a frame with the ruleset passed in instead of SimData
+showframe(o::ImageOutput, f, t) = showframe(o[f], o, Ruleset(), f, t)
+showframe(frame, o::ImageOutput, ruleset::AbstractRuleset, f, t) =
+    showframe(frametoimage(o, ruleset, frame, f), o, f, t)
 
 """
 Default colorscheme. Better performance than using a Colorschemes.jl scheme.
@@ -77,15 +73,14 @@ Convert a frame to an RGB24 image, using a FrameProcessor
 """
 function frametoimage end
 
-frametoimage(o::ImageOutput, i::Integer) = frametoimage(o, o[i], i)
-frametoimage(o::ImageOutput, frame, i::Integer) = 
-    frametoimage(processor(o), o, Ruleset(), o[i], i)
-frametoimage(o::ImageOutput, ruleset::AbstractRuleset, i::Integer) = 
-    frametoimage(processor(o), o, ruleset, o[i], i)
+# frametoimage(o, ruleset, frame, f)
+# frametoimage(o::ImageOutput, i::Integer) = frametoimage(o, o[i], i)
+# frametoimage(o::ImageOutput, frame, i::Integer) = frametoimage(o, Ruleset(), o[i], i)
+# frametoimage(o::ImageOutput, args...) = frametoimage(processor(o), o, args...)
+frametoimage(o::ImageOutput, ruleset::AbstractRuleset, frame, i::Integer) =
+    frametoimage(processor(o), o, ruleset, frame, i)
 frametoimage(processor::FrameProcessor, o::ImageOutput, ruleset, frame, i) =
     frametoimage(processor::FrameProcessor, minval(o), maxval(o), ruleset, frame, i)
-
-frametoimage(o::ImageOutput, args...) = frametoimage(processor(o), o, args...)
 
 """"
     ColorProcessor(; scheme=Greyscale(), zerocolor=nothing, maskcolor=nothing)
@@ -145,7 +140,7 @@ struct Blue <: BandColor end
 """
     ThreeColorProcessor(; colors=(Red(), Green(), Blue()), zerocolor=nothing, maskcolor=nothing)
 
-Assigns `Red()`, `Blue()`, `Green()` or `nothing` to 
+Assigns `Red()`, `Blue()`, `Green()` or `nothing` to
 any number of dynamic grids in any order. Duplicate colors will be summed.
 The final color sums are combined into a composite color image for display.
 
@@ -167,9 +162,9 @@ maskcolor(processor::ThreeColorProcessor) = processor.maskcolor
 frametoimage(p::ThreeColorProcessor, minval::Tuple, maxval::Tuple, ruleset, grids::NamedTuple, t) = begin
     img = fill(RGB24(0), size(first(grids)))
     ncols = length(colors(p))
-    ngrids = length(grids) 
-    if !(ngrids == ncols == length(minval) == length(maxval)) 
-        throw(ArgumentError("Number of grids ($ngrids), processor colors ($ncols), minval ($(length(minval))) 
+    ngrids = length(grids)
+    if !(ngrids == ncols == length(minval) == length(maxval))
+        throw(ArgumentError("Number of grids ($ngrids), processor colors ($ncols), minval ($(length(minval)))
                             and maxival ($(length(maxval))) must be the same"))
     end
     for i in CartesianIndices(first(grids))
@@ -206,23 +201,23 @@ LayoutProcessor(layout::Array, processors)
 ## Arguments / Keyword arguments
 - `layout`: A Vector or Matrix containing the keyes or numbers of frames in the locations to
   display them. `nothing`, `missing` or `0` values will be skipped.
-- `processors`: tuple of SingleFrameProcessor, one for each grid in the simulation. 
+- `processors`: tuple of SingleFrameProcessor, one for each grid in the simulation.
   Can be `nothing` for unused grids.
 """
 @default_kw struct LayoutProcessor{L<:AbstractMatrix,P} <: MultiFrameProcessor
-    layout::L     | throw(ArgumentError("must include an Array for the layout keyword")) 
+    layout::L     | throw(ArgumentError("must include an Array for the layout keyword"))
     processors::P | throw(ArgumentError("include a tuple of processors for each grid"))
 end
 # Convenience constructor to convert Vector input to a column Matrix
-LayoutProcessor(layout::AbstractVector, processors) = 
+LayoutProcessor(layout::AbstractVector, processors) =
     LayoutProcessor(reshape(layout, length(layout), 1), processors)
 
 layout(p::LayoutProcessor) = p.layout
 processors(p::LayoutProcessor) = p.processors
 
 frametoimage(p::LayoutProcessor, minval::Tuple, maxval::Tuple, ruleset, grids::NamedTuple, t) = begin
-    if !(length(grids) == length(minval) == length(maxval)) 
-        throw(ArgumentError("Number of grids ($(length(grids)), minval ($(length(minval))) 
+    if !(length(grids) == length(minval) == length(maxval))
+        throw(ArgumentError("Number of grids ($(length(grids)), minval ($(length(minval)))
                             and maxival ($(length((maxval))) must be the same"))
     end
 
@@ -235,9 +230,9 @@ frametoimage(p::LayoutProcessor, minval::Tuple, maxval::Tuple, ruleset, grids::N
         # Accept symbol keys and numbers, skip missing/nothing/0
         (ismissing(grid_id) || grid_id === nothing || grid_id == 0)  && continue
         n = if grid_id isa Symbol
-            found = findfirst(k -> k === grid_id, keys(grids)) 
+            found = findfirst(k -> k === grid_id, keys(grids))
             found === nothing && throw(ArgumentError("$grid_id is not in $(keys(grids))"))
-            found 
+            found
         else
             grid_id
         end
@@ -260,10 +255,10 @@ Write the output array to a gif. You must pass a processor keyword argument for 
 
 Saving very large gifs may trigger a bug in Imagemagick.
 """
-savegif(filename::String, o::Output, ruleset=Ruleset(); 
+savegif(filename::String, o::Output, ruleset=Ruleset();
         processor=processor(o), minval=minval(o), maxval=maxval(o), kwargs...) = begin
-    images = map(frames(o), collect(firstindex(o):lastindex(o))) do frame, t 
-        frametoimage(processor, minval, maxval, ruleset, frame, t) 
+    images = map(frames(o), collect(firstindex(o):lastindex(o))) do frame, t
+        frametoimage(processor, minval, maxval, ruleset, frame, t)
     end
     array = cat(images..., dims=3)
     FileIO.save(filename, array; kwargs...)
@@ -275,7 +270,7 @@ struct NoMinMax end
 
 hasminmax(output::T) where T = (:minval in fieldnames(T)) ? HasMinMax() : NoMinMax()
 
-normaliseframe(output::Output, a) = 
+normaliseframe(output::Output, a) =
     normaliseframe(hasminmax(output), output, a)
 normaliseframe(::HasMinMax, output, a::NamedTuple) =
     map(normaliseframe, values(a), minval(output), maxval(output))
@@ -285,5 +280,5 @@ normaliseframe(::NoMinMax, output, a) = a
 normaliseframe(a::AbstractArray, minval::Number, maxval::Number) = normalise.(a, minval, maxval)
 normaliseframe(a::AbstractArray, minval, maxval) = a
 
-normalise(x::Number, minval::Number, maxval::Number) = 
+normalise(x::Number, minval::Number, maxval::Number) =
     min((x - minval) / (maxval - minval), oneunit(eltype(x)))

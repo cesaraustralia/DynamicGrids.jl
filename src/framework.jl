@@ -30,7 +30,7 @@ sim!(output, ruleset; init=nothing, tspan=(1, length(output)), fps=fps(output),
     initframes!(output, init)
     setfps!(output, fps)
     # Show the first frame
-    showframe(output, data, 1)
+    showframe(output, data, 1, starttime)
     # Let the init frame be displayed as long as a normal frame
     delay(output, 1)
     # Run the simulation
@@ -102,7 +102,7 @@ simloop!(output, data, fspan) = begin
         delay(output, f)
         # Exit gracefully
         if !isrunning(output) || f == last(fspan)
-            showframe(output, data, f)
+            showframe(output, data, f, currenttime(data))
             setrunning!(output, false)
             setstoptime!(output, currenttime(data))
             finalize!(output)
@@ -124,6 +124,10 @@ The default is to return the existing rule
 precalcrules(rule, data) = rule
 
 precalcrules(data::SimData) = @set data.ruleset.rules = precalcrules(rules(data), data)
+#precalcrules(data::SimData) = begin
+#    data.ruleset.rules = precalcrules(data.ruleset.rules, data)
+#    data
+# end
 precalcrules(data::MultiSimData) = @set data.data = map(precalcrules, data.data)
 precalcrules(rules::Tuple, data) =
     (precalcrules(rules[1], data), precalcrules(tail(rules), data)...)

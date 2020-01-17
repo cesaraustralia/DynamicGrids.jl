@@ -22,7 +22,7 @@ Base.length(o::Output) = length(frames(o))
 Base.size(o::Output) = size(frames(o))
 Base.firstindex(o::Output) = firstindex(frames(o))
 Base.lastindex(o::Output) = lastindex(frames(o))
-Base.@propagate_inbounds Base.getindex(o::Output, i) = 
+Base.@propagate_inbounds Base.getindex(o::Output, i) =
     getindex(frames(o), i)
 Base.@propagate_inbounds Base.setindex!(o::Output, x, i) = setindex!(frames(o), x, i)
 Base.push!(o::Output, x) = push!(frames(o), x)
@@ -65,10 +65,11 @@ showframe(o::Output, args...) = nothing
 
 # Frame strorage and updating
 frameindex(o::Output, data::AbstractSimData) = frameindex(o, currentframe(data))
+# Every frame is frame 1 if the simulation isn't stored
 frameindex(o::Output, f) = isstored(o) ? f : oneunit(f)
 
 zeroframes(init::AbstractArray, nframes) = [zero(init) for f in 1:nframes]
-zeroframes(init::NamedTuple, nframes) = 
+zeroframes(init::NamedTuple, nframes) =
     [map(layer -> zero(layer), init) for f in 1:nframes]
 
 

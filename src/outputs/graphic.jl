@@ -4,7 +4,7 @@ Outputs that display the simulation frames live.
 abstract type GraphicOutput{T} <: Output{T} end
 
 (::Type{F})(o::T; kwargs...) where F <: GraphicOutput where T <: GraphicOutput =
-    F(; frames=frames(o), starttime=starttime(o), endtime=endtime(o), 
+    F(; frames=frames(o), starttime=starttime(o), endtime=endtime(o),
       fps=fps(o), showfps=showfps(o), timestamp=timestamp(o), stampframe=stampframe(o), store=store(o),
       kwargs...)
 
@@ -34,7 +34,7 @@ end
 
 # Output interface
 # Delay output to maintain the frame rate
-delay(o::GraphicOutput, f) = 
+delay(o::GraphicOutput, f) =
     sleep(max(0.0, timestamp(o) + (f - stampframe(o))/fps(o) - time()))
 isshowable(o::GraphicOutput, f) = true # TODO working max fps. o.timestamp + (t - tlast(o))/o.maxfps < time()
 
@@ -62,7 +62,7 @@ storeframe!(o::GraphicOutput, data) = begin
         fill!(o[1], zero(eltype(o[1])))
         storeframe!(o, data, 1)
     end
-    isshowable(o, f) && showframe(o, data, f)
+    isshowable(o, f) && showframe(o, data, f, currenttime(data))
 end
 storeframe!(o::GraphicOutput, data::MultiSimData) = begin
     f = currentframe(data)
@@ -73,15 +73,28 @@ storeframe!(o::GraphicOutput, data::MultiSimData) = begin
         map(l -> fill!(l, zero(eltype(l))), o[1])
         storeframe!(o, data, 1)
     end
-    isshowable(o, f) && showframe(o, data, f)
+    isshowable(o, f) && showframe(o, data, f, currenttime(data))
 end
 
-showframe(o::GraphicOutput, data::AbstractSimData) = 
-    showframe(o, data, lastindex(o))
-showframe(o::GraphicOutput, data::AbstractSimData, f) = 
-    showframe(o[frameindex(o, f)], o, data, f)
-showframe(o::GraphicOutput, data::AbstractVector{<:AbstractSimData}, f) = 
-    showframe(o, data[1], f)
-showframe(frame, o::GraphicOutput, data::AbstractSimData, f) = 
-    showframe(frame, o, f)
-showframe(o::GraphicOutput, f=firstindex(o)) = showframe(o[f], o, f)
+
+# Show frame given only the output
+showframe(o::GraphicOutput, f=lastindex(o), t=stoptime(o)) =
+    showframe(o[f], o, f, t)
+# Get frame f from output and call showframe again
+showframe(o::GraphicOutput, data::AbstractSimData, f, t) =
+    showframe(o[frameindex(o, f)], o, data, f, t)
+# Handle a vector of SimData from replicate sims
+showframe(o::GraphicOutput, data::AbstractVector{<:AbstractSimData}, f, t) =
+    showframe(o, data[1], f, t)
+# Get frame swap SimData for Ruleset and call showframe again
+# This allows passing in the Ruleset when you don't have SimData
+showframe(frame, o::GraphicOutput, data::AbstractSimData, f, t) =
+    showframe(frame, o, ruleset(data), f, t)
+# Default behaviour: pass the frame to an output without modifications for Ruleset/Simdata
+showframe(frame, o::GraphicOutput, ruleset::AbstractRuleset, f, t) =
+    showframe(frame, o, f, t)
+
+# For interactive use
+# Show frame given data object
+showframe(o::GraphicOutput, data::Union{AbstractSimData,Ruleset}) =
+    showframe(o, data, lastindex(o), stoptime(o))
