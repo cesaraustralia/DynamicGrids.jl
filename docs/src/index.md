@@ -99,6 +99,13 @@ CustomNeighborhood
 LayeredCustomNeighborhood
 ```
 
+```@docs
+neighbors
+sumneighbors
+mapsetneighbor!
+setneighbor!
+```
+
 
 ## Output
 
@@ -122,7 +129,7 @@ to simplify specifying custom outputs with the required fields.
 @Image
 ```
 
-### Frame processors
+### Grid processors
 
 ```@docs
 FrameProcessor
@@ -132,6 +139,12 @@ MultiFrameProcessor
 ThreeColorProcessor
 LayoutProcessor
 Greyscale
+```
+
+### Gifs
+
+```@docs
+savegif
 ```
 
 ### Internal data handling

@@ -58,7 +58,7 @@ function precalcrule! end
 """
 neighbors(hood::Neighborhood, hoodbuffer)
 
-Returns an iterator over all cells in the neighborhood.
+Returns an iteraterable over all cells in the neighborhood.
 """
 function neighbors end
 
