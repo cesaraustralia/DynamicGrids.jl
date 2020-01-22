@@ -6,7 +6,7 @@ as defined in the Rule.
 
 ### Arguments:
 - `rule` : [`Rule`](@ref)
-- `data` : [`FrameData`](@ref)
+- `data` : [`SimData`](@ref)
 - `state`: the value of the current cell
 - `index`: a (row, column) tuple of Int for the current cell coordinates - `t`: the current time step
 - `buffer`: a neighborhood burrer array passed to [`NeighborhoodRule`].

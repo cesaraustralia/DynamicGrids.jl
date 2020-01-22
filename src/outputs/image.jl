@@ -28,9 +28,9 @@ maxval(o::Output) = 1
 
 
 # Allow construcing a frame with the ruleset passed in instead of SimData
-showframe(o::ImageOutput, f, t) = showframe(o[f], o, Ruleset(), f, t)
-showframe(frame, o::ImageOutput, ruleset::AbstractRuleset, f, t) =
-    showframe(frametoimage(o, ruleset, frame, f), o, f, t)
+showgrid(o::ImageOutput, f, t) = showgrid(o[f], o, Ruleset(), f, t)
+showgrid(grid, o::ImageOutput, ruleset::AbstractRuleset, f, t) =
+    showgrid(grid2image(o, ruleset, grid, f), o, f, t)
 
 """
 Default colorscheme. Better performance than using a Colorschemes.jl scheme.
@@ -54,33 +54,33 @@ const Grayscale = Greyscale
 
 
 """
-Frame processors convert a frame of the grid simulation into an RGB24 image for display.
+Grid processors convert a frame of the simulation into an RGB24 image for display.
 """
-abstract type FrameProcessor end
+abstract type GridProcessor end
 
 """
 Processors that convert one frame of a single grid model to an image.
 """
-abstract type SingleFrameProcessor <: FrameProcessor end
+abstract type SingleGridProcessor <: GridProcessor end
 
 """
 Processors that convert frames from multiple grids to a single image.
 """
-abstract type MultiFrameProcessor <: FrameProcessor end
+abstract type MultiGridProcessor <: GridProcessor end
 
 """
-Convert a frame to an RGB24 image, using a FrameProcessor
+Convert a grid to an RGB24 image, using a GridProcessor
 """
-function frametoimage end
+function grid2image end
 
-# frametoimage(o, ruleset, frame, f)
-# frametoimage(o::ImageOutput, i::Integer) = frametoimage(o, o[i], i)
-# frametoimage(o::ImageOutput, frame, i::Integer) = frametoimage(o, Ruleset(), o[i], i)
-# frametoimage(o::ImageOutput, args...) = frametoimage(processor(o), o, args...)
-frametoimage(o::ImageOutput, ruleset::AbstractRuleset, frame, i::Integer) =
-    frametoimage(processor(o), o, ruleset, frame, i)
-frametoimage(processor::FrameProcessor, o::ImageOutput, ruleset, frame, i) =
-    frametoimage(processor::FrameProcessor, minval(o), maxval(o), ruleset, frame, i)
+# grid2image(o, ruleset, frame, f)
+# grid2image(o::ImageOutput, i::Integer) = grid2image(o, o[i], i)
+# grid2image(o::ImageOutput, frame, i::Integer) = grid2image(o, Ruleset(), o[i], i)
+# grid2image(o::ImageOutput, args...) = grid2image(processor(o), o, args...)
+grid2image(o::ImageOutput, ruleset::AbstractRuleset, frame, i::Integer) =
+    grid2image(processor(o), o, ruleset, frame, i)
+grid2image(processor::GridProcessor, o::ImageOutput, ruleset, frame, i) =
+    grid2image(processor::GridProcessor, minval(o), maxval(o), ruleset, frame, i)
 
 """"
     ColorProcessor(; scheme=Greyscale(), zerocolor=nothing, maskcolor=nothing)
@@ -92,7 +92,7 @@ Converts output frames to a colorsheme.
 - `zerocolor`: an `RGB24` color to use when values are zero, or `nothing` to ignore.
 - `maskcolor`: an `RGB24` color to use when cells are masked, or `nothing` to ignore.
 """
-@default_kw struct ColorProcessor{S,Z,M} <: SingleFrameProcessor
+@default_kw struct ColorProcessor{S,Z,M} <: SingleGridProcessor
     scheme::S    | Greyscale()
     zerocolor::Z | nothing
     maskcolor::M | nothing
@@ -102,7 +102,7 @@ scheme(processor::ColorProcessor) = processor.scheme
 zerocolor(processor::ColorProcessor) = processor.zerocolor
 maskcolor(processor::ColorProcessor) = processor.maskcolor
 
-frametoimage(p::ColorProcessor, minval, maxval,
+grid2image(p::ColorProcessor, minval, maxval,
              ruleset::AbstractRuleset, frame::AbstractArray, t) = begin
     img = fill(RGB24(0), size(frame))
     for i in CartesianIndices(frame)
@@ -149,7 +149,7 @@ The final color sums are combined into a composite color image for display.
 - `zerocolor`: an `RGB24` color to use when values are zero, or `nothing` to ignore.
 - `maskcolor`: an `RGB24` color to use when cells are masked, or `nothing` to ignore.
 """
-@default_kw struct ThreeColorProcessor{C<:Tuple,Z,M} <: MultiFrameProcessor
+@default_kw struct ThreeColorProcessor{C<:Tuple,Z,M} <: MultiGridProcessor
     colors::C    | (Red(), Green(), Blue())
     zerocolor::Z | nothing
     maskcolor::M | nothing
@@ -159,7 +159,7 @@ colors(processor::ThreeColorProcessor) = processor.colors
 zerocolor(processor::ThreeColorProcessor) = processor.zerocolor
 maskcolor(processor::ThreeColorProcessor) = processor.maskcolor
 
-frametoimage(p::ThreeColorProcessor, minval::Tuple, maxval::Tuple, ruleset, grids::NamedTuple, t) = begin
+grid2image(p::ThreeColorProcessor, minval::Tuple, maxval::Tuple, ruleset, grids::NamedTuple, t) = begin
     img = fill(RGB24(0), size(first(grids)))
     ncols = length(colors(p))
     ngrids = length(grids)
@@ -201,10 +201,10 @@ LayoutProcessor(layout::Array, processors)
 ## Arguments / Keyword arguments
 - `layout`: A Vector or Matrix containing the keyes or numbers of frames in the locations to
   display them. `nothing`, `missing` or `0` values will be skipped.
-- `processors`: tuple of SingleFrameProcessor, one for each grid in the simulation.
+- `processors`: tuple of SingleGridProcessor, one for each grid in the simulation.
   Can be `nothing` for unused grids.
 """
-@default_kw struct LayoutProcessor{L<:AbstractMatrix,P} <: MultiFrameProcessor
+@default_kw struct LayoutProcessor{L<:AbstractMatrix,P} <: MultiGridProcessor
     layout::L     | throw(ArgumentError("must include an Array for the layout keyword"))
     processors::P | throw(ArgumentError("include a tuple of processors for each grid"))
 end
@@ -215,10 +215,9 @@ LayoutProcessor(layout::AbstractVector, processors) =
 layout(p::LayoutProcessor) = p.layout
 processors(p::LayoutProcessor) = p.processors
 
-frametoimage(p::LayoutProcessor, minval::Tuple, maxval::Tuple, ruleset, grids::NamedTuple, t) = begin
+grid2image(p::LayoutProcessor, minval::Tuple, maxval::Tuple, ruleset, grids::NamedTuple, t) = begin
     if !(length(grids) == length(minval) == length(maxval))
-        throw(ArgumentError("Number of grids ($(length(grids)), minval ($(length(minval)))
-                            and maxival ($(length((maxval))) must be the same"))
+        throw(ArgumentError("Number of grids ($(length(grids))), minval ($(length(minval))) and maxval ($(length(maxval))) must be the same"))
     end
 
     grid_ids = layout(p)
@@ -237,7 +236,7 @@ frametoimage(p::LayoutProcessor, minval::Tuple, maxval::Tuple, ruleset, grids::N
             grid_id
         end
         # Run processor for section
-        section = frametoimage(processors(p)[n], minval[n], maxval[n], ruleset, grids[n], t)
+        section = grid2image(processors(p)[n], minval[n], maxval[n], ruleset, grids[n], t)
         # Copy section into image
         for x in 1:size(section, 1), y in 1:size(section, 2)
             img[x + (i - 1) * sze[1], y + (j - 1) * sze[2]] = section[x, y]
@@ -258,7 +257,7 @@ Saving very large gifs may trigger a bug in Imagemagick.
 savegif(filename::String, o::Output, ruleset=Ruleset();
         processor=processor(o), minval=minval(o), maxval=maxval(o), kwargs...) = begin
     images = map(frames(o), collect(firstindex(o):lastindex(o))) do frame, t
-        frametoimage(processor, minval, maxval, ruleset, frame, t)
+        grid2image(processor, minval, maxval, ruleset, frame, t)
     end
     array = cat(images..., dims=3)
     FileIO.save(filename, array; kwargs...)
@@ -270,15 +269,15 @@ struct NoMinMax end
 
 hasminmax(output::T) where T = (:minval in fieldnames(T)) ? HasMinMax() : NoMinMax()
 
-normaliseframe(output::Output, a) =
-    normaliseframe(hasminmax(output), output, a)
-normaliseframe(::HasMinMax, output, a::NamedTuple) =
-    map(normaliseframe, values(a), minval(output), maxval(output))
-normaliseframe(::HasMinMax, output, a::AbstractArray) =
-    normaliseframe(a, minval(output), maxval(output))
-normaliseframe(::NoMinMax, output, a) = a
-normaliseframe(a::AbstractArray, minval::Number, maxval::Number) = normalise.(a, minval, maxval)
-normaliseframe(a::AbstractArray, minval, maxval) = a
+normalisegrid(output::Output, a) =
+    normalisegrid(hasminmax(output), output, a)
+normalisegrid(::HasMinMax, output, a::NamedTuple) =
+    map(normalisegrid, values(a), minval(output), maxval(output))
+normalisegrid(::HasMinMax, output, a::AbstractArray) =
+    normalisegrid(a, minval(output), maxval(output))
+normalisegrid(::NoMinMax, output, a) = a
+normalisegrid(a::AbstractArray, minval::Number, maxval::Number) = normalise.(a, minval, maxval)
+normalisegrid(a::AbstractArray, minval, maxval) = a
 
 normalise(x::Number, minval::Number, maxval::Number) =
     min((x - minval) / (maxval - minval), oneunit(eltype(x)))

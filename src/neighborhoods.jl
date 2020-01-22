@@ -113,14 +113,13 @@ A convenience wrapper to build a VonNeumann neighborhoods as a `CustomNeighborho
 """
 VonNeumannNeighborhood() = CustomNeighborhood(((0,-1), (-1,0), (1,0), (0,1)))
 
-
 """
 Find the largest radius present in the passed in rules.
 """
 radius(set::MultiRuleset) = begin
-    ruleradius = map(radius, map(rules, ruleset(set)))
-    intradius = map(key -> radius(interactions(set), key), map(Val, keys(set)))
-    map(max, Tuple(ruleradius), Tuple(intradius))
+    ruleradii = map(radius, ruleset(set))
+    interaction_maxradius = radius(interactions(set))
+    map(r -> max(r, interaction_maxradius), ruleradii)
 end
 radius(ruleset::Ruleset) = radius(rules(ruleset))
 radius(rules::Tuple) = mapreduce(radius, max, rules)
@@ -129,6 +128,8 @@ radius(rules::Tuple{}, args...) = 0
 
 radius(rule::NeighborhoodRule) = radius(neighborhood(rule))
 radius(rule::PartialNeighborhoodRule) = radius(neighborhood(rule))
+radius(rule::NeighborhoodInteraction) = radius(neighborhood(rule))
+radius(rule::PartialNeighborhoodInteraction) = radius(neighborhood(rule))
 radius(rule::Rule, args...) = 0
 # Only the first rule in a chain can have a radius larger than zero.
 radius(chain::Chain) = radius(chain[1])

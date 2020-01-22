@@ -9,6 +9,6 @@ A simple output that stores each step of the simulation in a vector of arrays.
 
 ArrayOutput(init, length::Integer; kwargs...) = begin
     frames = [deepcopy(init)]
-    append!(frames, zeroframes(init, length-1))
+    append!(frames, zerogrids(init, length-1))
     ArrayOutput(; frames=frames, kwargs...)
 end

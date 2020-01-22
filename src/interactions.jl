@@ -9,7 +9,7 @@ Base.keys(::Interaction{Keys}) where Keys = Keys
 
 # Default constructor for just the Keys type param where all args have type parameters
 (::Type{T})(args...) where T<:Interaction{Keys} where Keys =
-    T{Keys,typeof,(args)...}(args...)
+    T{typeof.(args)...}(args...)
 
 # Define the constructor for generic rule reconstruction in Flatten.jl and Setfield.jl
 ConstructionBase.constructorof(::Type{T}) where T<:Interaction{Keys} where Keys =

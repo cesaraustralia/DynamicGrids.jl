@@ -44,11 +44,11 @@ end
 
 isasync(o::REPLOutput) = false
 
-showframe(frame::AbstractArray, o::REPLOutput, f, t) = begin
+showgrid(frame::AbstractArray, o::REPLOutput, f, t) = begin
     # Print the frame
     put((0,0), o.color, replframe(o, frame))
     # Print the timestamp in the top right corner
-    put((0,0), o.color, string("Frame: $f at time $t"))
+    put((0,0), o.color, string("Grid: $f at time $t"))
 end
 
 # Terminal commands

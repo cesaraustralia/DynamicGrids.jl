@@ -40,7 +40,7 @@ isshowable(o::GraphicOutput, f) = true # TODO working max fps. o.timestamp + (t 
 
 
 """
-Frames are deleted and reallocated during the simulation,
+Grids are deleted and reallocated during the simulation,
 which this allows runs of any length.
 """
 initframes!(o::GraphicOutput, init) = begin
@@ -53,48 +53,48 @@ initframes!(o::GraphicOutput, init::NamedTuple) = begin
 end
 
 
-storeframe!(o::GraphicOutput, data) = begin
+storegrid!(o::GraphicOutput, data) = begin
     f = currentframe(data)
     if isstored(o)
         push!(o, fill!(similar(o[1]), zero(eltype(o[1]))))
-        storeframe!(o, data, f)
+        storegrid!(o, data, f)
     else
         fill!(o[1], zero(eltype(o[1])))
-        storeframe!(o, data, 1)
+        storegrid!(o, data, 1)
     end
-    isshowable(o, f) && showframe(o, data, f, currenttime(data))
+    isshowable(o, f) && showgrid(o, data, f, currenttime(data))
 end
-storeframe!(o::GraphicOutput, data::MultiSimData) = begin
+storegrid!(o::GraphicOutput, data::MultiSimData) = begin
     f = currentframe(data)
     if isstored(o)
         push!(o, map(l -> fill!(similar(l), zero(eltype(l))), o[1]))
-        storeframe!(o, data, f)
+        storegrid!(o, data, f)
     else
         map(l -> fill!(l, zero(eltype(l))), o[1])
-        storeframe!(o, data, 1)
+        storegrid!(o, data, 1)
     end
-    isshowable(o, f) && showframe(o, data, f, currenttime(data))
+    isshowable(o, f) && showgrid(o, data, f, currenttime(data))
 end
 
 
 # Show frame given only the output
-showframe(o::GraphicOutput, f=lastindex(o), t=stoptime(o)) =
-    showframe(o[f], o, f, t)
-# Get frame f from output and call showframe again
-showframe(o::GraphicOutput, data::AbstractSimData, f, t) =
-    showframe(o[frameindex(o, f)], o, data, f, t)
+showgrid(o::GraphicOutput, f=lastindex(o), t=stoptime(o)) =
+    showgrid(o[f], o, f, t)
+# Get frame f from output and call showgrid again
+showgrid(o::GraphicOutput, data::AbstractSimData, f, t) =
+    showgrid(o[gridindex(o, f)], o, data, f, t)
 # Handle a vector of SimData from replicate sims
-showframe(o::GraphicOutput, data::AbstractVector{<:AbstractSimData}, f, t) =
-    showframe(o, data[1], f, t)
-# Get frame swap SimData for Ruleset and call showframe again
+showgrid(o::GraphicOutput, data::AbstractVector{<:AbstractSimData}, f, t) =
+    showgrid(o, data[1], f, t)
+# Get frame swap SimData for Ruleset and call showgrid again
 # This allows passing in the Ruleset when you don't have SimData
-showframe(frame, o::GraphicOutput, data::AbstractSimData, f, t) =
-    showframe(frame, o, ruleset(data), f, t)
+showgrid(frame, o::GraphicOutput, data::AbstractSimData, f, t) =
+    showgrid(frame, o, ruleset(data), f, t)
 # Default behaviour: pass the frame to an output without modifications for Ruleset/Simdata
-showframe(frame, o::GraphicOutput, ruleset::AbstractRuleset, f, t) =
-    showframe(frame, o, f, t)
+showgrid(frame, o::GraphicOutput, ruleset::AbstractRuleset, f, t) =
+    showgrid(frame, o, f, t)
 
 # For interactive use
 # Show frame given data object
-showframe(o::GraphicOutput, data::Union{AbstractSimData,Ruleset}) =
-    showframe(o, data, lastindex(o), stoptime(o))
+showgrid(o::GraphicOutput, data::Union{AbstractSimData,Ruleset}) =
+    showgrid(o, data, lastindex(o), stoptime(o))

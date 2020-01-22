@@ -220,7 +220,7 @@ initdata!(data::Nothing, ruleset::Ruleset, init, starttime, nreplicates::Nothing
     # [SimData(ruleset, init, starttime) for r in 1:nreplicates]
 initdata!(data::Nothing, multiruleset::MultiRuleset, init::NamedTuple, starttime, nreplicates::Nothing) = begin
     radii = NamedTuple{keys(init)}(radius(multiruleset))
-    data = map((rs, ra, in) -> SimData(rs, in, starttime, ra), ruleset(multiruleset), radii, init) 
+    data = map((rs, ra, in) -> SimData(rs, in, starttime, ra), ruleset(multiruleset), radii, init)
     MultiSimData(init, data, multiruleset)
 end
 # initdata!(multidata::MultiSimData, multiruleset::MultiRuleset, init, starttime, nreplicates::Nothing) =
@@ -256,6 +256,7 @@ Base.@propagate_inbounds Base.setindex!(d::WritableSimData, x, I...) = begin
     isnan(x) && error("NaN in setindex: ", (d, I))
     dest(d)[I...] = x
 end
+
 Base.@propagate_inbounds Base.getindex(d::WritableSimData, I...) = getindex(dest(d), I...)
 
 @SimDataMixin struct NeighborhoodData{NB}

@@ -54,8 +54,8 @@ export Overflow, RemoveOverflow, WrapOverflow
 
 export Output, GraphicOutput, ImageOutput, ArrayOutput, REPLOutput
 
-export FrameProcessor, SingleFrameProcessor, ColorProcessor,
-       MultiFrameProcessor, ThreeColorProcessor, LayoutProcessor
+export GridProcessor, SingleGridProcessor, ColorProcessor,
+       MultiGridProcessor, ThreeColorProcessor, LayoutProcessor
 
 export Greyscale, Grayscale
 

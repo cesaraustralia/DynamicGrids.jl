@@ -6,7 +6,7 @@ Runs the whole simulation, passing the destination aray to
 the passed in output for each time-step.
 
 ### Arguments
-- `output`: An [Output](@ref) to store frames or display them on the screen.
+- `output`: An [Output](@ref) to store grids or display them on the screen.
 - `ruleset`: A Rule() containing one ore more [`Rule`](@ref). These will each be run in sequence.
 
 ### Keyword Arguments
@@ -26,12 +26,12 @@ sim!(output, ruleset; init=nothing, tspan=(1, length(output)), fps=fps(output),
     # Copy the init array from the ruleset or keyword arg
     init = chooseinit(DynamicGrids.init(ruleset), init)
     data = initdata!(data, ruleset, init, starttime, nreplicates)
-    # Delete frames output by the previous simulations
-    initframes!(output, init)
+    # Delete grids output by the previous simulations
+    initgrids!(output, init)
     setfps!(output, fps)
-    # Show the first frame
-    showframe(output, data, 1, starttime)
-    # Let the init frame be displayed as long as a normal frame
+    # Show the first grid
+    showgrid(output, data, 1, starttime)
+    # Let the init grid be displayed as long as a normal grid
     delay(output, 1)
     # Run the simulation
     runsim!(output, data, fspan)
@@ -51,7 +51,7 @@ chooseinit(rulesetinit::Nothing, arginit::Nothing) =
     resume!(output, ruleset; tadd=100, kwargs...)
 
 Restart the simulation where you stopped last time. For arguments see [`sim!`](@ref).
-The keyword arg `tadd` indicates the number of frames to add, and of course an init
+The keyword arg `tadd` indicates the number of grid frames to add, and of course an init
 array will not be accepted.
 """
 resume!(output, ruleset; tstop=stoptime(output), fps=fps(output), data=nothing,
@@ -95,14 +95,14 @@ simloop!(output, data, fspan) = begin
         data = updatetime(data, f) |> precalcrules
         # Run the ruleset and setup data for the next iteration
         data = sequencerules!(data)
-        # Save/do something with the the current frame
-        storeframe!(output, data)
+        # Save/do something with the the current grid
+        storegrid!(output, data)
         isasync(output) && yield()
         # Stick to the FPS
         delay(output, f)
         # Exit gracefully
         if !isrunning(output) || f == last(fspan)
-            showframe(output, data, f, currenttime(data))
+            showgrid(output, data, f, currenttime(data))
             setrunning!(output, false)
             setstoptime!(output, currenttime(data))
             finalize!(output)
