@@ -21,8 +21,7 @@ Setfield = "efcf1570-3423-57d1-acb7-fd33fddbac46"
 UnicodeGraphics = "ebadf6b4-db70-5817-83da-4a19ad584e34"
 
 [compat]
-julia = "1"
-Colors = "^0.9"
+Colors = "^0.9, 0.11"
 ConstructionBase = "1"
 Crayons = "^4"
 DocStringExtensions = "^0.8"
@@ -35,6 +34,7 @@ Mixers = "^0.1"
 OffsetArrays = "^0.11"
 Setfield = "^0.5"
 UnicodeGraphics = "^0.1"
+julia = "1"
 
 [extras]
 ColorSchemes = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
