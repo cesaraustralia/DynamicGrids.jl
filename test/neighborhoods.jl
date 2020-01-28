@@ -69,16 +69,16 @@ end
 @testset "radius" begin
     rulesetA = Ruleset(TestNeighborhoodRule(RadialNeighborhood{1}()))
     rulesetB = Ruleset(TestPartialNeighborhoodRule(RadialNeighborhood{5}()))
-    interactionA = TestPartialNeighborhoodInteraction{:x,RadialNeighborhood{2}}(RadialNeighborhood{2}())
-    interactionB = TestPartialNeighborhoodInteraction{:x,RadialNeighborhood{3}}(RadialNeighborhood{3}())
+    interactionA = TestPartialNeighborhoodInteraction{(:a,),RadialNeighborhood{3}}(RadialNeighborhood{3}())
+    interactionB = TestPartialNeighborhoodInteraction{(:b,),RadialNeighborhood{2}}(RadialNeighborhood{2}())
     multiruleset = MultiRuleset(
         rulesets = (a = rulesetA, b=rulesetB),
         interactions = (interactionA, interactionB)
     )
     @test DynamicGrids.radius(rulesetA) == 1
     @test DynamicGrids.radius(rulesetB) == 5
-    @test DynamicGrids.radius(interactionA) == 2
-    @test DynamicGrids.radius(interactionB) == 3
+    @test DynamicGrids.radius(interactionA) == 3
+    @test DynamicGrids.radius(interactionB) == 2
     @testset "multiruleset returns max radii of grid rules and all interactions" begin
         @test DynamicGrids.radius(multiruleset) == (a=3, b=5)
     end
