@@ -219,9 +219,13 @@ initdata!(data::Nothing, ruleset::Ruleset, init, starttime, nreplicates::Nothing
 # initdata!(data::Nothing, ruleset::Ruleset, init, starttime, nreplicates::Integer) =
     # [SimData(ruleset, init, starttime) for r in 1:nreplicates]
 initdata!(data::Nothing, multiruleset::MultiRuleset, init::NamedTuple, starttime, nreplicates::Nothing) = begin
-    radii = NamedTuple{keys(init)}(radius(multiruleset))
-    data = map((rs, ra, in) -> SimData(rs, in, starttime, ra), ruleset(multiruleset), radii, init)
-    MultiSimData(init, data, multiruleset)
+    # Add empty rulesets where missing in the MultiRuleset
+    rulesets = NamedTuple{keys(init)}(get(ruleset(multiruleset), key, Ruleset()) for key in keys(init))
+    # Calculate the neighborhood radus (and grid padding) for each grid
+    radii = NamedTuple{keys(init)}(get(radius(multiruleset), key, 0) for key in keys(init))
+    # Construct the SimData for each grid
+    simdata = map((rs, ra, in) -> SimData(rs, in, starttime, ra), rulesets, radii, init)
+    MultiSimData(init, simdata, multiruleset)
 end
 # initdata!(multidata::MultiSimData, multiruleset::MultiRuleset, init, starttime, nreplicates::Nothing) =
     # MultiSimData(map((d, rs) -> initdata!(d, rs, starttime), data(MultiSimData), ruleset(multiruleset))),

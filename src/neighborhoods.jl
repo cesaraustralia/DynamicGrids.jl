@@ -117,11 +117,16 @@ VonNeumannNeighborhood() = CustomNeighborhood(((0,-1), (-1,0), (1,0), (0,1)))
 Find the largest radius present in the passed in rules.
 """
 radius(set::MultiRuleset) = begin
-    ruleradii = map(radius, ruleset(set))
-    interaction_maxradius = radius(interactions(set))
-    map(r -> max(r, interaction_maxradius), ruleradii)
+    allkeys = Tuple(union(map(keys, interactions(set))..., keys(ruleset(set))))
+    ruleradii = radius(ruleset(set))
+    maxradii = Tuple(max(get(ruleradii, key, 0), radius(interactions(set), key)) for key in allkeys)
+    NamedTuple{allkeys}(maxradii)
 end
+radius(rulesets::NamedTuple) where K = map(radius, rulesets)
 radius(ruleset::Ruleset) = radius(rules(ruleset))
+# Get radius of specific key from all interactions
+radius(interactions::Tuple{<:Interaction,Vararg}, key) = 
+    reduce(max, radius(i) for i in interactions if key in keys(i); init=0)
 radius(rules::Tuple) = mapreduce(radius, max, rules)
 radius(rules::Tuple, key) = mapreduce(rule -> radius(rule, key), max, rules)
 radius(rules::Tuple{}, args...) = 0

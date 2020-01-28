@@ -68,6 +68,9 @@ end
 end
 MultiRuleset(; rulesets=(), interactions=(), init=map(init, rulesets), 
              mask=nothing, overflow=RemoveOverflow(), cellsize=1, timestep=1) = begin
+    if !(interactions isa Tuple)
+        interactions = (interactions,)
+    end
     rulesets = map(r -> standardise_ruleset(r, mask, overflow, cellsize, timestep), rulesets)
     MultiRuleset((rulesets, interactions), init, mask, overflow, cellsize, timestep)
 end
