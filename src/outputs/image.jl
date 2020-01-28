@@ -55,37 +55,38 @@ const Grayscale = Greyscale
 
 """
 Grid processors convert a frame of the simulation into an RGB24 image for display.
+Frames may hold one or multiple grids.
 """
 abstract type GridProcessor end
 
 """
-Processors that convert one frame of a single grid model to an image.
+Grid processors that convert one grid to an image.
 """
 abstract type SingleGridProcessor <: GridProcessor end
 
 """
-Processors that convert frames from multiple grids to a single image.
+Processors that convert multiple grids to an image.
 """
 abstract type MultiGridProcessor <: GridProcessor end
 
 """
-Convert a grid to an RGB24 image, using a GridProcessor
+Convert a grid or named tuple of grids to an RGB24 image, using a GridProcessor
 """
 function grid2image end
 
-# grid2image(o, ruleset, frame, f)
+# grid2image(o, ruleset, grid, f)
 # grid2image(o::ImageOutput, i::Integer) = grid2image(o, o[i], i)
-# grid2image(o::ImageOutput, frame, i::Integer) = grid2image(o, Ruleset(), o[i], i)
+# grid2image(o::ImageOutput, grid, i::Integer) = grid2image(o, Ruleset(), o[i], i)
 # grid2image(o::ImageOutput, args...) = grid2image(processor(o), o, args...)
-grid2image(o::ImageOutput, ruleset::AbstractRuleset, frame, i::Integer) =
-    grid2image(processor(o), o, ruleset, frame, i)
-grid2image(processor::GridProcessor, o::ImageOutput, ruleset, frame, i) =
-    grid2image(processor::GridProcessor, minval(o), maxval(o), ruleset, frame, i)
+grid2image(o::ImageOutput, ruleset::AbstractRuleset, grid, i::Integer) =
+    grid2image(processor(o), o, ruleset, grid, i)
+grid2image(processor::GridProcessor, o::ImageOutput, ruleset, grid, i) =
+    grid2image(processor::GridProcessor, minval(o), maxval(o), ruleset, grid, i)
 
 """"
     ColorProcessor(; scheme=Greyscale(), zerocolor=nothing, maskcolor=nothing)
 
-Converts output frames to a colorsheme.
+Converts output grids to a colorsheme.
 
 ## Arguments / Keyword Arguments
 - `scheme`: a ColorSchemes.jl colorscheme.
@@ -103,16 +104,16 @@ zerocolor(processor::ColorProcessor) = processor.zerocolor
 maskcolor(processor::ColorProcessor) = processor.maskcolor
 
 grid2image(p::ColorProcessor, minval, maxval,
-             ruleset::AbstractRuleset, frame::AbstractArray, t) = begin
-    img = fill(RGB24(0), size(frame))
-    for i in CartesianIndices(frame)
+           ruleset::AbstractRuleset, grid::AbstractArray, t) = begin
+    img = fill(RGB24(0), size(grid))
+    for i in CartesianIndices(grid)
         img[i] = if !(maskcolor(p) isa Nothing) && ismasked(mask(ruleset), i)
             maskcolor(p)
         else
             x = if minval === nothing || maxval === nothing
-                frame[i]
+                grid[i]
             else
-                normalise(frame[i], minval, maxval)
+                normalise(grid[i], minval, maxval)
             end
             if !(zerocolor(p) isa Nothing) && x == zero(x)
                 zerocolor(p)
@@ -199,7 +200,7 @@ LayoutProcessor(layout::Array, processors)
     LayoutProcessor(reshape(layout, length(layout), 1), processors)
 
 ## Arguments / Keyword arguments
-- `layout`: A Vector or Matrix containing the keyes or numbers of frames in the locations to
+- `layout`: A Vector or Matrix containing the keyes or numbers of grids in the locations to
   display them. `nothing`, `missing` or `0` values will be skipped.
 - `processors`: tuple of SingleGridProcessor, one for each grid in the simulation.
   Can be `nothing` for unused grids.
