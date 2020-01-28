@@ -15,6 +15,24 @@ Base.keys(::Interaction{Keys}) where Keys = Keys
 ConstructionBase.constructorof(::Type{T}) where T<:Interaction{Keys} where Keys =
     T{Keys}
 
+show(io::IO, rule::I) where I <: Interaction = begin
+    indent = get(io, :indent, "")
+    printstyled(io, indent, Base.nameof(typeof(rule)); color=:red)
+    printstyled(io, indent, string("{", keys(rule), "}"); color=:red)
+    if nfields(rule) > 0
+        printstyled(io, " :\n"; color=:red)
+        for fn in fieldnames(I)
+            if fieldtype(I, fn) <: Union{Number,Symbol,String}
+                println(io, indent, "    ", fn, " = ", repr(getfield(rule, fn)))
+            else
+                # Avoid prining arrays etc. Just show the type.
+                println(io, indent, "    ", fn, " = ", fieldtype(I, fn))
+            end
+        end
+    end
+end
+
+
 """
 Cell by cell interaction, analogous to [`CellRule`](@ref).
 """
