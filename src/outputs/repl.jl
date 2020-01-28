@@ -44,11 +44,11 @@ end
 
 isasync(o::REPLOutput) = false
 
-showframe(frame::AbstractArray, o::REPLOutput, t) = begin 
+showgrid(frame::AbstractArray, o::REPLOutput, f, t) = begin
     # Print the frame
-    put((0,0), o.color, replframe(o, frame)) 
+    put((0,0), o.color, replframe(o, frame))
     # Print the timestamp in the top right corner
-    put((0,0), o.color, string(t)) 
+    put((0,0), o.color, string("Grid: $f at time $t"))
 end
 
 # Terminal commands
@@ -82,7 +82,7 @@ chartype(s::Block) = YBLOCK, XBLOCK, blockize
 
 replframe(o, frame) = begin
     ystep, xstep, f = chartype(o)
-    
+
     # Limit output area to available terminal size.
     dispy, dispx = displaysize(stdout)
     youtput, xoutput = outputsize = size(frame)

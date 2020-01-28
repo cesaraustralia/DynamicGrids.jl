@@ -21,9 +21,9 @@ init = round.(Int8, max.(0.0, rand(-2.0:0.1:1.0, 70,70)))
 model = Ruleset(Life())
 
 # Use an output that shows the cellular automata as blocks in the REPL
-output = REPLOutput(init; fps=100)
+output = REPLOutput(init; fps=5)
 
-sim!(output, model, init; tspan=(1, 5))
+sim!(output, model; init=init, tspan=(1, 50))
 ```
 
 More life-like examples:
@@ -99,6 +99,13 @@ CustomNeighborhood
 LayeredCustomNeighborhood
 ```
 
+```@docs
+neighbors
+sumneighbors
+mapsetneighbor!
+setneighbor!
+```
+
 
 ## Output
 
@@ -122,7 +129,7 @@ to simplify specifying custom outputs with the required fields.
 @Image
 ```
 
-### Frame processors
+### Grid processors
 
 ```@docs
 FrameProcessor
@@ -132,6 +139,12 @@ MultiFrameProcessor
 ThreeColorProcessor
 LayoutProcessor
 Greyscale
+```
+
+### Gifs
+
+```@docs
+savegif
 ```
 
 ### Internal data handling

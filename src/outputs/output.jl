@@ -7,7 +7,7 @@ many cases can be used interchangeably.
 """
 abstract type Output{T} <: AbstractVector{T} end
 
-# Generic ouput constructor. Converts init array to vector of frames.
+# Generic ouput constructor. Converts an init array to vector of arrays.
 (::Type{F})(init::AbstractMatrix; kwargs...) where F <: Output =
     F(; frames=[deepcopy(init)], kwargs...)
 (::Type{F})(init::NamedTuple; kwargs...) where F <: Output =
@@ -22,7 +22,7 @@ Base.length(o::Output) = length(frames(o))
 Base.size(o::Output) = size(frames(o))
 Base.firstindex(o::Output) = firstindex(frames(o))
 Base.lastindex(o::Output) = lastindex(frames(o))
-Base.@propagate_inbounds Base.getindex(o::Output, i) = 
+Base.@propagate_inbounds Base.getindex(o::Output, i) =
     getindex(frames(o), i)
 Base.@propagate_inbounds Base.setindex!(o::Output, x, i) = setindex!(frames(o), x, i)
 Base.push!(o::Output, x) = push!(frames(o), x)
@@ -60,38 +60,41 @@ isstored(o::Output) = true
 isshowable(o::Output, f) = false
 finalize!(o::Output, args...) = nothing
 delay(o::Output, f) = nothing
-showframe(o::Output, args...) = nothing
+showgrid(o::Output, args...) = nothing
 
 
-# Frame strorage and updating
-frameindex(o::Output, data::AbstractSimData) = frameindex(o, currentframe(data))
-frameindex(o::Output, f) = isstored(o) ? f : oneunit(f)
+# Grid strorage and updating
+gridindex(o::Output, data::AbstractSimData) = gridindex(o, currentframe(data))
+# Every frame is frame 1 if the simulation isn't stored
+gridindex(o::Output, f) = isstored(o) ? f : oneunit(f)
 
-zeroframes(init::AbstractArray, nframes) = [zero(init) for f in 1:nframes]
-zeroframes(init::NamedTuple, nframes) = 
+zerogrids(init::AbstractArray, nframes) = [zero(init) for f in 1:nframes]
+zerogrids(init::NamedTuple, nframes) =
     [map(layer -> zero(layer), init) for f in 1:nframes]
 
 
 @inline blockdo!(data::SimData, frame::AbstractArray, index, f) =
     return @inbounds frame[index...] = data[index...]
 
-storeframe!(output, data) = storeframe!(output, data, frameindex(output, data))
-storeframe!(output, data::SimData, f) = begin
+storegrid!(output, data) = storegrid!(output, data, gridindex(output, data))
+storegrid!(output, data::SimData, f) = begin
     checkbounds(output, f)
     blockrun!(data, output[f], f)
 end
-storeframe!(output, multidata::MultiSimData, f) = begin
+storegrid!(output, multidata::MultiSimData, f) = begin
     checkbounds(output, f)
     for key in keys(multidata)
         # TODO use blocks for MutiSimData?
         # blockrun!(data(multidata)[key], output[f][key], f)
+        source = data(multidata)[key]
+        target = output[f][key]
         for i in CartesianIndices(output[f][key])
-            output[f][key][i] = data(multidata)[key][i]
+            target[i] = source[i]
         end
     end
 end
 # Replicated frames
-storeframe!(output, data::AbstractVector{<:SimData}, f) = begin
+storegrid!(output, data::AbstractVector{<:SimData}, f) = begin
     for j in 1:size(output[1], 2), i in 1:size(output[1], 1)
         replicatesum = zero(eltype(output[1]))
         for d in data
@@ -101,22 +104,22 @@ storeframe!(output, data::AbstractVector{<:SimData}, f) = begin
     end
 end
 
-allocateframes!(o::Output, init, framerange) = begin
+allocategrids!(o::Output, init, framerange) = begin
     append!(frames(o), [similar(init) for f in framerange])
     o
 end
 
 """
-Frames are preallocated and reused.
+Grids are preallocated and reused.
 """
-initframes!(o::Output, init) = begin
+initgrids!(o::Output, init) = begin
     first(o) .= init
     for f = (firstindex(o) + 1):lastindex(o)
         @inbounds o[f] .= zero(eltype(init))
     end
     o
 end
-initframes!(o::Output, init::NamedTuple) = begin
+initgrids!(o::Output, init::NamedTuple) = begin
     for key in keys(init)
         first(o)[key] .= init[key]
     end

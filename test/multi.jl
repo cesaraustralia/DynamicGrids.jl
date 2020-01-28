@@ -30,7 +30,7 @@ sim!(output, ruleset; init=init, tspan=(1, 20))
 @Image @Graphic @Output mutable struct TestImageOutput{} <: ImageOutput{T} end
 processor=DynamicGrids.ThreeColorProcessor(colors=(DynamicGrids.Blue(), DynamicGrids.Red()))
 imageoutput = TestImageOutput(init; processor=processor, minval=(0, 0), maxval=(1000, 100), store=true)
-DynamicGrids.showframe(::TestImageOutput, ::AbstractSimData, args...) = nothing 
+DynamicGrids.showgrid(::TestImageOutput, ::AbstractSimData, args...) = nothing 
 sim!(imageoutput, ruleset; init=init, tspan=(1, 20))
 
 output[20] == imageoutput[20]

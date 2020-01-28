@@ -21,6 +21,8 @@ is ommitted.
 """
 struct RadialNeighborhood{R} <: AbstractRadialNeighborhood{R} end
 
+ConstructionBase.constructorof(::Type{RadialNeighborhood{R}}) where R = RadialNeighborhood{R}()
+
 neighbors(hood::AbstractRadialNeighborhood, buf) =
     (buf[i] for i in 1:hoodsize(hood)^2)
 
@@ -44,7 +46,7 @@ sumneighbors(hood::AbstractRadialNeighborhood, buf, state) = sum(buf) - state
 end
 
 """
-Custom neighborhoods are tuples of custom coordinates (also tuples) specified in relation 
+Custom neighborhoods are tuples of custom coordinates (also tuples) specified in relation
 to the central point of the current cell. They can be any arbitrary shape or size, but
 should be listed in column-major order for performance.
 """
@@ -54,22 +56,25 @@ abstract type AbstractCustomNeighborhood{R} <: Neighborhood{R} end
 Allows completely arbitrary neighborhood shapes by specifying each coordinate
 specifically.
 """
-@description struct CustomNeighborhood{R,C} <: AbstractCustomNeighborhood{R}
-    coords::C | "A tuple of tuples of Int, containing 2-D coordinates relative to the central point"
+@description @flattenable struct CustomNeighborhood{R,C} <: AbstractCustomNeighborhood{R}
+    coords::C | false | "A tuple of tuples of Int, containing 2-D coordinates relative to the central point"
 end
+CustomNeighborhood{R}(coords) where R = CustomNeighborhood{R,typeof(coords)}(coords)
 CustomNeighborhood(args...) = CustomNeighborhood(args)
-CustomNeighborhood(coords) = CustomNeighborhood{absmaxcoord(coords), typeof(coords)}(coords)
+CustomNeighborhood(coords) = CustomNeighborhood{absmaxcoord(coords),typeof(coords)}(coords)
+
+ConstructionBase.constructorof(::Type{CustomNeighborhood}) where R = CustomNeighborhood{R}
 
 coords(hood::CustomNeighborhood) = hood.coords
 # Calculate the maximum absolute value in the coords to use as the radius
 absmaxcoord(coords) = maximum((x -> maximum(abs.(x))).(coords))
 
-neighbors(rule::NeighborhoodRule, buf) = 
+neighbors(rule::NeighborhoodRule, buf) =
     neighbors(neighborhood(rule), buf)
 neighbors(hood::CustomNeighborhood, buf) =
     (buf[(coord .+ radius(hood) .+ 1)...] for coord in coords(hood))
 
-sumneighbors(hood::CustomNeighborhood, buf, state) = 
+sumneighbors(hood::CustomNeighborhood, buf, state) =
     sum(neighbors(hood, buf))
 
 @inline mapsetneighbor!(data::AbstractSimData, hood::CustomNeighborhood, rule, state, index) = begin
@@ -92,13 +97,13 @@ end
 LayeredCustomNeighborhood(l::Tuple) =
     LayeredCustomNeighborhood{maximum(absmaxcoord.(coords.(l))), typeof(l)}(l)
 
-@inline neighbors(hood::LayeredCustomNeighborhood, buf) = 
+@inline neighbors(hood::LayeredCustomNeighborhood, buf) =
     map(layer -> neighbors(layer, buf), hood.layers)
 
-@inline sumneighbors(hood::LayeredCustomNeighborhood, buf, state) = 
+@inline sumneighbors(hood::LayeredCustomNeighborhood, buf, state) =
     map(layer -> sumneighbors(layer, buf, state), hood.layers)
 
-@inline mapsetneighbor!(data::AbstractSimData, hood::LayeredCustomNeighborhood, rule, state, index) = 
+@inline mapsetneighbor!(data::AbstractSimData, hood::LayeredCustomNeighborhood, rule, state, index) =
     map(layer -> mapsetneighbor!(data, layer, rule, state, index), hood.layers)
 
 """
@@ -108,22 +113,28 @@ A convenience wrapper to build a VonNeumann neighborhoods as a `CustomNeighborho
 """
 VonNeumannNeighborhood() = CustomNeighborhood(((0,-1), (-1,0), (1,0), (0,1)))
 
-
 """
 Find the largest radius present in the passed in rules.
 """
 radius(set::MultiRuleset) = begin
-    ruleradius = map(radius, map(rules, ruleset(set)))
-    intradius = map(key -> radius(interactions(set), key), map(Val, keys(set)))
-    map(max, Tuple(ruleradius), Tuple(intradius))
+    allkeys = Tuple(union(map(keys, interactions(set))..., keys(ruleset(set))))
+    ruleradii = radius(ruleset(set))
+    maxradii = Tuple(max(get(ruleradii, key, 0), radius(interactions(set), key)) for key in allkeys)
+    NamedTuple{allkeys}(maxradii)
 end
+radius(rulesets::NamedTuple) where K = map(radius, rulesets)
 radius(ruleset::Ruleset) = radius(rules(ruleset))
+# Get radius of specific key from all interactions
+radius(interactions::Tuple{<:Interaction,Vararg}, key) = 
+    reduce(max, radius(i) for i in interactions if key in keys(i); init=0)
 radius(rules::Tuple) = mapreduce(radius, max, rules)
 radius(rules::Tuple, key) = mapreduce(rule -> radius(rule, key), max, rules)
 radius(rules::Tuple{}, args...) = 0
 
 radius(rule::NeighborhoodRule) = radius(neighborhood(rule))
 radius(rule::PartialNeighborhoodRule) = radius(neighborhood(rule))
+radius(rule::NeighborhoodInteraction) = radius(neighborhood(rule))
+radius(rule::PartialNeighborhoodInteraction) = radius(neighborhood(rule))
 radius(rule::Rule, args...) = 0
 # Only the first rule in a chain can have a radius larger than zero.
 radius(chain::Chain) = radius(chain[1])

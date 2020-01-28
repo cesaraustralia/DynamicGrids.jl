@@ -15,12 +15,13 @@ show(io::IO, rule::R) where R <: Rule = begin
             if fieldtype(R, fn) <: Union{Number,Symbol,String}
                 println(io, indent, "    ", fn, " = ", repr(getfield(rule, fn)))
             else
-                # Avoid prining arrays etc. Just show the type.
+                # Avoid printing arrays etc. Just show the type.
                 println(io, indent, "    ", fn, " = ", fieldtype(R, fn))
             end
         end
     end
 end
+
 
 """
 PartialRule is for rules that manually write to whichever cells of the grid
@@ -36,19 +37,18 @@ abstract type PartialRule <: Rule end
 """
 A Rule That only accesses a neighborhood, defined by its radius distance from the current cell.
 
-For each cell a buffer will be populated containing the neighborhood cells, accessible with
-`buffer(data)`. This allows memory optimisations and the use of BLAS routines on the neighborhood. 
-It also means that and no bounds checking is required.
+For each cell a neighborhood buffer will be populated containing the neighborhood cells,
+and passed to `applyrule` as an extra argmuent: `applyrule(rule, data, state, index, buffer)`.
+This allows memory optimisations and the use of BLAS routines on the neighborhood buffer
+for [`RadialNeighborhood`](@ref). It also means that and no bounds checking is required in
+neighborhood code, a major performance gain.
 
-`NeighborhoodRule` must read only from the state variable and the 
-neighborhood_buffer array, and never manually write to the `dest(data)` array. 
-Its return value is allways written to the central cell.
-
-Custom Neighborhood rules must return their radius with a `radius()` method.
+`NeighborhoodRule` should read only from the state variable and the neighborhood
+buffer array. The return value is written to the central cell for the next grid frame.
 """
 abstract type NeighborhoodRule <: Rule end
 
-neighborhood(rule::NeighborhoodRule) = rule.neighborhood 
+neighborhood(rule::NeighborhoodRule) = rule.neighborhood
 
 """
 A Rule that only writes to its neighborhood, defined by its radius distance from the current point.
@@ -58,7 +58,7 @@ Custom PartialNeighborhood rules must return their radius with a `radius()` meth
 """
 abstract type PartialNeighborhoodRule <: PartialRule end
 
-neighborhood(rule::PartialNeighborhoodRule) = rule.neighborhood 
+neighborhood(rule::PartialNeighborhoodRule) = rule.neighborhood
 
 """
 A Rule that only writes and accesses a single cell: its return value is the new
