@@ -27,7 +27,6 @@ end
     else
         x, true
     end
-
 @inline isinbounds(xs::Tuple, maxs::Tuple, overflow) = all(isinbounds.(xs, maxs, Ref(overflow)))
 @inline isinbounds(x::Number, max::Number, overflow::RemoveOverflow) = 
     x > zero(x) && x <= max
@@ -49,6 +48,9 @@ ruletypes(ruleset::Ruleset) = ruletypes(typeof(Ruleset.rules))
 ruletypes(t::Type) = t.name.wrapper
 ruletypes(ts::Type{<:Tuple}) = (ruletypes.(ts.parameters)...,)
 
+"""
+Check if a cell is masked, using the passed-in mask grid.
+"""
 @inline ismasked(data::AbstractSimData, i...) = ismasked(mask(data), i...)
 @inline ismasked(mask::Nothing, i...) = false
 @inline ismasked(mask::AbstractArray, i...) = @inbounds return !mask[i...]

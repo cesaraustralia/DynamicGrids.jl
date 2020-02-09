@@ -1,7 +1,20 @@
+"""
+Simulation data hold all intermediate arrays, timesteps
+and frame numbers for the current frame of the siulation.
+
+It is accessable from a rule.
+"""
 abstract type AbstractSimData end
 
+"""
+Simulation data for a singule ruleset.
+"""
 abstract type SingleSimData{T,N,I} <: AbstractSimData end
 
+"""
+Common fields for SimData and WritableSimData. Which are basically 
+identical except for with methods.
+"""
 @mix struct SimDataMixin{T,N,I<:AbstractArray{T,N},S,St,LSt,B,Ra,Ru,STi,CTi,CFr}
     init::I
     source::S
@@ -63,11 +76,11 @@ Get the actual current timestep, ie. not variable periods like Month
 """
 currenttimestep(d::AbstractSimData) = currenttime(d) + timestep(d) - currenttime(d)
 
-" Simulation data and storage is passed to rules for each timestep "
-@SimDataMixin struct SimData{} <: SingleSimData{T,N,I} end
 
-ConstructionBase.constructorof(::Type{SimData}) =
-    (init, args...) -> SimData{eltype(init),ndims(init),typeof(init),typeof.(args)...}(init, args...)
+""" 
+Simulation data and storage passed to rules for each timestep.
+"""
+@SimDataMixin struct SimData{} <: SingleSimData{T,N,I} end
 
 """
 Generate simulation data to match a ruleset and init array.
@@ -82,7 +95,7 @@ SimData(ruleset::Ruleset, init::AbstractArray, starttime, r=radius(ruleset)) = b
         nblocs = indtoblock.(size(source), blocksize) .+ 1
         sourcestatus = BitArray(zeros(Bool, nblocs))
         deststatus = deepcopy(sourcestatus)
-        updatestatus!(parent(source), sourcestatus, deststatus, r)
+        updatestatus!(source, sourcestatus, deststatus, r)
 
         buffers = [zeros(eltype(init), hoodsize, hoodsize) for i in 1:blocksize]
         localstatus = zeros(Bool, 2, 2)
@@ -100,9 +113,14 @@ SimData(ruleset::Ruleset, init::AbstractArray, starttime, r=radius(ruleset)) = b
             ruleset, starttime, currenttime, currentframe)
 end
 
+ConstructionBase.constructorof(::Type{SimData}) =
+    (init, args...) -> SimData{eltype(init),ndims(init),typeof(init),typeof.(args)...}(init, args...)
+
+Base.@propagate_inbounds Base.getindex(d::SimData, I...) = getindex(source(d), I...)
+
 
 """
-MultipleSimData is used for MultiRuleset models
+Simulation data for MultiRuleset models
 """
 struct MultiSimData{I,D<:NamedTuple,Ru} <: AbstractSimData
     init::I
@@ -169,7 +187,7 @@ updatetime(data::AbstractVector{<:SimData}, f) = updatetime.(data, f)
 updatetime(multidata::MultiSimData, f) =
     @set multidata.data = map(d -> updatetime(d, f), data(multidata))
 
-timefromframe(data::AbstractSimData, f) = starttime(data) + (f - 1) * timestep(data)
+timefromframe(data::AbstractSimData, f::Int) = starttime(data) + (f - 1) * timestep(data)
 
 """
 Find the maximum radius required by all rules
@@ -209,43 +227,70 @@ updatestatus!(source, sourcestatus, deststatus, r) = begin
     end
 end
 
-# TODO document these behaviours
-initdata!(data::AbstractSimData, ruleset, init::AbstractArray, starttime, nreplicates) =
-    initdata!(data, ruleset, starttime)
-initdata!(data::AbstractVector{<:AbstractSimData}, ruleset, init::AbstractArray, starttime, nreplicates::Integer) =
-    map(d -> initdata!(d, ruleset, init, starttime, nreplicates), data)
-initdata!(data::Nothing, ruleset::Ruleset, init, starttime, nreplicates::Nothing) =
+
+"""
+When no simdata is passed in, the existing SimData arrays are re-initialised
+"""
+initdata!(simdata::Nothing, ruleset::Ruleset, init, starttime, nreplicates::Nothing) =
     SimData(ruleset, init, starttime)
-# initdata!(data::Nothing, ruleset::Ruleset, init, starttime, nreplicates::Integer) =
-    # [SimData(ruleset, init, starttime) for r in 1:nreplicates]
-initdata!(data::Nothing, multiruleset::MultiRuleset, init::NamedTuple, starttime, nreplicates::Nothing) = begin
+"""
+When no simdata is passed in, the existing SimData arrays are re-initialised
+"""
+initdata!(simdata::Nothing, ruleset::Ruleset, init, starttime, nreplicates::Integer) =
+    [SimData(ruleset, init, starttime) for r in 1:nreplicates]
+"""
+When simdata is passed in, the existing SimData arrays are re-initialised
+"""
+initdata!(simdata::AbstractSimData, ruleset, init::AbstractArray, starttime, nreplicates) =
+    initdata!(simdata, ruleset, starttime)
+"""
+When SimData with replicates is passed in, the existing SimData replicates are re-initialised
+"""
+initdata!(simdata::AbstractVector{<:AbstractSimData}, ruleset, init::AbstractArray, starttime, nreplicates::Integer) =
+    map(d -> initdata!(d, ruleset, init, starttime, nreplicates), simdata)
+"""
+MultiRuleset needs additional initialisation steps.
+"""
+initdata!(::Nothing, multiruleset::MultiRuleset, init::NamedTuple, starttime, nreplicates::Nothing) = begin
     # Add empty rulesets where missing in the MultiRuleset
-    rulesets = NamedTuple{keys(init)}(get(ruleset(multiruleset), key, Ruleset()) for key in keys(init))
+    rulesets = NamedTuple{keys(init)}(get(ruleset(multiruleset), key, Ruleset(;timestep=timestep(multiruleset))) for key in keys(init))
     # Calculate the neighborhood radus (and grid padding) for each grid
     radii = NamedTuple{keys(init)}(get(radius(multiruleset), key, 0) for key in keys(init))
     # Construct the SimData for each grid
-    simdata = map((rs, ra, in) -> SimData(rs, in, starttime, ra), rulesets, radii, init)
-    MultiSimData(init, simdata, multiruleset)
+    multidata = map((rs, ra, in) -> SimData(rs, in, starttime, ra), rulesets, radii, init)
+    MultiSimData(init, multidata, multiruleset)
 end
-# initdata!(multidata::MultiSimData, multiruleset::MultiRuleset, init, starttime, nreplicates::Nothing) =
-    # MultiSimData(map((d, rs) -> initdata!(d, rs, starttime), data(MultiSimData), ruleset(multiruleset))),
-                 # interactions(multiruleset))
-initdata!(data::AbstractSimData, ruleset::Ruleset, starttime) = begin
-    for j in 1:framesize(data)[2], i in 1:framesize(data)[1]
-        @inbounds source(data)[i, j] = dest(data)[i, j] = init(data)[i, j]
+#"""
+#MultiRuleset with existing MultiSimData, object reinitialises the object.
+#TODO: make this work
+#"""
+#initdata!(multidata::MultiSimData, multiruleset::MultiRuleset, init, starttime, nreplicates::Nothing) =
+    #MultiSimData(map((d, rs) -> initdata!(d, rs, starttime), data(MultiSimData), ruleset(multiruleset))),
+                 #interactions(multiruleset))
+"""
+Initialise a SimData object with a new `Ruleset` and starttime.
+"""
+initdata!(simdata::AbstractSimData, ruleset::Ruleset, starttime) = begin
+    for j in 1:framesize(simdata)[2], i in 1:framesize(simdata)[1]
+        @inbounds source(simdata)[i, j] = dest(simdata)[i, j] = init(simdata)[i, j]
     end
-    updatestatus!(data)
-    @set! data.ruleset = ruleset
-    @set! data.starttime = starttime
-    data
+    updatestatus!(simdata)
+    @set! simdata.ruleset = ruleset
+    @set! simdata.starttime = starttime
+    simdata
 end
 
+"Convert regular index to block index"
 indtoblock(x, blocksize) = (x - 1) ÷ blocksize + 1
+
+"Convert block index to regular index"
 blocktoind(x, blocksize) = (x - 1) * blocksize + 1
 
-Base.@propagate_inbounds Base.getindex(d::SimData, I...) = getindex(source(d), I...)
-
-" Simulation data and storage is passed to rules for each timestep "
+"""
+WriteableSimData is passed to rules `<: PartialRule`, and can be written to directly as
+an array. This handles updates to block status and writing to the correct source/dest
+array. Is always converted back to regular `SimData`.
+"""
 @SimDataMixin struct WritableSimData{} <: SingleSimData{T,N,I} end
 
 ConstructionBase.constructorof(::Type{WritableSimData}) =
@@ -257,7 +302,6 @@ Base.@propagate_inbounds Base.setindex!(d::WritableSimData, x, I...) = begin
         bi = indtoblock.(I .+ r, 2r)
         deststatus(d)[bi...] = true
     end
-    isnan(x) && error("NaN in setindex: ", (d, I))
     dest(d)[I...] = x
 end
 

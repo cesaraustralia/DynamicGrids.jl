@@ -1,6 +1,31 @@
+
 """
+    blockrun(data, context, args...)
+
+Runs simulations over the block grid. Inactive blocks do not run.
+
+This can lead to order of magnitude performance improvments in sparse 
+simulations where large areas of the grid are filled with zeros.
+"""
+function blockrun! end
+
+"""
+    celldo!(data, context, args...)
+
+Run rule for particular cell. Applied to active cells inside [`blockrun!`](@ref).
+"""
+function celldo! end
+
+"""
+    maprule!(data, rule)
+
 Apply the rule for each cell in the grid, using optimisations
-allowed for the supertype of the rule.
+specific to the supertype of the rule.
+"""
+function maprule! end
+
+"""
+Regular rules just run over the grid blocks
 """
 maprule!(data::AbstractSimData, rule::Rule) = blockrun!(data, rule)
 
@@ -25,24 +50,28 @@ blockrun!(data, context, args...) = begin
 
             for j in jstart:jstop, i in istart:istop
                 ismasked(data, i, j) && continue
-                blockdo!(data, context, (i, j), args...)
+                celldo!(data, context, (i, j), args...)
             end
         end
     else
         for j in 1:ncols, i in 1:nrows
             ismasked(data, i, j) && continue
-            blockdo!(data, context, (i, j), args...)
+            celldo!(data, context, (i, j), args...)
         end
     end
 end
 
-@inline blockdo!(data, rule::Rule, I) = begin
+@inline celldo!(data, rule::Rule, I) = begin
     @inbounds state = source(data)[I...]
     @inbounds dest(data)[I...] = applyrule(rule, data, state, I)
     nothing
 end
 
 
+"""
+Parital rules must copy the grid to dest as not all cells will be written.
+Block status is also updated.
+"""
 maprule!(data::AbstractSimData, rule::PartialRule) = begin
     data = WritableSimData(data)
     # Update active blocks in the dest array
@@ -52,10 +81,37 @@ maprule!(data::AbstractSimData, rule::PartialRule) = begin
     updatestatus!(sourcestatus(data), deststatus(data))
 end
 
-@inline blockdo!(data::WritableSimData, rule::PartialRule, I) = begin
+@inline celldo!(data::WritableSimData, rule::PartialRule, I) = begin
     state = source(data)[I...]
     state == zero(state) && return
     applyrule!(rule, data, state, I)
+end
+
+@inline celldo!(data::WritableSimData, rule::PartialNeighborhoodRule, I) = begin
+    state = source(data)[I...]
+    state == zero(state) && return
+    applyrule!(rule, data, state, I)
+    zerooverflow!(data, overflow(data), radius(data))
+end
+
+# TODO overflow should be wrapped back around?
+zerooverflow!(data, overflow::WrapOverflow, r) = nothing
+zerooverflow!(data, overflow::RemoveOverflow, r) = begin
+    # Zero edge padding, as it can be written to in writable rules.
+    src = parent(source(data))
+    nrows, ncols = size(src)
+    for j = 1:r, i = 1:nrows
+        src[i, j] = zero(eltype(src))
+    end
+    for j = ncols-r+1:ncols, i = 1:nrows
+        src[i, j] = zero(eltype(src))
+    end
+    for j = 1:ncols, i = 1:r
+        src[i, j] = zero(eltype(src))
+    end
+    for j = 1:ncols, i = nrows-r+1:nrows
+        src[i, j] = zero(eltype(src))
+    end
 end
 
 """
@@ -63,58 +119,75 @@ Run the rule for all cells, writing the result to the dest array
 The neighborhood is copied to the rules neighborhood buffer array for performance
 # TODO test 1d
 """
-maprule!(data::SingleSimData{T,2}, rule::Union{NeighborhoodRule,Chain{<:Tuple{NeighborhoodRule,Vararg}}}, 
+maprule!(data::SingleSimData{T,2}, rule::Union{NeighborhoodRule,Chain{<:Tuple{NeighborhoodRule,Vararg}}},
          args...) where T = begin
-    # The rule provides the neighborhood buffer
     r = radius(rule)
+    # Blocks are cell smaller than the hood, because this works very nicely
+    # for looking at only 4 blocks at a time. Larger blocks mean each neighborhood
+    # is more likely to be active, smaller means handling more than 2 neighborhoods per block.
+    # It would be good to test if this is the sweet spot for performance.
+    # It probably isn't for game of life size grids.
     blocksize = 2r
     hoodsize = 2r + 1
+    nrows, ncols = framesize(data)
+    # We unwrap offset arrays and work with the underlying array
     src, dst = parent(source(data)), parent(dest(data))
     srcstatus, dststatus = sourcestatus(data), deststatus(data)
-    sumstatus = localstatus(data)
+    # curstatus and newstatus track active status for 4 local blocks
+    curstatus = zeros(Bool, 2, 2)
+    newstatus = zeros(Bool, 2, 2)
+    # Initialise status for the dest. Is this needed?
+    # deststatus(data) .= false
+    # Get the preallocated neighborhood buffers
     bufs = buffers(data)
-    nrows, ncols = framesize(data)
-
-    handleoverflow!(data, r)
     # Center of the buffer for both axes
-    center = r + 1
-    deststatus(data) .= false
+    bufcenter = r + 1
+
+    # Wrap overflow, or zero padding if not wrapped
+    handleoverflow!(data, r)
 
     # Run the rule row by row. When we move along a row by one cell, we access only
     # a single new column of data the same hight of the nighborhood, and move the existing
     # data in the neighborhood buffer array accross by one column. This saves on reads
     # from the main array, and focusses reads and writes in the small buffer array that
     # should be in fast local memory.
+
+    # Loop down the block COLUMN
     @inbounds for bi = 1:size(srcstatus, 1) - 1
-        sumstatus .= false
         i = blocktoind(bi, blocksize)
+        # Get current block
         rowsinblock = min(blocksize, nrows - blocksize * (bi - 1))
         skippedlastblock = true
         freshbuffer = true
 
-        b11, b12 = srcstatus[bi,     1], srcstatus[bi,     2]
-        b21, b22 = srcstatus[bi + 1, 1], srcstatus[bi + 1, 2]
-        sumstatus[1, 2] = false
-        sumstatus[2, 2] = false
-        for bj = 1:size(srcstatus, 2) - 1
-            sumstatus[1, 1] = sumstatus[1, 2]
-            sumstatus[2, 1] = sumstatus[2, 2]
-            sumstatus[1, 2] = false
-            sumstatus[2, 2] = false
+        # Initialise block status for the start of the row
+        curstatus = srcstatus[bi:bi+1, 1:2]
+        newstatus .= false
 
-            b11, b21 = b12, b22
-            b12, b22 = srcstatus[bi, bj + 1], srcstatus[bi + 1, bj + 1]
+        # Loop along the block ROW. This is faster because we are reading
+        # 1 column from the main array for 2 blocks at each step, not actually along the row.
+        for bj = 1:size(srcstatus, 2) - 1
+            newstatus[1, 1] = newstatus[1, 2]
+            newstatus[2, 1] = newstatus[2, 2]
+            newstatus[1, 2] = false
+            newstatus[2, 2] = false
+
+            # Copy the status accross
+            curstatus[:, 1] .= curstatus[:, 2]
+            # Get a new column of status from srcstatus
+            curstatus[:, 2] .= srcstatus[bi:bi+1, bj + 1]
 
             jstart = blocktoind(bj, blocksize)
             jstop = min(jstart + blocksize - 1, ncols)
 
-            # Use this block unless it or its neighbors are active
-            if !(b11 | b12 | b21 | b22)
+            # Use this block if it or its neighbors are active
+            if !any(curstatus)
                 # Skip this block
                 skippedlastblock = true
                 continue
             end
 
+            # Reinitialise neighborhood buffers if we have skipped a section of the array
             if skippedlastblock
                 for y = 1:hoodsize
                     for b in 1:rowsinblock
@@ -128,8 +201,10 @@ maprule!(data::SingleSimData{T,2}, rule::Union{NeighborhoodRule,Chain{<:Tuple{Ne
                 freshbuffer = true
             end
 
+            # Loop over the grid COLUMNS inside the block
             for j in jstart:jstop
-                centerbj = j - jstart < r ? 1 : 2
+                # Which block column are we in
+                curblockj = j - jstart < r ? 1 : 2
                 if freshbuffer
                     freshbuffer = false
                 else
@@ -147,26 +222,30 @@ maprule!(data::SingleSimData{T,2}, rule::Union{NeighborhoodRule,Chain{<:Tuple{Ne
                         end
                     end
                 end
+
+                # Loop over the grid ROWS inside the block
                 for b in 1:rowsinblock
                     ii = i + b - 1
                     ismasked(data, ii, j) && continue
-
-                    centerbi = b <= r ? 1 : 2
+                    # Which block row are we in
+                    curblocki = b <= r ? 1 : 2
                     # Run the rule using buffer b
                     buf = bufs[b]
-                    state = buf[center, center]
+                    state = buf[bufcenter, bufcenter]
                     # @assert state == src[ii + r, j + r]
                     newstate = applyrule(rule, data, state, (ii, j), buf)
-                    sumstatus[centerbi, centerbj] |= newstate != zero(newstate)
+                    # Update the status for the block
+                    newstatus[curblocki, curblockj] |= newstate != zero(newstate)
+                    # Write the new state to the dest array
                     dst[ii + r, j + r] = newstate
                 end
+
                 # Combine blocks with the previous rows / cols
-                # TODO only write the first column
-                dststatus[bi, bj] |= sumstatus[1, 1]
-                dststatus[bi, bj+1] |= sumstatus[1, 2]
-                dststatus[bi+1, bj] |= sumstatus[2, 1]
+                dststatus[bi, bj] |= newstatus[1, 1]
+                dststatus[bi, bj+1] |= newstatus[1, 2]
+                dststatus[bi+1, bj] |= newstatus[2, 1]
                 # Start new block fresh to remove old status
-                dststatus[bi+1, bj+1] = sumstatus[2, 2]
+                dststatus[bi+1, bj+1] = newstatus[2, 2]
             end
         end
     end
@@ -223,29 +302,10 @@ handleoverflow!(data::SingleSimData{T,2}, overflow::WrapOverflow, r::Integer) wh
 end
 handleoverflow!(data, overflow::RemoveOverflow, r) = nothing
 
+
 combinestatus(x::Number, y::Number) = x + y
 combinestatus(x::Integer, y::Integer) = x | y
 
-updatestatus!(copyto::AbstractArray, copyfrom::AbstractArray) = 
-    @inbounds copyto .= copyfrom
 updatestatus!(copyto, copyfrom) = nothing
-
-
-"""
-    applyrule(rules::Chain, data, state, (i, j))
-
-Chained rules. If a `Chain` of rules is passed to applyrule, run them sequentially for each 
-cell.  This can have much beter performance as no writes occur between rules, and they are
-essentially compiled together into compound rules. This gives correct results only for
-CellRule, or for a single NeighborhoodRule followed by CellRule.
-"""
-@inline applyrule(rules::Chain{<:Tuple{<:NeighborhoodRule,Vararg}}, data, state, index, buf) = begin
-    state = applyrule(rules[1], data, state, index, buf)
-    applyrule(tail(rules), data, state, index)
-end
-@inline applyrule(rules::Chain, data, state, index) = begin
-    state == zero(state) && return state
-    newstate = applyrule(rules[1], data, state, index)
-    applyrule(tail(rules), data, newstate, index)
-end
-@inline applyrule(rules::Chain{Tuple{}}, data, state, index) = state
+updatestatus!(copyto::AbstractArray, copyfrom::AbstractArray) =
+    @inbounds copyto .= copyfrom

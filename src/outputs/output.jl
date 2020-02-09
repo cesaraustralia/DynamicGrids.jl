@@ -73,7 +73,7 @@ zerogrids(init::NamedTuple, nframes) =
     [map(layer -> zero(layer), init) for f in 1:nframes]
 
 
-@inline blockdo!(data::SimData, frame::AbstractArray, index, f) =
+@inline celldo!(data::SimData, frame::AbstractArray, index, f) =
     return @inbounds frame[index...] = data[index...]
 
 storegrid!(output, data) = storegrid!(output, data, gridindex(output, data))
