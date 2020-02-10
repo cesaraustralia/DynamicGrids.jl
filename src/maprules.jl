@@ -134,8 +134,7 @@ maprule!(data::SingleSimData{T,2}, rule::Union{NeighborhoodRule,Chain{<:Tuple{Ne
     src, dst = parent(source(data)), parent(dest(data))
     srcstatus, dststatus = sourcestatus(data), deststatus(data)
     # curstatus and newstatus track active status for 4 local blocks
-    curstatus = zeros(Bool, 2, 2)
-    newstatus = zeros(Bool, 2, 2)
+    newstatus = localstatus(data)
     # Initialise status for the dest. Is this needed?
     # deststatus(data) .= false
     # Get the preallocated neighborhood buffers
@@ -161,7 +160,8 @@ maprule!(data::SingleSimData{T,2}, rule::Union{NeighborhoodRule,Chain{<:Tuple{Ne
         freshbuffer = true
 
         # Initialise block status for the start of the row
-        curstatus = srcstatus[bi:bi+1, 1:2]
+        bs11, bs12 = srcstatus[bi,     1], srcstatus[bi,     2]
+        bs21, bs22 = srcstatus[bi + 1, 1], srcstatus[bi + 1, 2]
         newstatus .= false
 
         # Loop along the block ROW. This is faster because we are reading
@@ -172,16 +172,15 @@ maprule!(data::SingleSimData{T,2}, rule::Union{NeighborhoodRule,Chain{<:Tuple{Ne
             newstatus[1, 2] = false
             newstatus[2, 2] = false
 
-            # Copy the status accross
-            curstatus[:, 1] .= curstatus[:, 2]
-            # Get a new column of status from srcstatus
-            curstatus[:, 2] .= srcstatus[bi:bi+1, bj + 1]
+            # Get current block status from the source status array
+            bs11, bs21 = bs12, bs22
+            bs12, bs22 = srcstatus[bi, bj + 1], srcstatus[bi + 1, bj + 1]
 
             jstart = blocktoind(bj, blocksize)
             jstop = min(jstart + blocksize - 1, ncols)
 
-            # Use this block if it or its neighbors are active
-            if !any(curstatus)
+            # Use this block unless it or its neighbors are active
+            if !(bs11 | bs12 | bs21 | bs22)
                 # Skip this block
                 skippedlastblock = true
                 continue
