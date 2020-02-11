@@ -82,7 +82,7 @@ showgrid(o::GraphicOutput, f=lastindex(o), t=stoptime(o)) =
     showgrid(o[f], o, f, t)
 # Get frame f from output and call showgrid again
 showgrid(o::GraphicOutput, data::AbstractSimData, f, t) =
-    showgrid(o[gridindex(o, f)], o, data, f, t)
+    showgrid(o[frameindex(o, f)], o, data, f, t)
 # Handle a vector of SimData from replicate sims
 showgrid(o::GraphicOutput, data::AbstractVector{<:AbstractSimData}, f, t) =
     showgrid(o, data[1], f, t)

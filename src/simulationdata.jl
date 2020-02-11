@@ -212,7 +212,9 @@ end
 Initialise the block status array.
 This tracks whether anything has to be done in an area of the main array.
 """
-updatestatus!(data) = updatestatus!(parent(source(data)), sourcestatus(data), deststatus(data), radius(data))
+updatestatus!(data::Tuple) = map(updatestatus!, data) 
+updatestatus!(data::AbstractSimData) = 
+    updatestatus!(parent(source(data)), sourcestatus(data), deststatus(data), radius(data))
 updatestatus!(source, sourcestatus::Bool, deststatus::Bool, r) = nothing
 updatestatus!(source, sourcestatus, deststatus, r) = begin
     blocksize = 2r

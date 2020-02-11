@@ -64,9 +64,9 @@ showgrid(o::Output, args...) = nothing
 
 
 # Grid strorage and updating
-gridindex(o::Output, data::AbstractSimData) = gridindex(o, currentframe(data))
+frameindex(o::Output, data::AbstractSimData) = frameindex(o, currentframe(data))
 # Every frame is frame 1 if the simulation isn't stored
-gridindex(o::Output, f) = isstored(o) ? f : oneunit(f)
+frameindex(o::Output, f) = isstored(o) ? f : oneunit(f)
 
 zerogrids(init::AbstractArray, nframes) = [zero(init) for f in 1:nframes]
 zerogrids(init::NamedTuple, nframes) =
@@ -76,23 +76,22 @@ zerogrids(init::NamedTuple, nframes) =
 @inline celldo!(data::SimData, frame::AbstractArray, index, f) =
     return @inbounds frame[index...] = data[index...]
 
-storegrid!(output, data) = storegrid!(output, data, gridindex(output, data))
-storegrid!(output, data::SimData, f) = begin
+storegrid!(output::Output, data) = storegrid!(output, data, frameindex(output, data))
+storegrid!(output::Output, data::SimData, f) = begin
     checkbounds(output, f)
     blockrun!(data, output[f], f)
 end
-storegrid!(output, multidata::MultiSimData, f) = begin
+storegrid!(output::Output, multidata::MultiSimData, f) = begin
     checkbounds(output, f)
-    for key in keys(multidata)
-        # TODO use blocks for MutiSimData?
-        # blockrun!(data(multidata)[key], output[f][key], f)
-        source = data(multidata)[key]
-        target = output[f][key]
-        for i in CartesianIndices(output[f][key])
-            target[i] = source[i]
-        end
+    map(_storegrid!, values(output[f]), values(data(multidata)))
+end
+
+_storegrid!(outputgrid::AbstractArray, sourcegrid::SimData) = begin
+    for i in CartesianIndices(outputgrid)
+        outputgrid[i] = sourcegrid[i]
     end
 end
+
 # Replicated frames
 storegrid!(output, data::AbstractVector{<:SimData}, f) = begin
     for j in 1:size(output[1], 2), i in 1:size(output[1], 1)
