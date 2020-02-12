@@ -17,14 +17,15 @@ end
 
 mapinteraction!(multidata::MultiSimData, rule::PartialInteraction) = begin
     # Copy the sources to dests
-    map(data(multidata)) do d
+    map(values(data(multidata))) do d
         @inbounds parent(dest(d)) .= parent(source(d))
     end
 
     # Only pass in the data that the rule wants, in that order
     wkeys, wdata = writedata(rule, multidata)
     rkeys, rdata = readdata(rule, multidata)
-    simdata = @set multidata.data = ruledata(wkeys, wdata)
+    rd = ruledata(wkeys, wdata, rkeys, rdata)
+    simdata = @set multidata.data = rd
     _interactionloop(rule, simdata, rdata, mask(multidata))
 
     # Update status of all arrays written to
@@ -35,6 +36,7 @@ _interactionloop(rule, simdata, readdata, mask) = begin
     nrows, ncols = framesize(data(simdata)[1])
     for j in 1:ncols, i in 1:nrows
         ismasked(mask, i, j) && continue
+        # readstate(readdata, i, j)
         state = readstate(readdata, i, j)
         applyinteraction!(rule, simdata, state, (i, j))
     end
@@ -43,17 +45,32 @@ end
 @inline readstate(data::Tuple, I...) = map(d -> readstate(d, I...), data)
 @inline readstate(data, I...) = data[I...] 
 
-copystatus!(data::Tuple{Vararg{<:AbstractSimData}}) = map(copystatus!, data)
-copystatus!(data::AbstractSimData) =
-    copystatus!(sourcestatus(data), deststatus(data))
-copystatus!(srcstatus::AbstractArray, deststatus::AbstractArray) = srcstatus .= deststatus
-copystatus!(srcstatus, deststatus) = nothing
+@inline ruledata(wkey, wdata, rkey, rdata) = 
+    ruledata((wkey,), (wdata,), (rkey,), (rdata,))
+@inline ruledata(wkey, wdata, rkeys::Tuple, rdata::Tuple) = 
+    ruledata((wkey,), (wdata,), rkeys, rdata)
+@inline ruledata(wkeys::Tuple, wdata::Tuple, rkey, rdata) = 
+    ruledata(wkeys, wdata, (rkey,), (rdata,))
+@generated ruledata(wkeys::Tuple{Vararg{<:Val}}, wdata::Tuple,
+                    rkeys::Tuple{Vararg{<:Val}}, rdata::Tuple) = begin
+    wkeys = _vals2syms(wkeys)
+    keysexp = Expr(:tuple, QuoteNode.(wkeys)...)
+    dataexp = Expr(:tuple, :(wdata...))
 
-@inline ruledata(key, data) = ruledata((key,), (data,))
-@inline ruledata(keys::Tuple{Vararg{<:Val}}, data::Tuple) = 
-    NamedTuple{map(_keyval, keys)}(data)
+    rkeys = _vals2syms(rkeys)
+    for (i, key) in enumerate(rkeys)
+        if !(key in wkeys)
+            push!(dataexp.args, :(rdata[$i])) 
+            push!(keysexp.args, QuoteNode(key))
+        end
+    end
 
-@inline _keyval(keys::Val{K}) where K = K
+    quote 
+        NamedTuple{$keysexp}($dataexp)
+    end
+end
+
+_vals2syms(x) = map(v -> v.parameters[1], x.parameters)
 
 writedata(rule::Interaction, multidata) = writedata(writekeys(rule), multidata)
 @inline writedata(keys::Tuple{Symbol,Vararg}, multidata) =

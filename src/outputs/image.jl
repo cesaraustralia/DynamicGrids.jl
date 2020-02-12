@@ -1,13 +1,25 @@
 """
-Graphic outputs that displays an output frame as an RGB24 images.
+Graphic outputs that display the grid(s) as an RGB24 images.
 """
 abstract type ImageOutput{T} <: GraphicOutput{T} end
 
-(::Type{F})(o::T; kwargs...) where F <: ImageOutput where T <: ImageOutput =
-    F(; frames=frames(o), starttime=starttime(o), endtime=endtime(o),
-      fps=fps(o), showfps=showfps(o), timestamp=timestamp(o), stampframe=stampframe(o), store=store(o),
-      processor=processor(o), minval=minval(o), maxval=maxval(o),
-      kwargs...)
+"""
+Construct one ImageOutput from another ImageOutput.
+"""
+(::Type{F})(o::T; kwargs...) where F <: ImageOutput where T <: ImageOutput = F(;
+    frames=frames(o),
+    starttime=starttime(o),
+    endtime=endtime(o),
+    fps=fps(o),
+    showfps=showfps(o),
+    timestamp=timestamp(o),
+    stampframe=stampframe(o),
+    store=store(o),
+    processor=processor(o),
+    minval=minval(o),
+    maxval=maxval(o),
+    kwargs...
+)
 
 """
 Mixin for outputs that output images and can use an image processor.
@@ -18,13 +30,15 @@ Mixin for outputs that output images and can use an image processor.
     maxval::Ma   | 1
 end
 
+processor(o::Output) = Greyscale()
 processor(o::ImageOutput) = o.processor
+
+minval(o::Output) = 0
 minval(o::ImageOutput) = o.minval
+
+maxval(o::Output) = 1
 maxval(o::ImageOutput) = o.maxval
 
-processor(o::Output) = Greyscale()
-minval(o::Output) = 0
-maxval(o::Output) = 1
 
 
 # Allow construcing a frame with the ruleset passed in instead of SimData
@@ -33,7 +47,8 @@ showgrid(grid, o::ImageOutput, ruleset::AbstractRuleset, f, t) =
     showgrid(grid2image(o, ruleset, grid, f), o, f, t)
 
 """
-Default colorscheme. Better performance than using a Colorschemes.jl scheme.
+Default colorscheme. Better performance than using a Colorschemes.jl
+scheme as there is no interpolation.
 """
 struct Greyscale{M1,M2}
     min::M1
@@ -42,11 +57,6 @@ end
 Greyscale(; min=nothing, max=nothing) = Greyscale(min, max)
 
 Base.get(scheme::Greyscale, x) = scale(x, scheme.min, scheme.max)
-
-scale(x, ::Nothing, max) = x * max
-scale(x, min, ::Nothing) = x * (one(min) - min) + min
-scale(x, ::Nothing, ::Nothing) = x
-scale(x, min, max) = x * (max - min) + min
 
 "Alternate name for Greyscale()"
 const Grayscale = Greyscale
@@ -110,25 +120,21 @@ grid2image(p::ColorProcessor, minval, maxval,
         img[i] = if !(maskcolor(p) isa Nothing) && ismasked(mask(ruleset), i)
             maskcolor(p)
         else
-            x = if minval === nothing || maxval === nothing
-                grid[i]
-            else
-                normalise(grid[i], minval, maxval)
-            end
+            x = normalise(grid[i], minval, maxval)
             if !(zerocolor(p) isa Nothing) && x == zero(x)
                 zerocolor(p)
             else
-                rgb(scheme(p), x)
+                rgb24(scheme(p), x)
             end
         end
     end
     img
 end
 
-rgb(scheme, x) = RGB24(get(scheme, x))
-rgb(c::RGB24) = c
-rgb(c::Tuple) = RGB24(c...)
-rgb(c::Number) = RGB24(c)
+rgb24(scheme, x) = RGB24(get(scheme, x))
+rgb24(c::RGB24) = c
+rgb24(c::Tuple) = RGB24(c...)
+rgb24(c::Number) = RGB24(c)
 
 
 abstract type BandColor end
@@ -136,7 +142,6 @@ abstract type BandColor end
 struct Red <: BandColor end
 struct Green <: BandColor end
 struct Blue <: BandColor end
-
 
 """
     ThreeColorProcessor(; colors=(Red(), Green(), Blue()), zerocolor=nothing, maskcolor=nothing)
@@ -160,39 +165,29 @@ colors(processor::ThreeColorProcessor) = processor.colors
 zerocolor(processor::ThreeColorProcessor) = processor.zerocolor
 maskcolor(processor::ThreeColorProcessor) = processor.maskcolor
 
-grid2image(p::ThreeColorProcessor, minval::Tuple, maxval::Tuple, ruleset, grids::NamedTuple, t) = begin
+grid2image(p::ThreeColorProcessor, minval::Tuple, maxval::Tuple, ruleset,
+           grids::NamedTuple, t) = begin
     img = fill(RGB24(0), size(first(grids)))
     ncols = length(colors(p))
     ngrids = length(grids)
     if !(ngrids == ncols == length(minval) == length(maxval))
-        throw(ArgumentError("Number of grids ($ngrids), processor colors ($ncols), minval ($(length(minval)))
-                            and maxival ($(length(maxval))) must be the same"))
+        throw(ArgumentError("Number of grids ($ngrids), processor colors ($ncols), " *
+            "minval ($(length(minval))) and maxival ($(length(maxval))) must be the same"))
     end
     for i in CartesianIndices(first(grids))
         img[i] = if !(maskcolor(p) isa Nothing) && ismasked(mask(ruleset), i)
             maskcolor(p)
         else
-            xs = if minval === nothing || maxval === nothing
-                map(f -> f[i], values(grids))
-            else
-                map((f, mi, ma) -> normalise(f[i], mi, ma), values(grids), minval, maxval)
-            end
+            xs = map((f, mi, ma) -> normalise(f[i], mi, ma), values(grids), minval, maxval)
             if !(zerocolor(p) isa Nothing) && all(map(x -> x .== zero(x), xs))
                 zerocolor(p)
             else
-                acc = (0.0, 0.0, 0.0)
-                combine(colors(p), acc, xs)
+                combinebands(colors(p), xs)
             end
         end
     end
     img
 end
-
-combine(c::Tuple{Red,Vararg}, acc, xs) = combine(tail(c), (acc[1] + xs[1], acc[2], acc[3]), tail(xs))
-combine(c::Tuple{Green,Vararg}, acc, xs) = combine(tail(c), (acc[1], acc[2] + xs[1], acc[3]), tail(xs))
-combine(c::Tuple{Blue,Vararg}, acc, xs) = combine(tail(c), (acc[1], acc[2], acc[3] + xs[1]), tail(xs))
-combine(c::Tuple{Nothing,Vararg}, acc, xs) = combine(tail(c), acc, tail(xs))
-combine(c::Tuple{}, acc, xs) = RGB24(acc...)
 
 
 """
@@ -265,20 +260,42 @@ savegif(filename::String, o::Output, ruleset=Ruleset();
 end
 
 
-struct HasMinMax end
-struct NoMinMax end
 
-hasminmax(output::T) where T = (:minval in fieldnames(T)) ? HasMinMax() : NoMinMax()
+"""
+    combinebands(c::Tuple{Vararg{<:BandColor}, acc, xs)
 
-normalisegrid(output::Output, a) =
-    normalisegrid(hasminmax(output), output, a)
-normalisegrid(::HasMinMax, output, a::NamedTuple) =
-    map(normalisegrid, values(a), minval(output), maxval(output))
-normalisegrid(::HasMinMax, output, a::AbstractArray) =
-    normalisegrid(a, minval(output), maxval(output))
-normalisegrid(::NoMinMax, output, a) = a
-normalisegrid(a::AbstractArray, minval::Number, maxval::Number) = normalise.(a, minval, maxval)
-normalisegrid(a::AbstractArray, minval, maxval) = a
+Assign values to color bands given in any order, and output as RGB24.
+"""
+combinebands(colors, xs) = combinebands(colors, xs, (0.0, 0.0, 0.0))
+combinebands(c::Tuple{Red,Vararg}, xs, acc) =
+    combinebands(tail(c), tail(xs), (acc[1] + xs[1], acc[2], acc[3]))
+combinebands(c::Tuple{Green,Vararg}, xs, acc) =
+    combinebands(tail(c), tail(xs), (acc[1], acc[2] + xs[1], acc[3]))
+combinebands(c::Tuple{Blue,Vararg}, xs, acc) =
+    combinebands(tail(c), tail(xs), (acc[1], acc[2], acc[3] + xs[1]))
+combinebands(c::Tuple{Nothing,Vararg}, xs, acc) =
+    combinebands(tail(c), tail(xs), acc)
+combinebands(c::Tuple{}, xs, acc) = RGB24(acc...)
 
-normalise(x::Number, minval::Number, maxval::Number) =
-    min((x - minval) / (maxval - minval), oneunit(eltype(x)))
+"""
+    normalise(x, min, max)
+
+Set a value to be between zero and one.
+min and max of `nothing` are assumed to be 0 and 1.
+"""
+normalise(x, minval::Number, maxval::Number) =
+    min((x - minval) / (maxval - minval), oneunit(x))
+normalise(x, minval::Number, maxval::Nothing) = (x - minval) / (onunit(minval) - minval)
+normalise(x, minval::Nothing, maxval::Number) = min(x / maxval, oneunit(x))
+normalise(x, minval::Nothing, maxval::Nothing) = x
+
+"""
+    scale(x, min, max)
+
+Rescale a value between 0 and 1 to be between `min` and `max`.
+min and max of `nothing` are assumed to be 0 and 1.
+"""
+scale(x, min, max) = x * (max - min) + min
+scale(x, ::Nothing, max) = x * max
+scale(x, min, ::Nothing) = x * (oneunit(min) - min) + min
+scale(x, ::Nothing, ::Nothing) = x

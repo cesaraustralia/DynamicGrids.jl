@@ -43,7 +43,6 @@ Ruleset(rules::Vararg{<:Rule}; kwargs...) = Ruleset(; rules=rules, kwargs...)
 Ruleset(args...; kwargs...) = Ruleset(; rules=args, kwargs...)
 rules(rs::Ruleset) = rs.rules
 
-# Getters
 
 show(io::IO, ruleset::Ruleset) = begin
     printstyled(io, Base.nameof(typeof(ruleset)), " =\n"; color=:blue)
@@ -88,10 +87,3 @@ standardise_ruleset(ruleset, mask, overflow, cellsize, timestep) = begin
     @set! ruleset.timestep = timestep
     ruleset
 end
-
-
-
-# struct HasMinMax end
-# struct NoMinMax end
-
-# hasminmax(ruleset::T) where T = fieldtype(T, :minval) <: Number ? HasMinMax() : NoMinMax()
