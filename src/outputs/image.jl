@@ -131,10 +131,6 @@ grid2image(p::ColorProcessor, minval, maxval,
     img
 end
 
-rgb24(scheme, x) = RGB24(get(scheme, x))
-rgb24(c::RGB24) = c
-rgb24(c::Tuple) = RGB24(c...)
-rgb24(c::Number) = RGB24(c)
 
 
 abstract type BandColor end
@@ -259,7 +255,47 @@ savegif(filename::String, o::Output, ruleset=Ruleset();
     FileIO.save(filename, array; kwargs...)
 end
 
+# Color manipulation tools
 
+"""
+    normalise(x, min, max)
+
+Set a value to be between zero and one, before converting to Color.
+min and max of `nothing` are assumed to be 0 and 1.
+"""
+normalise(x, minval::Number, maxval::Number) =
+    min((x - minval) / (maxval - minval), oneunit(x))
+normalise(x, minval::Number, maxval::Nothing) = (x - minval) / (onunit(minval) - minval)
+normalise(x, minval::Nothing, maxval::Number) = min(x / maxval, oneunit(x))
+normalise(x, minval::Nothing, maxval::Nothing) = x
+
+"""
+    scale(x, min, max)
+
+Rescale a value between 0 and 1 to be between `min` and `max`.
+This can be used to shrink the range of a colorsheme that is displayed.
+min and max of `nothing` are assumed to be 0 and 1.
+"""
+scale(x, min, max) = x * (max - min) + min
+scale(x, ::Nothing, max) = x * max
+scale(x, min, ::Nothing) = x * (oneunit(min) - min) + min
+scale(x, ::Nothing, ::Nothing) = x
+
+"""
+    rgb24(val)
+
+Convert a number, tuple or color to an RGB24 value.
+"""
+rgb24(val::Number) = RGB24(val)
+rgb24(vals::Tuple) = RGB24(vals...)
+rgb24(val::Color) = RGB24(val)
+rgb24(val::RGB24) = val
+"""
+    rgb24(scheme, val)
+
+Convert a color scheme and value to an RGB24 value.
+"""
+rgb24(scheme, val) = RGB24(get(scheme, val))
 
 """
     combinebands(c::Tuple{Vararg{<:BandColor}, acc, xs)
@@ -276,26 +312,3 @@ combinebands(c::Tuple{Blue,Vararg}, xs, acc) =
 combinebands(c::Tuple{Nothing,Vararg}, xs, acc) =
     combinebands(tail(c), tail(xs), acc)
 combinebands(c::Tuple{}, xs, acc) = RGB24(acc...)
-
-"""
-    normalise(x, min, max)
-
-Set a value to be between zero and one.
-min and max of `nothing` are assumed to be 0 and 1.
-"""
-normalise(x, minval::Number, maxval::Number) =
-    min((x - minval) / (maxval - minval), oneunit(x))
-normalise(x, minval::Number, maxval::Nothing) = (x - minval) / (onunit(minval) - minval)
-normalise(x, minval::Nothing, maxval::Number) = min(x / maxval, oneunit(x))
-normalise(x, minval::Nothing, maxval::Nothing) = x
-
-"""
-    scale(x, min, max)
-
-Rescale a value between 0 and 1 to be between `min` and `max`.
-min and max of `nothing` are assumed to be 0 and 1.
-"""
-scale(x, min, max) = x * (max - min) + min
-scale(x, ::Nothing, max) = x * max
-scale(x, min, ::Nothing) = x * (oneunit(min) - min) + min
-scale(x, ::Nothing, ::Nothing) = x
