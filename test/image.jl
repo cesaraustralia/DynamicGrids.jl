@@ -1,5 +1,5 @@
 using DynamicGrids, Test, Colors, ColorSchemes, FieldDefaults
-using DynamicGrids: normalisegrid, grid2image, @Image, @Graphic, @Output
+using DynamicGrids: grid2image, @Image, @Graphic, @Output, minval, maxval, normalise
 using ColorSchemes: leonardo
 
 init = [8.0 10.0;
@@ -13,7 +13,7 @@ output = TestImageOutput(init, minval=0.0, maxval=10.0)
 ruleset = Ruleset(Life())
 
 # Test level normalisation
-normed = normalisegrid(output, output[1])
+normed = normalise.(output[1], minval(output), maxval(output))
 @test normed == [0.8 1.0
                  0.0 0.5]
 

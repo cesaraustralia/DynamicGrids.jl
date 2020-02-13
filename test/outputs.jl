@@ -1,5 +1,5 @@
 using DynamicGrids, Test
-using DynamicGrids: isshowable, allocategrids!, gridindex, storegrid!, SimData
+using DynamicGrids: isshowable, allocategrids!, frameindex, storegrid!, SimData
 
 init = [10.0 11.0;
         0.0   5.0]
@@ -7,7 +7,7 @@ init = [10.0 11.0;
 output = ArrayOutput(init)
 ruleset = Ruleset(Life())
 
-@test gridindex(output, 5) == 5 
+@test frameindex(output, 5) == 5 
 @test isshowable(output, 5) == false
 
 # Test pushing new frames to an output

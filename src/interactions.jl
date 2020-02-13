@@ -3,22 +3,32 @@ Rules that involved the interaction between two grids
 
 Applied using [`applyinteraction](@ref) and [`applyinteraction!](@ref).
 """
-abstract type Interaction{Keys} <: Rule end
+abstract type Interaction{Writekeys,Readkeys} <: Rule end
 
-Base.keys(::Interaction{Keys}) where Keys = Keys
+@generated Base.keys(rule::Interaction{W,R}) where {W,R} =
+    Expr(:tuple, QuoteNode.(union(_asiterable(W), _asiterable(R)))...)
+writekeys(::Interaction{W,R}) where {W,R} = W
+@generated writekeys(::Interaction{W,R}) where {W<:Tuple,R} =
+    Expr(:tuple, QuoteNode.(W.parameters)...)
+readkeys(::Interaction{W,R}) where {W,R} = R
+@generated readkeys(::Interaction{W,R}) where {W,R<:Tuple} =
+    Expr(:tuple, QuoteNode.(R.parameters)...)
+
+_asiterable(x::Symbol) = (x,)
+_asiterable(x::Type{<:Tuple}) = x.parameters
 
 # Default constructor for just the Keys type param where all args have type parameters
-(::Type{T})(args...) where T<:Interaction{Keys} where Keys =
+(::Type{T})(args...) where T<:Interaction{W,R} where {W,R} =
     T{typeof.(args)...}(args...)
 
 # Define the constructor for generic rule reconstruction in Flatten.jl and Setfield.jl
-ConstructionBase.constructorof(::Type{T}) where T<:Interaction{Keys} where Keys =
-    T{Keys}
+ConstructionBase.constructorof(::Type{T}) where T<:Interaction{W,R} where {W,R} =
+    T{W,R}
 
-show(io::IO, rule::I) where I <: Interaction = begin
+show(io::IO, rule::I) where I <: Interaction{W,R} where {W,R} = begin
     indent = get(io, :indent, "")
     printstyled(io, indent, Base.nameof(typeof(rule)); color=:red)
-    printstyled(io, indent, string("{", keys(rule), "}"); color=:red)
+    printstyled(io, indent, string("{", W, ",", R, "}"); color=:red)
     if nfields(rule) > 0
         printstyled(io, " :\n"; color=:red)
         for fn in fieldnames(I)
@@ -36,25 +46,25 @@ end
 """
 Cell by cell interaction, analogous to [`CellRule`](@ref).
 """
-abstract type CellInteraction{Keys} <: Interaction{Keys} end
+abstract type CellInteraction{W,R} <: Interaction{W,R} end
 
 """
 Rules that conditionally apply to particular cells, but may not write
 to every cell in the grid. Analogous to [`PartialRule`](@ref).
 """
-abstract type PartialInteraction{Keys} <: Interaction{Keys} end
+abstract type PartialInteraction{W,R} <: Interaction{W,R} end
 
 """
 Interactions that use a neighborhood and write to the current cell,
 analagous to [`NeighborhoodRule`](@ref).
 """
-abstract type NeighborhoodInteraction{Keys} <: Interaction{Keys} end
+abstract type NeighborhoodInteraction{W,R} <: Interaction{W,R} end
 
 neighborhood(interaction::NeighborhoodInteraction) = interaction.neighborhood
 
 """
 Interactions that write to a neighborhood, analogous to [`PartialNeighborhoodRule`](@ref).
 """
-abstract type PartialNeighborhoodInteraction{Keys} <: PartialInteraction{Keys} end
+abstract type PartialNeighborhoodInteraction{W,R} <: PartialInteraction{W,R} end
 
 neighborhood(interaction::PartialInteraction) = interaction.neighborhood

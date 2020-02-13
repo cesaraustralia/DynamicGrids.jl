@@ -51,6 +51,6 @@ ruletypes(ts::Type{<:Tuple}) = (ruletypes.(ts.parameters)...,)
 """
 Check if a cell is masked, using the passed-in mask grid.
 """
-@inline ismasked(data::AbstractSimData, i...) = ismasked(mask(data), i...)
-@inline ismasked(mask::Nothing, i...) = false
-@inline ismasked(mask::AbstractArray, i...) = @inbounds return !mask[i...]
+@inline ismasked(data::AbstractSimData, I...) = ismasked(mask(data), I...)
+@inline ismasked(mask::Nothing, I...) = false
+@inline ismasked(mask::AbstractArray, I...) = @inbounds return !(mask[I...])

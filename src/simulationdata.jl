@@ -203,16 +203,26 @@ addpadding(init::AbstractArray{T,N}, r) where {T,N} = begin
     source .= zero(eltype(source))
     # Copy the init array to he middle section of the source array
     for j in 1:size(init, 2), i in 1:size(init, 1)
-        source[i, j] = init[i, j]
+        @inbounds source[i, j] = init[i, j]
     end
     source
 end
 
 """
+Copy status from one array to another, allowing
+for doing nothing if they are not both arrays.
+"""
+copystatus!(copyto, copyfrom) = nothing
+copystatus!(copyto::AbstractArray, copyfrom::AbstractArray) =
+    @inbounds copyto .= copyfrom
+
+"""
 Initialise the block status array.
 This tracks whether anything has to be done in an area of the main array.
 """
-updatestatus!(data) = updatestatus!(parent(source(data)), sourcestatus(data), deststatus(data), radius(data))
+updatestatus!(data::Tuple) = map(updatestatus!, data) 
+updatestatus!(data::AbstractSimData) = 
+    updatestatus!(parent(source(data)), sourcestatus(data), deststatus(data), radius(data))
 updatestatus!(source, sourcestatus::Bool, deststatus::Bool, r) = nothing
 updatestatus!(source, sourcestatus, deststatus, r) = begin
     blocksize = 2r
@@ -227,6 +237,11 @@ updatestatus!(source, sourcestatus, deststatus, r) = begin
     end
 end
 
+copystatus!(data::Tuple{Vararg{<:AbstractSimData}}) = map(copystatus!, data)
+copystatus!(data::AbstractSimData) =
+    copystatus!(sourcestatus(data), deststatus(data))
+copystatus!(srcstatus::AbstractArray, deststatus::AbstractArray) = srcstatus .= deststatus
+copystatus!(srcstatus, deststatus) = nothing
 
 """
 When no simdata is passed in, the existing SimData arrays are re-initialised

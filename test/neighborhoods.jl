@@ -58,19 +58,19 @@ struct TestPartialNeighborhoodRule{N} <: PartialNeighborhoodRule
     neighborhood::N
 end
 
-struct TestNeighborhoodInteraction{Keys,N} <: NeighborhoodInteraction{Keys}
+struct TestNeighborhoodInteraction{W,R,N} <: NeighborhoodInteraction{W,R}
     neighborhood::N
 end
 
-struct TestPartialNeighborhoodInteraction{Keys,N} <: PartialNeighborhoodInteraction{Keys}
+struct TestPartialNeighborhoodInteraction{W,R,N} <: PartialNeighborhoodInteraction{W,R}
     neighborhood::N
 end
 
 @testset "radius" begin
     rulesetA = Ruleset(TestNeighborhoodRule(RadialNeighborhood{1}()))
     rulesetB = Ruleset(TestPartialNeighborhoodRule(RadialNeighborhood{5}()))
-    interactionA = TestPartialNeighborhoodInteraction{(:a,),RadialNeighborhood{3}}(RadialNeighborhood{3}())
-    interactionB = TestPartialNeighborhoodInteraction{(:b,),RadialNeighborhood{2}}(RadialNeighborhood{2}())
+    interactionA = TestNeighborhoodInteraction{:a,:a,RadialNeighborhood{3}}(RadialNeighborhood{3}())
+    interactionB = TestPartialNeighborhoodInteraction{Tuple{:b},Tuple{:b},RadialNeighborhood{2}}(RadialNeighborhood{2}())
     multiruleset = MultiRuleset(
         rulesets = (a = rulesetA, b=rulesetB),
         interactions = (interactionA, interactionB)

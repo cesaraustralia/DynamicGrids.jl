@@ -64,32 +64,28 @@ showgrid(o::Output, args...) = nothing
 
 
 # Grid strorage and updating
-gridindex(o::Output, data::AbstractSimData) = gridindex(o, currentframe(data))
+frameindex(o::Output, data::AbstractSimData) = frameindex(o, currentframe(data))
 # Every frame is frame 1 if the simulation isn't stored
-gridindex(o::Output, f) = isstored(o) ? f : oneunit(f)
+frameindex(o::Output, f) = isstored(o) ? f : oneunit(f)
 
 zerogrids(init::AbstractArray, nframes) = [zero(init) for f in 1:nframes]
 zerogrids(init::NamedTuple, nframes) =
     [map(layer -> zero(layer), init) for f in 1:nframes]
 
 
-@inline celldo!(data::SimData, frame::AbstractArray, index, f) =
-    return @inbounds frame[index...] = data[index...]
+@inline celldo!(data::SimData, ouputgrid::AbstractArray, index, f) =
+    return @inbounds ouputgrid[index...] = data[index...]
 
-storegrid!(output, data) = storegrid!(output, data, gridindex(output, data))
-storegrid!(output, data::SimData, f) = begin
+storegrid!(output::Output, data) = storegrid!(output, data, frameindex(output, data))
+storegrid!(output::Output, data::SimData, f) = begin
     checkbounds(output, f)
     blockrun!(data, output[f], f)
 end
-storegrid!(output, multidata::MultiSimData, f) = begin
+storegrid!(output::Output, multidata::MultiSimData, f) = begin
     checkbounds(output, f)
-    for key in keys(multidata)
-        # TODO use blocks for MutiSimData?
-        # blockrun!(data(multidata)[key], output[f][key], f)
-        source = data(multidata)[key]
-        target = output[f][key]
-        for i in CartesianIndices(output[f][key])
-            target[i] = source[i]
+    map(values(output[f]), values(data(multidata))) do outputgrid, data
+        for i in CartesianIndices(outputgrid)
+            outputgrid[i] = data[i]
         end
     end
 end

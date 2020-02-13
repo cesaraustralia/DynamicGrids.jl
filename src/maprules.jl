@@ -78,7 +78,7 @@ maprule!(data::AbstractSimData, rule::PartialRule) = begin
     @inbounds parent(dest(data)) .= parent(source(data))
     # Run the rule for active blocks
     blockrun!(data, rule)
-    updatestatus!(sourcestatus(data), deststatus(data))
+    copystatus!(data)
 end
 
 @inline celldo!(data::WritableSimData, rule::PartialRule, I) = begin
@@ -248,7 +248,7 @@ maprule!(data::SingleSimData{T,2}, rule::Union{NeighborhoodRule,Chain{<:Tuple{Ne
             end
         end
     end
-    updatestatus!(sourcestatus(data), deststatus(data))
+    copystatus!(data)
 end
 
 """
@@ -304,7 +304,3 @@ handleoverflow!(data, overflow::RemoveOverflow, r) = nothing
 
 combinestatus(x::Number, y::Number) = x + y
 combinestatus(x::Integer, y::Integer) = x | y
-
-updatestatus!(copyto, copyfrom) = nothing
-updatestatus!(copyto::AbstractArray, copyfrom::AbstractArray) =
-    @inbounds copyto .= copyfrom
