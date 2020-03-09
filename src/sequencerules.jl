@@ -18,12 +18,12 @@ at each step.
 Returns the simdata object with source and dest arrays ready for the next rule 
 in the sequence, or the next timestep.
 """
-sequenceinteractions!(simdata::AbstractSimData) = 
-    sequenceinteractions!(simdata, rules(simdata))
-sequenceinteractions!(simdata::AbstractSimData, rules::Tuple) = begin
-    # Run the first interaction
+sequencerules!(simdata::AbstractSimData) = 
+    sequencerules!(simdata, rules(simdata))
+sequencerules!(simdata::AbstractSimData, rules::Tuple) = begin
+    # Run the first rules
     simdata = maprule!(simdata, rules[1])
-    # Run the rest of the interactions recursively
-    sequenceinteractions!(simdata, tail(rules))
+    # Run the rest of the rules recursively
+    sequencerules!(simdata, tail(rules))
 end
-sequenceinteractions!(simdata::AbstractSimData, rules::Tuple{}) = simdata
+sequencerules!(simdata::AbstractSimData, rules::Tuple{}) = simdata

@@ -2,16 +2,20 @@ using DynamicGrids, FieldDefaults, FieldMetadata, Test
 import DynamicGrids: applyrule, applyrule!, applyrule, 
                      Rule, readkeys, writekeys, @Image, @Graphic, @Output
 
-struct Double{W,R} <: CellRule{W,R} end
+struct Double{R,W} <: CellRule{R,W} end
 applyrule(rule::Double, data, state, index) = state * 2
 
-struct Predation{W,R} <: CellRule{W,R} end
-Predation(; prey=:prey, predator=:predator) = Predation{Tuple{prey,predator},Tuple{predator,prey}}()
+struct Predation{R,W} <: CellRule{R,W} end
+Predation(; prey=:prey, predator=:predator) = 
+    Predation{Tuple{predator,prey},Tuple{prey,predator}}()
 applyrule(::Predation, data, (predators, prey), index) = begin
     caught = prey * 0.02 * predators
     conversion = 0.2
     mortality = 0.1
-    max(prey - caught, zero(prey)), predators + caught * 0.1 - predators * mortality
+    prey = max(prey - caught, zero(prey)) 
+    predators = predators + caught * 0.1 - predators * mortality
+    # Output is flipped from input to test that can work
+    prey, predators
 end
 
 preyarray = rand(300, 300) .* 20

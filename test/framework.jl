@@ -1,7 +1,7 @@
 using DynamicGrids, Test, Setfield
 import DynamicGrids: applyrule, applyrule!, maprule!, 
        SimData, source, dest, currenttime, 
-       Read, Write, getdata, combinedata, interactionloop
+       Read, Write, getdata, combinedata, ruleloop
 
 init  = [0 1 1 0;
          0 1 1 0;
@@ -9,7 +9,7 @@ init  = [0 1 1 0;
          0 1 1 0;
          0 1 1 0]
 
-struct TestRule{W,R} <: Rule{W,R} end
+struct TestRule{R,W} <: Rule{R,W} end
 applyrule(::TestRule, data, state, index) = 0
 
 @testset "a rule that returns zero gives zero outputs" begin
@@ -27,13 +27,13 @@ applyrule(::TestRule, data, state, index) = 0
     rkeys, rdata = getdata(Read(), rule, simdata)
     wkeys, wdata = getdata(Write(), rule, simdata)
     newsimdata = @set simdata.data = combinedata(wkeys, wdata, rkeys, rdata)
-    @inferred interactionloop(rule, newsimdata, rkeys, rdata, wkeys, wdata)
+    @inferred ruleloop(rule, newsimdata, rkeys, rdata, wkeys, wdata)
     
     resultdata = maprule!(simdata, rule)
     @test source(resultdata[:test]) == final
 end
 
-struct TestPartial{W,R} <: PartialRule{W,R} end
+struct TestPartial{R,W} <: PartialRule{R,W} end
 applyrule!(::TestPartial, data, state, index) = 0
 
 @testset "a partial rule that returns zero does nothing" begin
@@ -44,13 +44,13 @@ applyrule!(::TestPartial, data, state, index) = 0
     rkeys, rdata = getdata(Read(), rule, simdata)
     wkeys, wdata = getdata(Write(), rule, simdata)
     newsimdata = @set simdata.data = combinedata(wkeys, wdata, rkeys, rdata)
-    @inferred interactionloop(rule, newsimdata, rkeys, rdata, wkeys, wdata)
+    @inferred ruleloop(rule, newsimdata, rkeys, rdata, wkeys, wdata)
 
     resultdata = maprule!(simdata, rule)
     @test source(first(resultdata)) == init
 end
 
-struct TestPartialWrite{W,R} <: PartialRule{W,R} end
+struct TestPartialWrite{R,W} <: PartialRule{R,W} end
 applyrule!(::TestPartialWrite, data, state, index) = data[:test][index[1], 2] = 0
 
 @testset "a partial rule that writes to dest affects output" begin
@@ -67,10 +67,10 @@ applyrule!(::TestPartialWrite, data, state, index) = data[:test][index[1], 2] = 
     @test source(first(resultdata)) == final
 end
 
-struct TestCellTriple{W,R} <: CellRule{W,R} end
+struct TestCellTriple{R,W} <: CellRule{R,W} end
 applyrule(::TestCellTriple, data, state, index) = 3state
 
-struct TestCellSquare{W,R} <: CellRule{W,R} end
+struct TestCellSquare{R,W} <: CellRule{R,W} end
 applyrule(::TestCellSquare, data, (state,), index) = state^2
 
 @testset "a chained cell rull" begin
@@ -87,7 +87,7 @@ applyrule(::TestCellSquare, data, (state,), index) = state^2
     @test source(first(resultdata)) == final
 end
 
-struct PrecalcRule{W,R,P} <: Rule{W,R}
+struct PrecalcRule{R,W,P} <: Rule{R,W}
     precalc::P
 end
 DynamicGrids.precalcrules(rule::PrecalcRule, data) = 

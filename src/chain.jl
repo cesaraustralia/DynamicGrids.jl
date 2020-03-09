@@ -3,7 +3,7 @@ Chains allow chaining rules together to be completed in a single processing step
 without intermediate writes, and potentially compiled together into a single function call.
 These can either be all CellRule or NeighborhoodRule followed by CellRule.
 """
-struct Chain{W,R,T<:Union{Tuple{},Tuple{<:Union{NeighborhoodRule,CellRule},Vararg{<:CellRule}}}} <: Rule{W,R}
+struct Chain{R,W,T<:Union{Tuple{},Tuple{<:Union{NeighborhoodRule,CellRule},Vararg{<:CellRule}}}} <: Rule{R,W}
     val::T
 end
 Chain(args...) = begin
@@ -24,8 +24,8 @@ Base.show(io::IO, chain::Chain) = begin
         print(IOContext(io, :indent => indent * "    "), rule)
     end
 end
-Base.tail(chain::Chain{W,R}) where {W,R} = 
-    (ch = tail(val(chain)); Chain{W,R,typeof(ch)}(ch))
+Base.tail(chain::Chain{R,W}) where {R,W} = 
+    (ch = tail(val(chain)); Chain{R,W,typeof(ch)}(ch))
 Base.tail(chain::Chain{Tuple{}}) = Chain(())
 Base.getindex(chain::Chain, I...) = getindex(val(chain), I...)
 Base.size(chain::Chain) = size(val(chain))
@@ -51,8 +51,8 @@ end
     state = updatestate(chain, write, state)
     applyrule(tail(chain), data, state, index)
 end
-@inline applyrule(rules::Chain{W,R,Tuple{}}, data, state::NamedTuple, index
-                        ) where {W,R} = state
+@inline applyrule(rules::Chain{R,W,Tuple{}}, data, state::NamedTuple, index
+                        ) where {R,W} = state
 
 readstate(chain::Chain, state::NamedTuple) = begin
     keys = readkeys(chain[1])

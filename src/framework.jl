@@ -94,7 +94,7 @@ simloop!(output, simdata, fspan) = begin
         # Get a data object with updated timestep and precalculated rules
         simdata = updatetime(simdata, f) |> precalcrules
         # Run the ruleset and setup data for the next iteration
-        simdata = sequenceinteractions!(simdata)
+        simdata = sequencerules!(simdata)
         # Save/do something with the the current grid
         storegrid!(output, simdata)
         isasync(output) && yield()

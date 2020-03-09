@@ -52,11 +52,11 @@ import DynamicGrids: neighbors, sumneighbors, SimData, radius
     @test sumneighbors(layered, buf, state) == sum.(neighbors(layered, buf)) == (1, 2)
 end
 
-struct TestNeighborhoodRule{W,R,K,N} <: NeighborhoodRule{W,R,K}
+struct TestNeighborhoodRule{R,W,K,N} <: NeighborhoodRule{R,W,K}
     neighborhood::N
 end
 
-struct TestPartialNeighborhoodRule{W,R,N} <: PartialNeighborhoodRule{W,R}
+struct TestPartialNeighborhoodRule{R,W,N} <: PartialNeighborhoodRule{R,W}
     neighborhood::N
 end
 

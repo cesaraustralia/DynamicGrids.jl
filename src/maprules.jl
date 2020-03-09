@@ -20,7 +20,7 @@ maprule!(simdata::SimData, rule::PartialRule) = begin
 
     rkeys, rdata = getdata(Read(), rule, simdata)
     wkeys, wdata = getdata(Write(), rule, simdata)
-    newsimdata = @set simdata.data = combinedata(wkeys, wdata, rkeys, rdata)
+    newsimdata = @set simdata.data = combinedata(rkeys, rdata, wkeys, wdata)
     ruleloop(rule, newsimdata, rkeys, rdata, wkeys, wdata)
     copystatus!(wdata)
     swapsource(simdata)
@@ -75,14 +75,14 @@ getdata(::Read, key::Val{K}, simdata) where K =
     key, simdata[K]
 
 
-@inline combinedata(wkey, wdata, rkey, rdata) =
-    combinedata((wkey,), (wdata,), (rkey,), (rdata,))
-@inline combinedata(wkey, wdata, rkeys::Tuple, rdata::Tuple) =
-    combinedata((wkey,), (wdata,), rkeys, rdata)
-@inline combinedata(wkeys::Tuple, wdata::Tuple, rkey, rdata) =
-    combinedata(wkeys, wdata, (rkey,), (rdata,))
-@generated combinedata(wkeys::Tuple{Vararg{<:Val}}, wdata::Tuple,
-                    rkeys::Tuple{Vararg{<:Val}}, rdata::Tuple) = begin
+@inline combinedata(rkey, rdata, wkey, wdata) =
+    combinedata((rkey,), (rdata,), (wkey,), (wdata,))
+@inline combinedata(rkeys::Tuple, rdata::Tuple, wkey, wdata) =
+    combinedata((rkey,), (rdata,), wkeys, wdata)
+@inline combinedata(rkeys::Tuple, rdata::Tuple, wkey, wdata) =
+    combinedata(rkeys, rdata, (wkey,), (wdata,))
+@generated combinedata(rkeys::Tuple{Vararg{<:Val}}, rdata::Tuple,
+                    wkeys::Tuple{Vararg{<:Val}}, wdata::Tuple) = begin
     wkeys = _vals2syms(wkeys)
     keysexp = Expr(:tuple, QuoteNode.(wkeys)...)
     dataexp = Expr(:tuple, :(wdata...))

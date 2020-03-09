@@ -72,7 +72,6 @@ const FIELDDOCTABLE = FieldDocTable((:Description, :Default, :Limits),
     """
 
 include("rules.jl")
-include("interactions.jl")
 include("chain.jl")
 include("rulesets.jl")
 include("simulationdata.jl")

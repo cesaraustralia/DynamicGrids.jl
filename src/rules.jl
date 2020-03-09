@@ -10,7 +10,7 @@ cell in the grid.
 
 Rules are applied to the grid using the [`applyrule`](@ref) method.
 """
-abstract type Rule{Writekeys,Readkeys} end
+abstract type Rule{R,W} end
 
 show(io::IO, rule::R) where R <: Rule = begin
     indent = get(io, :indent, "")
@@ -28,29 +28,29 @@ show(io::IO, rule::R) where R <: Rule = begin
     end
 end
 
-@generated Base.keys(rule::Rule{W,R}) where {W,R} =
+@generated Base.keys(rule::Rule{R,W}) where {R,W} =
     Expr(:tuple, QuoteNode.(union(_asiterable(W), _asiterable(R)))...)
     
-writekeys(::Rule{W,R}) where {W,R} = W
-@generated writekeys(::Rule{W,R}) where {W<:Tuple,R} =
+writekeys(::Rule{R,W}) where {R,W} = W
+@generated writekeys(::Rule{R,W}) where {R,W<:Tuple} =
     Expr(:tuple, QuoteNode.(W.parameters)...)
 
-readkeys(::Rule{W,R}) where {W,R} = R
-@generated readkeys(::Rule{W,R}) where {W,R<:Tuple} =
+readkeys(::Rule{R,W}) where {R,W} = R
+@generated readkeys(::Rule{R,W}) where {R<:Tuple,W} =
     Expr(:tuple, QuoteNode.(R.parameters)...)
 
 _asiterable(x::Symbol) = (x,)
 _asiterable(x::Type{<:Tuple}) = x.parameters
 
 # Default constructor for just the Keys type param where all args have type parameters
-(::Type{T})(args...) where T<:Rule{W,R} where {W,R} =
+(::Type{T})(args...) where T<:Rule{R,W} where {R,W} =
     T{typeof.(args)...}(args...)
 
 # Define the constructor for generic rule reconstruction in Flatten.jl and Setfield.jl
-ConstructionBase.constructorof(::Type{T}) where T<:Rule{W,R} where {W,R} =
-    T{W,R}
+ConstructionBase.constructorof(::Type{T}) where T<:Rule{R,W} where {R,W} =
+    T{R,W}
 
-show(io::IO, rule::I) where I <: Rule{W,R} where {W,R} = begin
+show(io::IO, rule::I) where I <: Rule{R,W} where {R,W} = begin
     indent = get(io, :indent, "")
     printstyled(io, indent, Base.nameof(typeof(rule)); color=:red)
     printstyled(io, indent, string("{", W, ",", R, "}"); color=:red)
@@ -76,7 +76,7 @@ such as wrapping rules in [`Chain`](@ref) so that no writes occur between rules.
 Accessing `source(data)` and `dest(data)` arrays directly from CellRule
 is not guaranteed to have correct results, and should not be done.
 """
-abstract type CellRule{W,R} <: Rule{W,R} end
+abstract type CellRule{R,W} <: Rule{R,W} end
 
 """
 PartialRule is for rules that manually write to whichever cells of the grid
@@ -85,7 +85,7 @@ that they choose, instead of automatically updating every cell with their output
 Updates to the destination grids data must be performed manually by 
 `data[:key] = x`. Updating block status is handled automatically on write.
 """
-abstract type PartialRule{W,R} <: Rule{W,R} end
+abstract type PartialRule{R,W} <: Rule{R,W} end
 
 """
 A Rule that only accesses a neighborhood centered around the current cell.
@@ -108,10 +108,10 @@ any neigborhood type - Custom shapes as well as square radial neighborhoods.
 `NeighborhoodRule` should read only from the state variable and the neighborhood
 buffer array. The return value is written to the central cell for the next grid frame.
 """
-abstract type NeighborhoodRule{W,R,N} <: Rule{W,R} end
+abstract type NeighborhoodRule{R,W,N} <: Rule{R,W} end
 
 neighborhood(rule::NeighborhoodRule) = rule.neighborhood
-neighborhoodkey(rule::NeighborhoodRule{W,R,N}) where {W,R,N} = N
+neighborhoodkey(rule::NeighborhoodRule{R,W,N}) where {R,W,N} = N
 
 
 """
@@ -124,7 +124,7 @@ by default this will be called on the result of `neighborhood(rule)`.
 TODO: performance optimisations with a neighborhood buffer, 
 simular to [`NeighborhoodRule`](@ref) but for writing.
 """
-abstract type PartialNeighborhoodRule{W,R} <: PartialRule{W,R} end
+abstract type PartialNeighborhoodRule{R,W} <: PartialRule{R,W} end
 
 neighborhood(rule::PartialRule) = rule.neighborhood
 
@@ -136,7 +136,7 @@ A [`CellRule`](@ref) that applies a function `f` to the
 ## Example
 
 """
-@description @flattenable struct Map{W,R,F} <: Rule{W,R}
+@description @flattenable struct Map{R,W,F} <: Rule{R,W}
     # Field | Flatten | Description
     f::F    | false   | "Function to apply to the target values"
 end
@@ -145,10 +145,10 @@ end
 
     Map function f with cell values from read grid(s), write grid(s)
 """
-Map{W,R}(f::F) where {W,R,F} = Map{W,R,F}(f)
+Map{R,W}(f::F) where {R,W,F} = Map{R,W,F}(f)
 Map(f; write, read) = Map{write,read}(f)
 
-@generated applyrule!(rule::Map{W,R}, data, read, index) where {W,R} =
+@generated applyrule!(rule::Map{R,W}, data, read, index) where {R,W} =
     if R <: Tuple
         :(rule.f(read...))
     else

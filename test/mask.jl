@@ -8,7 +8,7 @@ mask = Bool[0 1 0;
             0 1 1;
             1 1 0]
 
-struct DoNothingRule{W,R} <: Rule{W,R} end
+struct DoNothingRule{R,W} <: Rule{R,W} end
 DynamicGrids.applyrule(::DoNothingRule, data, state, args...) = state
 
 rules = Ruleset(DoNothingRule{:_default_,:_default_}(); init=init, mask=mask)
