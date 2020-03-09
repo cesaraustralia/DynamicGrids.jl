@@ -69,18 +69,8 @@ CellRule
 NeighborhoodRule
 PartialRule
 PartialNeighborhoodRule
-Life
 Chain
-```
-
-`Interaction` rules specify interactions between multiple dynamic grids.
-
-```@docs
-Interaction
-NeighborhoodInteraction
-CellInteraction
-PartialInteraction
-PartialNeighborhoodInteraction
+Life
 ```
 
 ## Neighborhoods

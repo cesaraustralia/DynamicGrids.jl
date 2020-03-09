@@ -1,5 +1,5 @@
 using DynamicGrids, Test
-import DynamicGrids: sumneighbors, SimData, radius
+import DynamicGrids: neighbors, sumneighbors, SimData, radius
 
 @testset "sumneighbors" begin
     init = [0 0 0 1 1 1;
@@ -17,21 +17,22 @@ import DynamicGrids: sumneighbors, SimData, radius
            0 1 0
            0 0 0]
     state = buf[2, 2]
-    @test sumneighbors(moore, buf, state) == 0
+    @test sumneighbors(moore, buf, state) == sum(neighbors(moore, buf)) == 0
     @test sumneighbors(vonneumann, buf, state) == 0
 
     buf = [1 1 1
            1 0 1
            1 1 1]
     state = buf[2, 2]
-    @test sumneighbors(moore, buf, state) == 8
+    collect(neighbors(moore, buf))
+    @test sumneighbors(moore, buf, state) == sum(neighbors(moore, buf)) == 8
     @test sumneighbors(vonneumann, buf, state) == 4
 
     buf = [1 1 1
            0 0 1
            0 0 1]
     state = buf[2, 2]
-    @test sumneighbors(moore, buf, state) == 5
+    @test sumneighbors(moore, buf, state) == sum(neighbors(moore, buf)) == 5
     @test sumneighbors(vonneumann, buf, state) == 2
 
 
@@ -43,43 +44,29 @@ import DynamicGrids: sumneighbors, SimData, radius
     state = buf[3, 3]
     custom1 = CustomNeighborhood(((-1,-1), (2,-2), (2,2), (-1,2), (0,0)))
     custom2 = CustomNeighborhood(((-1,-1), (0,-1), (1,-1), (2,-1), (0,0)))
-    layered = LayeredCustomNeighborhood((CustomNeighborhood((-1,1), (-2,2)), CustomNeighborhood((1,2), (2,2))))
+    layered = LayeredCustomNeighborhood((CustomNeighborhood((-1,1), (-2,2)), 
+                                         CustomNeighborhood((1,2), (2,2))))
 
-    @test sumneighbors(custom1, buf, state) == 2
-    @test sumneighbors(custom2, buf, state) == 0
-    @test sumneighbors(layered, buf, state) == (1, 2)
+    @test sumneighbors(custom1, buf, state) == sum(neighbors(custom1, buf)) == 2
+    @test sumneighbors(custom2, buf, state) == sum(neighbors(custom2, buf)) == 0
+    @test sumneighbors(layered, buf, state) == sum.(neighbors(layered, buf)) == (1, 2)
 end
 
-struct TestNeighborhoodRule{N} <: NeighborhoodRule
+struct TestNeighborhoodRule{W,R,K,N} <: NeighborhoodRule{W,R,K}
     neighborhood::N
 end
 
-struct TestPartialNeighborhoodRule{N} <: PartialNeighborhoodRule
-    neighborhood::N
-end
-
-struct TestNeighborhoodInteraction{W,R,N} <: NeighborhoodInteraction{W,R}
-    neighborhood::N
-end
-
-struct TestPartialNeighborhoodInteraction{W,R,N} <: PartialNeighborhoodInteraction{W,R}
+struct TestPartialNeighborhoodRule{W,R,N} <: PartialNeighborhoodRule{W,R}
     neighborhood::N
 end
 
 @testset "radius" begin
-    rulesetA = Ruleset(TestNeighborhoodRule(RadialNeighborhood{1}()))
-    rulesetB = Ruleset(TestPartialNeighborhoodRule(RadialNeighborhood{5}()))
-    interactionA = TestNeighborhoodInteraction{:a,:a,RadialNeighborhood{3}}(RadialNeighborhood{3}())
-    interactionB = TestPartialNeighborhoodInteraction{Tuple{:b},Tuple{:b},RadialNeighborhood{2}}(RadialNeighborhood{2}())
-    multiruleset = MultiRuleset(
-        rulesets = (a = rulesetA, b=rulesetB),
-        interactions = (interactionA, interactionB)
-    )
-    @test DynamicGrids.radius(rulesetA) == 1
-    @test DynamicGrids.radius(rulesetB) == 5
-    @test DynamicGrids.radius(interactionA) == 3
-    @test DynamicGrids.radius(interactionB) == 2
-    @testset "multiruleset returns max radii of grid rules and all interactions" begin
-        @test DynamicGrids.radius(multiruleset) == (a=3, b=5)
+    ruleA = TestNeighborhoodRule{:a,:a,RadialNeighborhood{3}}(RadialNeighborhood{3}())
+    ruleB = TestPartialNeighborhoodRule{Tuple{:b},Tuple{:b},RadialNeighborhood{2}}(RadialNeighborhood{2}())
+    ruleset = Ruleset(ruleA, ruleB)
+    @test DynamicGrids.radius(ruleA) == 3
+    @test DynamicGrids.radius(ruleB) == 2
+    @testset "ruleset returns max radii of all rule" begin
+        @test DynamicGrids.radius(ruleset) == (a=3, b=2)
     end
 end

@@ -1,13 +1,106 @@
+struct Read end
+struct Write end
 
-"""
-    blockrun(data, context, args...)
+maprule!(simdata::SimData, rule::Rule) = begin
+    rkeys, rdata = getdata(Read(), rule, simdata)
+    wkeys, wdata = getdata(Write(), rule, simdata)
+    simdata = @set simdata.data =
+        combinedata(wkeys, wdata, rkeys, rdata)
 
-Runs simulations over the block grid. Inactive blocks do not run.
+    ruleloop(rule, simdata, rkeys, rdata, wkeys, wdata)
+    copystatus!(wdata)
+    swapsource(simdata)
+end
 
-This can lead to order of magnitude performance improvments in sparse 
-simulations where large areas of the grid are filled with zeros.
-"""
-function blockrun! end
+maprule!(simdata::SimData, rule::PartialRule) = begin
+    # Copy the sources to dests
+    map(values(data(simdata))) do d
+        @inbounds parent(dest(d)) .= parent(source(d))
+    end
+
+    rkeys, rdata = getdata(Read(), rule, simdata)
+    wkeys, wdata = getdata(Write(), rule, simdata)
+    newsimdata = @set simdata.data = combinedata(wkeys, wdata, rkeys, rdata)
+    ruleloop(rule, newsimdata, rkeys, rdata, wkeys, wdata)
+    copystatus!(wdata)
+    swapsource(simdata)
+end
+
+ruleloop(rule::Rule, simdata, rkeys, rdata, wkeys, wdata) = begin
+    nrows, ncols = framesize(simdata)
+    for j in 1:ncols, i in 1:nrows
+        ismasked(mask(simdata), i, j) && continue
+        read = readstate(rkeys, rdata, i, j)
+        write = applyrule(rule, simdata, read, (i, j))
+        if wdata isa Tuple
+            map(wdata, write) do d, w
+                @inbounds dest(d)[i, j] = w
+            end
+        else
+            @inbounds dest(wdata)[i, j] = write
+        end
+    end
+end
+ruleloop(rule::PartialRule, simdata, rkeys, rdata, wkeys, wdata) = begin
+    nrows, ncols = framesize(data(simdata)[1])
+    for j in 1:ncols, i in 1:nrows
+        ismasked(mask(simdata), i, j) && continue
+        read = readstate(rkeys, rdata, i, j)
+        applyrule!(rule, simdata, read, (i, j))
+    end
+end
+
+@inline readstate(keys::Tuple, data::Union{<:Tuple,<:NamedTuple}, I...) = begin
+    vals = map(d -> readstate(keys, d, I...), data)
+    NamedTuple{map(unwrap, keys),typeof(vals)}(vals)
+end
+@inline readstate(keys, data::AbstractGridData, I...) = data[I...]
+
+getdata(context, rule::Rule, simdata) =
+    getdata(context, writekeys(rule), simdata)
+getdata(context, keys::Tuple{Symbol,Vararg}, simdata) =
+    getdata(context, map(Val, keys), simdata)
+getdata(context, key::Symbol, simdata) = getdata(context, Val(key), simdata)
+getdata(context, ::Nothing, simdata) = nothing, simdata.data
+getdata(context, keys::Tuple{Val,Vararg}, simdata) = begin
+    k, d = getdata(context, keys[1], simdata)
+    ks, ds = getdata(context, tail(keys), simdata)
+    (k, ks...), (d, ds...)
+end
+getdata(context, keys::Tuple{}, simdata) = (), ()
+
+getdata(::Write, key::Val{K}, simdata) where K =
+    key, WritableGridData(simdata[K])
+getdata(::Read, key::Val{K}, simdata) where K =
+    key, simdata[K]
+
+
+@inline combinedata(wkey, wdata, rkey, rdata) =
+    combinedata((wkey,), (wdata,), (rkey,), (rdata,))
+@inline combinedata(wkey, wdata, rkeys::Tuple, rdata::Tuple) =
+    combinedata((wkey,), (wdata,), rkeys, rdata)
+@inline combinedata(wkeys::Tuple, wdata::Tuple, rkey, rdata) =
+    combinedata(wkeys, wdata, (rkey,), (rdata,))
+@generated combinedata(wkeys::Tuple{Vararg{<:Val}}, wdata::Tuple,
+                    rkeys::Tuple{Vararg{<:Val}}, rdata::Tuple) = begin
+    wkeys = _vals2syms(wkeys)
+    keysexp = Expr(:tuple, QuoteNode.(wkeys)...)
+    dataexp = Expr(:tuple, :(wdata...))
+
+    rkeys = _vals2syms(rkeys)
+    for (i, key) in enumerate(rkeys)
+        if !(key in wkeys)
+            push!(dataexp.args, :(rdata[$i]))
+            push!(keysexp.args, QuoteNode(key))
+        end
+    end
+
+    quote
+        NamedTuple{$keysexp}($dataexp)
+    end
+end
+
+_vals2syms(x) = map(v -> v.parameters[1], x.parameters)
 
 """
     celldo!(data, context, args...)
@@ -27,9 +120,18 @@ function maprule! end
 """
 Regular rules just run over the grid blocks
 """
-maprule!(data::AbstractSimData, rule::Rule) = blockrun!(data, rule)
+maprule!(data::AbstractGridData, rule::Rule) = blockrun!(data, rule)
 
-blockrun!(data, context, args...) = begin
+
+"""
+    blockrun(data, context, args...)
+
+Runs simulations over the block grid. Inactive blocks do not run.
+
+This can lead to order of magnitude performance improvments in sparse 
+simulations where large areas of the grid are filled with zeros.
+"""
+blockrun!(data::AbstractGridData, context, args...) = begin
     nrows, ncols = framesize(data)
     r = radius(data)
     if r > 0
@@ -61,7 +163,7 @@ blockrun!(data, context, args...) = begin
     end
 end
 
-@inline celldo!(data, rule::Rule, I) = begin
+@inline celldo!(data::AbstractGridData, rule::Rule, I) = begin
     @inbounds state = source(data)[I...]
     @inbounds dest(data)[I...] = applyrule(rule, data, state, I)
     nothing
@@ -72,8 +174,8 @@ end
 Parital rules must copy the grid to dest as not all cells will be written.
 Block status is also updated.
 """
-maprule!(data::AbstractSimData, rule::PartialRule) = begin
-    data = WritableSimData(data)
+maprule!(data::AbstractGridData, rule::PartialRule) = begin
+    data = WritableGridData(data)
     # Update active blocks in the dest array
     @inbounds parent(dest(data)) .= parent(source(data))
     # Run the rule for active blocks
@@ -81,47 +183,28 @@ maprule!(data::AbstractSimData, rule::PartialRule) = begin
     copystatus!(data)
 end
 
-@inline celldo!(data::WritableSimData, rule::PartialRule, I) = begin
+@inline celldo!(data::WritableGridData, rule::PartialRule, I) = begin
     state = source(data)[I...]
     state == zero(state) && return
     applyrule!(rule, data, state, I)
 end
 
-@inline celldo!(data::WritableSimData, rule::PartialNeighborhoodRule, I) = begin
+@inline celldo!(data::WritableGridData, rule::PartialNeighborhoodRule, I) = begin
     state = source(data)[I...]
     state == zero(state) && return
     applyrule!(rule, data, state, I)
     zerooverflow!(data, overflow(data), radius(data))
 end
 
-# TODO overflow should be wrapped back around?
-zerooverflow!(data, overflow::WrapOverflow, r) = nothing
-zerooverflow!(data, overflow::RemoveOverflow, r) = begin
-    # Zero edge padding, as it can be written to in writable rules.
-    src = parent(source(data))
-    nrows, ncols = size(src)
-    for j = 1:r, i = 1:nrows
-        src[i, j] = zero(eltype(src))
-    end
-    for j = ncols-r+1:ncols, i = 1:nrows
-        src[i, j] = zero(eltype(src))
-    end
-    for j = 1:ncols, i = 1:r
-        src[i, j] = zero(eltype(src))
-    end
-    for j = 1:ncols, i = nrows-r+1:nrows
-        src[i, j] = zero(eltype(src))
-    end
-end
 
 """
 Run the rule for all cells, writing the result to the dest array
 The neighborhood is copied to the rules neighborhood buffer array for performance
 # TODO test 1d
 """
-maprule!(data::SingleSimData{T,2}, rule::Union{NeighborhoodRule,Chain{<:Tuple{NeighborhoodRule,Vararg}}},
-         args...) where T = begin
+ruleloop(rule::NeighborhoodRule, simdata, rkeys, rdata, wkeys, wdata) = begin
     r = radius(rule)
+    data = simdata[neighborhoodkey(rule)]
     # Blocks are cell smaller than the hood, because this works very nicely
     # for looking at only 4 blocks at a time. Larger blocks mean each neighborhood
     # is more likely to be active, smaller means handling more than 2 neighborhoods per block.
@@ -143,13 +226,14 @@ maprule!(data::SingleSimData{T,2}, rule::Union{NeighborhoodRule,Chain{<:Tuple{Ne
     bufcenter = r + 1
 
     # Wrap overflow, or zero padding if not wrapped
-    handleoverflow!(data, r)
+    handleoverflow!(simdata, data, r)
 
     # Run the rule row by row. When we move along a row by one cell, we access only
     # a single new column of data the same hight of the nighborhood, and move the existing
     # data in the neighborhood buffer array accross by one column. This saves on reads
     # from the main array, and focusses reads and writes in the small buffer array that
     # should be in fast local memory.
+    
 
     # Loop down the block COLUMN
     @inbounds for bi = 1:size(srcstatus, 1) - 1
@@ -225,18 +309,19 @@ maprule!(data::SingleSimData{T,2}, rule::Union{NeighborhoodRule,Chain{<:Tuple{Ne
                 # Loop over the grid ROWS inside the block
                 for b in 1:rowsinblock
                     ii = i + b - 1
-                    ismasked(data, ii, j) && continue
+                    ismasked(simdata, ii, j) && continue
                     # Which block row are we in
                     curblocki = b <= r ? 1 : 2
                     # Run the rule using buffer b
                     buf = bufs[b]
-                    state = buf[bufcenter, bufcenter]
+                    #read = readstate(rdata, i + r, j + r)
+                    read = buf[bufcenter, bufcenter]
                     # @assert state == src[ii + r, j + r]
-                    newstate = applyrule(rule, data, state, (ii, j), buf)
+                    write = applyrule(rule, data, read, (ii, j), buf)
                     # Update the status for the block
-                    newstatus[curblocki, curblockj] |= newstate != zero(newstate)
-                    # Write the new state to the dest array
-                    dst[ii + r, j + r] = newstate
+                    newstatus[curblocki, curblockj] |= write != zero(write)
+                    # if wdata isa Tuple # map(wdata, write) do d, w # dest(wdata)[i, j] = w # end
+                    dst[ii + r, j + r] = write
                 end
 
                 # Combine blocks with the previous rows / cols
@@ -251,20 +336,25 @@ maprule!(data::SingleSimData{T,2}, rule::Union{NeighborhoodRule,Chain{<:Tuple{Ne
     copystatus!(data)
 end
 
+
 """
 Wrap overflow where required. This optimisation allows us to ignore
 bounds checks on neighborhoods and still use a wraparound grid.
 """
-handleoverflow!(data::SingleSimData, r::Integer) = handleoverflow!(data, overflow(data), r)
-handleoverflow!(data::SingleSimData{T,1}, overflow::WrapOverflow, r::Integer) where T = begin
+handleoverflow!(simdata::AbstractSimData, griddata::AbstractGridData, r::Integer) = 
+    handleoverflow!(overflow(simdata), simdata, griddata, r)
+handleoverflow!(overflow::WrapOverflow, simdata::AbstractSimData, 
+                griddata::AbstractGridData{T,1}, r::Integer
+               ) where T = begin
     # Copy two sides
     @inbounds copyto!(source, 1-r:0, source, nrows+1-r:nrows)
     @inbounds copyto!(source, nrows+1:nrows+r, source, 1:r)
 end
-handleoverflow!(data::SingleSimData{T,2}, overflow::WrapOverflow, r::Integer) where T = begin
+handleoverflow!(overflow::WrapOverflow, simdata::AbstractSimData, 
+                griddata::AbstractGridData{T,2}, r::Integer) where T = begin
     # TODO optimise this. Its mostly a placeholder so wrapping still works in GOL tests.
-    src = source(data)
-    nrows, ncols = framesize(data)
+    src = source(griddata)
+    nrows, ncols = framesize(griddata)
     # Left
     @inbounds copyto!(src, CartesianIndices((1:nrows, 1-r:0)),
                       src, CartesianIndices((1:nrows, ncols+1-r:ncols)))
@@ -289,7 +379,7 @@ handleoverflow!(data::SingleSimData{T,2}, overflow::WrapOverflow, r::Integer) wh
                       src, CartesianIndices((1:r, ncols+1-r:ncols)))
 
     # Wrap status
-    status = sourcestatus(data)
+    status = sourcestatus(griddata)
     # status[:, 1] .|= status[:, end-1] .| status[:, end-2]
     # status[1, :] .|= status[end-1, :] .| status[end-2, :]
     # status[end-1, :] .|= status[1, :]
@@ -299,8 +389,29 @@ handleoverflow!(data::SingleSimData{T,2}, overflow::WrapOverflow, r::Integer) wh
     # FIXME: Buggy currently, just running all in Wrap mode
     status .= true
 end
-handleoverflow!(data, overflow::RemoveOverflow, r) = nothing
+handleoverflow!(overflow::RemoveOverflow, simdata::AbstractSimData, griddata::GridData, r) = nothing
 
 
 combinestatus(x::Number, y::Number) = x + y
 combinestatus(x::Integer, y::Integer) = x | y
+
+
+# TODO overflow should be wrapped back around?
+zerooverflow!(data, overflow::WrapOverflow, r) = nothing
+zerooverflow!(data, overflow::RemoveOverflow, r) = begin
+    # Zero edge padding, as it can be written to in writable rules.
+    src = parent(source(data))
+    nrows, ncols = size(src)
+    for j = 1:r, i = 1:nrows
+        src[i, j] = zero(eltype(src))
+    end
+    for j = ncols-r+1:ncols, i = 1:nrows
+        src[i, j] = zero(eltype(src))
+    end
+    for j = 1:ncols, i = 1:r
+        src[i, j] = zero(eltype(src))
+    end
+    for j = 1:ncols, i = nrows-r+1:nrows
+        src[i, j] = zero(eltype(src))
+    end
+end

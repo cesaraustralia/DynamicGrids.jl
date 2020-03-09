@@ -35,16 +35,14 @@ import FieldMetadata: @description, description, @limits, limits,
 
 export sim!, resume!, replay, savegif
 
-export AbstractSimData, SimData, MultiSimData
+export Rule, NeighborhoodRule, CellRule,
+       PartialRule, PartialNeighborhoodRule
 
-export Rule, PartialRule, NeighborhoodRule, PartialNeighborhoodRule, CellRule, Chain
-
-export Interaction, NeighborhoodInteraction, CellInteraction,
-       PartialInteraction, PartialNeighborhoodInteraction
-
-export AbstractRuleset, Ruleset, MultiRuleset
+export Chain
 
 export Life
+
+export AbstractRuleset, Ruleset
 
 export Neighborhood, AbstractRadialNeighborhood, RadialNeighborhood,
        AbstractCustomNeighborhood, CustomNeighborhood, LayeredCustomNeighborhood,
@@ -87,8 +85,6 @@ include("interface.jl")
 include("framework.jl")
 include("sequencerules.jl")
 include("maprules.jl")
-include("applyrule.jl")
-include("mapinteractions.jl")
 include("neighborhoods.jl")
 include("utils.jl")
 include("life.jl")

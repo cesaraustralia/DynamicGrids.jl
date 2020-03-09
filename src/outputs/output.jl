@@ -32,8 +32,8 @@ Base.append!(o::Output, x) = append!(frames(o), x)
 """
 Mixin of basic fields for all outputs
 """
-@premix @default_kw struct Output{T<:AbstractVector}
-    frames::T      | []
+@premix @default_kw struct Output{T,A<:AbstractVector{T}}
+    frames::A      | []
     running::Bool  | false
     starttime::Any | 1
     stoptime::Any  | 1
@@ -66,31 +66,38 @@ showgrid(o::Output, args...) = nothing
 # Grid strorage and updating
 frameindex(o::Output, data::AbstractSimData) = frameindex(o, currentframe(data))
 # Every frame is frame 1 if the simulation isn't stored
-frameindex(o::Output, f) = isstored(o) ? f : oneunit(f)
+frameindex(o::Output, f::Int) = isstored(o) ? f : oneunit(f)
 
 zerogrids(init::AbstractArray, nframes) = [zero(init) for f in 1:nframes]
 zerogrids(init::NamedTuple, nframes) =
     [map(layer -> zero(layer), init) for f in 1:nframes]
 
 
-@inline celldo!(data::SimData, ouputgrid::AbstractArray, index, f) =
+@inline celldo!(data::AbstractGridData, ouputgrid::AbstractArray, index, f) =
     return @inbounds ouputgrid[index...] = data[index...]
 
-storegrid!(output::Output, data) = storegrid!(output, data, frameindex(output, data))
-storegrid!(output::Output, data::SimData, f) = begin
+storegrid!(output::Output, data) =
+    storegrid!(output, data, frameindex(output, data))
+storegrid!(output::Output, data::AbstractGridData, f::Int) = begin
     checkbounds(output, f)
     blockrun!(data, output[f], f)
 end
-storegrid!(output::Output, multidata::MultiSimData, f) = begin
+storegrid!(output::Output, simdata::SimData, f::Int) = begin
     checkbounds(output, f)
-    map(values(output[f]), values(data(multidata))) do outputgrid, data
-        for i in CartesianIndices(outputgrid)
-            outputgrid[i] = data[i]
+    if eltype(output) <: NamedTuple
+        map(values(output[f]), values(data(simdata))) do grid, griddata
+            for i in CartesianIndices(grid)
+                grid[i] = source(griddata)[i]
+            end
+        end
+    else
+        for i in CartesianIndices(output[f])
+            output[f][i] = source(first(data(simdata)))[i]
         end
     end
 end
 # Replicated frames
-storegrid!(output, data::AbstractVector{<:SimData}, f) = begin
+storegrid!(output, data::AbstractVector{<:AbstractGridData}, f::Int) = begin
     for j in 1:size(output[1], 2), i in 1:size(output[1], 1)
         replicatesum = zero(eltype(output[1]))
         for d in data

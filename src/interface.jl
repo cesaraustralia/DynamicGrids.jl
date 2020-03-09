@@ -28,22 +28,22 @@ see [`applyrule`](@ref)
 function applyrule! end
 
 """
-    applyinteraction(interacttion::PartialRule, data, state, index)
+    applyrule(interacttion::PartialRule, data, state, index)
 
 Applay an interation that returns a tuple of values.
 ### Arguments:
 see [`applyrule`](@ref)
 """
-function applyinteraction end
+function applyrule end
 
 """
-    applyinteraction!(interacttion::PartialRule, data, state, index)
+    applyrule!(interacttion::PartialRule, data, state, index)
 
 Applay an interation that manually writes to the passed in dest arrays.
 ### Arguments:
 see [`applyrule`](@ref)
 """
-function applyinteraction! end
+function applyrule! end
 
 """
     precalcrule!(rule, data)
@@ -56,16 +56,19 @@ passed into a rule via the `data` object, but it's done statefully for now for s
 function precalcrule! end
 
 """
-neighbors(hood::Neighborhood, hoodbuffer)
+neighbors(hood::Neighborhood, buffer)
 
 Returns an iteraterable over all cells in the neighborhood.
 """
 function neighbors end
 
 """
-sumneighbors(hood::Neighborhood, hoodbuffer, state)
+sumneighbors(hood::Neighborhood, buffer, state)
 
-Sums all cells in the neighborhood.
+Sums all cells in the neighborhood. This can be more
+efficient than running `sum(neighbors(hood, buffer))` as
+if may use effient matrix algra for `sum`, instead of
+an iterator.
 """
 function sumneighbors end
 

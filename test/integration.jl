@@ -30,7 +30,13 @@ test5 = [0 0 0 0 0 0;
          0 0 0 0 0 1;
          0 0 0 0 0 0]
 
-ruleset = Ruleset(Life(); init=init, overflow=WrapOverflow(), timestep=Day(2))
+
+ruleset = Ruleset(; 
+    rules=(Life(),), 
+    init=init, 
+    timestep=Day(2), 
+    overflow=WrapOverflow(),
+)
 output = ArrayOutput(init, 5)
 sim!(output, ruleset; tspan=(Date(2001, 1, 1), Date(2001, 1, 10)))
 
@@ -49,23 +55,32 @@ end
 
 
 @testset "REPLOutput block works, in Unitful.jl seconds" begin
-    ruleset = Ruleset(Life(); init=init, overflow=WrapOverflow(), timestep=5u"s")
+    ruleset = Ruleset(; 
+        rules=(Life(),), 
+        init=init, 
+        overflow=WrapOverflow(),
+        timestep=5u"s",
+    )
     output = REPLOutput(init; style=Block(), fps=100, store=true)
-    sim!(output, ruleset; tspan=(0u"s", 10u"s"))
-    resume!(output, ruleset; tstop=25u"s")
+    output = ArrayOutput(init, 6)
+    sim!(output, ruleset; tspan=(0u"s", 5u"s"))
+    resume!(output, ruleset; tstop=20u"s")
     @test output[2] == test2
     @test output[3] == test3
     @test output[5] == test5
-    # replay(output, ruleset)
 end
 
 @testset "REPLOutput braile works, in Months" begin
-    ruleset = Ruleset(Life(); init=init, overflow=WrapOverflow(), timestep=Month(1))
+    ruleset = Ruleset(; 
+        rules=(Life(),), 
+        init=init, 
+        overflow=WrapOverflow(),
+        timestep=Month(1),
+    )
     output = REPLOutput(init; style=Braile(), fps=100, store=true)
     sim!(output, ruleset; tspan=(Date(2010, 4), Date(2010, 7)))
     resume!(output, ruleset; tstop=Date(2010, 9))
     @test output[2] == test2
     @test output[3] == test3
     @test output[5] == test5
-    # replay(output, ruleset)
 end

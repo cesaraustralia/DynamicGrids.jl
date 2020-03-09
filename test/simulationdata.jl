@@ -11,6 +11,6 @@ ruleset = Ruleset()
 starttime = 1
 radius = 3
 
-simdata = DynamicGrids.SimData(ruleset, init, starttime, radius)
+simdata = DynamicGrids.SimData(init, ruleset, starttime)
 
 # TODO some tests

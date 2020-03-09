@@ -55,35 +55,3 @@ show(io::IO, ruleset::Ruleset) = begin
         println(io, fn, " = ", repr(getfield(ruleset, fn)))
     end
 end
-
-@flattenable struct MultiRuleset{R<:Tuple{<:NamedTuple,<:Tuple},I,M,O,C,T} <: AbstractRuleset
-    rules::R     | true
-    init::I      | false
-    mask::M      | false
-    overflow::O  | false
-    cellsize::C  | false
-    timestep::T  | false
-end
-MultiRuleset(; rulesets=(), interactions=(), init=map(init, rulesets),
-             mask=nothing, overflow=RemoveOverflow(), cellsize=1, timestep=1) = begin
-    if !(interactions isa Tuple)
-        interactions = (interactions,)
-    end
-    rulesets = map(r -> standardise_ruleset(r, mask, overflow, cellsize, timestep), rulesets)
-    MultiRuleset((rulesets, interactions), init, mask, overflow, cellsize, timestep)
-end
-
-rules(rs::MultiRuleset) = rs.rules
-ruleset(mrs::MultiRuleset) = mrs.rules[1]
-interactions(mrs::MultiRuleset) = mrs.rules[2]
-
-Base.getindex(mrs::MultiRuleset, key) = getindex(ruleset(mrs), key)
-Base.keys(mrs::MultiRuleset) = keys(ruleset(mrs))
-
-standardise_ruleset(ruleset, mask, overflow, cellsize, timestep) = begin
-    @set! ruleset.mask = mask
-    @set! ruleset.overflow = overflow
-    @set! ruleset.cellsize = cellsize
-    @set! ruleset.timestep = timestep
-    ruleset
-end
