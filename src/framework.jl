@@ -21,10 +21,10 @@ sim!(output, ruleset; init=nothing, tspan=(1, length(output)), fps=fps(output),
     isrunning(output) && error("A simulation is already running in this output")
     setrunning!(output, true) || error("Could not start the simulation with this output")
     starttime = first(tspan)
-    fspan = tspan2fspan(tspan, timestep(ruleset))
+    fspan = _tspan2fspan(tspan, timestep(ruleset))
     setstarttime!(output, starttime)
     # Copy the init array from the ruleset or keyword arg
-    init = chooseinit(DynamicGrids.init(ruleset), init)
+    init = _chooseinit(DynamicGrids.init(ruleset), init)
     simdata = initdata!(simdata, ruleset, init, starttime, nreplicates)
     # Delete grids output by the previous simulations
     initgrids!(output, init)
@@ -37,14 +37,14 @@ sim!(output, ruleset; init=nothing, tspan=(1, length(output)), fps=fps(output),
     runsim!(output, simdata, fspan)
 end
 
-tspan2fspan(tspan, tstep) = 1:lastindex(first(tspan):tstep:last(tspan))
+_tspan2fspan(tspan, tstep) = 1:lastindex(first(tspan):tstep:last(tspan))
 
 # Allows attaching an init array to the ruleset, but also passing in an
 # alternate array as a keyword arg (which will take preference).
-chooseinit(rulesetinit, arginit) = arginit
-chooseinit(rulesetinit::Nothing, arginit) = arginit
-chooseinit(rulesetinit, arginit::Nothing) = rulesetinit
-chooseinit(rulesetinit::Nothing, arginit::Nothing) =
+_chooseinit(rulesetinit, arginit) = arginit
+_chooseinit(rulesetinit::Nothing, arginit) = arginit
+_chooseinit(rulesetinit, arginit::Nothing) = rulesetinit
+_chooseinit(rulesetinit::Nothing, arginit::Nothing) =
     error("Include an init array: either in the ruleset or with the `init` keyword")
 
 """

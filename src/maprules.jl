@@ -1,23 +1,31 @@
+# Internal traits for sharing read/write methods
 struct Read end
 struct Write end
 
+
+"""
+    maprule!(data, rule)
+
+Apply the rule for each cell in the grid, using optimisations
+specific to the supertype of the rule.
+"""
 maprule!(simdata::SimData, rule::Rule) = begin
     rkeys, rdata = getdata(Read(), rule, simdata)
     wkeys, wdata = getdata(Write(), rule, simdata)
-    simdata = @set simdata.data =
-        combinedata(wkeys, wdata, rkeys, rdata)
-
+    simdata = @set simdata.data = combinedata(wkeys, wdata, rkeys, rdata)
     ruleloop(rule, simdata, rkeys, rdata, wkeys, wdata)
     copystatus!(wdata)
     swapsource(simdata)
 end
 
+"""
+Regular rules just run over the grid blocks
+"""
 maprule!(simdata::SimData, rule::PartialRule) = begin
     # Copy the sources to dests
     map(values(data(simdata))) do d
         @inbounds parent(dest(d)) .= parent(source(d))
     end
-
     rkeys, rdata = getdata(Read(), rule, simdata)
     wkeys, wdata = getdata(Write(), rule, simdata)
     newsimdata = @set simdata.data = combinedata(rkeys, rdata, wkeys, wdata)
@@ -55,7 +63,6 @@ end
     NamedTuple{map(unwrap, keys),typeof(vals)}(vals)
 end
 @inline readstate(keys, data::AbstractGridData, I...) = data[I...]
-
 getdata(context, rule::Rule, simdata) =
     getdata(context, writekeys(rule), simdata)
 getdata(context, keys::Tuple{Symbol,Vararg}, simdata) =
@@ -109,19 +116,6 @@ Run rule for particular cell. Applied to active cells inside [`blockrun!`](@ref)
 """
 function celldo! end
 
-"""
-    maprule!(data, rule)
-
-Apply the rule for each cell in the grid, using optimisations
-specific to the supertype of the rule.
-"""
-function maprule! end
-
-"""
-Regular rules just run over the grid blocks
-"""
-maprule!(data::AbstractGridData, rule::Rule) = blockrun!(data, rule)
-
 
 """
     blockrun(data, context, args...)
@@ -170,39 +164,41 @@ end
 end
 
 
-"""
-Parital rules must copy the grid to dest as not all cells will be written.
-Block status is also updated.
-"""
-maprule!(data::AbstractGridData, rule::PartialRule) = begin
-    data = WritableGridData(data)
-    # Update active blocks in the dest array
-    @inbounds parent(dest(data)) .= parent(source(data))
-    # Run the rule for active blocks
-    blockrun!(data, rule)
-    copystatus!(data)
-end
+# """
+# Parital rules must copy the grid to dest as not all cells will be written.
+# Block status is also updated.
+# """
+# maprule!(data::AbstractGridData, rule::PartialRule) = begin
+#     data = WritableGridData(data)
+#     # Update active blocks in the dest array
+#     @inbounds parent(dest(data)) .= parent(source(data))
+#     # Run the rule for active blocks
+#     blockrun!(data, rule)
+#     copystatus!(data)
+# end
 
-@inline celldo!(data::WritableGridData, rule::PartialRule, I) = begin
-    state = source(data)[I...]
-    state == zero(state) && return
-    applyrule!(rule, data, state, I)
-end
+# @inline celldo!(data::WritableGridData, rule::PartialRule, I) = begin
+#     state = source(data)[I...]
+#     state == zero(state) && return
+#     applyrule!(rule, data, state, I)
+# end
 
-@inline celldo!(data::WritableGridData, rule::PartialNeighborhoodRule, I) = begin
-    state = source(data)[I...]
-    state == zero(state) && return
-    applyrule!(rule, data, state, I)
-    zerooverflow!(data, overflow(data), radius(data))
-end
+# @inline celldo!(data::WritableGridData, rule::PartialNeighborhoodRule, I) = begin
+#     state = source(data)[I...]
+#     state == zero(state) && return
+#     applyrule!(rule, data, state, I)
+#     _zerooverflow!(data, overflow(data), radius(data))
+# end
 
 
 """
 Run the rule for all cells, writing the result to the dest array
-The neighborhood is copied to the rules neighborhood buffer array for performance
-# TODO test 1d
+The neighborhood is copied to the rules neighborhood buffer array for performance.
+
+Empty blocks are skipped for NeighborhoodRules.
 """
-ruleloop(rule::NeighborhoodRule, simdata, rkeys, rdata, wkeys, wdata) = begin
+ruleloop(rule::Union{NeighborhoodRule,Chain{<:NeighborhoodRule}}, 
+         simdata, rkeys, rdata, wkeys, wdata) = begin
     r = radius(rule)
     data = simdata[neighborhoodkey(rule)]
     # Blocks are cell smaller than the hood, because this works very nicely
@@ -267,6 +263,27 @@ ruleloop(rule::NeighborhoodRule, simdata, rkeys, rdata, wkeys, wdata) = begin
             if !(bs11 | bs12 | bs21 | bs22)
                 # Skip this block
                 skippedlastblock = true
+                # Run the rest of the chain if it exists
+                # TODO: test this
+                if rule isa Chain && length(rule) > 1
+                    # Loop over the grid COLUMNS inside the block
+                    for j in jstart:jstop
+                        # Loop over the grid ROWS inside the block
+                        for b in 1:rowsinblock
+                            ii = i + b - 1
+                            ismasked(simdata, ii, j) && continue
+                            read = readstate(rkeys, rdata, i, j)
+                            write = applyrule(tail(rule), data, read, (ii, j), buf)
+                            if wdata isa Tuple
+                                map(wdata, write) do d, w
+                                    @inbounds dest(d)[i, j] = w
+                                end
+                            else
+                                @inbounds dest(wdata)[i, j] = write
+                            end
+                        end
+                    end
+                end
                 continue
             end
 
@@ -391,14 +408,9 @@ handleoverflow!(overflow::WrapOverflow, simdata::AbstractSimData,
 end
 handleoverflow!(overflow::RemoveOverflow, simdata::AbstractSimData, griddata::GridData, r) = nothing
 
-
-combinestatus(x::Number, y::Number) = x + y
-combinestatus(x::Integer, y::Integer) = x | y
-
-
 # TODO overflow should be wrapped back around?
-zerooverflow!(data, overflow::WrapOverflow, r) = nothing
-zerooverflow!(data, overflow::RemoveOverflow, r) = begin
+_zerooverflow!(data, overflow::WrapOverflow, r) = nothing
+_zerooverflow!(data, overflow::RemoveOverflow, r) = begin
     # Zero edge padding, as it can be written to in writable rules.
     src = parent(source(data))
     nrows, ncols = size(src)

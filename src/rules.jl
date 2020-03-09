@@ -12,6 +12,11 @@ Rules are applied to the grid using the [`applyrule`](@ref) method.
 """
 abstract type Rule{R,W} end
 
+"""
+Default constructor for all rules. 
+"""
+(::Type{T})(args...) where T<:Rule = T{:_default_,:_default_}(args...) 
+
 show(io::IO, rule::R) where R <: Rule = begin
     indent = get(io, :indent, "")
     printstyled(io, indent, Base.nameof(typeof(rule)); color=:red)
