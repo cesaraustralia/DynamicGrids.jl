@@ -122,10 +122,10 @@ to simplify specifying custom outputs with the required fields.
 ### Grid processors
 
 ```@docs
-FrameProcessor
-SingleFrameProcessor 
+GridProcessor
+SingleGridProcessor 
 ColorProcessor
-MultiFrameProcessor
+MultiGridProcessor
 ThreeColorProcessor
 LayoutProcessor
 Greyscale
@@ -139,9 +139,14 @@ savegif
 
 ### Internal data handling
 
+Simdata and Griddata objects are used to manage the simulation
+and provide rules with any data they need.
+
 ```@docs
 SimData
-MultiSimData
+GridData
+ReadableGridData
+WritableGridData
 ```
 
 ## Overflow

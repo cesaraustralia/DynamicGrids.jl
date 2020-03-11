@@ -36,7 +36,7 @@ The framework is highly customisable, but there are some central ideas that defi
 how a simulation works: *rules* and *interactions*, *init* arrays and *outputs*.
 
 
-## Rules and Interactions
+## Rules
 
 Rules hold the parameters for running a simulation. Each rule triggers a
 specific `applyrule` method that operates on each of the active cells in the grid.
@@ -68,24 +68,17 @@ efficient function call.
 ruleset = Ruleset(rule1, Chain(rule2, rule3, rule4))
 ```
 
-A `MultiRuleset` holds, as the name suggests, multiple rulesets. These may
+A `Ruleset` can also hold rules that act on multiple grids. These may
 either run side by side independently (say for live comparative analysis), or
-interact using `Interaction` rules. An `Interaction` is a rule that operates on
-multiple grids, linking multiple discrete `Ruleset`s into a larger model, such
-as this hypothetical spatial predator/prey model:
-
-```julia
-MuliRuleset(rules=(predator=predatordispersal, prey=Chain(popgrowth, preydispersal)),
-            interactions=(predation,))
-```
+interact.
 
 
 ## Init
 
-The `init` array may be any `AbstractArray`, containing whatever initialisation
-data is required to start the simulation. The array type, size and element type
-of the `init` array determine the types used in the simulation, as well as
-providing the initial conditions:
+The `init` array may be any `AbstractArray` or a `NamedTuple` of `AbstractArray`, 
+It contains whatever initialisation data is required to start the simulation. 
+The array type, size and element type of the `init` array determine the types
+used in the simulation, as well as providing the initial conditions:
 
 ```juli
 init = rand(Float32, 100, 100)
@@ -103,7 +96,7 @@ or passed into a simulation, where it will take preference over the `Ruleset` in
 sim!(output, rulset; init=init)
 ```
 
-For `MultiRuleset`, `init` is a `NamedTuple` of equal-sized arrays
+For multiple grids, `init` is a `NamedTuple` of equal-sized arrays
 matching the names given to each `Ruleset` :
 
 ```julia
@@ -111,12 +104,16 @@ init = (predator=rand(100, 100), prey=(rand(100, 100))
 ```
 
 Handling and passing of the correct arrays is automated by DynamicGrids.jl.
-`Interaction` rules must specify which grids they require in what order. 
+`Rule`s must specify which grids they require in what order, using the
+first two (`R` and `W`) type parameters. 
 
-Passing spatial `init` arrays from [GeoData.jl](https://github.com/rafaqz/GeoData.jl) 
-will propagate through the model to give spatially explicit output. This will plot 
-correctly as a map using [Plots.jl](https://github.com/JuliaPlots/Plots.jl), 
-to which shape files and observation points can be easily added.
+
+Dimensional or spatial `init` arrays from
+[DimensionalData.jl](https://github.com/rafaqz/DimensionalData.jl) of
+[GeoData.jl](https://github.com/rafaqz/GeoData.jl) will propagate through the
+model to return output with explicit dimensions. This will plot correctly as a
+map using [Plots.jl](https://github.com/JuliaPlots/Plots.jl), to which shape
+files and observation points can be easily added.
 
 ## Output 
 
@@ -160,6 +157,8 @@ can also be written, which can help developing specialised visualisations.
 
 This example implements a very simple forest fire model:
 
+
+
 ```julia
 using DynamicGrids, DynamicGridsGtk, ColorSchemes, Colors
 
@@ -168,8 +167,8 @@ const ALIVE = 2
 const BURNING = 3
 
 # Define the Rule struct
-struct ForestFire{N,PC,PR} <: NeighborhoodRule
-    neighborhood::N
+struct ForestFire{N,PC,PR} <: NeighborhoodRule{R,W}
+    neighborhood::NH
     prob_combustion::PC
     prob_regrowth::PR
 end

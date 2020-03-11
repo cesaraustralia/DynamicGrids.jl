@@ -54,12 +54,7 @@ ConstructionBase.constructorof(::Type{T}) where T<:Rule{R,W} where {R,W} =
 show(io::IO, rule::I) where I <: Rule{R,W} where {R,W} = begin
     indent = get(io, :indent, "")
     printstyled(io, indent, Base.nameof(typeof(rule)); color=:red)
-    type_params = if rule isa NeighborhoodRule
-        string("{", W, ",", R, ",", neighborhoodkey(rule), "}") 
-    else
-        string("{", W, ",", R, "}")
-    end
-    printstyled(io, indent, type_params; color=:red)
+    printstyled(io, indent, string("{", W, ",", R, "}"); color=:red)
     if nfields(rule) > 0
         printstyled(io, " :\n"; color=:red)
         for fn in fieldnames(I)
@@ -95,49 +90,35 @@ abstract type PartialRule{R,W} <: Rule{R,W} end
 
 """
 A Rule that only accesses a neighborhood centered around the current cell.
-
-For each cell a neighborhood buffer will be populated containing the neighborhood cells,
-and passed to `applyrule` as an extra argmuent: `applyrule(rule, data, state, index, buffer)`.
-This allows memory optimisations and the use of BLAS routines on the neighborhood buffer
-for [`RadialNeighborhood`](@ref). It also means that and no bounds checking is required in
-neighborhood code, a major performance gain.
-
 NeighborhoodRule is applied with the method:
 
 ```julia
-applyrule(rule::Life, data, state, index, buffer) =
+applyrule(rule::Life, data, state, index, buffer)
 ```
+
+For each cell a neighborhood buffer will be populated containing the
+neighborhood cells, and passed to `applyrule` as the extra `buffer` argmuent.
+
+This allows memory optimisations and the use of BLAS routines on the 
+neighborhood buffer for [`RadialNeighborhood`](@ref). It also means 
+that and no bounds checking is required in neighborhood code, a major 
+performance gain.
 
 `neighbors(buffer)` returns an iterator over the buffer that is generic to 
 any neigborhood type - Custom shapes as well as square radial neighborhoods.
 
-`NeighborhoodRule` should read only from the state variable and the neighborhood
+`NeighborhoodRule` should read only from the state args and the neighborhood
 buffer array. The return value is written to the central cell for the next grid frame.
-"""
-abstract type NeighborhoodRule{R,W,N} <: Rule{R,W} end
 
+For neighborhood rules with multiple read grids, the first is the one
+given a neighborhood buffer.
 """
-Default constructor for all rules. 
-Sets both the read and write grids to `:_default`.
-"""
-(::Type{T})(args...) where T<:NeighborhoodRule = 
-    T{:_default_,:_default_,:_default_,map(typeof, args)...}(args...) 
-(::Type{T})(args...) where T<:NeighborhoodRule{R,W,N} where {R,W,N} = 
-    T{typeof.(args)...}(args...)
-(::Type{T})(; kwargs...) where T<:NeighborhoodRule = begin
-    args = FieldDefaults.insert_kwargs(kwargs, T)
-    T{:_default_,:_default_,:_default_,map(typeof, args)...}(args...) 
-end
-(::Type{T})(; kwargs...) where T<:NeighborhoodRule{R,W,N} where {R,W,N} = begin
-    args = FieldDefaults.insert_kwargs(kwargs, T)
-    T{typeof.(args)...}(args...)
-end
-
-ConstructionBase.constructorof(::Type{T}) where T<:NeighborhoodRule{R,W,N} where {R,W,N} =
-    T.name.wrapper{R,W,N}
+abstract type NeighborhoodRule{R,W} <: Rule{R,W} end
 
 neighborhood(rule::NeighborhoodRule) = rule.neighborhood
-neighborhoodkey(rule::NeighborhoodRule{R,W,N}) where {R,W,N} = N
+neighborhoodkey(rule::NeighborhoodRule{R,W}) where {R,W} = R
+# The first argument is for the neighborhood grid
+neighborhoodkey(rule::NeighborhoodRule{Tuple{R,Vararg},W}) where {R,W} = K
 
 
 """
@@ -153,6 +134,8 @@ simular to [`NeighborhoodRule`](@ref) but for writing.
 abstract type PartialNeighborhoodRule{R,W} <: PartialRule{R,W} end
 
 neighborhood(rule::PartialRule) = rule.neighborhood
+neighborhoodkey(rule::PartialNeighborhoodRule{R,W}) where {R,W} = R
+neighborhoodkey(rule::PartialNeighborhoodRule{Tuple{R,Vararg},W}) where {R,W} = K
 
 
 """
