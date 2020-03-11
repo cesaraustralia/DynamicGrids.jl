@@ -3,9 +3,7 @@ struct All end
 struct Read end
 struct Write end
 
-"""
-Set up the rule data to loop over
-"""
+# Set up the rule data to loop over
 maprule!(simdata::SimData, rule::Rule) = begin
     allkeys, alldata = getdata(All(), simdata)
     rkeys, rdata = getdata(Read(), rule, simdata)
@@ -22,12 +20,7 @@ maprule!(simdata::SimData, rule::Rule) = begin
     # Swap the dest/source of grids that were written to
     wdata = _to_readonly(swapsource(wdata))
     # Combine the written grids with the original simdata
-    simdata = replacedata(simdata, wkeys, wdata)
-    # println("source")
-    # display(source(first(simdata)))
-    # println("dest")
-    # display(dest(first(simdata)))
-    simdata
+    replacedata(simdata, wkeys, wdata)
 end
 
 _to_namedtuple(keys, data) = _to_namedtuple((keys,), (data,))
@@ -47,8 +40,7 @@ _maybeupdate_dest!(d::WritableGridData, rule::PartialRule) = begin
 end
 
 
-# Separated out for both modularity and as 
-# a function barrier for type stability
+# Separated out for both modularity and as a function barrier for type stability
 ruleloop(rule::Rule, simdata, rkeys, rdata, wkeys, wdata) = begin
     nrows, ncols = framesize(simdata)
     for j in 1:ncols, i in 1:nrows
@@ -74,21 +66,18 @@ ruleloop(rule::PartialRule, simdata, rkeys, rdata, wkeys, wdata) = begin
     end
 end
 
-"""
-Run the rule for all cells, writing the result to the dest array
+#= Run the rule for all cells, writing the result to the dest array
 The neighborhood is copied to the rules neighborhood buffer array for performance.
-
-Empty blocks are skipped for NeighborhoodRules.
-"""
+Empty blocks are skipped for NeighborhoodRules. =#
 ruleloop(rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:NeighborhoodRule,Vararg}}}, 
          simdata, rkeys, rdata, wkeys, wdata) where {R,W} = begin
     r = radius(rule)
     griddata = simdata[neighborhoodkey(rule)]
-    # Blocks are cell smaller than the hood, because this works very nicely
-    # for looking at only 4 blocks at a time. Larger blocks mean each neighborhood
-    # is more likely to be active, smaller means handling more than 2 neighborhoods per block.
-    # It would be good to test if this is the sweet spot for performance.
-    # It probably isn't for game of life size grids.
+    #= Blocks are cell smaller than the hood, because this works very nicely for 
+    #looking at only 4 blocks at a time. Larger blocks mean each neighborhood is more 
+    #likely to be active, smaller means handling more than 2 neighborhoods per block.
+    It would be good to test if this is the sweet spot for performance,
+    it probably isn't for game of life size grids. =#
     blocksize = 2r
     hoodsize = 2r + 1
     nrows, ncols = framesize(griddata)
@@ -107,11 +96,11 @@ ruleloop(rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:NeighborhoodRule,Varar
     # Wrap overflow or zero padding if not wrapped
     handleoverflow!(griddata)
 
-    # Run the rule row by row. When we move along a row by one cell, we access only
-    # a single new column of data the same hight of the nighborhood, and move the existing
-    # data in the neighborhood buffer array accross by one column. This saves on reads
-    # from the main array, and focusses reads and writes in the small buffer array that
-    # should be in fast local memory.
+    #= Run the rule row by row. When we move along a row by one cell, we access only
+    a single new column of data the same hight of the nighborhood, and move the existing
+    data in the neighborhood buffer array accross by one column. This saves on reads
+    from the main array, and focusses reads and writes in the small buffer array that
+    should be in fast local memory. =#
     
 
     # Loop down the block COLUMN
@@ -243,10 +232,8 @@ ruleloop(rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:NeighborhoodRule,Varar
 end
 
 
-"""
-Wrap overflow where required. This optimisation allows us to ignore
-bounds checks on neighborhoods and still use a wraparound grid.
-"""
+#= Wrap overflow where required. This optimisation allows us to ignore
+bounds checks on neighborhoods and still use a wraparound grid. =#
 handleoverflow!(griddata) = handleoverflow!(griddata, overflow(griddata))
 handleoverflow!(griddata::GridData{T,2}, ::WrapOverflow) where T = begin
     r = radius(griddata)
@@ -416,22 +403,11 @@ _vals2syms(x::Type{<:Tuple}) = map(v -> _vals2syms(v), x.parameters)
 _vals2syms(::Type{<:Val{X}}) where X = X
 
 
-"""
-    celldo!(data, context, args...)
-
-Run rule for particular cell. Applied to active cells inside [`blockrun!`](@ref).
-"""
-function celldo! end
 
 
-"""
-    blockrun(data, context, args...)
-
-Runs simulations over the block grid. Inactive blocks do not run.
-
+#= Runs simulations over the block grid. Inactive blocks do not run.
 This can lead to order of magnitude performance improvments in sparse 
-simulations where large areas of the grid are filled with zeros.
-"""
+simulations where large areas of the grid are filled with zeros. =#
 blockrun!(data::GridData, context, args...) = begin
     nrows, ncols = framesize(data)
     r = radius(data)
@@ -464,6 +440,7 @@ blockrun!(data::GridData, context, args...) = begin
     end
 end
 
+# Run rule for particular cell. Applied to active cells inside blockrun!
 @inline celldo!(data::GridData, rule::Rule, I) = begin
     @inbounds state = source(data)[I...]
     @inbounds dest(data)[I...] = applyrule(rule, data, state, I)

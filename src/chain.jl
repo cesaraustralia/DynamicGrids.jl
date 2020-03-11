@@ -1,7 +1,9 @@
 """
-Chains allow chaining rules together to be completed in a single processing step
-without intermediate writes, and potentially compiled together into a single function call.
-These can either be all CellRule or NeighborhoodRule followed by CellRule.
+`Chain`s allow chaining rules together to be completed in a single processing step
+without intermediate reads or writes from grids. They are potentially compiled 
+together into a single function call, especially if you use `@inline` on all 
+`applyrule`. methods. `Chain` can hold either all [`CellRule`](@ref) or 
+[`NeighborhoodRule`](@ref) followed by [CellRule`](@ref).
 """
 struct Chain{R,W,T<:Union{Tuple{},Tuple{<:Union{NeighborhoodRule,CellRule},Vararg{<:CellRule}}}} <: Rule{R,W}
     val::T
@@ -35,14 +37,15 @@ Base.length(chain::Chain) = length(val(chain))
 """
     applyrule(rules::Chain, data, state, (i, j))
 
-Chained rules. If a `Chain` of rules is passed to applyrule, run them sequentially
-for each cell. This can have much beter performance as no writes occur between rules, and
-they are essentially compiled together into compound rules. This gives correct results only
-for CellRule, or for a single NeighborhoodRule followed by CellRule.
+Chained rules. If a [`Chain`](@ref) of rules is passed to `applyrule`, run them 
+sequentially for each cell. This can have much beter performance as no writes 
+occur between rules, and they are essentially compiled together into compound 
+rules. This gives correct results only for [`CellRule`](@ref), or for a single 
+[`NeighborhoodRule`](@ref) followed by [`CellRule`](@ref).
 """
-@inline applyrule(chain::Chain, data, state::NamedTuple, index, args...) = begin
+@inline applyrule(chain::Chain, data, state::NamedTuple, index) = begin
     read = readstate(chain, state)
-    write = applyrule(chain[1], data, read, index, args...)
+    write = applyrule(chain[1], data, read, index)
     updated = updatestate(chain, write, state)
     applyrule(tail(chain), data, updated, index)
 end

@@ -49,7 +49,7 @@ Rules are joined in a `Ruleset` object and run in sequence:
 ruleset = Ruleset(Life(2, 3))
 ```
 
-The `Rulset` wrapper seems a little redundant here, but multiple models can be
+The `Ruleset` wrapper seems a little redundant here, but multiple models can be
 combined in a `Ruleset`. Each rule will be run for the whole grid, in sequence,
 using appropriate optimisations depending on the parent types of each rule:
 
@@ -75,16 +75,16 @@ interact.
 
 ## Init
 
-The `init` array may be any `AbstractArray` or a `NamedTuple` of `AbstractArray`, 
+The init array may be any AbstractArray or a NamedTuple of AbstractArray, 
 It contains whatever initialisation data is required to start the simulation. 
-The array type, size and element type of the `init` array determine the types
+The array type, size and element type of the init array determine the types
 used in the simulation, as well as providing the initial conditions:
 
 ```juli
 init = rand(Float32, 100, 100)
 ```
 
-An `init` array can be attached to a `Ruleset`: 
+An init array can be attached to a `Ruleset`: 
 
 ```
 ruleset = Ruleset(Life(); init=init)
@@ -96,7 +96,7 @@ or passed into a simulation, where it will take preference over the `Ruleset` in
 sim!(output, rulset; init=init)
 ```
 
-For multiple grids, `init` is a `NamedTuple` of equal-sized arrays
+For multiple grids, init is a NamedTuple of equal-sized arrays
 matching the names given to each `Ruleset` :
 
 ```julia
@@ -108,7 +108,7 @@ Handling and passing of the correct arrays is automated by DynamicGrids.jl.
 first two (`R` and `W`) type parameters. 
 
 
-Dimensional or spatial `init` arrays from
+Dimensional or spatial init arrays from
 [DimensionalData.jl](https://github.com/rafaqz/DimensionalData.jl) of
 [GeoData.jl](https://github.com/rafaqz/GeoData.jl) will propagate through the
 model to return output with explicit dimensions. This will plot correctly as a
@@ -121,7 +121,7 @@ files and observation points can be easily added.
 are ways of storing or viewing a simulation. They can be used
 interchangeably depending on your needs: `ArrayOutput` is a simple storage
 structure for high performance-simulations. As with most outputs, it is
-initialised with the `init` array, but in this case it also requires the number
+initialised with the init array, but in this case it also requires the number
 of simulation frames to preallocate before the simulation runs.
 
 ```julia
@@ -167,7 +167,7 @@ const ALIVE = 2
 const BURNING = 3
 
 # Define the Rule struct
-struct ForestFire{N,PC,PR} <: NeighborhoodRule{R,W}
+struct ForestFire{R,W,N,PC,PR} <: NeighborhoodRule{R,W}
     neighborhood::NH
     prob_combustion::PC
     prob_regrowth::PR

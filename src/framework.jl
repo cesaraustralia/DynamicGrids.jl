@@ -10,11 +10,12 @@ the passed in output for each time-step.
 - `ruleset`: A Rule() containing one ore more [`Rule`](@ref). These will each be run in sequence.
 
 ### Keyword Arguments
-- `init`: the initialisation array. If `nothing`, the Ruleset must contain an `init` array.
-- `tspan`: the timespan simulaiton will run for.
+- `init`: the initialisation array. If not passed, the [`Ruleset`](@ref) must contain an `init` array.
+- `tspan`: a tuple holding the start and end of the timespan the simulaiton will run for.
 - `fps`: the frames per second to display. Will be taken from the output if not passed in.
 - `nreplicates`: the number of replicates to combine in stochastic simulations
-- `simdata`: a SimData object. Can reduce allocations when that is important.
+- `simdata`: a SimData object. Keeping it between simulations can reduce memory
+  allocation when that is important.
 """
 sim!(output, ruleset; init=nothing, tspan=(1, length(output)), fps=fps(output),
      nreplicates=nothing, simdata=nothing) = begin
@@ -70,7 +71,7 @@ resume!(output, ruleset; tstop=stoptime(output), fps=fps(output), simdata=nothin
     runsim!(output, simdata, fspan)
 end
 
-"run the simulation either directly or asynchronously."
+# run the simulation either directly or asynchronously.
 runsim!(output, args...) =
     if isasync(output)
         @async simloop!(output, args...)
@@ -78,13 +79,10 @@ runsim!(output, args...) =
         simloop!(output, args...)
     end
 
-"""
-Loop over the selected timespan, running the ruleset and displaying the output
-
+#= Loop over the selected timespan, running the ruleset and displaying the output
 Operations on outputs and rulesets are allways mutable and in-place.
 Operations on rules and simdata objects are functional as they are used in inner loops
-where immutability improves performance.
-"""
+where immutability improves performance. =#
 simloop!(output, simdata, fspan) = begin
     settimestamp!(output, first(fspan))
     # Initialise types etc
@@ -112,15 +110,6 @@ simloop!(output, simdata, fspan) = begin
     output
 end
 
-
-"""
-    precalcrules(rule, simdata) = rule
-
-Rule precalculation. This is a functional approach rebuilding rules recursively.
-@set from Setfield.jl helps in specific rule implementations.
-
-The default is to return the existing rule
-"""
 precalcrules(rule, simdata) = rule
 precalcrules(simdata::SimData) = 
     @set simdata.ruleset.rules = precalcrules(rules(simdata), simdata)

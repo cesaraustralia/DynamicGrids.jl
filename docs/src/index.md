@@ -4,10 +4,10 @@
 DynamicGrids
 ```
 
-## Examples
+## More Examples
 
 While this package isn't designed or optimised specifically to run the game of
-life, it's a simple example of what this package can do. This example runs a
+life, it's a simple demonstration of what it can do. This example runs a
 game of life and displays it in a REPLOutput.
 
 
@@ -57,10 +57,8 @@ sim!(output, Ruleset(Life(b=[1,3,5,7], s=[1,3,5,7])); init=init2)
 
 Rules define simulation behaviour. They hold data relevant to the simulation,
 and trigger dispatch of particular [`applyrule`](@ref) or [`applyrule!`](@ref) methods.
-Rules can be chained together arbitrarily to make composite simulations.
-
-
-### Types and Constructors
+Rules can be chained together arbitrarily to make composite simulations across
+any number of grids.
 
 ```@docs
 Ruleset
@@ -69,16 +67,20 @@ CellRule
 NeighborhoodRule
 PartialRule
 PartialNeighborhoodRule
+Map          
 Chain
 Life
+```
+
+```@docs
+applyrule
+applyrule!
 ```
 
 ## Neighborhoods
 
 Neighborhoods define a pattern of cells surrounding the current cell, 
 and how they are combined to update the value of the current cell.
-
-### Types and Constructors
 
 ```@docs
 Neighborhood
@@ -137,7 +139,15 @@ Greyscale
 savegif
 ```
 
-### Internal data handling
+## Overflow
+
+```@docs
+Overflow
+WrapOverflow
+RemoveOverflow
+```
+
+## Internal data handling
 
 Simdata and Griddata objects are used to manage the simulation
 and provide rules with any data they need.
@@ -147,14 +157,6 @@ SimData
 GridData
 ReadableGridData
 WritableGridData
-```
-
-## Overflow
-
-```@docs
-Overflow
-WrapOverflow
-RemoveOverflow
 ```
 
 # Methods

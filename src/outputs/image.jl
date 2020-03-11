@@ -1,5 +1,11 @@
 """
 Graphic outputs that display the grid(s) as an RGB24 images.
+
+No `ImageOutput`s are provided in DynamicGrids.jl to avoid
+heavey dependencies on graphics libraries. See 
+[DynamicGridsGtk.jl](https://github.com/cesaraustralia/DynamicGridsGtk.jl) 
+and [DynamicGridsInteract.jl](https://github.com/cesaraustralia/DynamicGridsInteract.jl) 
+for implementations.
 """
 abstract type ImageOutput{T} <: GraphicOutput{T} end
 
@@ -22,7 +28,7 @@ Construct one ImageOutput from another ImageOutput.
 )
 
 """
-Mixin for outputs that output images and can use an image processor.
+Mixin fields for `ImageOutput`s
 """
 @premix @default_kw struct Image{P,Mi,Ma}
     processor::P | ColorProcessor()
@@ -38,7 +44,6 @@ minval(o::ImageOutput) = o.minval
 
 maxval(o::Output) = 1
 maxval(o::ImageOutput) = o.maxval
-
 
 
 # Allow construcing a frame with the ruleset passed in instead of SimData
@@ -84,10 +89,6 @@ Convert a grid or named tuple of grids to an RGB24 image, using a GridProcessor
 """
 function grid2image end
 
-# grid2image(o, ruleset, grid, f)
-# grid2image(o::ImageOutput, i::Integer) = grid2image(o, o[i], i)
-# grid2image(o::ImageOutput, grid, i::Integer) = grid2image(o, Ruleset(), o[i], i)
-# grid2image(o::ImageOutput, args...) = grid2image(processor(o), o, args...)
 grid2image(o::ImageOutput, ruleset::AbstractRuleset, grid, i::Integer) =
     grid2image(processor(o), o, ruleset, grid, i)
 grid2image(processor::GridProcessor, o::ImageOutput, ruleset, grid, i) =
@@ -130,7 +131,6 @@ grid2image(p::ColorProcessor, minval, maxval,
     end
     img
 end
-
 
 
 abstract type BandColor end
@@ -254,6 +254,7 @@ savegif(filename::String, o::Output, ruleset=Ruleset();
     array = cat(images..., dims=3)
     FileIO.save(filename, array; kwargs...)
 end
+
 
 # Color manipulation tools
 

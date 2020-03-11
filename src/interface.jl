@@ -32,6 +32,11 @@ function applyrule! end
 
 Run any precalculations needed to run a rule for a particular frame,
 returning new rule objects containing the updates.
+
+This is a functional approach, rebuilding rules recursively.
+`@set` from Setfield.jl can help updating immutable rules.
+
+The default action is to return the existing rule without change.
 """
 function precalcrules end
 
@@ -47,7 +52,8 @@ sumneighbors(hood::Neighborhood, buffer, state)
 
 Sums all cells in the neighborhood. This is identical to running 
 `sum(neighbors(hood, buffer))` but it can be more efficient than as
-it may use matrix algra for `sum`, instead of sum over an iterator.
+it may use matrix algra libraries for `sum`, instead of regular sum over 
+an iterator.
 """
 function sumneighbors end
 
@@ -64,6 +70,18 @@ Set value of a cell in the neighborhood. Called in `mapsetneighbor`.
 function setneighbor! end
 
 """
+    radius(rule, [key])
+
 Return the radius of a rule or ruleset if it has one, otherwise zero.
 """
 function radius end
+
+
+# TODO: docuent SimData methods
+function starttime end
+function currenttime end
+function currentframe end
+function framesize end
+function mask end
+function overflow end
+function timestep end
