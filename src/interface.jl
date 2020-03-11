@@ -81,7 +81,7 @@ function radius end
 function starttime end
 function currenttime end
 function currentframe end
-function framesize end
+function gridsize end
 function mask end
 function overflow end
 function timestep end

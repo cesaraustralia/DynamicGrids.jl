@@ -42,7 +42,7 @@ end
 
 # Separated out for both modularity and as a function barrier for type stability
 ruleloop(rule::Rule, simdata, rkeys, rdata, wkeys, wdata) = begin
-    nrows, ncols = framesize(simdata)
+    nrows, ncols = gridsize(simdata)
     for j in 1:ncols, i in 1:nrows
         ismasked(mask(simdata), i, j) && continue
         read = readstate(rkeys, rdata, i, j)
@@ -58,7 +58,7 @@ ruleloop(rule::Rule, simdata, rkeys, rdata, wkeys, wdata) = begin
     end
 end
 ruleloop(rule::PartialRule, simdata, rkeys, rdata, wkeys, wdata) = begin
-    nrows, ncols = framesize(data(simdata)[1])
+    nrows, ncols = gridsize(data(simdata)[1])
     for j in 1:ncols, i in 1:nrows
         ismasked(mask(simdata), i, j) && continue
         read = readstate(rkeys, rdata, i, j)
@@ -80,7 +80,7 @@ ruleloop(rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:NeighborhoodRule,Varar
     it probably isn't for game of life size grids. =#
     blocksize = 2r
     hoodsize = 2r + 1
-    nrows, ncols = framesize(griddata)
+    nrows, ncols = gridsize(griddata)
     # We unwrap offset arrays and work with the underlying array
     src, dst = parent(source(griddata)), parent(dest(griddata))
     srcstatus, dststatus = sourcestatus(griddata), deststatus(griddata)
@@ -240,7 +240,7 @@ handleoverflow!(griddata::GridData{T,2}, ::WrapOverflow) where T = begin
 
     # TODO optimise this. Its mostly a placeholder so wrapping still works in GOL tests.
     src = source(griddata)
-    nrows, ncols = framesize(griddata)
+    nrows, ncols = gridsize(griddata)
     # Left
     @inbounds copyto!(src, CartesianIndices((1:nrows, 1-r:0)),
                       src, CartesianIndices((1:nrows, ncols+1-r:ncols)))
@@ -409,7 +409,7 @@ _vals2syms(::Type{<:Val{X}}) where X = X
 This can lead to order of magnitude performance improvments in sparse 
 simulations where large areas of the grid are filled with zeros. =#
 blockrun!(data::GridData, context, args...) = begin
-    nrows, ncols = framesize(data)
+    nrows, ncols = gridsize(data)
     r = radius(data)
     if r > 0
         blocksize = 2r

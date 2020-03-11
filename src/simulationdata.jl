@@ -45,7 +45,7 @@ sourcestatus(d::GridData) = d.sourcestatus
 deststatus(d::GridData) = d.deststatus
 localstatus(d::GridData) = d.localstatus
 buffers(d::GridData) = d.buffers
-framesize(d::GridData) = size(init(d))
+gridsize(d::GridData) = size(init(d))
 
 
 """ 
@@ -157,7 +157,7 @@ Base.keys(d::SimData) = keys(data(d))
 Base.values(d::SimData) = values(data(d))
 Base.first(d::SimData) = first(data(d))
 Base.last(d::SimData) = last(data(d))
-framesize(d::SimData) = framesize(first(d))
+gridsize(d::SimData) = gridsize(first(d))
 mask(d::SimData) = mask(ruleset(d))
 rules(d::SimData) = rules(ruleset(d))
 overflow(d::SimData) = overflow(ruleset(d))
@@ -253,7 +253,7 @@ initdata!(::Nothing, ruleset::Ruleset, init, starttime, nreplicates::Nothing) =
 # Initialise a SimData object with a new `Ruleset` and starttime.
 initdata!(simdata::AbstractSimData, ruleset::Ruleset, initgrids, starttime) = begin
     map(values(simdata), initgrids) do data, init
-        for j in 1:framesize(data)[2], i in 1:framesize(simdata)[1]
+        for j in 1:gridsize(data)[2], i in 1:gridsize(simdata)[1]
             @inbounds source(data)[i, j] = dest(data)[i, j] = init[i, j]
         end
         updatestatus!(data)
