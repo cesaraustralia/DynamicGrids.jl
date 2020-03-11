@@ -73,12 +73,12 @@ zerogrids(init::NamedTuple, nframes) =
     [map(layer -> zero(layer), init) for f in 1:nframes]
 
 
-@inline celldo!(data::AbstractGridData, ouputgrid::AbstractArray, index, f) =
+@inline celldo!(data::GridData, ouputgrid::AbstractArray, index, f) =
     return @inbounds ouputgrid[index...] = data[index...]
 
 storegrid!(output::Output, data) =
     storegrid!(output, data, frameindex(output, data))
-storegrid!(output::Output, data::AbstractGridData, f::Int) = begin
+storegrid!(output::Output, data::GridData, f::Int) = begin
     checkbounds(output, f)
     blockrun!(data, output[f], f)
 end
@@ -97,7 +97,7 @@ storegrid!(output::Output, simdata::SimData, f::Int) = begin
     end
 end
 # Replicated frames
-storegrid!(output, data::AbstractVector{<:AbstractGridData}, f::Int) = begin
+storegrid!(output, data::AbstractVector{<:GridData}, f::Int) = begin
     for j in 1:size(output[1], 2), i in 1:size(output[1], 1)
         replicatesum = zero(eltype(output[1]))
         for d in data

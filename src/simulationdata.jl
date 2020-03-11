@@ -2,16 +2,17 @@
 """
 Simulation data for a singule ruleset.
 """
-abstract type AbstractGridData{T,N,I} end
+abstract type GridData{T,N,I} end
 
 """
 Common fields for SimData and WritableGridData. Which are basically 
 identical except for with methods.
 """
-@mix struct GridDataMixin{T,N,I<:AbstractArray{T,N},M,R,S,St,LSt,B}
+@mix struct GridDataMixin{T,N,I<:AbstractArray{T,N},M,R,O,S,St,LSt,B}
     init::I
     mask::M
     radius::R
+    overflow::O
     source::S
     dest::S
     sourcestatus::St
@@ -20,48 +21,44 @@ identical except for with methods.
     buffers::B
 end
 
-GridDataOrReps = Union{AbstractGridData, Vector{<:AbstractGridData}}
+GridDataOrReps = Union{GridData, Vector{<:GridData}}
 
-(::Type{T})(data::AbstractGridData) where T <: AbstractGridData =
-    T(init(data), mask(data), radius(data), source(data), dest(data), sourcestatus(data), deststatus(data),
-      localstatus(data), buffers(data))
+(::Type{T})(d::GridData) where T <: GridData =
+    T(init(d), mask(d), radius(d), overflow(d), source(d), dest(d), 
+      sourcestatus(d), deststatus(d), localstatus(d), buffers(d))
 
 # Array interface
-Base.length(d::AbstractGridData) = length(source(d))
-Base.firstindex(d::AbstractGridData) = firstindex(source(d))
-Base.lastindex(d::AbstractGridData) = lastindex(source(d))
-Base.size(d::AbstractGridData) = size(source(d))
-Base.iterate(d::AbstractGridData, args...) = iterate(source(d), args...)
-Base.ndims(::AbstractGridData{T,N}) where {T,N} = N
-Base.eltype(::AbstractGridData{T}) where T = T
+Base.length(d::GridData) = length(source(d))
+Base.firstindex(d::GridData) = firstindex(source(d))
+Base.lastindex(d::GridData) = lastindex(source(d))
+Base.size(d::GridData) = size(source(d))
+Base.iterate(d::GridData, args...) = iterate(source(d), args...)
+Base.ndims(::GridData{T,N}) where {T,N} = N
+Base.eltype(::GridData{T}) where T = T
 
 # Getters
-init(d::AbstractGridData) = d.init
-mask(d::AbstractGridData) = d.mask
-radius(d::AbstractGridData) = d.radius
-source(d::AbstractGridData) = d.source
-dest(d::AbstractGridData) = d.dest
-sourcestatus(d::AbstractGridData) = d.sourcestatus
-deststatus(d::AbstractGridData) = d.deststatus
-localstatus(d::AbstractGridData) = d.localstatus
-buffers(d::AbstractGridData) = d.buffers
-framesize(d::AbstractGridData) = size(init(d))
-
-"""
-Get the actual current timestep, ie. not variable periods like Month
-"""
-currenttimestep(d::AbstractGridData) = currenttime(d) + timestep(d) - currenttime(d)
+init(d::GridData) = d.init
+mask(d::GridData) = d.mask
+radius(d::GridData) = d.radius
+overflow(d::GridData) = d.overflow
+source(d::GridData) = d.source
+dest(d::GridData) = d.dest
+sourcestatus(d::GridData) = d.sourcestatus
+deststatus(d::GridData) = d.deststatus
+localstatus(d::GridData) = d.localstatus
+buffers(d::GridData) = d.buffers
+framesize(d::GridData) = size(init(d))
 
 
 """ 
 Simulation data and storage passed to rules for each timestep.
 """
-@GridDataMixin struct GridData{} <: AbstractGridData{T,N,I} end
+@GridDataMixin struct ReadableGridData{} <: GridData{T,N,I} end
 
 """
 Generate simulation data to match a ruleset and init array.
 """
-GridData(init::AbstractArray, mask, radius) = begin
+ReadableGridData(init::AbstractArray, mask, radius, overflow) = begin
     r = radius
     # We add one extra row/column so we dont have to worry about
     # special casing the last block
@@ -84,13 +81,35 @@ GridData(init::AbstractArray, mask, radius) = begin
     end
     dest = deepcopy(source)
 
-    GridData(init, mask, radius, source, dest, sourcestatus, deststatus, localstatus, buffers)
+    ReadableGridData(init, mask, radius, overflow, source, dest, 
+                     sourcestatus, deststatus, localstatus, buffers)
 end
 
-ConstructionBase.constructorof(::Type{GridData}) =
-    (init, args...) -> GridData{eltype(init),ndims(init),typeof(init),typeof.(args)...}(init, args...)
+ConstructionBase.constructorof(::Type{ReadableGridData}) =
+    (init, args...) -> ReadableGridData{eltype(init),ndims(init),typeof(init),typeof.(args)...}(init, args...)
 
-Base.@propagate_inbounds Base.getindex(d::GridData, I...) = getindex(source(d), I...)
+Base.@propagate_inbounds Base.getindex(d::ReadableGridData, I...) = getindex(source(d), I...)
+
+"""
+WriteableSimData is passed to rules `<: PartialRule`, and can be written to directly as
+an array. This handles updates to block status and writing to the correct source/dest
+array. Is always converted back to regular `SimData`.
+"""
+@GridDataMixin struct WritableGridData{} <: GridData{T,N,I} end
+
+ConstructionBase.constructorof(::Type{WritableGridData}) =
+    (init, args...) -> SimData{eltype(init),ndims(init),typeof(init),typeof.(args)...}(init, args...)
+
+Base.@propagate_inbounds Base.setindex!(d::WritableGridData, x, I...) = begin
+    r = radius(d)
+    if r > 0
+        bi = indtoblock.(I .+ r, 2r)
+        deststatus(d)[bi...] = true
+    end
+    dest(d)[I...] = x
+end
+
+Base.@propagate_inbounds Base.getindex(d::WritableGridData, I...) = getindex(dest(d), I...)
 
 
 
@@ -119,7 +138,9 @@ SimData(init::NamedTuple, ruleset::Ruleset, starttime) = begin
     # Calculate the neighborhood radus (and grid padding) for each grid
     radii = NamedTuple{keys(init)}(get(radius(ruleset), key, 0) for key in keys(init))
     # Construct the SimData for each grid
-    griddata = map((in, ra) -> GridData(in, mask(ruleset), ra), init, radii)
+    griddata = map(init, radii) do in, ra
+        ReadableGridData(in, mask(ruleset), ra, overflow(ruleset))
+    end
     SimData(init, griddata, ruleset, starttime)
 end
 SimData(init, griddata, ruleset::Ruleset, starttime) =
@@ -140,46 +161,32 @@ Base.keys(d::SimData) = keys(data(d))
 Base.values(d::SimData) = values(data(d))
 Base.first(d::SimData) = first(data(d))
 Base.last(d::SimData) = last(data(d))
-framesize(d::SimData) = framesize(first(data(d)))
+framesize(d::SimData) = framesize(first(d))
 mask(d::SimData) = mask(ruleset(d))
 rules(d::SimData) = rules(ruleset(d))
 overflow(d::SimData) = overflow(ruleset(d))
 timestep(d::SimData) = timestep(ruleset(d))
 cellsize(d::SimData) = cellsize(ruleset(d))
 
-
 """
-WriteableSimData is passed to rules `<: PartialRule`, and can be written to directly as
-an array. This handles updates to block status and writing to the correct source/dest
-array. Is always converted back to regular `SimData`.
+Get the actual current timestep, ie. not variable periods like Month
 """
-@GridDataMixin struct WritableGridData{} <: AbstractGridData{T,N,I} end
-
-ConstructionBase.constructorof(::Type{WritableGridData}) =
-    (init, args...) -> SimData{eltype(init),ndims(init),typeof(init),typeof.(args)...}(init, args...)
-
-Base.@propagate_inbounds Base.setindex!(d::WritableGridData, x, I...) = begin
-    r = radius(d)
-    if r > 0
-        bi = indtoblock.(I .+ r, 2r)
-        deststatus(d)[bi...] = true
-    end
-    dest(d)[I...] = x
-end
-
-Base.@propagate_inbounds Base.getindex(d::WritableGridData, I...) = getindex(dest(d), I...)
+currenttimestep(d::SimData) = currenttime(d) + timestep(d) - currenttime(d)
 
 
 """
 Swap source and dest arrays. Allways returns regular SimData.
 """
-swapsource(data::AbstractGridData) = begin
+swapsource(d::SimData) = begin
+    @set d.data = swapsource(d.data)
+end
+swapsource(d::Tuple) = map(swapsource, d)
+swapsource(data::GridData) = begin
     src = data.source
     dst = data.dest
     @set! data.dest = src
     @set data.source = dst
 end
-swapsource(d::SimData) = @set d.data = map(swapsource, d.data)
 
 """
 Uptate timestamp
@@ -235,8 +242,8 @@ updatestatus!(source, sourcestatus, deststatus, radius) = begin
     end
 end
 
-copystatus!(data::Tuple{Vararg{<:AbstractGridData}}) = map(copystatus!, data)
-copystatus!(data::AbstractGridData) =
+copystatus!(data::Tuple{Vararg{<:GridData}}) = map(copystatus!, data)
+copystatus!(data::GridData) =
     copystatus!(sourcestatus(data), deststatus(data))
 copystatus!(srcstatus, deststatus) = nothing
 copystatus!(srcstatus::AbstractArray, deststatus::AbstractArray) = 

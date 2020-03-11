@@ -1,7 +1,7 @@
 using DynamicGrids, Test, Setfield
 import DynamicGrids: applyrule, applyrule!, maprule!, 
-       SimData, source, dest, currenttime, 
-       Read, Write, getdata, combinedata, ruleloop
+       source, dest, currenttime, getdata, combinedata, ruleloop,
+       SimData, WritableGridData, Read, Write
 
 init  = [0 1 1 0;
          0 1 1 0;
@@ -23,10 +23,14 @@ applyrule(::TestRule, data, state, index) = 0
     ruleset = Ruleset(rule; init=init)
     simdata = SimData(init, ruleset, 1)
 
-    # Test type stability
+    # Test maprules components
     rkeys, rdata = getdata(Read(), rule, simdata)
     wkeys, wdata = getdata(Write(), rule, simdata)
-    newsimdata = @set simdata.data = combinedata(wkeys, wdata, rkeys, rdata)
+    @test rkeys == Val{:_default_}()
+    @test wkeys == Val{:_default_}()
+    newsimdata = @set simdata.data = combinedata(rkeys, rdata, wkeys, wdata)
+    @test newsimdata.data[1] isa WritableGridData
+    # Test type stability
     @inferred ruleloop(rule, newsimdata, rkeys, rdata, wkeys, wdata)
     
     resultdata = maprule!(simdata, rule)

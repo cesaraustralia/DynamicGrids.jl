@@ -16,17 +16,19 @@ val(chain::Chain) = chain.val
 # Only the first rule in a chain can have a radius larger than zero.
 radius(chain::Chain) = radius(chain[1])
 
-Base.show(io::IO, chain::Chain) = begin
+Base.show(io::IO, chain::Chain{R,W}) where {R,W} = begin
     indent = get(io, :indent, "")
-    printstyled(io, indent, "Chain :"; color=:green)
+    printstyled(io, indent, string("Chain {", W, ",", R, "} :"); color=:green)
     for rule in val(chain)
         println(io)
         print(IOContext(io, :indent => indent * "    "), rule)
     end
 end
-Base.tail(chain::Chain{R,W}) where {R,W} = 
-    (ch = tail(val(chain)); Chain{R,W,typeof(ch)}(ch))
-Base.tail(chain::Chain{Tuple{}}) = Chain(())
+Base.tail(chain::Chain{R,W}) where {R,W} = begin
+    ch = tail(val(chain)) 
+    Chain{R,W,typeof(ch)}(ch)
+end
+Base.tail(chain::Chain{R,W,Tuple{}}) where {R,W} = Chain{R,W}(())
 Base.getindex(chain::Chain, I...) = getindex(val(chain), I...)
 Base.length(chain::Chain) = length(val(chain))
 
@@ -38,21 +40,14 @@ for each cell. This can have much beter performance as no writes occur between r
 they are essentially compiled together into compound rules. This gives correct results only
 for CellRule, or for a single NeighborhoodRule followed by CellRule.
 """
-@inline applyrule(chain::Chain{<:Tuple{<:NeighborhoodRule,Vararg}},
-                         data, state::NamedTuple, index, buf) = begin
-    read = readstate(chain[1], state)
-    write = applyrule(chain[1], data, read, index, buf)
-    state = updatestate(chain, write, state)
+@inline applyrule(chain::Chain, data, state::NamedTuple, index, args...) = begin
+    read = readstate(chain, state)
+    write = applyrule(chain[1], data, read, index, args...)
+    updated = updatestate(chain, write, state)
     applyrule(tail(chain), data, updated, index)
 end
-@inline applyrule(chain::Chain, data, state::NamedTuple, index) = begin
-    read = readstate(chain, state)
-    write = applyrule(chain[1], data, read, index)
-    state = updatestate(chain, write, state)
-    applyrule(tail(chain), data, state, index)
-end
-@inline applyrule(rules::Chain{R,W,Tuple{}}, data, state::NamedTuple, index
-                        ) where {R,W} = state
+@inline applyrule(rules::Chain{R,W,Tuple{}}, data, state::NamedTuple, index, args...
+                 ) where {R,W} = state
 
 readstate(chain::Chain, state::NamedTuple) = begin
     keys = readkeys(chain[1])
@@ -84,4 +79,4 @@ end
         writekey == ck ? write : s 
     end
 
-unwrap(::Val{X}) where X = X
+neighborhoodkey(chain::Chain) = neighborhoodkey(chain[1])

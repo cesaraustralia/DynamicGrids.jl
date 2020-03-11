@@ -35,12 +35,9 @@ import FieldMetadata: @description, description, @limits, limits,
 
 export sim!, resume!, replay, savegif
 
-export Rule, NeighborhoodRule, CellRule,
-       PartialRule, PartialNeighborhoodRule
+export Rule, NeighborhoodRule, CellRule, PartialRule, PartialNeighborhoodRule
 
-export Chain
-
-export Life
+export Chain, Map, Life
 
 export AbstractRuleset, Ruleset
 

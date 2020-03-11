@@ -54,3 +54,6 @@ Check if a cell is masked, using the passed-in mask grid.
 @inline ismasked(data::AbstractSimData, I...) = ismasked(mask(data), I...)
 @inline ismasked(mask::Nothing, I...) = false
 @inline ismasked(mask::AbstractArray, I...) = @inbounds return !(mask[I...])
+
+unwrap(::Val{X}) where X = X
+unwrap(::Type{Val{X}}) where X = X

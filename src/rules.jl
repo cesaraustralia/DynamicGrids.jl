@@ -1,5 +1,3 @@
-# abstract type PartialRule <: Rule end
-
 
 """
 A rule contains all the information required to run a rule in a 
@@ -14,23 +12,25 @@ abstract type Rule{R,W} end
 
 """
 Default constructor for all rules. 
-"""
-(::Type{T})(args...) where T<:Rule = T{:_default_,:_default_}(args...) 
+Sets both the read and write grids to `:_default`.
 
-show(io::IO, rule::R) where R <: Rule = begin
-    indent = get(io, :indent, "")
-    printstyled(io, indent, Base.nameof(typeof(rule)); color=:red)
-    if nfields(rule) > 0
-        printstyled(io, " :\n"; color=:red)
-        for fn in fieldnames(R)
-            if fieldtype(R, fn) <: Union{Number,Symbol,String}
-                println(io, indent, "    ", fn, " = ", repr(getfield(rule, fn)))
-            else
-                # Avoid printing arrays etc. Just show the type.
-                println(io, indent, "    ", fn, " = ", fieldtype(R, fn))
-            end
-        end
-    end
+Other keyword args are passed through to FieldDefaults.jl.
+
+This strategy relies on a one-to-one relationship 
+between all fields and their type parameters, besides
+the initial `R`, `W` etc fields.
+"""
+(::Type{T})(args...) where T<:Rule = 
+    T{:_default_,:_default_,map(typeof, args)...}(args...) 
+(::Type{T})(args...) where T<:Rule{R,W} where {R,W} = 
+    T{typeof.(args)...}(args...)
+(::Type{T})(; kwargs...) where T<:Rule = begin
+    args = FieldDefaults.insert_kwargs(kwargs, T)
+    T{:_default_,:_default_,map(typeof, args)...}(args...) 
+end
+(::Type{T})(; kwargs...) where T<:Rule{R,W} where {R,W} = begin
+    args = FieldDefaults.insert_kwargs(kwargs, T)
+    T{typeof.(args)...}(args...)
 end
 
 @generated Base.keys(rule::Rule{R,W}) where {R,W} =
@@ -47,18 +47,19 @@ readkeys(::Rule{R,W}) where {R,W} = R
 _asiterable(x::Symbol) = (x,)
 _asiterable(x::Type{<:Tuple}) = x.parameters
 
-# Default constructor for just the Keys type param where all args have type parameters
-(::Type{T})(args...) where T<:Rule{R,W} where {R,W} =
-    T{typeof.(args)...}(args...)
-
 # Define the constructor for generic rule reconstruction in Flatten.jl and Setfield.jl
 ConstructionBase.constructorof(::Type{T}) where T<:Rule{R,W} where {R,W} =
-    T{R,W}
+    T.name.wrapper{R,W}
 
 show(io::IO, rule::I) where I <: Rule{R,W} where {R,W} = begin
     indent = get(io, :indent, "")
     printstyled(io, indent, Base.nameof(typeof(rule)); color=:red)
-    printstyled(io, indent, string("{", W, ",", R, "}"); color=:red)
+    type_params = if rule isa NeighborhoodRule
+        string("{", W, ",", R, ",", neighborhoodkey(rule), "}") 
+    else
+        string("{", W, ",", R, "}")
+    end
+    printstyled(io, indent, type_params; color=:red)
     if nfields(rule) > 0
         printstyled(io, " :\n"; color=:red)
         for fn in fieldnames(I)
@@ -115,6 +116,26 @@ buffer array. The return value is written to the central cell for the next grid 
 """
 abstract type NeighborhoodRule{R,W,N} <: Rule{R,W} end
 
+"""
+Default constructor for all rules. 
+Sets both the read and write grids to `:_default`.
+"""
+(::Type{T})(args...) where T<:NeighborhoodRule = 
+    T{:_default_,:_default_,:_default_,map(typeof, args)...}(args...) 
+(::Type{T})(args...) where T<:NeighborhoodRule{R,W,N} where {R,W,N} = 
+    T{typeof.(args)...}(args...)
+(::Type{T})(; kwargs...) where T<:NeighborhoodRule = begin
+    args = FieldDefaults.insert_kwargs(kwargs, T)
+    T{:_default_,:_default_,:_default_,map(typeof, args)...}(args...) 
+end
+(::Type{T})(; kwargs...) where T<:NeighborhoodRule{R,W,N} where {R,W,N} = begin
+    args = FieldDefaults.insert_kwargs(kwargs, T)
+    T{typeof.(args)...}(args...)
+end
+
+ConstructionBase.constructorof(::Type{T}) where T<:NeighborhoodRule{R,W,N} where {R,W,N} =
+    T.name.wrapper{R,W,N}
+
 neighborhood(rule::NeighborhoodRule) = rule.neighborhood
 neighborhoodkey(rule::NeighborhoodRule{R,W,N}) where {R,W,N} = N
 
@@ -141,22 +162,19 @@ A [`CellRule`](@ref) that applies a function `f` to the
 ## Example
 
 """
-@description @flattenable struct Map{R,W,F} <: Rule{R,W}
+@description @flattenable struct Map{R,W,F} <: CellRule{R,W}
     # Field | Flatten | Description
     f::F    | false   | "Function to apply to the target values"
 end
 """
-    Map(f; write, read)
+    Map(f; read, write)
 
-    Map function f with cell values from read grid(s), write grid(s)
+Map function f with cell values from read grid(s), write grid(s)
 """
-Map{R,W}(f::F) where {R,W,F} = Map{R,W,F}(f)
-Map(f; write, read) = Map{write,read}(f)
+Map(f; read, write) = Map{read,write}(f)
 
-@generated applyrule!(rule::Map{R,W}, data, read, index) where {R,W} =
-    if R <: Tuple
-        :(rule.f(read...))
-    else
-        :(rule.f(read))
-    end
+@inline applyrule(rule::Map{R,W}, data, read, index) where {R<:Union{Tuple,NamedTuple},W} =
+    rule.f(read...)
+@inline applyrule(rule::Map{R,W}, data, read, index) where {R,W} =
+    rule.f(read)
 

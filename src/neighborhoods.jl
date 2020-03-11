@@ -31,7 +31,7 @@ end
 
 sumneighbors(hood::AbstractRadialNeighborhood, buf, state) = sum(buf) - state
 
-@inline mapsetneighbor!(data::AbstractSimData, hood::AbstractRadialNeighborhood, rule, state, index) = begin
+@inline mapsetneighbor!(data::WritableGridData, hood::AbstractRadialNeighborhood, rule, state, index) = begin
     r = radius(hood)
     sum = zero(state)
     # Loop over dispersal kernel grid dimensions
@@ -129,11 +129,9 @@ radius(set::Ruleset{Tuple{}}) = NamedTuple{(),Tuple{}}(())
 radius(rules::Tuple{<:Rule,Vararg}, key) = 
     reduce(max, radius(i) for i in rules if key in keys(i); init=0)
 radius(rules::Tuple) = mapreduce(radius, max, rules)
-radius(rules::Tuple, key) = mapreduce(rule -> radius(rule, key), max, rules)
 radius(rules::Tuple{}, args...) = 0
 
-# radius(rule::NeighborhoodRule) = radius(neighborhood(rule))
-# radius(rule::PartialNeighborhoodRule) = radius(neighborhood(rule))
-radius(rule::NeighborhoodRule) = radius(neighborhood(rule))
-radius(rule::PartialNeighborhoodRule) = radius(neighborhood(rule))
+# TODO radius only for neighborhood grid
+radius(rule::NeighborhoodRule, args...) = radius(neighborhood(rule))
+radius(rule::PartialNeighborhoodRule, args...) = radius(neighborhood(rule))
 radius(rule::Rule, args...) = 0
