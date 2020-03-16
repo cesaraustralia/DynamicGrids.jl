@@ -30,7 +30,7 @@ ruleset(rs::AbstractRuleset) = rs
 A container for holding a sequence of `Rule`, an `init`
 array and other simulaiton details.
 """
-@flattenable @default_kw mutable struct Ruleset{R<:Tuple,I,M,O<:Overflow,C,T} <: AbstractRuleset
+@flattenable @default_kw mutable struct Ruleset{R<:Tuple{Vararg{<:Rule}},I,M,O<:Overflow,C,T} <: AbstractRuleset
     rules::R     | ()               | true
     init::I      | nothing          | false
     mask::M      | nothing          | false
