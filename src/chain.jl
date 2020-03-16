@@ -1,11 +1,11 @@
 """
 `Chain`s allow chaining rules together to be completed in a single processing step
-without intermediate reads or writes from grids. They are potentially compiled 
-together into a single function call, especially if you use `@inline` on all 
-`applyrule`. methods. `Chain` can hold either all [`CellRule`](@ref) or 
+without intermediate reads or writes from grids. They are potentially compiled
+together into a single function call, especially if you use `@inline` on all
+`applyrule`. methods. `Chain` can hold either all [`CellRule`](@ref) or
 [`NeighborhoodRule`](@ref) followed by [CellRule`](@ref).
 """
-struct Chain{R,W,T<:Union{Tuple{},Tuple{<:Union{NeighborhoodRule,CellRule},Vararg{<:CellRule}}}} <: Rule{R,W}
+struct Chain{R,W,T<:Union{Tuple{},Tuple{Union{<:NeighborhoodRule,<:CellRule},Vararg{<:CellRule}}}} <: Rule{R,W}
     val::T
 end
 Chain(args...) = begin
@@ -27,7 +27,7 @@ Base.show(io::IO, chain::Chain{R,W}) where {R,W} = begin
     end
 end
 Base.tail(chain::Chain{R,W}) where {R,W} = begin
-    ch = tail(val(chain)) 
+    ch = tail(val(chain))
     Chain{R,W,typeof(ch)}(ch)
 end
 Base.tail(chain::Chain{R,W,Tuple{}}) where {R,W} = Chain{R,W}(())
@@ -37,15 +37,15 @@ Base.length(chain::Chain) = length(val(chain))
 """
     applyrule(rules::Chain, data, state, (i, j))
 
-Chained rules. If a [`Chain`](@ref) of rules is passed to `applyrule`, run them 
-sequentially for each cell. This can have much beter performance as no writes 
-occur between rules, and they are essentially compiled together into compound 
-rules. This gives correct results only for [`CellRule`](@ref), or for a single 
+Chained rules. If a [`Chain`](@ref) of rules is passed to `applyrule`, run them
+sequentially for each cell. This can have much beter performance as no writes
+occur between rules, and they are essentially compiled together into compound
+rules. This gives correct results only for [`CellRule`](@ref), or for a single
 [`NeighborhoodRule`](@ref) followed by [`CellRule`](@ref).
 """
-@inline applyrule(chain::Chain, data, state::NamedTuple, index) = begin
+@inline applyrule(chain::Chain, data, state::NamedTuple, index, args...) = begin
     read = readstate(chain, state)
-    write = applyrule(chain[1], data, read, index)
+    write = applyrule(chain[1], data, read, index, args...)
     updated = updatestate(chain, write, state)
     applyrule(tail(chain), data, updated, index)
 end
@@ -79,7 +79,7 @@ end
 end
 @inline writestate(chainkeys::Tuple, writekey::Val, write, state) =
     map(state, NamedTuple{keys(state)}(chainkeys)) do s, ck
-        writekey == ck ? write : s 
+        writekey == ck ? write : s
     end
 
 neighborhoodkey(chain::Chain) = neighborhoodkey(chain[1])
