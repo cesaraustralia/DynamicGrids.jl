@@ -4,7 +4,7 @@ Simulation data specific to a singule grid.
 """
 abstract type GridData{T,N,I} end
 
-# Common fields for SimData and WritableGridData. Which are basically 
+# Common fields for SimData and WritableGridData. Which are basically
 # identical except for with methods.
 @mix struct GridDataMixin{T,N,I<:AbstractArray{T,N},M,R,O,S,St,LSt,B}
     init::I
@@ -22,7 +22,7 @@ end
 GridDataOrReps = Union{GridData, Vector{<:GridData}}
 
 (::Type{T})(d::GridData) where T <: GridData =
-    T(init(d), mask(d), radius(d), overflow(d), source(d), dest(d), 
+    T(init(d), mask(d), radius(d), overflow(d), source(d), dest(d),
       sourcestatus(d), deststatus(d), localstatus(d), buffers(d))
 
 # Array interface
@@ -48,7 +48,7 @@ buffers(d::GridData) = d.buffers
 gridsize(d::GridData) = size(init(d))
 
 
-""" 
+"""
 Simulation data and storage passed to rules for each timestep.
 """
 @GridDataMixin struct ReadableGridData{} <: GridData{T,N,I} end
@@ -77,7 +77,7 @@ ReadableGridData(init::AbstractArray, mask, radius, overflow) = begin
     end
     dest = deepcopy(source)
 
-    ReadableGridData(init, mask, radius, overflow, source, dest, 
+    ReadableGridData(init, mask, radius, overflow, source, dest,
                      sourcestatus, deststatus, localstatus, buffers)
 end
 
@@ -88,7 +88,7 @@ Base.@propagate_inbounds Base.getindex(d::ReadableGridData, I...) = getindex(sou
 
 """
 WriteableGridData is passed to rules `<: PartialRule`, and can be written to directly as
-an array. This handles updates to block optimisations and writing to the correct 
+an array. This handles updates to block optimisations and writing to the correct
 source/dest array.
 """
 @GridDataMixin struct WritableGridData{} <: GridData{T,N,I} end
@@ -128,8 +128,8 @@ struct SimData{I,D,Ru,STi,CTi,CFr} <: AbstractSimData
     currenttime::CTi
     currentframe::CFr
 end
-SimData(init::AbstractArray, ruleset::Ruleset, starttime) = 
-    SimData((_default_=init,), ruleset::Ruleset, starttime) 
+SimData(init::AbstractArray, ruleset::Ruleset, starttime) =
+    SimData((_default_=init,), ruleset::Ruleset, starttime)
 SimData(init::NamedTuple, ruleset::Ruleset, starttime) = begin
     # Calculate the neighborhood radus (and grid padding) for each grid
     radii = NamedTuple{keys(init)}(get(radius(ruleset), key, 0) for key in keys(init))
@@ -188,7 +188,7 @@ updatetime(simdata::AbstractVector{<:SimData}, f) = updatetime.(simdata, f)
 updatetime(simdata::SimData, f) =
     @set simdata.data = map(d -> updatetime(d, f), data(simdata))
 
-timefromframe(simdata::AbstractSimData, f::Int) = 
+timefromframe(simdata::AbstractSimData, f::Int) =
     starttime(simdata) + (f - 1) * timestep(simdata)
 
 #=
@@ -214,8 +214,8 @@ end
 Initialise the block status array.
 This tracks whether anything has to be done in an area of the main array.
 =#
-updatestatus!(data::Tuple) = map(updatestatus!, data) 
-updatestatus!(data::AbstractSimData) = 
+updatestatus!(data::Tuple) = map(updatestatus!, data)
+updatestatus!(data::AbstractSimData) =
     updatestatus!(parent(source(data)), sourcestatus(data), deststatus(data), radius(data))
 updatestatus!(source, sourcestatus::Bool, deststatus::Bool, radius) = nothing
 updatestatus!(source, sourcestatus, deststatus, radius) = begin
@@ -235,7 +235,7 @@ copystatus!(data::Tuple{Vararg{<:GridData}}) = map(copystatus!, data)
 copystatus!(data::GridData) =
     copystatus!(sourcestatus(data), deststatus(data))
 copystatus!(srcstatus, deststatus) = nothing
-copystatus!(srcstatus::AbstractArray, deststatus::AbstractArray) = 
+copystatus!(srcstatus::AbstractArray, deststatus::AbstractArray) =
     @inbounds return srcstatus .= deststatus
 
 # When simdata is passed in, the existing SimData arrays are re-initialised

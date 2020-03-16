@@ -2,9 +2,9 @@
 Graphic outputs that display the grid(s) as an RGB24 images.
 
 No `ImageOutput`s are provided in DynamicGrids.jl to avoid
-heavey dependencies on graphics libraries. See 
-[DynamicGridsGtk.jl](https://github.com/cesaraustralia/DynamicGridsGtk.jl) 
-and [DynamicGridsInteract.jl](https://github.com/cesaraustralia/DynamicGridsInteract.jl) 
+heavey dependencies on graphics libraries. See
+[DynamicGridsGtk.jl](https://github.com/cesaraustralia/DynamicGridsGtk.jl)
+and [DynamicGridsInteract.jl](https://github.com/cesaraustralia/DynamicGridsInteract.jl)
 for implementations.
 """
 abstract type ImageOutput{T} <: GraphicOutput{T} end
@@ -114,6 +114,10 @@ scheme(processor::ColorProcessor) = processor.scheme
 zerocolor(processor::ColorProcessor) = processor.zerocolor
 maskcolor(processor::ColorProcessor) = processor.maskcolor
 
+# Show the first grid of a NamedTuple
+grid2image(p::ColorProcessor, minval, maxval,
+           ruleset::AbstractRuleset, grids::NamedTuple, t) =
+    grid2image(p, minval, maxval, ruleset, grids[1], t)
 grid2image(p::ColorProcessor, minval, maxval,
            ruleset::AbstractRuleset, grid::AbstractArray, t) = begin
     img = fill(RGB24(0), size(grid))

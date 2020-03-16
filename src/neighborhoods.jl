@@ -112,7 +112,7 @@ LayeredCustomNeighborhood(l::Tuple) =
 """
 A convenience wrapper to build a VonNeumann neighborhoods as a `CustomNeighborhood`.
 
-# TODO: variable radius
+TODO: variable radius
 """
 VonNeumannNeighborhood() = CustomNeighborhood(((0,-1), (-1,0), (1,0), (0,1)))
 
@@ -126,7 +126,7 @@ radius(set::Ruleset) = begin
 end
 radius(set::Ruleset{Tuple{}}) = NamedTuple{(),Tuple{}}(())
 # Get radius of specific key from all rules
-radius(rules::Tuple{<:Rule,Vararg}, key) = 
+radius(rules::Tuple{<:Rule,Vararg}, key) =
     reduce(max, radius(i) for i in rules if key in keys(i); init=0)
 radius(rules::Tuple) = mapreduce(radius, max, rules)
 radius(rules::Tuple{}, args...) = 0

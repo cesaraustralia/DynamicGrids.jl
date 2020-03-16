@@ -8,7 +8,7 @@ maprule!(simdata::SimData, rule::Rule) = begin
     allkeys, alldata = getdata(All(), simdata)
     rkeys, rdata = getdata(Read(), rule, simdata)
     wkeys, wdata = getdata(Write(), rule, simdata)
-    # Copy the source to dest for grids we are writing to, 
+    # Copy the source to dest for grids we are writing to,
     # if they need to be copied
     _maybeupdate_dest!(wdata, rule)
     # Combine read and write grids to a temporary simdata object
@@ -31,8 +31,8 @@ _to_readonly(data::WritableGridData) = ReadableGridData(data)
 _to_readonly(data::Tuple) = map(ReadableGridData, data)
 
 _maybeupdate_dest!(d, rule::Rule) = d
-_maybeupdate_dest!(d::Tuple, rule::PartialRule) = 
-    _map(d -> maybeupdate_dest!(d, rule))
+_maybeupdate_dest!(d::Tuple, rule::PartialRule) =
+    map(d -> maybeupdate_dest!(d, rule))
 _maybeupdate_dest!(d::WritableGridData, rule::PartialRule) = begin
     @inbounds parent(dest(d)) .= parent(source(d))
     # Wrap overflow, or zero padding if not wrapped
@@ -52,7 +52,6 @@ ruleloop(rule::Rule, simdata, rkeys, rdata, wkeys, wdata) = begin
                 @inbounds dest(d)[i, j] = w
             end
         else
-            #println(typeof(rule), "read: ", read, " write: ", write)
             @inbounds dest(wdata)[i, j] = write
         end
     end
@@ -69,12 +68,12 @@ end
 #= Run the rule for all cells, writing the result to the dest array
 The neighborhood is copied to the rules neighborhood buffer array for performance.
 Empty blocks are skipped for NeighborhoodRules. =#
-ruleloop(rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:NeighborhoodRule,Vararg}}}, 
+ruleloop(rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:NeighborhoodRule,Vararg}}},
          simdata, rkeys, rdata, wkeys, wdata) where {R,W} = begin
     r = radius(rule)
     griddata = simdata[neighborhoodkey(rule)]
-    #= Blocks are cell smaller than the hood, because this works very nicely for 
-    #looking at only 4 blocks at a time. Larger blocks mean each neighborhood is more 
+    #= Blocks are cell smaller than the hood, because this works very nicely for
+    #looking at only 4 blocks at a time. Larger blocks mean each neighborhood is more
     #likely to be active, smaller means handling more than 2 neighborhoods per block.
     It would be good to test if this is the sweet spot for performance,
     it probably isn't for game of life size grids. =#
@@ -101,7 +100,7 @@ ruleloop(rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:NeighborhoodRule,Varar
     data in the neighborhood buffer array accross by one column. This saves on reads
     from the main array, and focusses reads and writes in the small buffer array that
     should be in fast local memory. =#
-    
+
 
     # Loop down the block COLUMN
     @inbounds for bi = 1:size(srcstatus, 1) - 1
@@ -137,25 +136,25 @@ ruleloop(rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:NeighborhoodRule,Varar
                 skippedlastblock = true
                 # Run the rest of the chain if it exists
                 # TODO: test this
-                if rule isa Chain && length(rule) > 1
-                    # Loop over the grid COLUMNS inside the block
-                    for j in jstart:jstop
-                        # Loop over the grid ROWS inside the block
-                        for b in 1:rowsinblock
-                            ii = i + b - 1
-                            ismasked(simdata, ii, j) && continue
-                            read = readstate(rkeys, rdata, i, j)
-                            write = applyrule(tail(rule), griddata, read, (ii, j), buf)
-                            if wdata isa Tuple
-                                map(wdata, write) do d, w
-                                    @inbounds dest(d)[i, j] = w
-                                end
-                            else
-                                @inbounds dest(wdata)[i, j] = write
-                            end
-                        end
-                    end
-                end
+                # if rule isa Chain && length(rule) > 1
+                #     # Loop over the grid COLUMNS inside the block
+                #     for j in jstart:jstop
+                #         # Loop over the grid ROWS inside the block
+                #         for b in 1:rowsinblock
+                #             ii = i + b - 1
+                #             ismasked(simdata, ii, j) && continue
+                #             read = readstate(rkeys, rdata, i, j)
+                #             write = applyrule(tail(rule), griddata, read, (ii, j), buf)
+                #             if wdata isa Tuple
+                #                 map(wdata, write) do d, w
+                #                     @inbounds dest(d)[i, j] = w
+                #                 end
+                #             else
+                #                 @inbounds dest(wdata)[i, j] = write
+                #             end
+                #         end
+                #     end
+                # end
                 continue
             end
 
@@ -208,8 +207,8 @@ ruleloop(rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:NeighborhoodRule,Varar
                     # @assert state == src[ii + r, j + r]
                     write = applyrule(rule, griddata, read, (ii, j), buf)
                     # Update the status for the block
-                    # if wdata isa NamedTuple 
-                        # map(wdata, write) do d, w 
+                    # if wdata isa NamedTuple
+                        # map(wdata, write) do d, w
                             # dest(wdata)[i, j] = w # end
                             # newstatus[curblocki, curblockj] |= write != zero(write)
                         # end
@@ -313,14 +312,14 @@ getdata(context::Read, rule::Rule, simdata) =
     getdata(context, keys(simdata), readkeys(rule), simdata)
 @inline getdata(context, gridkeys, rulekeys::Tuple{Symbol,Vararg}, simdata) =
     getdata(context, map(Val, rulekeys), simdata)
-@inline getdata(context, gridkeys, rulekey::Symbol, simdata) = 
+@inline getdata(context, gridkeys, rulekey::Symbol, simdata) =
     getdata(context, Val(rulekey), simdata)
-# When there is only one grid, use its key and ignore the rule key 
+# When there is only one grid, use its key and ignore the rule key
 # This can make scripting easier as you can safely ignore the keys
 # for smaller models.
 @inline getdata(context, gridkeys::Tuple{Symbol}, rulekeys::Tuple{Symbol}, simdata) =
     getdata(context, (Val(gridkeys[1]),), simdata)
-@inline getdata(context, gridkeys::Tuple{Symbol}, rulekey::Symbol, simdata) = 
+@inline getdata(context, gridkeys::Tuple{Symbol}, rulekey::Symbol, simdata) =
     getdata(context, Val(gridkeys[1]), simdata)
 
 # Iterate when keys are a tuple
@@ -363,13 +362,13 @@ end
     end
 end
 
-replacedata(simdata::AbstractSimData, wkeys, wdata) = 
+replacedata(simdata::AbstractSimData, wkeys, wdata) =
     @set simdata.data = replacedata(data(simdata), wkeys, wdata)
 @generated replacedata(alldata::NamedTuple, wkeys::Tuple, wdata::Tuple) = begin
     writekeys = map(unwrap, wkeys.parameters)
     allkeys = alldata.parameters[1]
     expr = Expr(:tuple)
-    for key in allkeys 
+    for key in allkeys
         if key in writekeys
             i = findfirst(k -> k == key, writekeys)
             push!(expr.args, :(wdata[$i]))
@@ -377,23 +376,23 @@ replacedata(simdata::AbstractSimData, wkeys, wdata) =
             push!(expr.args, :(alldata.$key))
         end
     end
-    quote 
+    quote
         vals = $expr
         NamedTuple{$allkeys,typeof(vals)}(vals)
     end
 end
 @generated replacedata(alldata::NamedTuple, wkey::Val, wdata::GridData) = begin
-    writekey = unwrap(wkey) 
+    writekey = unwrap(wkey)
     allkeys = alldata.parameters[1]
     expr = Expr(:tuple)
-    for key in allkeys 
+    for key in allkeys
         if key == writekey
             push!(expr.args, :(wdata))
         else
             push!(expr.args, :(alldata.$key))
         end
     end
-    quote 
+    quote
         vals = $expr
         NamedTuple{$allkeys,typeof(vals)}(vals)
     end
@@ -406,7 +405,7 @@ _vals2syms(::Type{<:Val{X}}) where X = X
 
 
 #= Runs simulations over the block grid. Inactive blocks do not run.
-This can lead to order of magnitude performance improvments in sparse 
+This can lead to order of magnitude performance improvments in sparse
 simulations where large areas of the grid are filled with zeros. =#
 blockrun!(data::GridData, context, args...) = begin
     nrows, ncols = gridsize(data)
@@ -473,5 +472,3 @@ end
 #     applyrule!(rule, data, state, I)
 #     _zerooverflow!(data, overflow(data), radius(data))
 # end
-
-
