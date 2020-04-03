@@ -46,7 +46,7 @@ rules. This gives correct results only for [`CellRule`](@ref), or for a single
 @inline applyrule(chain::Chain, data, state::NamedTuple, index, args...) = begin
     read = readstate(chain, state)
     write = applyrule(chain[1], data, read, index, args...)
-    updated = updatestate(chain, write, state)
+    updated = update_chainstate(chain, write, state)
     applyrule(tail(chain), data, updated, index)
 end
 @inline applyrule(rules::Chain{R,W,Tuple{}}, data, state::NamedTuple, index, args...
@@ -62,7 +62,7 @@ readstate(chain::Chain, state::NamedTuple) = begin
     end
 end
 
-updatestate(chain::Chain, write, state::NamedTuple) = begin
+update_chainstate(chain::Chain, write, state::NamedTuple) = begin
     chainkeys = map(Val, keys(chain))
     wkeys = writekeys(chain[1])
     wkeys = if wkeys isa Tuple
@@ -70,14 +70,14 @@ updatestate(chain::Chain, write, state::NamedTuple) = begin
     else
         Val(wkeys)
     end
-    writestate(chainkeys, wkeys, write, state)
+    update_chainstate(chainkeys, wkeys, write, state)
 end
 
-@inline writestate(chainkeys::Tuple, wkeys::Tuple, write, state) = begin
+@inline update_chainstate(chainkeys::Tuple, wkeys::Tuple, write, state) = begin
     state = writestate(chainkeys, wkeys[1], writestate, state)
     writestate(chainkeys, tail(wkeys), writestate, state)
 end
-@inline writestate(chainkeys::Tuple, writekey::Val, write, state) =
+@inline update_chainstate(chainkeys::Tuple, writekey::Val, write, state) =
     map(state, NamedTuple{keys(state)}(chainkeys)) do s, ck
         writekey == ck ? write : s
     end

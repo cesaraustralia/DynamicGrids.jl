@@ -53,7 +53,7 @@ initframes!(o::GraphicOutput, init::NamedTuple) = begin
 end
 
 
-storegrid!(o::GraphicOutput, data) = begin
+storegrid!(o::GraphicOutput, data::AbstractSimData) = begin
     f = currentframe(data)
     if isstored(o)
         push!(o, fill!(similar(o[1]), zero(eltype(o[1]))))
@@ -67,7 +67,7 @@ end
 storegrid!(o::GraphicOutput, data::AbstractSimData) =
     storegrid!(eltype(o), o, data)
 storegrid!(::Type{<:NamedTuple}, o::GraphicOutput, data::AbstractSimData) = begin
-    f = currentframe(data) 
+    f = currentframe(data)
     if isstored(o)
         push!(o, map(grid -> fill!(similar(grid), zero(eltype(grid))), o[1]))
         storegrid!(o, data, f)
@@ -78,7 +78,7 @@ storegrid!(::Type{<:NamedTuple}, o::GraphicOutput, data::AbstractSimData) = begi
     isshowable(o, f) && showgrid(o, data, f, currenttime(data))
 end
 storegrid!(::Type{<:AbstractArray}, o::GraphicOutput, data::AbstractSimData) = begin
-    f = currentframe(data) 
+    f = currentframe(data)
     if isstored(o)
         push!(o, fill!(similar(o[1]), zero(eltype(o[1]))))
         storegrid!(o, data, f)

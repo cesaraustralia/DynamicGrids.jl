@@ -63,7 +63,7 @@ ReadableGridData(init::AbstractArray, mask, radius, overflow) = begin
         blocksize = 2r
         source = addpadding(init, r)
         nblocs = indtoblock.(size(source), blocksize) .+ 1
-        sourcestatus = BitArray(zeros(Bool, nblocs))
+        sourcestatus = zeros(Bool, nblocs)
         deststatus = deepcopy(sourcestatus)
         updatestatus!(source, sourcestatus, deststatus, r)
 
@@ -94,15 +94,15 @@ source/dest array.
 @GridDataMixin struct WritableGridData{} <: GridData{T,N,I} end
 
 ConstructionBase.constructorof(::Type{WritableGridData}) =
-    (init, args...) -> SimData{eltype(init),ndims(init),typeof(init),typeof.(args)...}(init, args...)
+    (init, args...) -> WritableGridData{eltype(init),ndims(init),typeof(init),typeof.(args)...}(init, args...)
 
 Base.@propagate_inbounds Base.setindex!(d::WritableGridData, x, I...) = begin
     r = radius(d)
-    if r > 0
+    @inbounds dest(d)[I...] = x
+    if deststatus(d) isa AbstractArray
         bi = indtoblock.(I .+ r, 2r)
-        deststatus(d)[bi...] = true
+        @inbounds deststatus(d)[bi...] = true
     end
-    dest(d)[I...] = x
 end
 
 Base.@propagate_inbounds Base.getindex(d::WritableGridData, I...) = getindex(dest(d), I...)
@@ -147,16 +147,17 @@ SimData(init, griddata, ruleset::Ruleset, starttime) =
 init(d::SimData) = d.init
 ruleset(d::SimData) = d.ruleset
 data(d::SimData) = d.data
+grids(d::SimData) = d.data
 starttime(d::SimData) = d.starttime
 currenttime(d::SimData) = d.currenttime
 currentframe(d::SimData) = d.currentframe
 
 # Getters forwarded to data
-Base.getindex(d::SimData, key) = getindex(data(d), key)
-Base.keys(d::SimData) = keys(data(d))
-Base.values(d::SimData) = values(data(d))
-Base.first(d::SimData) = first(data(d))
-Base.last(d::SimData) = last(data(d))
+Base.getindex(d::SimData, key) = getindex(grids(d), key)
+Base.keys(d::SimData) = keys(grids(d))
+Base.values(d::SimData) = values(grids(d))
+Base.first(d::SimData) = first(grids(d))
+Base.last(d::SimData) = last(grids(d))
 gridsize(d::SimData) = gridsize(first(d))
 mask(d::SimData) = mask(ruleset(d))
 rules(d::SimData) = rules(ruleset(d))
@@ -214,8 +215,8 @@ end
 Initialise the block status array.
 This tracks whether anything has to be done in an area of the main array.
 =#
-updatestatus!(data::Tuple) = map(updatestatus!, data)
-updatestatus!(data::AbstractSimData) =
+updatestatus!(data::NamedTuple) = map(updatestatus!, data)
+updatestatus!(data::GridData) =
     updatestatus!(parent(source(data)), sourcestatus(data), deststatus(data), radius(data))
 updatestatus!(source, sourcestatus::Bool, deststatus::Bool, radius) = nothing
 updatestatus!(source, sourcestatus, deststatus, radius) = begin
@@ -225,8 +226,8 @@ updatestatus!(source, sourcestatus, deststatus, radius) = begin
         # Mark the status block if there is a non-zero value
         if source[i] != 0
             bi = indtoblock.(Tuple(i), blocksize)
-            sourcestatus[bi...] = true
-            deststatus[bi...] = true
+            @inbounds sourcestatus[bi...] = true
+            @inbounds deststatus[bi...] = true
         end
     end
 end
@@ -251,12 +252,12 @@ initdata!(::Nothing, ruleset::Ruleset, init, starttime, nreplicates::Nothing) =
     SimData(init, ruleset, starttime)
 
 # Initialise a SimData object with a new `Ruleset` and starttime.
-initdata!(simdata::AbstractSimData, ruleset::Ruleset, initgrids, starttime) = begin
-    map(values(simdata), initgrids) do data, init
-        for j in 1:gridsize(data)[2], i in 1:gridsize(simdata)[1]
-            @inbounds source(data)[i, j] = dest(data)[i, j] = init[i, j]
+initdata!(simdata::AbstractSimData, ruleset::Ruleset, inits::NamedTuple, starttime) = begin
+    map(values(simdata), values(inits)) do grid, init
+        for j in 1:gridsize(grid)[2], i in 1:gridsize(grid)[1]
+            @inbounds source(grid)[i, j] = dest(grid)[i, j] = init[i, j]
         end
-        updatestatus!(data)
+        updatestatus!(grid)
     end
     @set! simdata.ruleset = ruleset
     @set! simdata.starttime = starttime
