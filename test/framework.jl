@@ -1,6 +1,7 @@
-using DynamicGrids, Test
+using DynamicGrids, Test, Setfield
 import DynamicGrids: applyrule, applyrule!, maprule!, 
-       SimData, source, dest, currenttime
+       source, dest, currenttime, getdata, combinedata, ruleloop,
+       SimData, WritableGridData, Read, Write
 
 init  = [0 1 1 0;
          0 1 1 0;
@@ -8,7 +9,7 @@ init  = [0 1 1 0;
          0 1 1 0;
          0 1 1 0]
 
-struct TestRule <: Rule end
+struct TestRule{R,W} <: Rule{R,W} end
 applyrule(::TestRule, data, state, index) = 0
 
 @testset "a rule that returns zero gives zero outputs" begin
@@ -18,24 +19,43 @@ applyrule(::TestRule, data, state, index) = 0
              0 0 0 0;
              0 0 0 0]
 
-    ruleset = Ruleset(TestRule(); init=init)
-    data = SimData(ruleset, init, 1)
-    maprule!(data, ruleset.rules[1])
-    @test dest(data) == final
+    rule = TestRule()
+    ruleset = Ruleset(rule; init=init)
+    simdata = SimData(init, ruleset, 1)
+
+    # Test maprules components
+    rkeys, rdata = getdata(Read(), rule, simdata)
+    wkeys, wdata = getdata(Write(), rule, simdata)
+    @test rkeys == Val{:_default_}()
+    @test wkeys == Val{:_default_}()
+    newsimdata = @set simdata.data = combinedata(rkeys, rdata, wkeys, wdata)
+    @test newsimdata.data[1] isa WritableGridData
+    # Test type stability
+    @inferred ruleloop(rule, newsimdata, rkeys, rdata, wkeys, wdata)
+    
+    resultdata = maprule!(simdata, rule)
+    @test source(resultdata[:_default_]) == final
 end
 
-struct TestPartial <: PartialRule end
+struct TestPartial{R,W} <: PartialRule{R,W} end
 applyrule!(::TestPartial, data, state, index) = 0
 
 @testset "a partial rule that returns zero does nothing" begin
-    ruleset = Ruleset(TestPartial(); init=init)
-    data = SimData(ruleset, init, 1)
-    maprule!(data, ruleset.rules[1])
-    @test dest(data) == init
+    rule = TestPartial()
+    ruleset = Ruleset(rule; init=init)
+    # Test type stability
+    simdata = SimData(init, ruleset, 1)
+    rkeys, rdata = getdata(Read(), rule, simdata)
+    wkeys, wdata = getdata(Write(), rule, simdata)
+    newsimdata = @set simdata.data = combinedata(wkeys, wdata, rkeys, rdata)
+    @inferred ruleloop(rule, newsimdata, rkeys, rdata, wkeys, wdata)
+
+    resultdata = maprule!(simdata, rule)
+    @test source(resultdata[:_default_]) == init
 end
 
-struct TestPartialWrite <: PartialRule end
-applyrule!(::TestPartialWrite, data, state, index) = data[index[1], 2] = 0
+struct TestPartialWrite{R,W} <: PartialRule{R,W} end
+applyrule!(::TestPartialWrite, data, state, index) = data[:_default_][index[1], 2] = 0
 
 @testset "a partial rule that writes to dest affects output" begin
     final = [0 0 1 0;
@@ -44,17 +64,18 @@ applyrule!(::TestPartialWrite, data, state, index) = data[index[1], 2] = 0
              0 0 1 0;
              0 0 1 0]
 
-    ruleset = Ruleset(TestPartialWrite(); init=init)
-    data = SimData(ruleset, init, 1)
-    maprule!(data, ruleset.rules[1])
-    @test dest(data) == final
+    rule = TestPartialWrite()
+    ruleset = Ruleset(rule; init=init)
+    simdata = SimData(init, ruleset, 1)
+    resultdata = maprule!(simdata, rule)
+    @test source(first(resultdata)) == final
 end
 
-struct TestCellTriple <: CellRule end
+struct TestCellTriple{R,W} <: CellRule{R,W} end
 applyrule(::TestCellTriple, data, state, index) = 3state
 
-struct TestCellSquare <: CellRule end
-applyrule(::TestCellSquare, data, state, index) = state^2
+struct TestCellSquare{R,W} <: CellRule{R,W} end
+applyrule(::TestCellSquare, data, (state,), index) = state^2
 
 @testset "a chained cell rull" begin
     init  = [0 1 2 3;
@@ -62,14 +83,15 @@ applyrule(::TestCellSquare, data, state, index) = state^2
 
     final = [0 9 36 81;
              144 225 324 441]
-
-    ruleset = Ruleset(Chain(TestCellTriple(), TestCellSquare()); init=init)
-    data = SimData(ruleset, init, 1)
-    maprule!(data, ruleset.rules[1])
-    @test dest(data) == final
+    rule = Chain(TestCellTriple(), 
+                 TestCellSquare())
+    ruleset = Ruleset(rule; init=init)
+    simdata = SimData(init, ruleset, 1)
+    resultdata = maprule!(simdata, ruleset.rules[1]);
+    @test source(first(resultdata)) == final
 end
 
-struct PrecalcRule{P} <: Rule 
+struct PrecalcRule{R,W,P} <: Rule{R,W}
     precalc::P
 end
 DynamicGrids.precalcrules(rule::PrecalcRule, data) = 
@@ -86,9 +108,12 @@ applyrule(rule::PrecalcRule, data, state, index) = rule.precalc[]
     out3  = [3 3;
              3 3]
 
-    ruleset = Ruleset(PrecalcRule(1); init=init)
+    rule = PrecalcRule(1)
+    ruleset = Ruleset(rule; init=init)
     output = ArrayOutput(init, 3)
     sim!(output, ruleset; tspan=(1, 3))
     @test output[2] == out2
     @test output[3] == out3
 end
+
+

@@ -23,12 +23,15 @@ struct RadialNeighborhood{R} <: AbstractRadialNeighborhood{R} end
 
 ConstructionBase.constructorof(::Type{RadialNeighborhood{R}}) where R = RadialNeighborhood{R}()
 
-neighbors(hood::AbstractRadialNeighborhood, buf) =
-    (buf[i] for i in 1:hoodsize(hood)^2)
+neighbors(hood::AbstractRadialNeighborhood, buf) = begin
+    hoodlen = hoodsize(hood)^2
+    centerpoint = hoodlen ÷ 2 + 1
+    (buf[i] for i in 1:hoodlen if i != centerpoint)
+end
 
 sumneighbors(hood::AbstractRadialNeighborhood, buf, state) = sum(buf) - state
 
-@inline mapsetneighbor!(data::AbstractSimData, hood::AbstractRadialNeighborhood, rule, state, index) = begin
+@inline mapsetneighbor!(data::WritableGridData, hood::AbstractRadialNeighborhood, rule, state, index) = begin
     r = radius(hood)
     sum = zero(state)
     # Loop over dispersal kernel grid dimensions
@@ -109,32 +112,26 @@ LayeredCustomNeighborhood(l::Tuple) =
 """
 A convenience wrapper to build a VonNeumann neighborhoods as a `CustomNeighborhood`.
 
-# TODO: variable radius
+TODO: variable radius
 """
 VonNeumannNeighborhood() = CustomNeighborhood(((0,-1), (-1,0), (1,0), (0,1)))
 
 """
 Find the largest radius present in the passed in rules.
 """
-radius(set::MultiRuleset) = begin
-    allkeys = Tuple(union(map(keys, interactions(set))..., keys(ruleset(set))))
-    ruleradii = radius(ruleset(set))
-    maxradii = Tuple(max(get(ruleradii, key, 0), radius(interactions(set), key)) for key in allkeys)
+radius(set::Ruleset) = begin
+    allkeys = Tuple(union(map(keys, rules(set))...))
+    maxradii = Tuple(radius(rules(set), key) for key in allkeys)
     NamedTuple{allkeys}(maxradii)
 end
-radius(rulesets::NamedTuple) where K = map(radius, rulesets)
-radius(ruleset::Ruleset) = radius(rules(ruleset))
-# Get radius of specific key from all interactions
-radius(interactions::Tuple{<:Interaction,Vararg}, key) = 
-    reduce(max, radius(i) for i in interactions if key in keys(i); init=0)
+radius(set::Ruleset{Tuple{}}) = NamedTuple{(),Tuple{}}(())
+# Get radius of specific key from all rules
+radius(rules::Tuple{<:Rule,Vararg}, key) =
+    reduce(max, radius(i) for i in rules if key in keys(i); init=0)
 radius(rules::Tuple) = mapreduce(radius, max, rules)
-radius(rules::Tuple, key) = mapreduce(rule -> radius(rule, key), max, rules)
 radius(rules::Tuple{}, args...) = 0
 
-radius(rule::NeighborhoodRule) = radius(neighborhood(rule))
-radius(rule::PartialNeighborhoodRule) = radius(neighborhood(rule))
-radius(rule::NeighborhoodInteraction) = radius(neighborhood(rule))
-radius(rule::PartialNeighborhoodInteraction) = radius(neighborhood(rule))
+# TODO radius only for neighborhood grid
+radius(rule::NeighborhoodRule, args...) = radius(neighborhood(rule))
+radius(rule::PartialNeighborhoodRule, args...) = radius(neighborhood(rule))
 radius(rule::Rule, args...) = 0
-# Only the first rule in a chain can have a radius larger than zero.
-radius(chain::Chain) = radius(chain[1])

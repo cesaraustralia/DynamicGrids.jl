@@ -27,7 +27,7 @@ allocategrids!(output, init, 3:5)
 
 # Test storing a new frame
 @test output[3] != update
-data = SimData(ruleset, update, 1)
+data = SimData((_default_=update,), ruleset, 1)
 storegrid!(output, data, 3)
 @test output[3] == update
 

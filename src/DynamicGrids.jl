@@ -5,8 +5,8 @@ module DynamicGrids
     include_dependency(path)
     # Use [`XX`](@ref) in the docs but not the readme
     text = replace(read(path, String), r"`(\w+\w)`" => s"[`\1`](@ref)")
-    # Use doctests
-    replace(text, "```julia" => "```jldoctest")
+    # Run examples
+    replace(text, "```julia" => "```@example")
 end DynamicGrids
 
 using Colors,
@@ -35,16 +35,11 @@ import FieldMetadata: @description, description, @limits, limits,
 
 export sim!, resume!, replay, savegif
 
-export AbstractSimData, SimData, MultiSimData
+export Rule, NeighborhoodRule, CellRule, PartialRule, PartialNeighborhoodRule
 
-export Rule, PartialRule, NeighborhoodRule, PartialNeighborhoodRule, CellRule, Chain
+export Chain, Map, Life
 
-export Interaction, NeighborhoodInteraction, CellInteraction,
-       PartialInteraction, PartialNeighborhoodInteraction
-
-export AbstractRuleset, Ruleset, MultiRuleset
-
-export Life
+export AbstractRuleset, Ruleset
 
 export Neighborhood, AbstractRadialNeighborhood, RadialNeighborhood,
        AbstractCustomNeighborhood, CustomNeighborhood, LayeredCustomNeighborhood,
@@ -74,7 +69,6 @@ const FIELDDOCTABLE = FieldDocTable((:Description, :Default, :Limits),
     """
 
 include("rules.jl")
-include("interactions.jl")
 include("chain.jl")
 include("rulesets.jl")
 include("simulationdata.jl")
@@ -87,8 +81,6 @@ include("interface.jl")
 include("framework.jl")
 include("sequencerules.jl")
 include("maprules.jl")
-include("applyrule.jl")
-include("mapinteractions.jl")
 include("neighborhoods.jl")
 include("utils.jl")
 include("life.jl")

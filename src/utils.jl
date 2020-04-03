@@ -17,7 +17,7 @@ wrapped equivalent, and `true` as it is allways in-bounds.
     b, inbounds_b = inbounds(xs[2], maxs[2], overflow)
     (a, b), inbounds_a & inbounds_b
 end
-@inline inbounds(x::Number, max::Number, overflow::RemoveOverflow) = 
+@inline inbounds(x::Number, max::Number, overflow::RemoveOverflow) =
     x, isinbounds(x, max, overflow)
 @inline inbounds(x::Number, max::Number, overflow::WrapOverflow) =
     if x < oneunit(x)
@@ -28,14 +28,14 @@ end
         x, true
     end
 @inline isinbounds(xs::Tuple, maxs::Tuple, overflow) = all(isinbounds.(xs, maxs, Ref(overflow)))
-@inline isinbounds(x::Number, max::Number, overflow::RemoveOverflow) = 
+@inline isinbounds(x::Number, max::Number, overflow::RemoveOverflow) =
     x > zero(x) && x <= max
 
 
 """
     hoodsize(radius)
 
-Get the size of a neighborhood dimension from its radius, 
+Get the size of a neighborhood dimension from its radius,
 which is always 2r + 1.
 """
 hoodsize(hood::Neighborhood) = hoodsize(radius(hood))
@@ -52,5 +52,11 @@ ruletypes(ts::Type{<:Tuple}) = (ruletypes.(ts.parameters)...,)
 Check if a cell is masked, using the passed-in mask grid.
 """
 @inline ismasked(data::AbstractSimData, I...) = ismasked(mask(data), I...)
+@inline ismasked(data::GridData, I...) = ismasked(mask(data), I...)
 @inline ismasked(mask::Nothing, I...) = false
-@inline ismasked(mask::AbstractArray, I...) = @inbounds return !(mask[I...])
+@inline ismasked(mask::AbstractArray, I...) = begin
+    @inbounds return !(mask[I...])
+end
+
+unwrap(::Val{X}) where X = X
+unwrap(::Type{Val{X}}) where X = X

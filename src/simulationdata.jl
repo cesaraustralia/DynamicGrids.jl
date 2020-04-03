@@ -1,91 +1,61 @@
-"""
-Simulation data hold all intermediate arrays, timesteps
-and frame numbers for the current frame of the siulation.
-
-It is accessable from a rule.
-"""
-abstract type AbstractSimData end
 
 """
-Simulation data for a singule ruleset.
+Simulation data specific to a singule grid.
 """
-abstract type SingleSimData{T,N,I} <: AbstractSimData end
+abstract type GridData{T,N,I} end
 
-"""
-Common fields for SimData and WritableSimData. Which are basically 
-identical except for with methods.
-"""
-@mix struct SimDataMixin{T,N,I<:AbstractArray{T,N},S,St,LSt,B,Ra,Ru,STi,CTi,CFr}
+# Common fields for SimData and WritableGridData. Which are basically
+# identical except for with methods.
+@mix struct GridDataMixin{T,N,I<:AbstractArray{T,N},M,R,O,S,St,LSt,B}
     init::I
+    mask::M
+    radius::R
+    overflow::O
     source::S
     dest::S
     sourcestatus::St
     deststatus::St
     localstatus::LSt
     buffers::B
-    radius::Ra
-    ruleset::Ru
-    starttime::STi
-    currenttime::CTi
-    currentframe::CFr
 end
 
-SimDataOrReps = Union{AbstractSimData, Vector{<:AbstractSimData}}
+GridDataOrReps = Union{GridData, Vector{<:GridData}}
 
-(::Type{T})(data::AbstractSimData) where T <: AbstractSimData =
-    T(init(data), source(data), dest(data), sourcestatus(data), deststatus(data),
-      localstatus(data), buffers(data), radius(data), ruleset(data), starttime(data),
-      currenttime(data), currentframe(data))
+(::Type{T})(d::GridData) where T <: GridData =
+    T(init(d), mask(d), radius(d), overflow(d), source(d), dest(d),
+      sourcestatus(d), deststatus(d), localstatus(d), buffers(d))
 
 # Array interface
-Base.length(d::SingleSimData) = length(source(d))
-Base.firstindex(d::SingleSimData) = firstindex(source(d))
-Base.lastindex(d::SingleSimData) = lastindex(source(d))
-Base.size(d::SingleSimData) = size(source(d))
-Base.broadcast(d::SingleSimData, args...) = broadcast(source(d), args...)
-Base.broadcast!(d::SingleSimData, args...) = broadcast!(dest(d), args...)
-Base.iterate(d::SingleSimData, args...) = iterate(source(d), args...)
-Base.ndims(::SingleSimData{T,N}) where {T,N} = N
-Base.eltype(::SingleSimData{T}) where T = T
+Base.length(d::GridData) = length(source(d))
+Base.firstindex(d::GridData) = firstindex(source(d))
+Base.lastindex(d::GridData) = lastindex(source(d))
+Base.size(d::GridData) = size(source(d))
+Base.iterate(d::GridData, args...) = iterate(source(d), args...)
+Base.ndims(::GridData{T,N}) where {T,N} = N
+Base.eltype(::GridData{T}) where T = T
 
 # Getters
-init(d::SingleSimData) = d.init
-source(d::SingleSimData) = d.source
-dest(d::SingleSimData) = d.dest
-sourcestatus(d::SingleSimData) = d.sourcestatus
-deststatus(d::SingleSimData) = d.deststatus
-localstatus(d::SingleSimData) = d.localstatus
-buffers(d::SingleSimData) = d.buffers
-radius(d::SingleSimData) = d.radius
-ruleset(d::SingleSimData) = d.ruleset
-starttime(d::SingleSimData) = d.starttime
-currenttime(d::SingleSimData) = d.currenttime
-currentframe(d::SingleSimData) = d.currentframe
+init(d::GridData) = d.init
+mask(d::GridData) = d.mask
+radius(d::GridData) = d.radius
+overflow(d::GridData) = d.overflow
+source(d::GridData) = d.source
+dest(d::GridData) = d.dest
+sourcestatus(d::GridData) = d.sourcestatus
+deststatus(d::GridData) = d.deststatus
+localstatus(d::GridData) = d.localstatus
+buffers(d::GridData) = d.buffers
+gridsize(d::GridData) = size(init(d))
 
-
-# Getters forwarded to ruleset
-framesize(d::SingleSimData) = size(init(d))
-rules(d::SingleSimData) = rules(ruleset(d))
-mask(d::SingleSimData) = mask(ruleset(d))
-overflow(d::SingleSimData) = overflow(ruleset(d))
-timestep(d::SingleSimData) = timestep(ruleset(d))
-cellsize(d::SingleSimData) = cellsize(ruleset(d))
 
 """
-Get the actual current timestep, ie. not variable periods like Month
-"""
-currenttimestep(d::AbstractSimData) = currenttime(d) + timestep(d) - currenttime(d)
-
-
-""" 
 Simulation data and storage passed to rules for each timestep.
 """
-@SimDataMixin struct SimData{} <: SingleSimData{T,N,I} end
+@GridDataMixin struct ReadableGridData{} <: GridData{T,N,I} end
 
-"""
-Generate simulation data to match a ruleset and init array.
-"""
-SimData(ruleset::Ruleset, init::AbstractArray, starttime, r=radius(ruleset)) = begin
+# Generate simulation data to match a ruleset and init array.
+ReadableGridData(init::AbstractArray, mask, radius, overflow) = begin
+    r = radius
     # We add one extra row/column so we dont have to worry about
     # special casing the last block
     if r > 0
@@ -93,7 +63,7 @@ SimData(ruleset::Ruleset, init::AbstractArray, starttime, r=radius(ruleset)) = b
         blocksize = 2r
         source = addpadding(init, r)
         nblocs = indtoblock.(size(source), blocksize) .+ 1
-        sourcestatus = BitArray(zeros(Bool, nblocs))
+        sourcestatus = zeros(Bool, nblocs)
         deststatus = deepcopy(sourcestatus)
         updatestatus!(source, sourcestatus, deststatus, r)
 
@@ -106,94 +76,127 @@ SimData(ruleset::Ruleset, init::AbstractArray, starttime, r=radius(ruleset)) = b
         localstatus = nothing
     end
     dest = deepcopy(source)
-    currentframe = 1
-    currenttime = starttime
 
-    SimData(init, source, dest, sourcestatus, deststatus, localstatus, buffers, r,
-            ruleset, starttime, currenttime, currentframe)
+    ReadableGridData(init, mask, radius, overflow, source, dest,
+                     sourcestatus, deststatus, localstatus, buffers)
 end
 
-ConstructionBase.constructorof(::Type{SimData}) =
-    (init, args...) -> SimData{eltype(init),ndims(init),typeof(init),typeof.(args)...}(init, args...)
+ConstructionBase.constructorof(::Type{ReadableGridData}) =
+    (init, args...) -> ReadableGridData{eltype(init),ndims(init),typeof(init),typeof.(args)...}(init, args...)
 
-Base.@propagate_inbounds Base.getindex(d::SimData, I...) = getindex(source(d), I...)
-
+Base.@propagate_inbounds Base.getindex(d::ReadableGridData, I...) = getindex(source(d), I...)
 
 """
-Simulation data for MultiRuleset models
+WriteableGridData is passed to rules `<: PartialRule`, and can be written to directly as
+an array. This handles updates to block optimisations and writing to the correct
+source/dest array.
 """
-struct MultiSimData{I,D<:NamedTuple,Ru} <: AbstractSimData
+@GridDataMixin struct WritableGridData{} <: GridData{T,N,I} end
+
+ConstructionBase.constructorof(::Type{WritableGridData}) =
+    (init, args...) -> WritableGridData{eltype(init),ndims(init),typeof(init),typeof.(args)...}(init, args...)
+
+Base.@propagate_inbounds Base.setindex!(d::WritableGridData, x, I...) = begin
+    r = radius(d)
+    @inbounds dest(d)[I...] = x
+    if deststatus(d) isa AbstractArray
+        bi = indtoblock.(I .+ r, 2r)
+        @inbounds deststatus(d)[bi...] = true
+    end
+end
+
+Base.@propagate_inbounds Base.getindex(d::WritableGridData, I...) = getindex(dest(d), I...)
+
+
+
+abstract type AbstractSimData end
+
+"""
+Simulation data hold all intermediate arrays, timesteps
+and frame numbers for the current frame of the siulation.
+
+A simdata object is accessable in `applyrule` as the second parameter.
+
+Multiple grids can be indexed into using their key. Single grids
+can be indexed as if SimData is regular array.
+"""
+struct SimData{I,D,Ru,STi,CTi,CFr} <: AbstractSimData
     init::I
     data::D
     ruleset::Ru
+    starttime::STi
+    currenttime::CTi
+    currentframe::CFr
 end
+SimData(init::AbstractArray, ruleset::Ruleset, starttime) =
+    SimData((_default_=init,), ruleset::Ruleset, starttime)
+SimData(init::NamedTuple, ruleset::Ruleset, starttime) = begin
+    # Calculate the neighborhood radus (and grid padding) for each grid
+    radii = NamedTuple{keys(init)}(get(radius(ruleset), key, 0) for key in keys(init))
+    # Construct the SimData for each grid
+    griddata = map(init, radii) do in, ra
+        ReadableGridData(in, mask(ruleset), ra, overflow(ruleset))
+    end
+    SimData(init, griddata, ruleset, starttime)
+end
+SimData(init, griddata, ruleset::Ruleset, starttime) =
+    SimData(init, griddata, ruleset, starttime, starttime, 1)
+
 
 # Getters
-init(d::MultiSimData) = d.init
-ruleset(d::MultiSimData) = d.ruleset
-data(d::MultiSimData) = d.data
-
-Base.getindex(d::MultiSimData, key) = begin
-    getindex(data(d), key)
-end
-Base.keys(d::MultiSimData) = keys(data(d))
-
+init(d::SimData) = d.init
+ruleset(d::SimData) = d.ruleset
+data(d::SimData) = d.data
+grids(d::SimData) = d.data
+starttime(d::SimData) = d.starttime
+currenttime(d::SimData) = d.currenttime
+currentframe(d::SimData) = d.currentframe
 
 # Getters forwarded to data
-firstdata(d::MultiSimData) = first(data(d))
+Base.getindex(d::SimData, key) = getindex(grids(d), key)
+Base.keys(d::SimData) = keys(grids(d))
+Base.values(d::SimData) = values(grids(d))
+Base.first(d::SimData) = first(grids(d))
+Base.last(d::SimData) = last(grids(d))
+gridsize(d::SimData) = gridsize(first(d))
+mask(d::SimData) = mask(ruleset(d))
+rules(d::SimData) = rules(ruleset(d))
+overflow(d::SimData) = overflow(ruleset(d))
+timestep(d::SimData) = timestep(ruleset(d))
 
-interactions(d::MultiSimData) = interactions(ruleset(d))
-framesize(d::MultiSimData) = framesize(firstdata(d))
-source(d::MultiSimData) = source(firstdata(d))
-dest(d::MultiSimData) = dest(firstdata(d))
-sourcestatus(d::MultiSimData) = sourcestatus(firstdata(d))
-deststatus(d::MultiSimData) = deststatus(firstdata(d))
-localstatus(d::MultiSimData) = localstatus(firstdata(d))
-buffers(d::MultiSimData) = buffers(firstdata(d))
-radius(d::MultiSimData) = radius(firstdata(d))
-starttime(d::MultiSimData) = starttime(firstdata(d))
-currenttime(d::MultiSimData) = currenttime(firstdata(d))
-currentframe(d::MultiSimData) = currentframe(firstdata(d))
+# Get the actual current timestep, ie. not variable periods like Month
+currenttimestep(d::SimData) = currenttime(d) + timestep(d) - currenttime(d)
 
 
-# Getters forwarded to ruleset
-firstruleset(d::MultiSimData) = first(ruleset(ruleset(d)))
-
-# rules(d::MultiSimData) = map(rules, ruleset(d))
-mask(d::MultiSimData) = mask(firstruleset(d))
-overflow(d::MultiSimData) = overflow(firstruleset(d))
-timestep(d::MultiSimData) = timestep(firstruleset(d))
-cellsize(d::MultiSimData) = cellsize(firstruleset(d))
-
-"""
-Swap source and dest arrays. Allways returns regular SimData.
-"""
-swapsource(data::SingleSimData) = begin
+# Swap source and dest arrays. Allways returns regular SimData.
+swapsource(d::SimData) = begin
+    @set d.data = swapsource(d.data)
+end
+swapsource(d::Tuple) = map(swapsource, d)
+swapsource(data::GridData) = begin
     src = data.source
     dst = data.dest
     @set! data.dest = src
     @set data.source = dst
 end
-swapsource(d::MultiSimData) = @set d.data = map(swapsource, d.data)
 
-"""
-Uptate timestamp
-"""
+# Uptate timestamp
 updatetime(data::SimData, f::Integer) = begin
     @set! data.currentframe = f
     @set data.currenttime = timefromframe(data, f)
 end
-updatetime(data::AbstractVector{<:SimData}, f) = updatetime.(data, f)
-updatetime(multidata::MultiSimData, f) =
-    @set multidata.data = map(d -> updatetime(d, f), data(multidata))
+updatetime(simdata::AbstractVector{<:SimData}, f) = updatetime.(simdata, f)
+updatetime(simdata::SimData, f) =
+    @set simdata.data = map(d -> updatetime(d, f), data(simdata))
 
-timefromframe(data::AbstractSimData, f::Int) = starttime(data) + (f - 1) * timestep(data)
+timefromframe(simdata::AbstractSimData, f::Int) =
+    starttime(simdata) + (f - 1) * timestep(simdata)
 
-"""
+#=
 Find the maximum radius required by all rules
 Add padding around the original init array, offset into the negative
 So that the first real cell is still 1, 1
-"""
+=#
 addpadding(init::AbstractArray{T,N}, r) where {T,N} = begin
     sze = size(init)
     paddedsize = sze .+ 2r
@@ -208,122 +211,61 @@ addpadding(init::AbstractArray{T,N}, r) where {T,N} = begin
     source
 end
 
-"""
-Copy status from one array to another, allowing
-for doing nothing if they are not both arrays.
-"""
-copystatus!(copyto, copyfrom) = nothing
-copystatus!(copyto::AbstractArray, copyfrom::AbstractArray) =
-    @inbounds copyto .= copyfrom
-
-"""
+#=
 Initialise the block status array.
 This tracks whether anything has to be done in an area of the main array.
-"""
-updatestatus!(data::Tuple) = map(updatestatus!, data) 
-updatestatus!(data::AbstractSimData) = 
+=#
+updatestatus!(data::NamedTuple) = map(updatestatus!, data)
+updatestatus!(data::GridData) =
     updatestatus!(parent(source(data)), sourcestatus(data), deststatus(data), radius(data))
-updatestatus!(source, sourcestatus::Bool, deststatus::Bool, r) = nothing
-updatestatus!(source, sourcestatus, deststatus, r) = begin
-    blocksize = 2r
+updatestatus!(source, sourcestatus::Bool, deststatus::Bool, radius) = nothing
+updatestatus!(source, sourcestatus, deststatus, radius) = begin
+    blocksize = 2radius
     source = parent(source)
     for i in CartesianIndices(source)
         # Mark the status block if there is a non-zero value
         if source[i] != 0
             bi = indtoblock.(Tuple(i), blocksize)
-            sourcestatus[bi...] = true
-            deststatus[bi...] = true
+            @inbounds sourcestatus[bi...] = true
+            @inbounds deststatus[bi...] = true
         end
     end
 end
 
-copystatus!(data::Tuple{Vararg{<:AbstractSimData}}) = map(copystatus!, data)
-copystatus!(data::AbstractSimData) =
+copystatus!(data::Tuple{Vararg{<:GridData}}) = map(copystatus!, data)
+copystatus!(data::GridData) =
     copystatus!(sourcestatus(data), deststatus(data))
-copystatus!(srcstatus::AbstractArray, deststatus::AbstractArray) = srcstatus .= deststatus
 copystatus!(srcstatus, deststatus) = nothing
+copystatus!(srcstatus::AbstractArray, deststatus::AbstractArray) =
+    @inbounds return srcstatus .= deststatus
 
-"""
-When no simdata is passed in, the existing SimData arrays are re-initialised
-"""
-initdata!(simdata::Nothing, ruleset::Ruleset, init, starttime, nreplicates::Nothing) =
-    SimData(ruleset, init, starttime)
-"""
-When no simdata is passed in, the existing SimData arrays are re-initialised
-"""
-initdata!(simdata::Nothing, ruleset::Ruleset, init, starttime, nreplicates::Integer) =
-    [SimData(ruleset, init, starttime) for r in 1:nreplicates]
-"""
-When simdata is passed in, the existing SimData arrays are re-initialised
-"""
-initdata!(simdata::AbstractSimData, ruleset, init::AbstractArray, starttime, nreplicates) =
-    initdata!(simdata, ruleset, starttime)
-"""
-When SimData with replicates is passed in, the existing SimData replicates are re-initialised
-"""
-initdata!(simdata::AbstractVector{<:AbstractSimData}, ruleset, init::AbstractArray, starttime, nreplicates::Integer) =
-    map(d -> initdata!(d, ruleset, init, starttime, nreplicates), simdata)
-"""
-MultiRuleset needs additional initialisation steps.
-"""
-initdata!(::Nothing, multiruleset::MultiRuleset, init::NamedTuple, starttime, nreplicates::Nothing) = begin
-    # Add empty rulesets where missing in the MultiRuleset
-    rulesets = NamedTuple{keys(init)}(get(ruleset(multiruleset), key, Ruleset(;timestep=timestep(multiruleset))) for key in keys(init))
-    # Calculate the neighborhood radus (and grid padding) for each grid
-    radii = NamedTuple{keys(init)}(get(radius(multiruleset), key, 0) for key in keys(init))
-    # Construct the SimData for each grid
-    multidata = map((rs, ra, in) -> SimData(rs, in, starttime, ra), rulesets, radii, init)
-    MultiSimData(init, multidata, multiruleset)
-end
-#"""
-#MultiRuleset with existing MultiSimData, object reinitialises the object.
-#TODO: make this work
-#"""
-#initdata!(multidata::MultiSimData, multiruleset::MultiRuleset, init, starttime, nreplicates::Nothing) =
-    #MultiSimData(map((d, rs) -> initdata!(d, rs, starttime), data(MultiSimData), ruleset(multiruleset))),
-                 #interactions(multiruleset))
-"""
-Initialise a SimData object with a new `Ruleset` and starttime.
-"""
-initdata!(simdata::AbstractSimData, ruleset::Ruleset, starttime) = begin
-    for j in 1:framesize(simdata)[2], i in 1:framesize(simdata)[1]
-        @inbounds source(simdata)[i, j] = dest(simdata)[i, j] = init(simdata)[i, j]
+# When simdata is passed in, the existing SimData arrays are re-initialised
+initdata!(simdata::AbstractSimData, ruleset, init, starttime, nreplicates) =
+    initdata!(simdata, ruleset, init, starttime)
+# When no simdata is passed in, the existing SimData arrays are re-initialised
+initdata!(::Nothing, ruleset::Ruleset, init, starttime, nreplicates::Integer) =
+    [initdata!(nothing, ruleset, init, starttime, nothing) for r in 1:nreplicates]
+# When SimData with replicates is passed in, the existing SimData replicates are re-initialised
+initdata!(simdata::AbstractVector{<:AbstractSimData}, ruleset, init, starttime, nreplicates::Integer) =
+    map(d -> initdata!(d, ruleset, init, starttime, nothing), simdata)
+initdata!(::Nothing, ruleset::Ruleset, init, starttime, nreplicates::Nothing) =
+    SimData(init, ruleset, starttime)
+
+# Initialise a SimData object with a new `Ruleset` and starttime.
+initdata!(simdata::AbstractSimData, ruleset::Ruleset, inits::NamedTuple, starttime) = begin
+    map(values(simdata), values(inits)) do grid, init
+        for j in 1:gridsize(grid)[2], i in 1:gridsize(grid)[1]
+            @inbounds source(grid)[i, j] = dest(grid)[i, j] = init[i, j]
+        end
+        updatestatus!(grid)
     end
-    updatestatus!(simdata)
     @set! simdata.ruleset = ruleset
     @set! simdata.starttime = starttime
     simdata
 end
 
-"Convert regular index to block index"
+# Convert regular index to block index
 indtoblock(x, blocksize) = (x - 1) ÷ blocksize + 1
 
-"Convert block index to regular index"
+# Convert block index to regular index
 blocktoind(x, blocksize) = (x - 1) * blocksize + 1
-
-"""
-WriteableSimData is passed to rules `<: PartialRule`, and can be written to directly as
-an array. This handles updates to block status and writing to the correct source/dest
-array. Is always converted back to regular `SimData`.
-"""
-@SimDataMixin struct WritableSimData{} <: SingleSimData{T,N,I} end
-
-ConstructionBase.constructorof(::Type{WritableSimData}) =
-    (init, args...) -> SimData{eltype(init),ndims(init),typeof(init),typeof.(args)...}(init, args...)
-
-Base.@propagate_inbounds Base.setindex!(d::WritableSimData, x, I...) = begin
-    r = radius(d)
-    if r > 0
-        bi = indtoblock.(I .+ r, 2r)
-        deststatus(d)[bi...] = true
-    end
-    dest(d)[I...] = x
-end
-
-Base.@propagate_inbounds Base.getindex(d::WritableSimData, I...) = getindex(dest(d), I...)
-
-@SimDataMixin struct NeighborhoodData{NB}
-    neighborhoodbuffer::NB
-end
-
-neighborhoodbuffer(data::NeighborhoodData) = data.neighborhoodbuffer
