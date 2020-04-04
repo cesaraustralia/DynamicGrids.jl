@@ -19,6 +19,7 @@ running the included game of life model `Life()`:
 
 ```julia
 using DynamicGrids, Crayons
+
 init = rand(Bool, 150, 200)
 output = REPLOutput(init; fps=30, color=Crayon(foreground=:red, background=:black, bold=true))
 ruleset = Ruleset(Life(); init=init)
@@ -172,8 +173,8 @@ struct ForestFire{R,W,N,PC,PR} <: NeighborhoodRule{R,W}
     prob_combustion::PC
     prob_regrowth::PR
 end
-ForestFire(; neighborhood=RadialNeighborhood{1}(), prob_combustion=0.0001, prob_regrowth=0.01) =
-    ForestFire(neighborhood, prob_combustion, prob_regrowth)
+ForestFire(; grid=:_default_, neighborhood=Radialighborhood{1}(), prob_combustion=0.0001, prob_regrowth=0.01) =
+    ForestFire{grid,grid}(neighborhood, prob_combustion, prob_regrowth)
 
 # Define an `applyrule` method to be broadcasted over the grid for the `ForestFire` rule
 @inline DynamicGrids.applyrule(rule::ForestFire, data, state::Integer, index, hoodbuffer) =
@@ -200,15 +201,13 @@ sim!(output, ruleset; tspan=(1, 200))
 
 # Save the output as a gif
 savegif("forestfire.gif", output)
-
-
 ```
 ![forestfire](https://user-images.githubusercontent.com/2534009/72052469-5450c580-3319-11ea-8948-5196d1c6fd33.gif)
 
 
 We could also use a "windy" custom neighborhood:
 
-```
+```julia
 windyhood = CustomNeighborhood((1,1), (1,2), (1,3), (2,1), (3,1))
 ruleset = Ruleset(ForestFire(; neighborhood=windyhood); init=init)
 sim!(output, ruleset; tspan=(1, 200))
@@ -220,7 +219,7 @@ savegif("windy_forestfire.gif", output)
 
 Timing the simulation for 200 steps, the performance is quite good:
 
-```
+```julia
 output = ArrayOutput(init, 200)
 @time sim!(output, ruleset; tspan=(1, 200))
  1.384755 seconds (640 allocations: 2.569 MiB)

@@ -52,18 +52,6 @@ initframes!(o::GraphicOutput, init::NamedTuple) = begin
     push!(frames(o), deepcopy(init))
 end
 
-
-storegrid!(o::GraphicOutput, data::AbstractSimData) = begin
-    f = currentframe(data)
-    if isstored(o)
-        push!(o, fill!(similar(o[1]), zero(eltype(o[1]))))
-        storegrid!(o, data, f)
-    else
-        fill!(o[1], zero(eltype(o[1])))
-        storegrid!(o, data, 1)
-    end
-    isshowable(o, f) && showgrid(o, data, f, currenttime(data))
-end
 storegrid!(o::GraphicOutput, data::AbstractSimData) =
     storegrid!(eltype(o), o, data)
 storegrid!(::Type{<:NamedTuple}, o::GraphicOutput, data::AbstractSimData) = begin

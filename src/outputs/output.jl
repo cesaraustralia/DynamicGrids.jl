@@ -75,8 +75,6 @@ zerogrids(init::NamedTuple, nframes) =
 
 @inline celldo!(grid::GridData, A::AbstractArray, I) =
     @inbounds return A[I...] = source(grid)[I...]
-@inline celldo!(grid::GridData, A::AbstractArray, I) =
-    @inbounds return A[I...] = source(grid)[I...]
 
 storegrid!(output::Output, data::AbstractSimData) =
     storegrid!(output, data, frameindex(output, data))
