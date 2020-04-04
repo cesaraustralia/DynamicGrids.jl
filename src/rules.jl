@@ -36,13 +36,16 @@ end
 @generated Base.keys(rule::Rule{R,W}) where {R,W} =
     Expr(:tuple, QuoteNode.(union(_asiterable(W), _asiterable(R)))...)
 
-writekeys(::Rule{R,W}) where {R,W} = W
+@inline writekeys(::Rule{R,W}) where {R,W} = W
 @generated writekeys(::Rule{R,W}) where {R,W<:Tuple} =
     Expr(:tuple, QuoteNode.(W.parameters)...)
 
-readkeys(::Rule{R,W}) where {R,W} = R
+@inline readkeys(::Rule{R,W}) where {R,W} = R
 @generated readkeys(::Rule{R,W}) where {R<:Tuple,W} =
     Expr(:tuple, QuoteNode.(R.parameters)...)
+
+keys2vals(keys::Tuple) = map(Val, keys)
+keys2vals(key::Symbol) = Val(key)
 
 _asiterable(x::Symbol) = (x,)
 _asiterable(x::Type{<:Tuple}) = x.parameters

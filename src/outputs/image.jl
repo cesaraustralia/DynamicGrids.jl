@@ -1,7 +1,11 @@
-"""
-Graphic outputs that display the grid(s) as an RGB24 images.
 
-No `ImageOutput`s are provided in DynamicGrids.jl to avoid
+const RulesetOrSimData = Union{Rule,AbstractSimData}
+
+"""
+Graphic outputs that display the simulation grid(s) as RGB24 images.
+
+Although the majority of the code is maintained here to enable sharing
+and reuse, no `ImageOutput`s are provided in DynamicGrids.jl to avoid
 heavey dependencies on graphics libraries. See
 [DynamicGridsGtk.jl](https://github.com/cesaraustralia/DynamicGridsGtk.jl)
 and [DynamicGridsInteract.jl](https://github.com/cesaraustralia/DynamicGridsInteract.jl)
@@ -10,7 +14,7 @@ for implementations.
 abstract type ImageOutput{T} <: GraphicOutput{T} end
 
 """
-Construct one ImageOutput from another ImageOutput.
+Construct one ImageOutput from another ImageOutput
 """
 (::Type{F})(o::T; kwargs...) where F <: ImageOutput where T <: ImageOutput = F(;
     frames=frames(o),
@@ -47,9 +51,9 @@ maxval(o::ImageOutput) = o.maxval
 
 
 # Allow construcing a frame with the ruleset passed in instead of SimData
-showgrid(o::ImageOutput, f, t) = showgrid(o[f], o, Ruleset(), f, t)
-showgrid(grid, o::ImageOutput, ruleset::AbstractRuleset, f, t) =
-    showgrid(grid2image(o, ruleset, grid, f), o, f, t)
+# showgrid(o::ImageOutput, f, t) = showgrid(o[f], o, Ruleset(), f, t)
+showgrid(grid, o::GraphicOutput, data::RulesetOrSimData, f, t) =
+    showgrid(grid2image(o, data, grid, f), o, data, f, t)
 
 """
 Default colorscheme. Better performance than using a Colorschemes.jl
@@ -67,7 +71,6 @@ Base.get(scheme::Greyscale, x) = scale(x, scheme.min, scheme.max)
 const Grayscale = Greyscale
 
 
-
 """
 Grid processors convert a frame of the simulation into an RGB24 image for display.
 Frames may hold one or multiple grids.
@@ -75,24 +78,46 @@ Frames may hold one or multiple grids.
 abstract type GridProcessor end
 
 """
-Grid processors that convert one grid to an image.
-"""
-abstract type SingleGridProcessor <: GridProcessor end
+    grid2image(o::ImageOutput, data::Union{Ruleset,SimData}, grid, t::Integer)
+    grid2image(p::GridProcessor, minval, maxval, data::Union{Ruleset,SimData}, grids, t)
 
-"""
-Processors that convert multiple grids to an image.
-"""
-abstract type MultiGridProcessor <: GridProcessor end
-
-"""
 Convert a grid or named tuple of grids to an RGB24 image, using a GridProcessor
+
+[`GridProcessor`](@reg) is intentionally not dispatched with the output type in
+the methods that finally generate images, to reduce coupling.
+But it they can be distpatched on together when required for custom outputs.
 """
 function grid2image end
 
-grid2image(o::ImageOutput, ruleset::AbstractRuleset, grid, i::Integer) =
-    grid2image(processor(o), o, ruleset, grid, i)
-grid2image(processor::GridProcessor, o::ImageOutput, ruleset, grid, i) =
-    grid2image(processor::GridProcessor, minval(o), maxval(o), ruleset, grid, i)
+grid2image(o::ImageOutput, data::RulesetOrSimData, grid, t::Integer) =
+    grid2image(processor(o), o, data, grid, t)
+grid2image(processor::GridProcessor, o::ImageOutput, data::RulesetOrSimData, grid, t) =
+    grid2image(processor::GridProcessor, minval(o), maxval(o), data, grid, t)
+
+"""
+Grid processors that convert one grid to an image.
+
+The first grid will be displayed if a SingleGridProcessor is
+used with a NamedTuple of grids.
+"""
+abstract type SingleGridProcessor <: GridProcessor end
+
+grid2image(p::SingleGridProcessor, minval, maxval,
+           data::RulesetOrSimData, grids::NamedTuple, t) =
+    grid2image(p, minval, maxval, data, first(grids), t)
+grid2image(p::SingleGridProcessor, minval, maxval,
+           data::RulesetOrSimData, grid::AbstractArray, t) = begin
+    img = fill(RGB24(0), size(grid))
+    for I in CartesianIndices(grid)
+        img[I] = cell2rgb(p, minval, maxval, data, grid[I], I)
+    end
+    img
+end
+
+"""
+Processors that convert multiple grids to a single image.
+"""
+abstract type MultiGridProcessor <: GridProcessor end
 
 """"
     ColorProcessor(; scheme=Greyscale(), zerocolor=nothing, maskcolor=nothing)
@@ -114,26 +139,36 @@ scheme(processor::ColorProcessor) = processor.scheme
 zerocolor(processor::ColorProcessor) = processor.zerocolor
 maskcolor(processor::ColorProcessor) = processor.maskcolor
 
-# Show the first grid of a NamedTuple
-grid2image(p::ColorProcessor, minval, maxval,
-           ruleset::AbstractRuleset, grids::NamedTuple, t) =
-    grid2image(p, minval, maxval, ruleset, grids[1], t)
-grid2image(p::ColorProcessor, minval, maxval,
-           ruleset::AbstractRuleset, grid::AbstractArray, t) = begin
-    img = fill(RGB24(0), size(grid))
-    for i in CartesianIndices(grid)
-        img[i] = if !(maskcolor(p) isa Nothing) && ismasked(mask(ruleset), i)
-            maskcolor(p)
+@inline cell2rgb(p::ColorProcessor, minval, maxval, data::RulesetOrSimData, val, I) =
+    if !(maskcolor(p) isa Nothing) && ismasked(mask(data), I)
+        maskcolor(p)
+    else
+        normval = normalise(val, minval, maxval)
+        if !(zerocolor(p) isa Nothing) && normval == zero(normval)
+            zerocolor(p)
         else
-            x = normalise(grid[i], minval, maxval)
-            if !(zerocolor(p) isa Nothing) && x == zero(x)
-                zerocolor(p)
-            else
-                rgb24(scheme(p), x)
-            end
+            rgb24(scheme(p), normval)
         end
     end
-    img
+
+struct SparseOptInspector <: SingleGridProcessor end
+
+@inline cell2rgb(p::SparseOptInspector, minval, maxval, data::AbstractSimData, val, I) = begin
+    r = radius(first(grids(data)))
+    blocksize = 2r
+    blockindex = indtoblock.((I[1] + r,  I[2] + r), blocksize)
+    normedval = normalise(val, minval, maxval)
+    if sourcestatus(first(data))[blockindex...]
+        if normedval > 0
+            rgb24(normedval)
+        else
+            rgb24(0.0, 0.5, 0.5)
+        end
+    elseif normedval > 0
+        rgb24(1.0, 0.0, 0.0)
+    else
+        rgb24(0.5, 0.5, 0.0)
+    end
 end
 
 
@@ -165,17 +200,18 @@ colors(processor::ThreeColorProcessor) = processor.colors
 zerocolor(processor::ThreeColorProcessor) = processor.zerocolor
 maskcolor(processor::ThreeColorProcessor) = processor.maskcolor
 
-grid2image(p::ThreeColorProcessor, minval::Tuple, maxval::Tuple, ruleset,
-           grids::NamedTuple, t) = begin
+grid2image(p::ThreeColorProcessor, minval::Tuple, maxval::Tuple,
+           data::RulesetOrSimData, grids::NamedTuple, t) = begin
     img = fill(RGB24(0), size(first(grids)))
-    ncols = length(colors(p))
-    ngrids = length(grids)
-    if !(ngrids == ncols == length(minval) == length(maxval))
-        throw(ArgumentError("Number of grids ($ngrids), processor colors ($ncols), " *
-            "minval ($(length(minval))) and maxival ($(length(maxval))) must be the same"))
+    ncols, ngrids, nmin, nmax = map(length, (colors(p), grids, minval, maxval))
+    if !(ngrids == ncols == nmin == nmax)
+        ArgumentError(
+            "Number of grids ($ngrids), processor colors ($ncols), " *
+            "minval ($nmin) and maxival ($nmax) must be the same"
+        ) |> throw
     end
     for i in CartesianIndices(first(grids))
-        img[i] = if !(maskcolor(p) isa Nothing) && ismasked(mask(ruleset), i)
+        img[i] = if !(maskcolor(p) isa Nothing) && ismasked(mask(data), i)
             maskcolor(p)
         else
             xs = map((f, mi, ma) -> normalise(f[i], mi, ma), values(grids), minval, maxval)
@@ -189,16 +225,19 @@ grid2image(p::ThreeColorProcessor, minval::Tuple, maxval::Tuple, ruleset,
     img
 end
 
-
 """
 LayoutProcessor(layout::Array, processors)
     LayoutProcessor(reshape(layout, length(layout), 1), processors)
 
+LayoutProcessor allows displaying multiple grids in a block layout,
+by specifying a layout matrix and a list of SingleGridProcessors to
+be run for each.
+
 ## Arguments / Keyword arguments
-- `layout`: A Vector or Matrix containing the keyes or numbers of grids in the locations to
+- `layout`: A Vector or Matrix containing the keys or numbers of grids in the locations to
   display them. `nothing`, `missing` or `0` values will be skipped.
 - `processors`: tuple of SingleGridProcessor, one for each grid in the simulation.
-  Can be `nothing` for unused grids.
+  Can be `nothing` or any other value for grids not in layout.
 """
 @default_kw struct LayoutProcessor{L<:AbstractMatrix,P} <: MultiGridProcessor
     layout::L     | throw(ArgumentError("must include an Array for the layout keyword"))
@@ -211,9 +250,13 @@ LayoutProcessor(layout::AbstractVector, processors) =
 layout(p::LayoutProcessor) = p.layout
 processors(p::LayoutProcessor) = p.processors
 
-grid2image(p::LayoutProcessor, minval::Tuple, maxval::Tuple, ruleset, grids::NamedTuple, t) = begin
-    if !(length(grids) == length(minval) == length(maxval))
-        throw(ArgumentError("Number of grids ($(length(grids))), minval ($(length(minval))) and maxval ($(length(maxval))) must be the same"))
+grid2image(p::LayoutProcessor, minval::Tuple, maxval::Tuple,
+           data::RulesetOrSimData, grids::NamedTuple, t) = begin
+    ngrids, nmin, nmax = map(length, (grids, minval, maxval))
+    if !(ngrids == nmin == nmax)
+        ArgumentError(
+            "Number of grids ($ngrids), minval ($nmin) and maxval ($nmax) must be the same"
+        ) |> throw
     end
 
     grid_ids = layout(p)
@@ -232,7 +275,7 @@ grid2image(p::LayoutProcessor, minval::Tuple, maxval::Tuple, ruleset, grids::Nam
             grid_id
         end
         # Run processor for section
-        section = grid2image(processors(p)[n], minval[n], maxval[n], ruleset, grids[n], t)
+        section = grid2image(processors(p)[n], minval[n], maxval[n], data, grids[n], t)
         # Copy section into image
         for x in 1:size(section, 1), y in 1:size(section, 2)
             img[x + (i - 1) * sze[1], y + (j - 1) * sze[2]] = section[x, y]
@@ -243,7 +286,7 @@ end
 
 
 """
-    savegif(filename::String, o::Output, ruleset; [processor=processor(o)], [kwargs...])
+    savegif(filename::String, o::Output, data; [processor=processor(o)], [kwargs...])
 
 Write the output array to a gif. You must pass a processor keyword argument for any
 `Output` objects not in `ImageOutput` (which allready have a processor attached).
@@ -270,7 +313,8 @@ min and max of `nothing` are assumed to be 0 and 1.
 """
 normalise(x, minval::Number, maxval::Number) =
     min((x - minval) / (maxval - minval), oneunit(x))
-normalise(x, minval::Number, maxval::Nothing) = (x - minval) / (onunit(minval) - minval)
+normalise(x, minval::Number, maxval::Nothing) =
+    (x - minval) / (onunit(minval) - minval)
 normalise(x, minval::Nothing, maxval::Number) = min(x / maxval, oneunit(x))
 normalise(x, minval::Nothing, maxval::Nothing) = x
 
@@ -291,8 +335,9 @@ scale(x, ::Nothing, ::Nothing) = x
 
 Convert a number, tuple or color to an RGB24 value.
 """
-rgb24(val::Number) = RGB24(val)
 rgb24(vals::Tuple) = RGB24(vals...)
+rgb24(vals...) = RGB24(vals...)
+rgb24(val::Number) = RGB24(val)
 rgb24(val::Color) = RGB24(val)
 rgb24(val::RGB24) = val
 """

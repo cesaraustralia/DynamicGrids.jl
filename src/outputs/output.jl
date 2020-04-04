@@ -1,9 +1,12 @@
 
 """
-All outputs must inherit from Output.
+Outputs are store or display simulation results, usually
+as a vector of grids, one for each timestep - but they may also
+sum, combine or otherise manipulate the simulation grids to improve
+performance, reduce memory overheads or similar.
 
-Simulation outputs are decoupled from simulation behaviour and in
-many cases can be used interchangeably.
+Simulation outputs are decoupled from simulation behaviour,
+and in many cases can be used interchangeably.
 """
 abstract type Output{T} <: AbstractVector{T} end
 
@@ -62,54 +65,51 @@ finalize!(o::Output, args...) = nothing
 delay(o::Output, f) = nothing
 showgrid(o::Output, args...) = nothing
 
-
 # Grid strorage and updating
-frameindex(o::Output, data::AbstractSimData) = frameindex(o, currentframe(data))
+gridindex(o::Output, data::AbstractSimData) = gridindex(o, currentframe(data))
 # Every frame is frame 1 if the simulation isn't stored
-frameindex(o::Output, f::Int) = isstored(o) ? f : oneunit(f)
-
-zerogrids(init::AbstractArray, nframes) = [zero(init) for f in 1:nframes]
-zerogrids(init::NamedTuple, nframes) =
-    [map(layer -> zero(layer), init) for f in 1:nframes]
+gridindex(o::Output, f::Int) = isstored(o) ? f : oneunit(f)
 
 
-@inline celldo!(data::GridData, ouputgrid::AbstractArray, index, f) =
-    return @inbounds ouputgrid[index...] = data[index...]
+@inline celldo!(grid::GridData, A::AbstractArray, I) =
+    @inbounds return A[I...] = source(grid)[I...]
+@inline celldo!(grid::GridData, A::AbstractArray, I) =
+    @inbounds return A[I...] = source(grid)[I...]
 
-storegrid!(output::Output, data) =
-    storegrid!(output, data, frameindex(output, data))
-storegrid!(output::Output, data::GridData, f::Int) = begin
+storegrid!(output::Output, data::AbstractSimData) = begin
+    f = gridindex(output, data)
     checkbounds(output, f)
-    blockrun!(data, output[f], f)
+    storegrid!(eltype(output), output, data, f)
 end
-storegrid!(output::Output, simdata::SimData, f::Int) = begin
-    checkbounds(output, f)
-    if eltype(output) <: NamedTuple
-        map(values(output[f]), values(data(simdata))) do grid, griddata
-            for i in CartesianIndices(grid)
-                grid[i] = source(griddata)[i]
-            end
-        end
-    else
-        for i in CartesianIndices(output[f])
-            output[f][i] = source(first(data(simdata)))[i]
-        end
+storegrid!(::Type{<:NamedTuple}, output::Output, simdata::AbstractSimData, f::Int) = begin
+    println("source:")
+    display(source(simdata[:detected]))
+    display(sourcestatus(simdata[:detected]))
+    map(values(grids(simdata)), keys(simdata)) do grid, key
+        outgrid = output[f][key]
+        fill!(outgrid, zero(eltype(outgrid)))
+        blockrun!(grid, outgrid)
     end
+    println("output:")
+    display(output[f][:detected])
 end
+storegrid!(::Type{<:AbstractArray}, output::Output, simdata::AbstractSimData, f::Int) = begin
+    outgrid = output[f]
+    fill!(outgrid, zero(eltype(outgrid)))
+    blockrun!(first(grids(simdata)), outgrid)
+end
+
 # Replicated frames
-storegrid!(output, data::AbstractVector{<:GridData}, f::Int) = begin
+storegrid!(output::Output, data::AbstractVector{<:AbstractSimData}) = begin
+    f = gridindex(output, data)
+    checkbounds(output, f)
     for j in 1:size(output[1], 2), i in 1:size(output[1], 1)
         replicatesum = zero(eltype(output[1]))
         for d in data
-            replicatesum += d[i, j]
+            @inbounds replicatesum += d[i, j]
         end
-        output[f][i, j] = replicatesum / length(data)
+        @inbounds output[f][i, j] = replicatesum / length(data)
     end
-end
-
-allocategrids!(o::Output, init, framerange) = begin
-    append!(frames(o), [similar(init) for f in framerange])
-    o
 end
 
 """
