@@ -55,11 +55,54 @@ settimestamp!(o::Output, f) = nothing
 fps(o::Output) = nothing
 setfps!(o::Output, x) = nothing
 showfps(o::Output) = nothing
+
+"""
+    isasync(o::Output)
+
+Check if the output should run asynchonously.
+"""
 isasync(o::Output) = false
+
+"""
+    isasync(o::Output)
+
+Check if the output is storing each grid frame,
+or just the the current one.
+"""
 isstored(o::Output) = true
+
+"""
+    isshowable(o::Output)
+
+Check if the output can be shown visually.
+"""
 isshowable(o::Output, f) = false
-finalize!(o::Output, args...) = nothing
+
+"""
+    initialise(o::Output)
+
+Initialise the output display, if it has one.
+"""
+initialise(o::Output) = nothing
+"""
+    finalise(o::Output)
+
+Finalise the output display, if it has one.
+"""
+finalise(o::Output) = nothing
+
+"""
+    delay(o::Output, f)
+
+`Graphic` outputs delay the simulations to match some `fps` rate, 
+but other outputs just do nothing and continue.
+"""
 delay(o::Output, f) = nothing
+"""
+    showgrid(o::Output, args...)
+
+Show the grid(s) in the output, if it can do that.
+"""
 showgrid(o::Output, args...) = nothing
 
 

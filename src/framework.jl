@@ -19,6 +19,7 @@ the passed in output for each time-step.
 """
 sim!(output, ruleset; init=nothing, tspan=(1, length(output)), fps=fps(output),
      nreplicates=nothing, simdata=nothing) = begin
+    initialise(output)
     isrunning(output) && error("A simulation is already running in this output")
     setrunning!(output, true) || error("Could not start the simulation with this output")
     starttime = first(tspan)
@@ -57,6 +58,7 @@ array will not be accepted.
 """
 resume!(output, ruleset; tstop=stoptime(output), fps=fps(output), simdata=nothing,
         nreplicates=nothing) = begin
+    initialise(output)
     length(output) > 0 || error("There is no simulation to resume. Run `sim!` first")
     isrunning(output) && error("A simulation is already running in this output")
     setrunning!(output, true) || error("Could not start the simulation with this output")
@@ -103,7 +105,7 @@ simloop!(output, simdata, fspan) = begin
             showgrid(output, simdata, f, currenttime(simdata))
             setrunning!(output, false)
             setstoptime!(output, currenttime(simdata))
-            finalize!(output)
+            finalise(output)
             break
         end
     end
