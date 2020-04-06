@@ -4,8 +4,8 @@ Simulation data specific to a singule grid.
 """
 abstract type GridData{T,N,I} end
 
-# Common fields for SimData and WritableGridData. Which are basically
-# identical except for with methods.
+# Common fields for GridData and WritableGridData, which are
+# identical except for their indexing methods
 @mix struct GridDataMixin{T,N,I<:AbstractArray{T,N},M,R,O,S,St,LSt,B}
     init::I
     mask::M
@@ -56,8 +56,9 @@ Simulation data and storage passed to rules for each timestep.
 # Generate simulation data to match a ruleset and init array.
 ReadableGridData(init::AbstractArray, mask, radius, overflow) = begin
     r = radius
-    # We add one extra row/column so we dont have to worry about
-    # special casing the last block
+    # We add one extra row and column of status blocks so
+    # we dont have to worry about special casing the last block
+    println(r) 
     if r > 0
         hoodsize = 2r + 1
         blocksize = 2r
@@ -153,7 +154,7 @@ currenttime(d::SimData) = d.currenttime
 currentframe(d::SimData) = d.currentframe
 
 # Getters forwarded to data
-Base.getindex(d::SimData, key) = getindex(grids(d), key)
+Base.getindex(d::SimData, key::Symbol) = getindex(grids(d), key)
 Base.keys(d::SimData) = keys(grids(d))
 Base.values(d::SimData) = values(grids(d))
 Base.first(d::SimData) = first(grids(d))
@@ -162,6 +163,7 @@ gridsize(d::SimData) = gridsize(first(d))
 mask(d::SimData) = mask(ruleset(d))
 rules(d::SimData) = rules(ruleset(d))
 overflow(d::SimData) = overflow(ruleset(d))
+opt(d::SimData) = opt(ruleset(d))
 timestep(d::SimData) = timestep(ruleset(d))
 
 # Get the actual current timestep, ie. not variable periods like Month

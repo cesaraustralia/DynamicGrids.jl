@@ -45,11 +45,13 @@ export Neighborhood, AbstractRadialNeighborhood, RadialNeighborhood,
        AbstractCustomNeighborhood, CustomNeighborhood, LayeredCustomNeighborhood,
        VonNeumannNeighborhood
 
+export PerformanceOpt, NoOpt, SparseOpt
+
 export Overflow, RemoveOverflow, WrapOverflow
 
 export Output, GraphicOutput, ImageOutput, ArrayOutput, REPLOutput
 
-export GridProcessor, SingleGridProcessor, ColorProcessor,
+export GridProcessor, SingleGridProcessor, ColorProcessor, SparseOptInspector,
        MultiGridProcessor, ThreeColorProcessor, LayoutProcessor
 
 export Greyscale, Grayscale

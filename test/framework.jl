@@ -1,7 +1,7 @@
 using DynamicGrids, Test, Setfield
 import DynamicGrids: applyrule, applyrule!, maprule!, 
        source, dest, currenttime, getdata, combinedata, ruleloop,
-       SimData, WritableGridData, Read, Write
+       SimData, WritableGridData, _Read_, _Write_
 
 init  = [0 1 1 0;
          0 1 1 0;
@@ -24,14 +24,14 @@ applyrule(::TestRule, data, state, index) = 0
     simdata = SimData(init, ruleset, 1)
 
     # Test maprules components
-    rkeys, rdata = getdata(Read(), rule, simdata)
-    wkeys, wdata = getdata(Write(), rule, simdata)
+    rkeys, rdata = getdata(_Read_(), rule, simdata)
+    wkeys, wdata = getdata(_Write_(), rule, simdata)
     @test rkeys == Val{:_default_}()
     @test wkeys == Val{:_default_}()
     newsimdata = @set simdata.data = combinedata(rkeys, rdata, wkeys, wdata)
     @test newsimdata.data[1] isa WritableGridData
     # Test type stability
-    @inferred ruleloop(rule, newsimdata, rkeys, rdata, wkeys, wdata)
+    @inferred ruleloop(NoOpt(), rule, newsimdata, rkeys, rdata, wkeys, wdata)
     
     resultdata = maprule!(simdata, rule)
     @test source(resultdata[:_default_]) == final
@@ -45,10 +45,11 @@ applyrule!(::TestPartial, data, state, index) = 0
     ruleset = Ruleset(rule; init=init)
     # Test type stability
     simdata = SimData(init, ruleset, 1)
-    rkeys, rdata = getdata(Read(), rule, simdata)
-    wkeys, wdata = getdata(Write(), rule, simdata)
+    rkeys, rdata = getdata(_Read_(), rule, simdata)
+    wkeys, wdata = getdata(_Write_(), rule, simdata)
     newsimdata = @set simdata.data = combinedata(wkeys, wdata, rkeys, rdata)
-    @inferred ruleloop(rule, newsimdata, rkeys, rdata, wkeys, wdata)
+
+    @inferred ruleloop(NoOpt(), rule, newsimdata, rkeys, rdata, wkeys, wdata)
 
     resultdata = maprule!(simdata, rule)
     @test source(resultdata[:_default_]) == init

@@ -113,7 +113,7 @@ simloop!(output, simdata, fspan) = begin
 end
 
 precalcrules(rule, simdata) = rule
-precalcrules(simdata::SimData) = 
+precalcrules(simdata::SimData) =
     @set simdata.ruleset.rules = precalcrules(rules(simdata), simdata)
 precalcrules(rules::Tuple, simdata) =
     (precalcrules(rules[1], simdata), precalcrules(tail(rules), simdata)...)
@@ -122,4 +122,3 @@ precalcrules(chain::Chain{R,W}, simdata) where {R,W} = begin
     ch = precalcrules(val(chain), simdata)
     Chain{R,W,typeof(ch)}(ch)
 end
-
