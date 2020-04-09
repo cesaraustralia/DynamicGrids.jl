@@ -51,10 +51,23 @@ maxval(rs::AbstractRuleset) = rs.maxval
 ruleset(rs::AbstractRuleset) = rs
 
 """
-    Ruleset(rules...; init=nothing, overflow=RemoveOverflow(), cellsize=1, timestep=1)
+    Ruleset(rules...; init=nothing, mask=nothing, overflow=RemoveOverflow(), opt=SparseeOpt(), cellsize=1, timestep=1)
 
 A container for holding a sequence of `Rule`, an `init`
-array and other simulaiton details.
+array and other simulaiton details. Rules will be run in the
+order they are passed, ie. `Ruleset(rule1, rule2, rule3)`.
+
+## Keyword Arguments
+- `init`: init grid(s) to use if none are supplied to `sim!`.
+  An `AbstractArray`, a `NamedTuple` of `AbsractactArray`, or `nothing`.
+- `mask`: An array of Bool matching the size of `init`. Cells that are `false` will not run.
+- `overflow`: determine what to do with overflow of grid edges.
+  Options are `RemoveOverflow()` or `WrapOverflow()`.
+  Available from `applyrule` with `overflow(data)`
+- `cellsize`: Size of cells.
+  Available from `applyrule` with `timestep(data)`
+- `timestep`: timestep size for all rules. eg. `Month(1)` or `1u"s"`.
+  Available from `applyrule` with `timestep(data)`
 """
 @flattenable @default_kw mutable struct Ruleset{
     R<:Tuple{Vararg{<:Rule}},I,M,O<:Overflow,Op<:PerformanceOpt,C,T
@@ -70,7 +83,7 @@ end
 Ruleset(rules::Vararg{<:Rule}; kwargs...) = Ruleset(; rules=rules, kwargs...)
 
 rules(rs::Ruleset) = rs.rules
-#
+
 show(io::IO, ruleset::Ruleset) = begin
     printstyled(io, Base.nameof(typeof(ruleset)), " =\n"; color=:blue)
     println(io, "rules:")
