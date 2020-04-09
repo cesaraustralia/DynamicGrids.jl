@@ -18,7 +18,6 @@ maprule!(simdata::SimData, rule::Rule) = begin
     copystatus!(wgrids)
     # Swap the dest/source of grids that were written to
     wgrids = swapsource(wgrids) |> _to_readonly
-    display(first(wgrids))
     # Combine the written grids with the original simdata
     replacedata(simdata, wkeys, wgrids)
 end
@@ -59,7 +58,6 @@ The neighborhood is copied to the rules neighborhood buffer array for performanc
 Empty blocks are skipped for NeighborhoodRules. =#
 ruleloop(opt::NoOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:NeighborhoodRule,Vararg}}},
          simdata, rkeys, rgrids, wkeys, wgrids) where {R,W} = begin
-    println("NoOpt")
     r = radius(rule)
     griddata = simdata[neighborhoodkey(rule)]
     blocksize = 2r
@@ -81,44 +79,48 @@ ruleloop(opt::NoOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighborho
     should be in fast local memory. =#
 
     # Loop down a block COLUMN
-    for bi = 1:blockcols
+    for bi = 1:blockrows
         rowsinblock = min(blocksize, nrows - blocksize * (bi - 1))
         # Get current block
         i = blocktoind(bi, blocksize)
+        
 
         # Loop along the block ROW. This is faster because we are reading
-        # 1 column from the main array for 2 blocks at each step, not actually along the row.
-        # Reinitialise neighborhood buffers
-        for y = 1:hoodsize
-            for b in 1:rowsinblock
-                for x = 1:hoodsize
-                    val = src[i + b + x - 2, y]
-                    @inbounds bufs[b][x, y] = val
-                end
-            end
-        end
-
+        # 1 column from the main array for multiple blocks at each step, 
+        # not actually along the row.  
         for j = 1:ncols
             # Which block column are we in
-            curblockj = indtoblock(j, blocksize)
-            # Move the neighborhood buffers accross one column
-            for b in 1:rowsinblock
-                @inbounds buf = bufs[b]
-                # copyto! uses linear indexing, so 2d dims are transformed manually
-                @inbounds copyto!(buf, 1, buf, hoodsize + 1, (hoodsize - 1) * hoodsize)
-            end
-            # Copy a new column to each neighborhood buffer
-            for b in 1:rowsinblock
-                @inbounds buf = bufs[b]
-                for x in 1:hoodsize
-                    @inbounds buf[x, hoodsize] = src[i + b + x - 2, j + 2r]
+            if j == 1
+                # Reinitialise neighborhood buffers
+                for y = 1:hoodsize
+                    for b in 1:rowsinblock
+                        for x = 1:hoodsize
+                            val = src[i + b + x - 2, y]
+                            @inbounds bufs[b][x, y] = val
+                        end
+                    end
+                end
+            else
+                # Move the neighborhood buffers accross one column
+                for b in 1:rowsinblock
+                    @inbounds buf = bufs[b]
+                    # copyto! uses linear indexing, so 2d dims are transformed manually
+                    @inbounds copyto!(buf, 1, buf, hoodsize + 1, (hoodsize - 1) * hoodsize)
+                end
+                # Copy a new column to each neighborhood buffer
+                for b in 1:rowsinblock
+                    @inbounds buf = bufs[b]
+                    for x in 1:hoodsize
+                        @inbounds buf[x, hoodsize] = src[i + b + x - 2, j + 2r]
+                    end
                 end
             end
+
+            curblockj = indtoblock(j, blocksize)
 
             # Loop over the grid ROWS inside the block
             for b in 1:rowsinblock
                 I = i + b - 1, j
-                println(I)
                 ismasked(simdata, I...) && continue
                 # Which block row are we in
                 curblocki = b <= r ? 1 : 2
@@ -136,7 +138,8 @@ end
 
 ruleloop(opt::SparseOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:NeighborhoodRule,Vararg}}},
          simdata, rkeys, rgrids, wkeys, wgrids) where {R,W} = begin
-    println("SparseOpt")
+
+    rgrids isa Tuple && length(rgrids) > 1 && error("`SparseOpt` can't handle rules with multiple read grids yet. Use `opt=NoOpt()`")
     r = radius(rule)
     griddata = simdata[neighborhoodkey(rule)]
     #= Blocks are cell smaller than the hood, because this works very nicely for
@@ -158,9 +161,6 @@ ruleloop(opt::SparseOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighb
     bufs = buffers(griddata)
     # Center of the buffer for both axes
     bufcenter = r + 1
-
-    # Wrap overflow or zero padding if not wrapped
-    handleoverflow!(griddata)
 
     #= Run the rule row by row. When we move along a row by one cell, we access only
     a single new column of data the same hight of the nighborhood, and move the existing
@@ -313,29 +313,42 @@ handleoverflow!(griddata::GridData{T,2}, ::WrapOverflow) where T = begin
     # TODO optimise this. Its mostly a placeholder so wrapping still works in GOL tests.
     src = source(griddata)
     nrows, ncols = gridsize(griddata)
-    println((nrows, nrows))
+
+    startpadrow = startpadcol = 1-r:0
+    endpadrow = nrows+1:nrows+r
+    endpadcol = ncols+1:ncols+r
+    startrow = startcol = 1:r
+    endrow = nrows+1-r:nrows
+    endcol = ncols+1-r:ncols
+    rows = 1:nrows
+    cols = 1:ncols
+
     # Left
-    @inbounds copyto!(src, CartesianIndices((1:nrows, 1-r:0)),
-                      src, CartesianIndices((1:nrows, ncols+1-r:ncols)))
+    @inbounds copyto!(src, CartesianIndices((rows, startpadcol)),
+                      src, CartesianIndices((rows, endcol)))
     # Right
-    @inbounds copyto!(src, CartesianIndices((1:nrows, ncols+1:ncols+r)),
-                      src, CartesianIndices((1:nrows, 1:r)))
+    @inbounds copyto!(src, CartesianIndices((rows, endpadcol)),
+                      src, CartesianIndices((rows, startcol)))
     # Top
-    @inbounds copyto!(src, CartesianIndices((1-r:0, 1:ncols)),
-                      src, CartesianIndices((nrows+1-r:nrows, 1:ncols)))
+    @inbounds copyto!(src, CartesianIndices((startpadrow, cols)),
+                      src, CartesianIndices((endrow, cols)))
     # Bottom
-    @inbounds copyto!(src, CartesianIndices((nrows+1:nrows+r, 1:ncols)),
-                      src, CartesianIndices((1:r, 1:ncols)))
+    @inbounds copyto!(src, CartesianIndices((endpadrow, cols)),
+                      src, CartesianIndices((startrow, cols)))
 
     # Copy four corners
-    @inbounds copyto!(src, CartesianIndices((1-r:0, 1-r:0)),
-                      src, CartesianIndices((nrows+1-r:nrows, ncols+1-r:ncols)))
-    @inbounds copyto!(src, CartesianIndices((1-r:0, ncols+1:ncols+r)),
-                      src, CartesianIndices((nrows+1-r:nrows, 1:r)))
-    @inbounds copyto!(src, CartesianIndices((nrows+1:nrows+r, ncols+1:ncols+r)),
-                      src, CartesianIndices((1:r, 1:r)))
-    @inbounds copyto!(src, CartesianIndices((nrows+1:nrows+r, 1-r:0)),
-                      src, CartesianIndices((1:r, ncols+1-r:ncols)))
+    # Top Left
+    @inbounds copyto!(src, CartesianIndices((startpadrow, startpadcol)),
+                      src, CartesianIndices((endrow, endcol)))
+    # Top Right
+    @inbounds copyto!(src, CartesianIndices((startpadrow, endpadcol)),
+                      src, CartesianIndices((endrow, startcol)))
+    # Botom Left
+    @inbounds copyto!(src, CartesianIndices((endpadrow, startpadcol)),
+                      src, CartesianIndices((startrow, endcol)))
+    # Botom Right
+    @inbounds copyto!(src, CartesianIndices((endpadrow, endpadcol)),
+                      src, CartesianIndices((startrow, startcol)))
 
     # Wrap status
     status = sourcestatus(griddata)
@@ -353,17 +366,23 @@ handleoverflow!(griddata::WritableGridData, ::RemoveOverflow) = begin
     r = radius(griddata)
     # Zero edge padding, as it can be written to in writable rules.
     src = parent(source(griddata))
-    nrows, ncols = size(src)
-    for j = 1:r, i = 1:nrows
+    npadrows, npadcols = size(src)
+
+    startpadrow = startpadcol = 1:r
+    endpadrow = npadrows-r+1:npadrows
+    endpadcol = npadcols-r+1:npadcols
+    padrows, padcols = axes(src)
+
+    for j = startpadcol, i = padrows 
         src[i, j] = zero(eltype(src))
     end
-    for j = ncols-r+1:ncols, i = 1:nrows
+    for j = endpadcol, i = padrows
         src[i, j] = zero(eltype(src))
     end
-    for j = 1:ncols, i = 1:r
+    for j = padcols, i = startpadrow
         src[i, j] = zero(eltype(src))
     end
-    for j = 1:ncols, i = nrows-r+1:nrows
+    for j = padcols, i = endpadrow
         src[i, j] = zero(eltype(src))
     end
     griddata

@@ -58,7 +58,6 @@ ReadableGridData(init::AbstractArray, mask, radius, overflow) = begin
     r = radius
     # We add one extra row and column of status blocks so
     # we dont have to worry about special casing the last block
-    println(r) 
     if r > 0
         hoodsize = 2r + 1
         blocksize = 2r
