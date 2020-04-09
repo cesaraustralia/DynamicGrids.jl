@@ -120,9 +120,10 @@ VonNeumannNeighborhood() = CustomNeighborhood(((0,-1), (-1,0), (1,0), (0,1)))
 Find the largest radius present in the passed in rules.
 """
 radius(set::Ruleset) = begin
+    length(rules(set)) > 0 || return NamedTuple()
     allkeys = Tuple(union(map(keys, rules(set))...))
     maxradii = Tuple(radius(rules(set), key) for key in allkeys)
-    NamedTuple{allkeys}(maxradii)
+    return NamedTuple{allkeys}(maxradii)
 end
 radius(set::Ruleset{Tuple{}}) = NamedTuple{(),Tuple{}}(())
 # Get radius of specific key from all rules

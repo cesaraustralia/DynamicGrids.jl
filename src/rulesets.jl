@@ -71,13 +71,13 @@ order they are passed, ie. `Ruleset(rule1, rule2, rule3)`.
 """
 @flattenable @default_kw mutable struct Ruleset{I,M,O<:Overflow,Op<:PerformanceOpt,C,T
     } <: AbstractRuleset
-    rules::Tuple | ()               | true
-    init::I      | nothing          | false
-    mask::M      | nothing          | false
-    overflow::O  | RemoveOverflow() | false
-    opt::Op      | SparseOpt()      | false
-    cellsize::C  | 1                | false
-    timestep::T  | 1                | false
+    rules::Tuple{Vararg{<:Rule}} | ()               | true
+    init::I                      | nothing          | false
+    mask::M                      | nothing          | false
+    overflow::O                  | RemoveOverflow() | false
+    opt::Op                      | SparseOpt()      | false
+    cellsize::C                  | 1                | false
+    timestep::T                  | 1                | false
 end
 Ruleset(rules::Vararg{<:Rule}; kwargs...) = Ruleset(; rules=rules, kwargs...)
 
