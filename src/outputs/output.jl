@@ -123,21 +123,22 @@ storegrid!(output::Output, data::AbstractSimData) = begin
     storegrid!(eltype(output), output, data, f)
 end
 storegrid!(::Type{<:NamedTuple}, output::Output, simdata::AbstractSimData, f::Int) = begin
-    println("source:")
-    display(source(simdata[:detected]))
-    display(sourcestatus(simdata[:detected]))
     map(values(grids(simdata)), keys(simdata)) do grid, key
         outgrid = output[f][key]
         fill!(outgrid, zero(eltype(outgrid)))
-        blockrun!(grid, outgrid)
+        # blockrun!(grid, outgrid)
+        for I in CartesianIndices(outgrid)
+            outgrid[I] = grid[I]
+        end
     end
-    println("output:")
-    display(output[f][:detected])
 end
 storegrid!(::Type{<:AbstractArray}, output::Output, simdata::AbstractSimData, f::Int) = begin
     outgrid = output[f]
     fill!(outgrid, zero(eltype(outgrid)))
-    blockrun!(first(grids(simdata)), outgrid)
+    # blockrun!(grid, outgrid)
+    for I in CartesianIndices(outgrid)
+        outgrid[I] = first(grids(simdata))[I]
+    end
 end
 
 # Replicated frames
