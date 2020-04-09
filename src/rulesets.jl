@@ -69,10 +69,9 @@ order they are passed, ie. `Ruleset(rule1, rule2, rule3)`.
 - `timestep`: timestep size for all rules. eg. `Month(1)` or `1u"s"`.
   Available from `applyrule` with `timestep(data)`
 """
-@flattenable @default_kw mutable struct Ruleset{
-    R<:Tuple{Vararg{<:Rule}},I,M,O<:Overflow,Op<:PerformanceOpt,C,T
+@flattenable @default_kw mutable struct Ruleset{I,M,O<:Overflow,Op<:PerformanceOpt,C,T
     } <: AbstractRuleset
-    rules::R     | ()               | true
+    rules::Tuple | ()               | true
     init::I      | nothing          | false
     mask::M      | nothing          | false
     overflow::O  | RemoveOverflow() | false
