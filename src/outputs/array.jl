@@ -12,3 +12,7 @@ ArrayOutput(init, length::Integer; kwargs...) = begin
     append!(frames, zerogrids(init, length-1))
     ArrayOutput(; frames=frames, kwargs...)
 end
+
+zerogrids(initgrid::AbstractArray, nframes) = [zero(initgrid) for f in 1:nframes]
+zerogrids(initgrids::NamedTuple, nframes) =
+    [map(grid -> zero(grid), initgrids) for f in 1:nframes]

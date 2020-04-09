@@ -88,15 +88,17 @@ where immutability improves performance. =#
 simloop!(output, simdata, fspan) = begin
     settimestamp!(output, first(fspan))
     # Initialise types etc
-    simdata = updatetime(simdata, 1)# |> precalcrules
+    simdata = updatetime(simdata, 1)
     # Loop over the simulation
     for f in fspan[2:end]
-        # Get a data object with updated timestep and precalculated rules
-        simdata = updatetime(simdata, f) |> precalcrules
+        # Get a data object with updated timestep and precalculate rules
+        simdata = updatetime(simdata, f)
+        precalcrules!(simdata)
         # Run the ruleset and setup data for the next iteration
         simdata = sequencerules!(simdata)
         # Save/do something with the the current grid
         storegrid!(output, simdata)
+        # Let interface things happen
         isasync(output) && yield()
         # Stick to the FPS
         delay(output, f)
@@ -112,9 +114,13 @@ simloop!(output, simdata, fspan) = begin
     output
 end
 
+# We have to keep the original rulset as it may be modified elsewhere
+# like in an Interact.jl interface. `Ruleset` is mutable.
+precalcrules!(simdata::SimData) = begin
+    simdata.ruleset.rules = precalcrules(rules(simdata), simdata)
+    simdata
+end
 precalcrules(rule, simdata) = rule
-precalcrules(simdata::SimData) = 
-    @set simdata.ruleset.rules = precalcrules(rules(simdata), simdata)
 precalcrules(rules::Tuple, simdata) =
     (precalcrules(rules[1], simdata), precalcrules(tail(rules), simdata)...)
 precalcrules(rules::Tuple{}, simdata) = ()
@@ -122,4 +128,3 @@ precalcrules(chain::Chain{R,W}, simdata) where {R,W} = begin
     ch = precalcrules(val(chain), simdata)
     Chain{R,W,typeof(ch)}(ch)
 end
-
