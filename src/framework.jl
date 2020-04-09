@@ -67,7 +67,11 @@ resume!(output, ruleset; tstop=stoptime(output), fps=fps(output), simdata=nothin
     stopframe = lastindex(tstart:timestep(ruleset):tstop)
     fspan = lastframe:stopframe
     # Use the last frame of the existing simulation as the init frame
-    init = output[lastframe]
+    if lastframe <= length(output)
+        init = output[lastframe]
+    else
+        init = first(output)
+    end
     simdata = initdata!(simdata, ruleset, init, tstart, nreplicates)
     setfps!(output, fps)
     runsim!(output, simdata, fspan)
