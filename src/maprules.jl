@@ -40,16 +40,20 @@ ruleloop(::PerformanceOpt, rule::Rule, simdata, rkeys, rgrids, wkeys, wgrids) = 
     nrows, ncols = gridsize(simdata)
     for j in 1:ncols, i in 1:nrows
         ismasked(mask(simdata), i, j) && continue
-        readvals = _readstate(rkeys, rgrids, i, j)
-        writevals = applyrule(rule, simdata, readvals, (i, j))
-        _writetogrids!(wgrids, writevals, i, j)
+        readvals = _readstate(rgrids, i, j)
+        writeit(rule, simdata, wgrids, readvals, i, j)
     end
+end
+
+writeit(rule, simdata, wgrids, readvals, i, j) = begin
+    writevals = applyrule(rule, simdata, readvals, (i, j))
+    _writestate!(wgrids, writevals, i, j)
 end
 ruleloop(::PerformanceOpt, rule::PartialRule, simdata, rkeys, rgrids, wkeys, wgrids) = begin
     nrows, ncols = gridsize(data(simdata)[1])
     for j in 1:ncols, i in 1:nrows
         ismasked(mask(simdata), i, j) && continue
-        read = _readstate(rkeys, rgrids, i, j)
+        read = _readstate(rgrids, i, j)
         applyrule!(rule, simdata, read, (i, j))
     end
 end
@@ -83,11 +87,11 @@ ruleloop(opt::NoOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighborho
         rowsinblock = min(blocksize, nrows - blocksize * (bi - 1))
         # Get current block
         i = blocktoind(bi, blocksize)
-        
+
 
         # Loop along the block ROW. This is faster because we are reading
-        # 1 column from the main array for multiple blocks at each step, 
-        # not actually along the row.  
+        # 1 column from the main array for multiple blocks at each step,
+        # not actually along the row.
         for j = 1:ncols
             # Which block column are we in
             if j == 1
@@ -126,10 +130,10 @@ ruleloop(opt::NoOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighborho
                 curblocki = b <= r ? 1 : 2
                 # Run the rule using buffer b
                 buf = bufs[b]
-                readval = _readstate(keys2vals(readkeys(rule)), rgrids, I...)
+                readval = _readstate(rgrids, I...)
                 #read = buf[bufcenter, bufcenter]
                 writeval = applyrule(rule, griddata, readval, I, buf)
-                _writetogrids!(wgrids, writeval, I...)
+                _writestate!(wgrids, writeval, I...)
                 # Update the status for the block
             end
         end
@@ -271,10 +275,10 @@ ruleloop(opt::SparseOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighb
                     curblocki = b <= r ? 1 : 2
                     # Run the rule using buffer b
                     buf = bufs[b]
-                    readval = _readstate(keys2vals(readkeys(rule)), rgrids, I...)
+                    readval = _readstate(rgrids, I...)
                     #read = buf[bufcenter, bufcenter]
                     writeval = applyrule(rule, griddata, readval, I, buf)
-                    _writetogrids!(wgrids, writeval, I...)
+                    _writestate!(wgrids, writeval, I...)
                     # Update the status for the block
                     cellstatus = if writeval isa NamedTuple
                         @inbounds val = writeval[neighborhoodkey(rule)]
@@ -296,13 +300,6 @@ ruleloop(opt::SparseOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighb
     end
     srcstatus .= dststatus
 end
-
-@inline _writetogrids!(data::Tuple, vals::NamedTuple, I...) =
-    map(data, values(vals)) do d, v
-        @inbounds dest(d)[I...] = v
-    end
-@inline _writetogrids!(data::GridData, val, I...) =
-    (@inbounds dest(data)[I...] = val)
 
 #= Wrap overflow where required. This optimisation allows us to ignore
 bounds checks on neighborhoods and still use a wraparound grid. =#
@@ -373,7 +370,7 @@ handleoverflow!(griddata::WritableGridData, ::RemoveOverflow) = begin
     endpadcol = npadcols-r+1:npadcols
     padrows, padcols = axes(src)
 
-    for j = startpadcol, i = padrows 
+    for j = startpadcol, i = padrows
         src[i, j] = zero(eltype(src))
     end
     for j = endpadcol, i = padrows
@@ -388,12 +385,26 @@ handleoverflow!(griddata::WritableGridData, ::RemoveOverflow) = begin
     griddata
 end
 
-
-@inline _readstate(keys::Tuple, data::Union{<:Tuple,<:NamedTuple}, I...) = begin
-    vals = map(d -> _readstate(keys, d, I...), data)
-    NamedTuple{map(unwrap, keys),typeof(vals)}(vals)
+@generated function _readstate(rdata::Tuple, I...)
+    expr = Expr(:tuple)
+    for p in 1:length(rdata.parameters)
+        push!(expr.args, :(rdata[$p][I...]))
+    end
+    expr
 end
-@inline _readstate(keys, data::GridData, I...) = data[I...]
+_readstate(rdata::ReadableGridData, I...) = rdata[I...]
+
+
+@generated _writestate!(wdata::Tuple, vals, I...) = begin
+    expr = Expr(:block)
+    for p in 1:length(rdata.parameters)
+        push!(expr.args, :(wdata[$p].dest[I...] = v))
+    end
+    push!(expr.args, :(nothing))
+    expr
+end
+_writestate!(wdata::GridData{T}, val::T, I...) where T =
+    (@inbounds wdata.dest[I...] = val; nothing)
 
 
 # getdata retreives GridDatGridData to match the requirements of a Rule.
