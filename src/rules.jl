@@ -159,7 +159,13 @@ Map function f with cell values from read grid(s), write grid(s)
 """
 Map(f; read, write) = Map{read,write}(f)
 
-@inline applyrule(rule::Map{R,W}, data, read, index) where {R<:Union{Tuple,NamedTuple},W} =
-    rule.f(read...)
-@inline applyrule(rule::Map{R,W}, data, read, index) where {R,W} =
-    rule.f(read)
+@inline applyrule(rule::Map{R,W}, data, read, index) where {R<:Tuple,W} = begin
+    let (rule, read) = (rule, read)
+        rule.f(read...)
+    end
+end
+@inline applyrule(rule::Map{R,W}, data, read, index) where {R,W} = begin
+    let (rule, read) = (rule, read)
+        rule.f(read)
+    end
+end
