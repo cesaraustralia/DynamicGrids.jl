@@ -388,23 +388,25 @@ end
 @generated function _readstate(rdata::Tuple, I...)
     expr = Expr(:tuple)
     for p in 1:length(rdata.parameters)
-        push!(expr.args, :(rdata[$p][I...]))
+        push!(expr.args, :(@inbounds rdata[$p][I...]))
     end
     expr
 end
-_readstate(rdata::ReadableGridData, I...) = rdata[I...]
+_readstate(rdata::ReadableGridData, I...) = (@inbounds rdata[I...])
 
 
 @generated _writestate!(wdata::Tuple, vals, I...) = begin
     expr = Expr(:block)
     for p in 1:length(rdata.parameters)
-        push!(expr.args, :(wdata[$p].dest[I...] = v))
+        push!(expr.args, :(@inbounds wdata[$p].dest[I...] = v))
     end
     push!(expr.args, :(nothing))
     expr
 end
-_writestate!(wdata::GridData{T}, val::T, I...) where T =
-    (@inbounds wdata.dest[I...] = val; nothing)
+_writestate!(wdata::GridData{T}, val::T, I...) where T = begin
+    @inbounds wdata.dest[I...] = val
+    nothing
+end
 
 
 # getdata retreives GridDatGridData to match the requirements of a Rule.
