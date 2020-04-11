@@ -40,20 +40,17 @@ ruleloop(::PerformanceOpt, rule::Rule, simdata, rkeys, rgrids, wkeys, wgrids) = 
     nrows, ncols = gridsize(simdata)
     for j in 1:ncols, i in 1:nrows
         ismasked(mask(simdata), i, j) && continue
-        readvals = _readstate(rgrids, i, j)
-        writeit(rule, simdata, wgrids, readvals, i, j)
+        readvals = _readstate(rkeys, rgrids, i, j)
+        writevals = applyrule(rule, simdata, readvals, (i, j))
+        _writestate!(wgrids, writevals, i, j)
     end
 end
 
-writeit(rule, simdata, wgrids, readvals, i, j) = begin
-    writevals = applyrule(rule, simdata, readvals, (i, j))
-    _writestate!(wgrids, writevals, i, j)
-end
 ruleloop(::PerformanceOpt, rule::PartialRule, simdata, rkeys, rgrids, wkeys, wgrids) = begin
     nrows, ncols = gridsize(data(simdata)[1])
     for j in 1:ncols, i in 1:nrows
         ismasked(mask(simdata), i, j) && continue
-        read = _readstate(rgrids, i, j)
+        read = _readstate(rkeys, rgrids, i, j)
         applyrule!(rule, simdata, read, (i, j))
     end
 end
@@ -130,7 +127,7 @@ ruleloop(opt::NoOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighborho
                 curblocki = b <= r ? 1 : 2
                 # Run the rule using buffer b
                 buf = bufs[b]
-                readval = _readstate(rgrids, I...)
+                readval = _readstate(rkeys, rgrids, I...)
                 #read = buf[bufcenter, bufcenter]
                 writeval = applyrule(rule, griddata, readval, I, buf)
                 _writestate!(wgrids, writeval, I...)
@@ -216,7 +213,7 @@ ruleloop(opt::SparseOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighb
                 #         for b in 1:rowsinblock
                 #             ii = i + b - 1
                 #             ismasked(simdata, ii, j) && continue
-                #             read = _readstate(rkeys, rgrids, i, j)
+                #             read = _readstate(rkeys, rkeys, rgrids, i, j)
                 #             write = applyrule(tail(rule), griddata, read, (ii, j), buf)
                 #             if wgrids isa Tuple
                 #                 map(wgrids, write) do d, w
@@ -275,7 +272,7 @@ ruleloop(opt::SparseOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighb
                     curblocki = b <= r ? 1 : 2
                     # Run the rule using buffer b
                     buf = bufs[b]
-                    readval = _readstate(rgrids, I...)
+                    readval = _readstate(rkeys, rgrids, I...)
                     #read = buf[bufcenter, bufcenter]
                     writeval = applyrule(rule, griddata, readval, I, buf)
                     _writestate!(wgrids, writeval, I...)
@@ -385,20 +382,24 @@ handleoverflow!(griddata::WritableGridData, ::RemoveOverflow) = begin
     griddata
 end
 
-@generated function _readstate(rdata::Tuple, I...)
+@generated function _readstate(rkeys::Tuple, rdata::Tuple, I...)
     expr = Expr(:tuple)
     for p in 1:length(rdata.parameters)
         push!(expr.args, :(@inbounds rdata[$p][I...]))
     end
-    expr
+    quote
+        keys = map(unwrap, rkeys)
+        vals = $expr
+        NamedTuple{keys,typeof(vals)}(vals)
+    end
 end
-_readstate(rdata::ReadableGridData, I...) = (@inbounds rdata[I...])
+_readstate(rkeys::Val, rdata::ReadableGridData, I...) = (@inbounds rdata[I...])
 
 
 @generated _writestate!(wdata::Tuple, vals, I...) = begin
     expr = Expr(:block)
-    for p in 1:length(rdata.parameters)
-        push!(expr.args, :(@inbounds wdata[$p].dest[I...] = v))
+    for p in 1:length(wdata.parameters)
+        push!(expr.args, :(@inbounds wdata[$p].dest[I...] = vals[$p]))
     end
     push!(expr.args, :(nothing))
     expr
@@ -464,7 +465,9 @@ combinedata(rkeys::Tuple, rgrids::Tuple, wkey, wgrids) =
     end
 
     quote
-        NamedTuple{$keysexp}($dataexp)
+        keys = $keysexp
+        vals = $dataexp
+        NamedTuple{keys,typeof(vals)}(vals)
     end
 end
 
