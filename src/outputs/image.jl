@@ -118,7 +118,8 @@ grid2image(p::SingleGridProcessor, minval, maxval,
     img = fill(RGB24(0), size(grid))
     for j in 1:size(img, 2), i in 1:size(img, 1)
         @inbounds val = grid[i, j]
-        @inbounds img[i, j] = cell2rgb(p, minval, maxval, data, val, i, j)
+        rgb = rgb24(cell2rgb(p, minval, maxval, data, val, i, j))
+        @inbounds img[i, j] = rgb
     end
     img
 end
@@ -284,13 +285,19 @@ grid2image(p::LayoutProcessor, minval::Tuple, maxval::Tuple,
             grid_id
         end
         # Run processor for section
-        section = grid2image(processors(p)[n], minval[n], maxval[n], data, grids[n], t)
-        # Copy section into image
-        for x in 1:size(section, 1), y in 1:size(section, 2)
-            img[x + (i - 1) * sze[1], y + (j - 1) * sze[2]] = section[x, y]
-        end
+        _sectionloop(processors(p)[n], img, minval[n], maxval[n], data, grids[n], t, i, j)
     end
     img
+end
+
+_sectionloop(processor::SingleGridProcessor, img, minval, maxval, data, grid, t, i, j) = begin
+    section = grid2image(processor, minval, maxval, data, grid, t)
+    @assert eltype(section) == eltype(img)
+    sze = size(section)
+    # Copy section into image
+    for y in 1:sze[2], x in 1:sze[1]
+        img[x + (i - 1) * sze[1], y + (j - 1) * sze[2]] = section[x, y]
+    end
 end
 
 

@@ -36,8 +36,9 @@ end
 
 # Separated out for both modularity and as a function barrier for type stability
 
-ruleloop(::PerformanceOpt, rule::Rule, simdata, rkeys, rgrids, wkeys, wgrids) = begin
-    nrows, ncols = gridsize(simdata)
+ruleloop(::PerformanceOpt, rule::Rule, simdata::SimData, rkeys, rgrids, wkeys, wgrids) = begin
+    nrows, ncols = gridsize(data(simdata)[1])
+
     for j in 1:ncols, i in 1:nrows
         ismasked(mask(simdata), i, j) && continue
         readvals = _readstate(rkeys, rgrids, i, j)
@@ -46,19 +47,19 @@ ruleloop(::PerformanceOpt, rule::Rule, simdata, rkeys, rgrids, wkeys, wgrids) = 
     end
 end
 
-ruleloop(::PerformanceOpt, rule::PartialRule, simdata, rkeys, rgrids, wkeys, wgrids) = begin
+ruleloop(::PerformanceOpt, rule::PartialRule, simdata::SimData, rkeys, rgrids, wkeys, wgrids) = begin
     nrows, ncols = gridsize(data(simdata)[1])
     for j in 1:ncols, i in 1:nrows
         ismasked(mask(simdata), i, j) && continue
-        read = _readstate(rkeys, rgrids, i, j)
-        applyrule!(rule, simdata, read, (i, j))
+        readvals = _readstate(rkeys, rgrids, i, j)
+        applyrule!(rule, simdata, readvals, (i, j))
     end
 end
 #= Run the rule for all cells, writing the result to the dest array
 The neighborhood is copied to the rules neighborhood buffer array for performance.
 Empty blocks are skipped for NeighborhoodRules. =#
 ruleloop(opt::NoOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:NeighborhoodRule,Vararg}}},
-         simdata, rkeys, rgrids, wkeys, wgrids) where {R,W} = begin
+         simdata::SimData, rkeys, rgrids, wkeys, wgrids) where {R,W} = begin
     r = radius(rule)
     griddata = simdata[neighborhoodkey(rule)]
     blocksize = 2r
@@ -138,7 +139,7 @@ ruleloop(opt::NoOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighborho
 end
 
 ruleloop(opt::SparseOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:NeighborhoodRule,Vararg}}},
-         simdata, rkeys, rgrids, wkeys, wgrids) where {R,W} = begin
+         simdata::SimData, rkeys, rgrids, wkeys, wgrids) where {R,W} = begin
 
     rgrids isa Tuple && length(rgrids) > 1 && error("`SparseOpt` can't handle rules with multiple read grids yet. Use `opt=NoOpt()`")
     r = radius(rule)

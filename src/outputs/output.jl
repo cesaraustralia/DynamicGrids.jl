@@ -97,7 +97,7 @@ finalise(o::Output) = nothing
 """
     delay(o::Output, f)
 
-`Graphic` outputs delay the simulations to match some `fps` rate, 
+`Graphic` outputs delay the simulations to match some `fps` rate,
 but other outputs just do nothing and continue.
 """
 delay(o::Output, f) = nothing
@@ -125,19 +125,17 @@ end
 storegrid!(::Type{<:NamedTuple}, output::Output, simdata::AbstractSimData, f::Int) = begin
     map(values(grids(simdata)), keys(simdata)) do grid, key
         outgrid = output[f][key]
-        fill!(outgrid, zero(eltype(outgrid)))
-        # blockrun!(grid, outgrid)
-        for I in CartesianIndices(outgrid)
-            outgrid[I] = grid[I]
-        end
+        _storeloop(outgrid, grid)
     end
 end
 storegrid!(::Type{<:AbstractArray}, output::Output, simdata::AbstractSimData, f::Int) = begin
     outgrid = output[f]
+    _storeloop(outgrid, grid)
+end
+_storeloop(outgrid, grid) = begin
     fill!(outgrid, zero(eltype(outgrid)))
-    # blockrun!(grid, outgrid)
     for I in CartesianIndices(outgrid)
-        outgrid[I] = first(grids(simdata))[I]
+        outgrid[I] = grid[I]
     end
 end
 
