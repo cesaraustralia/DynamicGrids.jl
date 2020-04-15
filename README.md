@@ -168,11 +168,11 @@ const BURNING = 3
 
 # Define the Rule struct
 struct ForestFire{R,W,N,PC,PR} <: NeighborhoodRule{R,W}
-    neighborhood::NH
+    neighborhood::N
     prob_combustion::PC
     prob_regrowth::PR
 end
-ForestFire(; grid=:_default_, neighborhood=Radialighborhood{1}(), prob_combustion=0.0001, prob_regrowth=0.01) =
+ForestFire(; grid=:_default_, neighborhood=RadialNeighborhood{1}(), prob_combustion=0.0001, prob_regrowth=0.01) =
     ForestFire{grid,grid}(neighborhood, prob_combustion, prob_regrowth)
 
 # Define an `applyrule` method to be broadcasted over the grid for the `ForestFire` rule
@@ -201,7 +201,9 @@ sim!(output, ruleset; tspan=(1, 200))
 # Save the output as a gif
 savegif("forestfire.gif", output)
 ```
+
 ![forestfire](https://user-images.githubusercontent.com/2534009/72052469-5450c580-3319-11ea-8948-5196d1c6fd33.gif)
+
 
 
 We could also use a "windy" custom neighborhood:
