@@ -130,7 +130,7 @@ storegrid!(::Type{<:NamedTuple}, output::Output, simdata::AbstractSimData, f::In
 end
 storegrid!(::Type{<:AbstractArray}, output::Output, simdata::AbstractSimData, f::Int) = begin
     outgrid = output[f]
-    _storeloop(outgrid, grid)
+    _storeloop(outgrid, first(grids(simdata)))
 end
 _storeloop(outgrid, grid) = begin
     fill!(outgrid, zero(eltype(outgrid)))
