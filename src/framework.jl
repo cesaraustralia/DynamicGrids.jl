@@ -1,23 +1,30 @@
 """
-sim!(output, ruleset; init=nothing, tstpan=(1, length(output)),
-     fps=fps(output), simdata=nothing, nreplicates=nothing)
+    sim!(output, ruleset;
+         init=nothing,
+         tstpan=(1, length(output)),
+         fps=fps(output),
+         simdata=nothing,
+         nreplicates=nothing)
 
 Runs the whole simulation, passing the destination aray to
 the passed in output for each time-step.
 
 ### Arguments
-- `output`: An [Output](@ref) to store grids or display them on the screen.
-- `ruleset`: A Rule() containing one ore more [`Rule`](@ref). These will each be run in sequence.
+- `output`: An [`Output`](@ref) to store grids or display them on the screen.
+- `ruleset`: A [`Ruleset`](@ref) containing one ore more [`Rule`](@ref)s.
+  These will each be run in sequence.
 
 ### Keyword Arguments
 - `init`: the initialisation array. If not passed, the [`Ruleset`](@ref) must contain an `init` array.
 - `tspan`: a tuple holding the start and end of the timespan the simulaiton will run for.
+  Taken from the output length if not passed in.
 - `fps`: the frames per second to display. Will be taken from the output if not passed in.
 - `nreplicates`: the number of replicates to combine in stochastic simulations
-- `simdata`: a SimData object. Keeping it between simulations can reduce memory
+- `simdata`: a [`SimData`](@ref) object. Keeping it between simulations can reduce memory
   allocation when that is important.
 """
-sim!(output, ruleset; init=nothing, tspan=(1, length(output)), fps=fps(output),
+sim!(output::Output, ruleset::Ruleset;
+     init=nothing, tspan=(1, length(output)), fps=fps(output),
      nreplicates=nothing, simdata=nothing) = begin
     initialise(output)
     isrunning(output) && error("A simulation is already running in this output")
@@ -50,14 +57,33 @@ _chooseinit(rulesetinit::Nothing, arginit::Nothing) =
     error("Include an init array: either in the ruleset or with the `init` keyword")
 
 """
-    resume!(output, ruleset; tadd=100, kwargs...)
+    resume!(output::Output, ruleset::Ruleset;
+            tstop=stoptime(output),
+            fps=fps(output),
+            simdata=nothing,
+            nreplicates=nothing)
 
 Restart the simulation where you stopped last time. For arguments see [`sim!`](@ref).
 The keyword arg `tadd` indicates the number of grid frames to add, and of course an init
 array will not be accepted.
+
+### Arguments
+- `output`: An [`Output`](@ref) to store grids or display them on the screen.
+- `ruleset`: A [`Ruleset`](@ref) containing one ore more [`Rule`](@ref)s.
+  These will each be run in sequence.
+
+### Keyword Arguments (optional
+- `init`: the initialisation array. If not passed, the [`Ruleset`](@ref) must contain
+  an `init` array.
+- `tstop`: the stop time for the simulation. Taken from the output length if not passed in.
+- `fps`: the frames per second to display. Taken from the output if not passed in.
+- `nreplicates`: the number of replicates to combine in stochastic simulations
+- `simdata`: a [`SimData`](@ref) object. Keeping it between simulations can reduce memory
+  allocation when that is important.
 """
-resume!(output, ruleset; tstop=stoptime(output), fps=fps(output), simdata=nothing,
-        nreplicates=nothing) = begin
+resume!(output::Output, ruleset::Ruleset;
+        tstop=stoptime(output), fps=fps(output),
+        simdata=nothing, nreplicates=nothing) = begin
     initialise(output)
     length(output) > 0 || error("There is no simulation to resume. Run `sim!` first")
     isrunning(output) && error("A simulation is already running in this output")
@@ -89,7 +115,7 @@ runsim!(output, args...) =
 Operations on outputs and rulesets are allways mutable and in-place.
 Operations on rules and simdata objects are functional as they are used in inner loops
 where immutability improves performance. =#
-simloop!(output, simdata, fspan) = begin
+simloop!(output::Output, simdata::SimData, fspan) = begin
     settimestamp!(output, first(fspan))
     # Initialise types etc
     simdata = updatetime(simdata, 1)

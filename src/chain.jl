@@ -9,14 +9,15 @@ struct Chain{R,W,T<:Union{Tuple{},Tuple{Union{<:NeighborhoodRule,<:CellRule},Var
     val::T
 end
 Chain(args...) = begin
-    wkeys = Tuple{union(map(writekeys, args))...}
-    rkeys = Tuple{union(map(readkeys, args))...}
-    Chain{wkeys,rkeys,typeof(args)}(args)
+    rkeys = Tuple{union(map(k -> asiterable(readkeys(k)), args)...)...}
+    wkeys = Tuple{union(map(k -> asiterable(writekeys(k)), args)...)...}
+    Chain{rkeys,wkeys,typeof(args)}(args)
 end
 
 val(chain::Chain) = chain.val
 # Only the first rule in a chain can have a radius larger than zero.
 radius(chain::Chain) = radius(chain[1])
+neighborhoodkey(chain::Chain) = neighborhoodkey(chain[1])
 
 Base.show(io::IO, chain::Chain{R,W}) where {R,W} = begin
     indent = get(io, :indent, "")
@@ -43,43 +44,71 @@ occur between rules, and they are essentially compiled together into compound
 rules. This gives correct results only for [`CellRule`](@ref), or for a single
 [`NeighborhoodRule`](@ref) followed by [`CellRule`](@ref).
 """
-@inline applyrule(chain::Chain, data, state::NamedTuple, index, args...) = begin
-    read = readstate(chain, state)
-    write = applyrule(chain[1], data, read, index, args...)
-    updated = update_chainstate(chain, write, state)
-    applyrule(tail(chain), data, updated, index)
+@inline applyrule(chain::Chain, data, state, index, args...) = begin
+    newstate = applyrule(chain::Chain, chain[1], data, state, index, args...)
 end
-@inline applyrule(rules::Chain{R,W,Tuple{}}, data, state::NamedTuple, index, args...
-                 ) where {R,W} = state
+@inline applyrule(chain::Chain{R,W,Tuple{}}, data, state, index, args...
+                 ) where {R,W} = 
+    chainstate(chain, map(Val, writekeys(chain)), state)
 
-readstate(chain::Chain, state::NamedTuple) = begin
-    keys = readkeys(chain[1])
-    if keys isa Tuple
-        vals = map(k -> state[k], keys)
-        NamedTuple{keys,typeof(vals)}(vals)
-    else
-        state[keys]
+@inline applyrule(chain::Chain, rule::Rule{RR,RW}, data, state, index, args...
+                  ) where {RR,RW} = begin
+    read = chainstate(chain, Val{RR}, state)
+    write = applyrule(rule, data, read, index, args...)
+    newstate = update_chainstate(chain, rule, state, write)
+    applyrule(tail(chain), data, newstate, index)
+end
+@inline applyrule(chain::Chain, rule::Rule{RR,RW}, data, state, index, args...
+                  ) where {RR<:Tuple,RW} = begin
+    read = chainstate(chain, (map(Val, readkeys(rule))...,), state)
+    write = applyrule(rule, data, read, index, args...)
+    newstate = update_chainstate(chain, rule, state, write)
+    applyrule(tail(chain), data, newstate, index)
+end
+
+@inline chainstate(chain::Chain, keys::Tuple, state) = begin
+    keys = map(unwrap, keys)
+    vals = map(k -> state[k], keys)
+    NamedTuple{keys,typeof(vals)}(vals)
+end
+@inline chainstate(chain::Chain, key::Type{<:Val}, state) = 
+    state[unwrap(key)]
+
+@generated update_chainstate(chain::Chain{CR,CW}, rule::Rule{RR,RW}, state::NamedTuple{K,V}, writestate::Tuple
+                            ) where {CR,CW,RR,RW,K,V} = begin
+    expr = Expr(:tuple)
+    wkeys = RW.parameters
+    keys = (union(K, RW.parameters)...,)
+    for (i, k) in enumerate(keys)
+        if k in wkeys
+            for (j, wkey) in enumerate(wkeys)
+                if k == wkey
+                    push!(expr.args, :(writestate[$j]))
+                end
+            end
+        else
+            push!(expr.args, :(state[$i]))
+        end
+    end
+    quote
+        newstate = $expr
+        NamedTuple{$keys}(newstate)
     end
 end
 
-update_chainstate(chain::Chain, write, state::NamedTuple) = begin
-    chainkeys = map(Val, keys(chain))
-    wkeys = writekeys(chain[1])
-    wkeys = if wkeys isa Tuple
-        map(Val, wkeys)
-    else
-        Val(wkeys)
+@generated update_chainstate(chain::Chain{CR,CW}, rule::Rule{RR,RW}, state::NamedTuple{K,V}, writestate
+                            ) where {CR,CW,RR,RW,K,V} = begin
+    expr = Expr(:tuple)
+    keys = (union(K, (RW,))...,)
+    for (i, k) in enumerate(keys)
+        if k == RW
+            push!(expr.args, :(writestate))
+        else
+            push!(expr.args, :(state[$i]))
+        end
     end
-    update_chainstate(chainkeys, wkeys, write, state)
-end
-
-@inline update_chainstate(chainkeys::Tuple, wkeys::Tuple, write, state) = begin
-    state = writestate(chainkeys, wkeys[1], writestate, state)
-    writestate(chainkeys, tail(wkeys), writestate, state)
-end
-@inline update_chainstate(chainkeys::Tuple, writekey::Val, write, state) =
-    map(state, NamedTuple{keys(state)}(chainkeys)) do s, ck
-        writekey == ck ? write : s
+    quote
+        newstate = $expr
+        NamedTuple{$keys}(newstate)
     end
-
-neighborhoodkey(chain::Chain) = neighborhoodkey(chain[1])
+end

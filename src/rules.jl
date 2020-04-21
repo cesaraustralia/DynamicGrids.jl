@@ -34,7 +34,7 @@ end
 end
 
 @generated Base.keys(rule::Rule{R,W}) where {R,W} =
-    Expr(:tuple, QuoteNode.(union(_asiterable(W), _asiterable(R)))...)
+    Expr(:tuple, QuoteNode.(union(asiterable(W), asiterable(R)))...)
 
 @inline writekeys(::Rule{R,W}) where {R,W} = W
 @generated writekeys(::Rule{R,W}) where {R,W<:Tuple} =
@@ -47,8 +47,9 @@ end
 keys2vals(keys::Tuple) = map(Val, keys)
 keys2vals(key::Symbol) = Val(key)
 
-_asiterable(x::Symbol) = (x,)
-_asiterable(x::Type{<:Tuple}) = x.parameters
+asiterable(x::Symbol) = (x,)
+asiterable(x::Type{<:Tuple}) = x.parameters
+asiterable(x::Tuple) = x
 
 # Define the constructor for generic rule reconstruction in Flatten.jl and Setfield.jl
 ConstructionBase.constructorof(::Type{T}) where T<:Rule{R,W} where {R,W} =
@@ -121,7 +122,7 @@ abstract type NeighborhoodRule{R,W} <: Rule{R,W} end
 neighborhood(rule::NeighborhoodRule) = rule.neighborhood
 neighborhoodkey(rule::NeighborhoodRule{R,W}) where {R,W} = R
 # The first argument is for the neighborhood grid
-neighborhoodkey(rule::NeighborhoodRule{Tuple{R,Vararg},W}) where {R,W} = K
+neighborhoodkey(rule::NeighborhoodRule{Tuple{R1,Vararg},W}) where {R1,W} = R1
 
 
 """
