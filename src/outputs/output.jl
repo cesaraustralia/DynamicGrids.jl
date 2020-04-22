@@ -135,7 +135,7 @@ end
 _storeloop(outgrid, grid) = begin
     fill!(outgrid, zero(eltype(outgrid)))
     for I in CartesianIndices(outgrid)
-        outgrid[I] = grid[I]
+        @inbounds outgrid[I] = grid[I]
     end
 end
 
@@ -164,7 +164,7 @@ initgrids!(o::Output, init) = begin
 end
 initgrids!(o::Output, init::NamedTuple) = begin
     for key in keys(init)
-        first(o)[key] .= init[key]
+        @inbounds first(o)[key] .= init[key]
     end
     for f = (firstindex(o) + 1):lastindex(o)
         for key in keys(init)
