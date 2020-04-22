@@ -71,9 +71,9 @@ const FIELDDOCTABLE = FieldDocTable((:Description, :Default, :Limits),
     """
 
 include("rules.jl")
-include("chain.jl")
 include("rulesets.jl")
 include("simulationdata.jl")
+include("chain.jl")
 include("outputs/output.jl")
 include("outputs/graphic.jl")
 include("outputs/image.jl")
@@ -85,6 +85,7 @@ include("sequencerules.jl")
 include("maprules.jl")
 include("neighborhoods.jl")
 include("utils.jl")
+include("map.jl")
 include("life.jl")
 
 end

@@ -40,7 +40,7 @@ end
 Life(; read=:_default_, write=read, neighborhood=RadialNeighborhood{1}(), b=(3, 3), s=(2, 3)) =
     Life{read,write}(neighborhood, b, s)
 
-applyrule(rule::Life, data, state, index, buf) = begin
+applyrule(rule::Life, data::SimData, state, index, buf) = begin
     sum = sumneighbors(rule.neighborhood, buf, state)
     # Check if neighborhood sum matches rule for the current state
     if sum in (rule.b, rule.s)[state+1]

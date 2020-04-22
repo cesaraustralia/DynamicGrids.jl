@@ -36,8 +36,9 @@ end
 
 # Separated out for both modularity and as a function barrier for type stability
 
-ruleloop(::PerformanceOpt, rule::Rule, simdata, rkeys, rgrids, wkeys, wgrids) = begin
-    nrows, ncols = gridsize(simdata)
+ruleloop(::PerformanceOpt, rule::Rule, simdata::SimData, rkeys, rgrids, wkeys, wgrids) = begin
+    nrows, ncols = gridsize(data(simdata)[1])
+
     for j in 1:ncols, i in 1:nrows
         ismasked(mask(simdata), i, j) && continue
         readval = readgrids(rkeys, rgrids, i, j)
@@ -45,7 +46,8 @@ ruleloop(::PerformanceOpt, rule::Rule, simdata, rkeys, rgrids, wkeys, wgrids) = 
         writegrids!(wgrids, writeval, i, j)
     end
 end
-ruleloop(::PerformanceOpt, rule::PartialRule, simdata, rkeys, rgrids, wkeys, wgrids) = begin
+
+ruleloop(::PerformanceOpt, rule::PartialRule, simdata::SimData, rkeys, rgrids, wkeys, wgrids) = begin
     nrows, ncols = gridsize(data(simdata)[1])
     for j in 1:ncols, i in 1:nrows
         ismasked(mask(simdata), i, j) && continue
@@ -57,7 +59,7 @@ end
 The neighborhood is copied to the rules neighborhood buffer array for performance.
 Empty blocks are skipped for NeighborhoodRules. =#
 ruleloop(opt::NoOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:NeighborhoodRule,Vararg}}},
-         simdata, rkeys, rgrids, wkeys, wgrids) where {R,W} = begin
+         simdata::SimData, rkeys, rgrids, wkeys, wgrids) where {R,W} = begin
     r = radius(rule)
     griddata = simdata[neighborhoodkey(rule)]
     blocksize = 2r
@@ -83,11 +85,11 @@ ruleloop(opt::NoOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighborho
         rowsinblock = min(blocksize, nrows - blocksize * (bi - 1))
         # Get current block
         i = blocktoind(bi, blocksize)
-        
+
 
         # Loop along the block ROW. This is faster because we are reading
-        # 1 column from the main array for multiple blocks at each step, 
-        # not actually along the row.  
+        # 1 column from the main array for multiple blocks at each step,
+        # not actually along the row.
         for j = 1:ncols
             # Which block column are we in
             if j == 1
@@ -128,16 +130,15 @@ ruleloop(opt::NoOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighborho
                 buf = bufs[b]
                 readval = readgrids(keys2vals(readkeys(rule)), rgrids, I...)
                 #read = buf[bufcenter, bufcenter]
-                writeval = applyrule(rule, griddata, readval, I, buf)
+                writeval = applyrule(rule, simdata, readval, I, buf)
                 writegrids!(wgrids, writeval, I...)
-                # Update the status for the block
             end
         end
     end
 end
 
 ruleloop(opt::SparseOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:NeighborhoodRule,Vararg}}},
-         simdata, rkeys, rgrids, wkeys, wgrids) where {R,W} = begin
+         simdata::SimData, rkeys, rgrids, wkeys, wgrids) where {R,W} = begin
 
     # rgrids isa Tuple && length(rgrids) > 1 && error("`SparseOpt` can't handle rules with multiple read grids yet. Use `opt=NoOpt()`")
     r = radius(rule)
@@ -212,7 +213,7 @@ ruleloop(opt::SparseOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighb
                             I = i + b - 1, j
                             ismasked(simdata, I...) && continue
                             read = readgrids(rkeys, rgrids, I...)
-                            write = applyrule(tail(rule), griddata, read, I)
+                            write = applyrule(tail(rule), simdata, read, I)
                             if wgrids isa Tuple
                                 map(wgrids, write) do d, w
                                     @inbounds dest(d)[I...] = w
@@ -272,7 +273,7 @@ ruleloop(opt::SparseOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighb
                     buf = bufs[b]
                     readval = readgrids(keys2vals(readkeys(rule)), rgrids, I...)
                     #read = buf[bufcenter, bufcenter]
-                    writeval = applyrule(rule, griddata, readval, I, buf)
+                    writeval = applyrule(rule, simdata, readval, I, buf)
                     writegrids!(wgrids, writeval, I...)
                     # Update the status for the block
                     cellstatus = if writeval isa NamedTuple
@@ -296,18 +297,33 @@ ruleloop(opt::SparseOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighb
     srcstatus .= dststatus
 end
 
-@inline readgrids(keys::Tuple, data::Union{<:Tuple,<:NamedTuple}, I...) = begin
-    vals = map(d -> readgrids(keys, d, I...), data)
-    NamedTuple{map(unwrap, keys),typeof(vals)}(vals)
-end
-@inline readgrids(keys, data::GridData, I...) = data[I...]
-
-@inline writegrids!(data::Tuple, vals::NamedTuple, I...) =
-    map(data, values(vals)) do d, v
-        @inbounds dest(d)[I...] = v
+@generated function readgrids(rkeys::Tuple, rdata::Tuple, I...)
+    expr = Expr(:tuple)
+    for p in 1:length(rdata.parameters)
+        push!(expr.args, :(@inbounds rdata[$p][I...]))
     end
-@inline writegrids!(data::GridData, val, I...) =
-    (@inbounds dest(data)[I...] = val)
+    quote
+        keys = map(unwrap, rkeys)
+        vals = $expr
+        NamedTuple{keys,typeof(vals)}(vals)
+    end
+end
+readgrids(rkeys::Val, rdata::ReadableGridData, I...) =
+    (return @inbounds rdata[I...])
+
+
+@generated writegrids!(wdata::Tuple, vals, I...) = begin
+    expr = Expr(:block)
+    for p in 1:length(wdata.parameters)
+        push!(expr.args, :(@inbounds wdata[$p].dest[I...] = vals[$p]))
+    end
+    push!(expr.args, :(nothing))
+    expr
+end
+writegrids!(wdata::GridData{T}, val::T, I...) where T = begin
+    @inbounds wdata.dest[I...] = val
+    nothing
+end
 
 
 # getdata retreives GridDatGridData to match the requirements of a Rule.
@@ -365,7 +381,9 @@ combinedata(rkeys::Tuple, rgrids::Tuple, wkey, wgrids) =
     end
 
     quote
-        NamedTuple{$keysexp}($dataexp)
+        keys = $keysexp
+        vals = $dataexp
+        NamedTuple{keys,typeof(vals)}(vals)
     end
 end
 
@@ -407,47 +425,6 @@ end
 
 _vals2syms(x::Type{<:Tuple}) = map(v -> _vals2syms(v), x.parameters)
 _vals2syms(::Type{<:Val{X}}) where X = X
-
-
-#= Runs simulations over the block grid. Inactive blocks do not run.
-This can lead to order of magnitude performance improvments in sparse
-simulations where large areas of the grid are filled with zeros. =#
-blockrun!(data::GridData, context, args...) = begin
-    nrows, ncols = gridsize(data)
-    r = radius(data)
-    if r > 0
-        blocksize = 2r
-        status = sourcestatus(data)
-
-        @inbounds for bj in 1:size(status, 2) - 1, bi in 1:size(status, 1) - 1
-            status[bi, bj] || continue
-            # Convert from padded block to init dimensions
-            istart = blocktoind(bi, blocksize) - r
-            jstart = blocktoind(bj, blocksize) - r
-            # Stop at the init row/column size, not the padding or block multiple
-            istop = min(istart + blocksize - 1, nrows)
-            jstop = min(jstart + blocksize - 1, ncols)
-            # Skip the padding
-            istart = max(istart, 1)
-            jstart = max(jstart, 1)
-
-            for j in jstart:jstop, i in istart:istop
-                celldo!(data, context, (i, j), args...)
-            end
-        end
-    else
-        for j in 1:ncols, i in 1:nrows
-            celldo!(data, context, (i, j), args...)
-        end
-    end
-end
-
-# Run rule for particular cell. Applied to active cells inside blockrun!
-@inline celldo!(data::GridData, rule::Rule, I) = begin
-    @inbounds state = source(data)[I...]
-    @inbounds dest(data)[I...] = applyrule(rule, data, state, I)
-    nothing
-end
 
 
 #= Wrap overflow where required. This optimisation allows us to ignore
@@ -519,7 +496,7 @@ handleoverflow!(griddata::WritableGridData, ::RemoveOverflow) = begin
     endpadcol = npadcols-r+1:npadcols
     padrows, padcols = axes(src)
 
-    for j = startpadcol, i = padrows 
+    for j = startpadcol, i = padrows
         src[i, j] = zero(eltype(src))
     end
     for j = endpadcol, i = padrows
