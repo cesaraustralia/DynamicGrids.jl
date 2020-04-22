@@ -44,21 +44,21 @@ occur between rules, and they are essentially compiled together into compound
 rules. This gives correct results only for [`CellRule`](@ref), or for a single
 [`NeighborhoodRule`](@ref) followed by [`CellRule`](@ref).
 """
-@inline applyrule(chain::Chain, data, state, index, args...) = begin
+@inline applyrule(chain::Chain, data::SimData, state, index, args...) = begin
     newstate = applyrule(chain::Chain, chain[1], data, state, index, args...)
 end
-@inline applyrule(chain::Chain{R,W,Tuple{}}, data, state, index, args...
-                 ) where {R,W} = 
+@inline applyrule(chain::Chain{R,W,Tuple{}}, data::SimData, state, index, args...
+                 ) where {R,W} =
     chainstate(chain, map(Val, writekeys(chain)), state)
 
-@inline applyrule(chain::Chain, rule::Rule{RR,RW}, data, state, index, args...
+@inline applyrule(chain::Chain, rule::Rule{RR,RW}, data::SimData, state, index, args...
                   ) where {RR,RW} = begin
     read = chainstate(chain, Val{RR}, state)
     write = applyrule(rule, data, read, index, args...)
     newstate = update_chainstate(chain, rule, state, write)
     applyrule(tail(chain), data, newstate, index)
 end
-@inline applyrule(chain::Chain, rule::Rule{RR,RW}, data, state, index, args...
+@inline applyrule(chain::Chain, rule::Rule{RR,RW}, data::SimData, state, index, args...
                   ) where {RR<:Tuple,RW} = begin
     read = chainstate(chain, (map(Val, readkeys(rule))...,), state)
     write = applyrule(rule, data, read, index, args...)
@@ -71,7 +71,7 @@ end
     vals = map(k -> state[k], keys)
     NamedTuple{keys,typeof(vals)}(vals)
 end
-@inline chainstate(chain::Chain, key::Type{<:Val}, state) = 
+@inline chainstate(chain::Chain, key::Type{<:Val}, state) =
     state[unwrap(key)]
 
 @generated update_chainstate(chain::Chain{CR,CW}, rule::Rule{RR,RW}, state::NamedTuple{K,V}, writestate::Tuple

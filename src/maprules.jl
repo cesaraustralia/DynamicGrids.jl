@@ -130,7 +130,7 @@ ruleloop(opt::NoOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighborho
                 buf = bufs[b]
                 readval = readgrids(keys2vals(readkeys(rule)), rgrids, I...)
                 #read = buf[bufcenter, bufcenter]
-                writeval = applyrule(rule, griddata, readval, I, buf)
+                writeval = applyrule(rule, simdata, readval, I, buf)
                 writegrids!(wgrids, writeval, I...)
             end
         end
@@ -213,7 +213,7 @@ ruleloop(opt::SparseOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighb
                             I = i + b - 1, j
                             ismasked(simdata, I...) && continue
                             read = readgrids(rkeys, rgrids, I...)
-                            write = applyrule(tail(rule), griddata, read, I)
+                            write = applyrule(tail(rule), simdata, read, I)
                             if wgrids isa Tuple
                                 map(wgrids, write) do d, w
                                     @inbounds dest(d)[I...] = w
@@ -273,7 +273,7 @@ ruleloop(opt::SparseOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighb
                     buf = bufs[b]
                     readval = readgrids(keys2vals(readkeys(rule)), rgrids, I...)
                     #read = buf[bufcenter, bufcenter]
-                    writeval = applyrule(rule, griddata, readval, I, buf)
+                    writeval = applyrule(rule, simdata, readval, I, buf)
                     writegrids!(wgrids, writeval, I...)
                     # Update the status for the block
                     cellstatus = if writeval isa NamedTuple
@@ -496,7 +496,7 @@ handleoverflow!(griddata::WritableGridData, ::RemoveOverflow) = begin
     endpadcol = npadcols-r+1:npadcols
     padrows, padcols = axes(src)
 
-    for j = startpadcol, i = padrows 
+    for j = startpadcol, i = padrows
         src[i, j] = zero(eltype(src))
     end
     for j = endpadcol, i = padrows
