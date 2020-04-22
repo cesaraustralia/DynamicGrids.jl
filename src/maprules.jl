@@ -41,9 +41,9 @@ ruleloop(::PerformanceOpt, rule::Rule, simdata::SimData, rkeys, rgrids, wkeys, w
 
     for j in 1:ncols, i in 1:nrows
         ismasked(mask(simdata), i, j) && continue
-        readvals = _readstate(rkeys, rgrids, i, j)
-        writevals = applyrule(rule, simdata, readvals, (i, j))
-        _writestate!(wgrids, writevals, i, j)
+        readval = readgrids(rkeys, rgrids, i, j)
+        writeval = applyrule(rule, simdata, readval, (i, j))
+        writegrids!(wgrids, writeval, i, j)
     end
 end
 
@@ -51,8 +51,8 @@ ruleloop(::PerformanceOpt, rule::PartialRule, simdata::SimData, rkeys, rgrids, w
     nrows, ncols = gridsize(data(simdata)[1])
     for j in 1:ncols, i in 1:nrows
         ismasked(mask(simdata), i, j) && continue
-        readvals = _readstate(rkeys, rgrids, i, j)
-        applyrule!(rule, simdata, readvals, (i, j))
+        readval = readgrids(rkeys, rgrids, i, j)
+        applyrule!(rule, simdata, readval, (i, j))
     end
 end
 #= Run the rule for all cells, writing the result to the dest array
@@ -128,11 +128,10 @@ ruleloop(opt::NoOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighborho
                 curblocki = b <= r ? 1 : 2
                 # Run the rule using buffer b
                 buf = bufs[b]
-                readval = _readstate(rkeys, rgrids, I...)
+                readval = readgrids(keys2vals(readkeys(rule)), rgrids, I...)
                 #read = buf[bufcenter, bufcenter]
                 writeval = applyrule(rule, griddata, readval, I, buf)
-                _writestate!(wgrids, writeval, I...)
-                # Update the status for the block
+                writegrids!(wgrids, writeval, I...)
             end
         end
     end
@@ -141,7 +140,7 @@ end
 ruleloop(opt::SparseOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:NeighborhoodRule,Vararg}}},
          simdata::SimData, rkeys, rgrids, wkeys, wgrids) where {R,W} = begin
 
-    rgrids isa Tuple && length(rgrids) > 1 && error("`SparseOpt` can't handle rules with multiple read grids yet. Use `opt=NoOpt()`")
+    # rgrids isa Tuple && length(rgrids) > 1 && error("`SparseOpt` can't handle rules with multiple read grids yet. Use `opt=NoOpt()`")
     r = radius(rule)
     griddata = simdata[neighborhoodkey(rule)]
     #= Blocks are cell smaller than the hood, because this works very nicely for
@@ -206,26 +205,25 @@ ruleloop(opt::SparseOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighb
                 # Skip this block
                 skippedlastblock = true
                 # Run the rest of the chain if it exists
-                # TODO: test this
-                # if rule isa Chain && length(rule) > 1
-                #     # Loop over the grid COLUMNS inside the block
-                #     for j in jstart:jstop
-                #         # Loop over the grid ROWS inside the block
-                #         for b in 1:rowsinblock
-                #             ii = i + b - 1
-                #             ismasked(simdata, ii, j) && continue
-                #             read = _readstate(rkeys, rkeys, rgrids, i, j)
-                #             write = applyrule(tail(rule), griddata, read, (ii, j), buf)
-                #             if wgrids isa Tuple
-                #                 map(wgrids, write) do d, w
-                #                     @inbounds dest(d)[i, j] = w
-                #                 end
-                #             else
-                #                 @inbounds dest(wgrids)[i, j] = write
-                #             end
-                #         end
-                #     end
-                # end
+                if rule isa Chain && length(rule) > 1
+                    # Loop over the grid COLUMNS inside the block
+                    for j in jstart:jstop
+                        # Loop over the grid ROWS inside the block
+                        for b in 1:rowsinblock
+                            I = i + b - 1, j
+                            ismasked(simdata, I...) && continue
+                            read = readgrids(rkeys, rgrids, I...)
+                            write = applyrule(tail(rule), griddata, read, I)
+                            if wgrids isa Tuple
+                                map(wgrids, write) do d, w
+                                    @inbounds dest(d)[I...] = w
+                                end
+                            else
+                                @inbounds dest(wgrids)[I...] = write
+                            end
+                        end
+                    end
+                end
                 continue
             end
 
@@ -273,10 +271,10 @@ ruleloop(opt::SparseOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighb
                     curblocki = b <= r ? 1 : 2
                     # Run the rule using buffer b
                     buf = bufs[b]
-                    readval = _readstate(rkeys, rgrids, I...)
+                    readval = readgrids(keys2vals(readkeys(rule)), rgrids, I...)
                     #read = buf[bufcenter, bufcenter]
                     writeval = applyrule(rule, griddata, readval, I, buf)
-                    _writestate!(wgrids, writeval, I...)
+                    writegrids!(wgrids, writeval, I...)
                     # Update the status for the block
                     cellstatus = if writeval isa NamedTuple
                         @inbounds val = writeval[neighborhoodkey(rule)]
@@ -299,91 +297,7 @@ ruleloop(opt::SparseOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighb
     srcstatus .= dststatus
 end
 
-#= Wrap overflow where required. This optimisation allows us to ignore
-bounds checks on neighborhoods and still use a wraparound grid. =#
-handleoverflow!(griddata) = handleoverflow!(griddata, overflow(griddata))
-handleoverflow!(griddata::GridData{T,2}, ::WrapOverflow) where T = begin
-    r = radius(griddata)
-
-    # TODO optimise this. Its mostly a placeholder so wrapping still works in GOL tests.
-    src = source(griddata)
-    nrows, ncols = gridsize(griddata)
-
-    startpadrow = startpadcol = 1-r:0
-    endpadrow = nrows+1:nrows+r
-    endpadcol = ncols+1:ncols+r
-    startrow = startcol = 1:r
-    endrow = nrows+1-r:nrows
-    endcol = ncols+1-r:ncols
-    rows = 1:nrows
-    cols = 1:ncols
-
-    # Left
-    @inbounds copyto!(src, CartesianIndices((rows, startpadcol)),
-                      src, CartesianIndices((rows, endcol)))
-    # Right
-    @inbounds copyto!(src, CartesianIndices((rows, endpadcol)),
-                      src, CartesianIndices((rows, startcol)))
-    # Top
-    @inbounds copyto!(src, CartesianIndices((startpadrow, cols)),
-                      src, CartesianIndices((endrow, cols)))
-    # Bottom
-    @inbounds copyto!(src, CartesianIndices((endpadrow, cols)),
-                      src, CartesianIndices((startrow, cols)))
-
-    # Copy four corners
-    # Top Left
-    @inbounds copyto!(src, CartesianIndices((startpadrow, startpadcol)),
-                      src, CartesianIndices((endrow, endcol)))
-    # Top Right
-    @inbounds copyto!(src, CartesianIndices((startpadrow, endpadcol)),
-                      src, CartesianIndices((endrow, startcol)))
-    # Botom Left
-    @inbounds copyto!(src, CartesianIndices((endpadrow, startpadcol)),
-                      src, CartesianIndices((startrow, endcol)))
-    # Botom Right
-    @inbounds copyto!(src, CartesianIndices((endpadrow, endpadcol)),
-                      src, CartesianIndices((startrow, startcol)))
-
-    # Wrap status
-    status = sourcestatus(griddata)
-    # status[:, 1] .|= status[:, end-1] .| status[:, end-2]
-    # status[1, :] .|= status[end-1, :] .| status[end-2, :]
-    # status[end-1, :] .|= status[1, :]
-    # status[:, end-1] .|= status[:, 1]
-    # status[end-2, :] .|= status[1, :]
-    # status[:, end-2] .|= status[:, 1]
-    # FIXME: Buggy currently, just running all in Wrap mode
-    status .= true
-    griddata
-end
-handleoverflow!(griddata::WritableGridData, ::RemoveOverflow) = begin
-    r = radius(griddata)
-    # Zero edge padding, as it can be written to in writable rules.
-    src = parent(source(griddata))
-    npadrows, npadcols = size(src)
-
-    startpadrow = startpadcol = 1:r
-    endpadrow = npadrows-r+1:npadrows
-    endpadcol = npadcols-r+1:npadcols
-    padrows, padcols = axes(src)
-
-    for j = startpadcol, i = padrows
-        src[i, j] = zero(eltype(src))
-    end
-    for j = endpadcol, i = padrows
-        src[i, j] = zero(eltype(src))
-    end
-    for j = padcols, i = startpadrow
-        src[i, j] = zero(eltype(src))
-    end
-    for j = padcols, i = endpadrow
-        src[i, j] = zero(eltype(src))
-    end
-    griddata
-end
-
-@generated function _readstate(rkeys::Tuple, rdata::Tuple, I...)
+@generated function readgrids(rkeys::Tuple, rdata::Tuple, I...)
     expr = Expr(:tuple)
     for p in 1:length(rdata.parameters)
         push!(expr.args, :(@inbounds rdata[$p][I...]))
@@ -394,10 +308,11 @@ end
         NamedTuple{keys,typeof(vals)}(vals)
     end
 end
-_readstate(rkeys::Val, rdata::ReadableGridData, I...) = (@inbounds rdata[I...])
+readgrids(rkeys::Val, rdata::ReadableGridData, I...) =
+    (return @inbounds rdata[I...])
 
 
-@generated _writestate!(wdata::Tuple, vals, I...) = begin
+@generated writegrids!(wdata::Tuple, vals, I...) = begin
     expr = Expr(:block)
     for p in 1:length(wdata.parameters)
         push!(expr.args, :(@inbounds wdata[$p].dest[I...] = vals[$p]))
@@ -405,7 +320,7 @@ _readstate(rkeys::Val, rdata::ReadableGridData, I...) = (@inbounds rdata[I...])
     push!(expr.args, :(nothing))
     expr
 end
-_writestate!(wdata::GridData{T}, val::T, I...) where T = begin
+writegrids!(wdata::GridData{T}, val::T, I...) where T = begin
     @inbounds wdata.dest[I...] = val
     nothing
 end
@@ -512,69 +427,86 @@ _vals2syms(x::Type{<:Tuple}) = map(v -> _vals2syms(v), x.parameters)
 _vals2syms(::Type{<:Val{X}}) where X = X
 
 
-#= Runs simulations over the block grid. Inactive blocks do not run.
-This can lead to order of magnitude performance improvments in sparse
-simulations where large areas of the grid are filled with zeros. =#
-blockrun!(data::GridData, context, args...) = begin
-    nrows, ncols = gridsize(data)
-    r = radius(data)
-    if r > 0
-        blocksize = 2r
-        status = sourcestatus(data)
+#= Wrap overflow where required. This optimisation allows us to ignore
+bounds checks on neighborhoods and still use a wraparound grid. =#
+handleoverflow!(griddata) = handleoverflow!(griddata, overflow(griddata))
+handleoverflow!(griddata::GridData{T,2}, ::WrapOverflow) where T = begin
+    r = radius(griddata)
 
-        @inbounds for bj in 1:size(status, 2) - 1, bi in 1:size(status, 1) - 1
-            status[bi, bj] || continue
-            # Convert from padded block to init dimensions
-            istart = blocktoind(bi, blocksize) - r
-            jstart = blocktoind(bj, blocksize) - r
-            # Stop at the init row/column size, not the padding or block multiple
-            istop = min(istart + blocksize - 1, nrows)
-            jstop = min(jstart + blocksize - 1, ncols)
-            # Skip the padding
-            istart = max(istart, 1)
-            jstart = max(jstart, 1)
+    # TODO optimise this. Its mostly a placeholder so wrapping still works in GOL tests.
+    src = source(griddata)
+    nrows, ncols = gridsize(griddata)
 
-            for j in jstart:jstop, i in istart:istop
-                celldo!(data, context, (i, j), args...)
-            end
-        end
-    else
-        for j in 1:ncols, i in 1:nrows
-            celldo!(data, context, (i, j), args...)
-        end
+    startpadrow = startpadcol = 1-r:0
+    endpadrow = nrows+1:nrows+r
+    endpadcol = ncols+1:ncols+r
+    startrow = startcol = 1:r
+    endrow = nrows+1-r:nrows
+    endcol = ncols+1-r:ncols
+    rows = 1:nrows
+    cols = 1:ncols
+
+    # Left
+    @inbounds copyto!(src, CartesianIndices((rows, startpadcol)),
+                      src, CartesianIndices((rows, endcol)))
+    # Right
+    @inbounds copyto!(src, CartesianIndices((rows, endpadcol)),
+                      src, CartesianIndices((rows, startcol)))
+    # Top
+    @inbounds copyto!(src, CartesianIndices((startpadrow, cols)),
+                      src, CartesianIndices((endrow, cols)))
+    # Bottom
+    @inbounds copyto!(src, CartesianIndices((endpadrow, cols)),
+                      src, CartesianIndices((startrow, cols)))
+
+    # Copy four corners
+    # Top Left
+    @inbounds copyto!(src, CartesianIndices((startpadrow, startpadcol)),
+                      src, CartesianIndices((endrow, endcol)))
+    # Top Right
+    @inbounds copyto!(src, CartesianIndices((startpadrow, endpadcol)),
+                      src, CartesianIndices((endrow, startcol)))
+    # Botom Left
+    @inbounds copyto!(src, CartesianIndices((endpadrow, startpadcol)),
+                      src, CartesianIndices((startrow, endcol)))
+    # Botom Right
+    @inbounds copyto!(src, CartesianIndices((endpadrow, endpadcol)),
+                      src, CartesianIndices((startrow, startcol)))
+
+    # Wrap status
+    status = sourcestatus(griddata)
+    # status[:, 1] .|= status[:, end-1] .| status[:, end-2]
+    # status[1, :] .|= status[end-1, :] .| status[end-2, :]
+    # status[end-1, :] .|= status[1, :]
+    # status[:, end-1] .|= status[:, 1]
+    # status[end-2, :] .|= status[1, :]
+    # status[:, end-2] .|= status[:, 1]
+    # FIXME: Buggy currently, just running all in Wrap mode
+    status .= true
+    griddata
+end
+handleoverflow!(griddata::WritableGridData, ::RemoveOverflow) = begin
+    r = radius(griddata)
+    # Zero edge padding, as it can be written to in writable rules.
+    src = parent(source(griddata))
+    npadrows, npadcols = size(source(griddata))
+
+    startpadrow = startpadcol = 1:r
+    endpadrow = npadrows-r+1:npadrows
+    endpadcol = npadcols-r+1:npadcols
+    padrows, padcols = axes(src)
+
+    for j = startpadcol, i = padrows 
+        src[i, j] = zero(eltype(src))
     end
+    for j = endpadcol, i = padrows
+        src[i, j] = zero(eltype(src))
+    end
+    for j = padcols, i = startpadrow
+        src[i, j] = zero(eltype(src))
+    end
+    for j = padcols, i = endpadrow
+        src[i, j] = zero(eltype(src))
+    end
+    griddata
 end
-
-# Run rule for particular cell. Applied to active cells inside blockrun!
-@inline celldo!(data::GridData, rule::Rule, I) = begin
-    @inbounds state = source(data)[I...]
-    @inbounds dest(data)[I...] = applyrule(rule, data, state, I)
-    nothing
-end
-
-
-# """
-# Parital rules must copy the grid to dest as not all cells will be written.
-# Block status is also updated.
-# """
-# maprule!(data::GridData, rule::PartialRule) = begin
-#     data = WritableGridData(data)
-#     # Update active blocks in the dest array
-#     @inbounds parent(dest(data)) .= parent(source(data))
-#     # Run the rule for active blocks
-#     blockrun!(data, rule)
-#     copystatus!(data)
-# end
-
-# @inline celldo!(data::WritableGridData, rule::PartialRule, I) = begin
-#     state = source(data)[I...]
-#     state == zero(state) && return
-#     applyrule!(rule, data, state, I)
-# end
-
-# @inline celldo!(data::WritableGridData, rule::PartialNeighborhoodRule, I) = begin
-#     state = source(data)[I...]
-#     state == zero(state) && return
-#     applyrule!(rule, data, state, I)
-#     _zerooverflow!(data, overflow(data), radius(data))
-# end

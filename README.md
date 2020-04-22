@@ -3,7 +3,6 @@
 [![](https://img.shields.io/badge/docs-stable-blue.svg)](https://cesaraustralia.github.io/DynamicGrids.jl/stable)
 [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://cesaraustralia.github.io/DynamicGrids.jl/dev)
 [![Build Status](https://travis-ci.org/cesaraustralia/DynamicGrids.jl.svg?branch=master)](https://travis-ci.org/cesaraustralia/DynamicGrids.jl) 
-[![Coverage Status](https://coveralls.io/repos/cesaraustralia/DynamicGrids.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/cesaraustralia/DynamicGrids.jl?branch=master) 
 [![codecov.io](http://codecov.io/github/cesaraustralia/DynamicGrids.jl/coverage.svg?branch=master)](http://codecov.io/github/cesaraustralia/DynamicGrids.jl?branch=master)
 
 DynamicGrids is a generalised framework for building high-performance grid-based spatial models, including celluar automata, but also allowing arbitrary behviours such as long distance jumps and interactions between multiple grids. It is extended by [Dispersal.jl](https://github.com/cesaraustralia/Dispersal.jl) for modelling organism dispersal processes.
@@ -169,11 +168,11 @@ const BURNING = 3
 
 # Define the Rule struct
 struct ForestFire{R,W,N,PC,PR} <: NeighborhoodRule{R,W}
-    neighborhood::NH
+    neighborhood::N
     prob_combustion::PC
     prob_regrowth::PR
 end
-ForestFire(; grid=:_default_, neighborhood=Radialighborhood{1}(), prob_combustion=0.0001, prob_regrowth=0.01) =
+ForestFire(; grid=:_default_, neighborhood=RadialNeighborhood{1}(), prob_combustion=0.0001, prob_regrowth=0.01) =
     ForestFire{grid,grid}(neighborhood, prob_combustion, prob_regrowth)
 
 # Define an `applyrule` method to be broadcasted over the grid for the `ForestFire` rule
@@ -202,7 +201,9 @@ sim!(output, ruleset; tspan=(1, 200))
 # Save the output as a gif
 savegif("forestfire.gif", output)
 ```
+
 ![forestfire](https://user-images.githubusercontent.com/2534009/72052469-5450c580-3319-11ea-8948-5196d1c6fd33.gif)
+
 
 
 We could also use a "windy" custom neighborhood:
