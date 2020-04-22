@@ -82,15 +82,3 @@ end
 Ruleset(rules::Vararg{<:Rule}; kwargs...) = Ruleset(; rules=rules, kwargs...)
 
 rules(rs::Ruleset) = rs.rules
-
-show(io::IO, ruleset::Ruleset) = begin
-    printstyled(io, Base.nameof(typeof(ruleset)), " =\n"; color=:blue)
-    println(io, "rules:")
-    for rule in rules(ruleset)
-        println(IOContext(io, :indent => "    "), rule)
-    end
-    for fn in fieldnames(typeof(ruleset))
-        fn == :rules && continue
-        println(io, fn, " = ", repr(getfield(ruleset, fn)))
-    end
-end

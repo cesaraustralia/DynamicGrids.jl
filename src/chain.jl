@@ -19,14 +19,6 @@ val(chain::Chain) = chain.val
 radius(chain::Chain) = radius(chain[1])
 neighborhoodkey(chain::Chain) = neighborhoodkey(chain[1])
 
-Base.show(io::IO, chain::Chain{R,W}) where {R,W} = begin
-    indent = get(io, :indent, "")
-    printstyled(io, indent, string("Chain {", W, ",", R, "} :"); color=:green)
-    for rule in val(chain)
-        println(io)
-        print(IOContext(io, :indent => indent * "    "), rule)
-    end
-end
 Base.tail(chain::Chain{R,W}) where {R,W} = begin
     ch = tail(val(chain))
     Chain{R,W,typeof(ch)}(ch)

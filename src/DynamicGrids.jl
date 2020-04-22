@@ -87,5 +87,6 @@ include("neighborhoods.jl")
 include("utils.jl")
 include("map.jl")
 include("life.jl")
+include("show.jl")
 
 end
