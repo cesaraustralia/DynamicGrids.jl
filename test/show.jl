@@ -1,4 +1,5 @@
 using DynamicGrids, Test, Dates
+import DynamicGrids: RemoveOverflow, NoOpt
 
 life = Life() 
 @test occursin("Life{:_default_,:_default_}", sprint(show, life))
@@ -11,8 +12,8 @@ ruleset = Ruleset(;
 )
 @test occursin("Ruleset =", sprint(show, ruleset))
 @test occursin("Life{:_default_,:_default_}", sprint(show, ruleset))
-@test occursin("opt = NoOpt()", sprint(show, ruleset))
-@test occursin("overflow = RemoveOverflow()", sprint(show, ruleset))
+@test occursin(r"opt = .*NoOpt()", "nopt = DynamicGrids.NoOpt()")
+@test occursin(r"overflow = .*RemoveOverflow()", sprint(show, ruleset))
 @test occursin("timestep = 1 day", sprint(show, ruleset))
 
 rule1 = Map{:a,:b}() do a
