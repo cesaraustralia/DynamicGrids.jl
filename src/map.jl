@@ -4,6 +4,12 @@ A [`CellRule`](@ref) that applies a function `f` to the
 
 ## Example
 
+Set the cells of grid `:c` to the sum of `:a` and `:b`.
+```julia
+rule = Map{Tuple{:a,:b},:c}() do a, b
+    a + b 
+end
+```
 """
 @description @flattenable struct Map{R,W,F} <: CellRule{R,W}
     # Field | Flatten | Description
