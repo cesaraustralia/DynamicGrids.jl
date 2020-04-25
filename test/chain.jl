@@ -5,7 +5,7 @@ using DynamicGrids: SimData, radius, rules, readkeys, writekeys,
 
 @testset "CellRule chain" begin
 
-    rule1 = Map{:a,:b}() do a
+    rule1 = Map(read=:a, write=:b) do a
         2a
     end
 
@@ -13,7 +13,7 @@ using DynamicGrids: SimData, radius, rules, readkeys, writekeys,
         b + d
     end
 
-    rule3 = Map{Tuple{:a,:c,:d},Tuple{:d,:e}}() do a, c, d
+    rule3 = Map(read=Tuple{:a,:c,:d}, write=Tuple{:d,:e}) do a, c, d
         a + c + d, 3a
     end
 

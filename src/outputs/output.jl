@@ -113,10 +113,6 @@ gridindex(o::Output, data::AbstractSimData) = gridindex(o, currentframe(data))
 # Every frame is frame 1 if the simulation isn't stored
 gridindex(o::Output, f::Int) = isstored(o) ? f : oneunit(f)
 
-
-@inline celldo!(grid::GridData, A::AbstractArray, I) =
-    @inbounds return A[I...] = source(grid)[I...]
-
 storegrid!(output::Output, data::AbstractSimData) = begin
     f = gridindex(output, data)
     checkbounds(output, f)

@@ -42,13 +42,6 @@ hoodsize(hood::Neighborhood) = hoodsize(radius(hood))
 hoodsize(radius::Integer) = 2radius + 1
 
 """
-Return a tuple of the base types of the rules in the ruleset
-"""
-ruletypes(ruleset::Ruleset) = ruletypes(typeof(Ruleset.rules))
-ruletypes(t::Type) = t.name.wrapper
-ruletypes(ts::Type{<:Tuple}) = (ruletypes.(ts.parameters)...,)
-
-"""
 Check if a cell is masked, using the passed-in mask grid.
 """
 @inline ismasked(data::AbstractSimData, I...) = ismasked(mask(data), I...)

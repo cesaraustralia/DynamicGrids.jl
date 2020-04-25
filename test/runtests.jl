@@ -10,3 +10,4 @@ using SafeTestsets
 @time @safetestset "chain" begin include("chain.jl") end
 @time @safetestset "neighborhoods" begin include("neighborhoods.jl") end
 @time @safetestset "mask" begin include("mask.jl") end
+@time @safetestset "show" begin include("show.jl") end
