@@ -1,5 +1,7 @@
 using DynamicGrids, Test
-import DynamicGrids: neighbors, sumneighbors, SimData, radius
+import DynamicGrids: neighbors, sumneighbors, SimData, radius, 
+       mapsetneighbor!, neighborhood, WritableGridData, dest, hoodsize, neighborhoodkey
+
 
 @testset "sumneighbors" begin
     init = [0 0 0 1 1 1;
@@ -10,7 +12,10 @@ import DynamicGrids: neighbors, sumneighbors, SimData, radius
             0 1 0 1 1 0]
 
     moore = RadialNeighborhood{1}()
+    @test hoodsize(moore) == 3 
+
     vonneumann = VonNeumannNeighborhood()
+    @test hoodsize(vonneumann) == 3 
     t = 1
 
     buf = [0 0 0
@@ -60,6 +65,24 @@ struct TestPartialNeighborhoodRule{R,W,N} <: PartialNeighborhoodRule{R,W}
     neighborhood::N
 end
 
+@testset "neighborhood" begin
+    ruleA = TestPartialNeighborhoodRule{:a,:a}(RadialNeighborhood{3}())
+    ruleB = TestPartialNeighborhoodRule{Tuple{:b},Tuple{:b}}(RadialNeighborhood{2}())
+    ruleset = Ruleset(ruleA, ruleB)
+    @test neighborhood(ruleA) == RadialNeighborhood{3}()
+    @test neighborhood(ruleB) == RadialNeighborhood{2}()
+    @test neighborhoodkey(ruleA) == :a
+    @test neighborhoodkey(ruleB) == :b
+
+    ruleA = TestNeighborhoodRule{:a,:a}(RadialNeighborhood{3}())
+    ruleB = TestNeighborhoodRule{Tuple{:b},Tuple{:b}}(RadialNeighborhood{2}())
+    ruleset = Ruleset(ruleA, ruleB)
+    @test neighborhood(ruleA) == RadialNeighborhood{3}()
+    @test neighborhood(ruleB) == RadialNeighborhood{2}()
+    @test neighborhoodkey(ruleA) == :a
+    @test neighborhoodkey(ruleB) == :b
+end
+
 @testset "radius" begin
     ruleA = TestNeighborhoodRule{:a,:a}(RadialNeighborhood{3}())
     ruleB = TestPartialNeighborhoodRule{Tuple{:b},Tuple{:b}}(RadialNeighborhood{2}())
@@ -69,4 +92,50 @@ end
     @testset "ruleset returns max radii of all rule" begin
         @test DynamicGrids.radius(ruleset) == (a=3, b=2)
     end
+end
+
+DynamicGrids.setneighbor!(data, hood, rule::TestPartialNeighborhoodRule,
+             state, hood_index, dest_index) = begin
+    data[dest_index...] += state
+    state
+end
+
+@testset "mapsetneighbor!" begin
+    init = [0 1 2 3 4 5
+            0 1 2 3 4 5
+            0 1 2 3 4 5
+            0 1 2 3 4 5
+            0 1 2 3 4 5
+            0 1 2 3 4 5]
+
+    hood = RadialNeighborhood{1}()
+    rule = TestPartialNeighborhoodRule{:a,:a}(hood)
+    ruleset = Ruleset(rule)
+    simdata = SimData(init, ruleset, 1)
+    state = 5
+    index = (3, 3)
+    @test mapsetneighbor!(WritableGridData(first(simdata)), hood, rule, state, index) == 40 
+    @test dest(first(simdata)) ==
+        [0 1 2 3 4 5
+         0 6 7 8 4 5
+         0 6 2 8 4 5
+         0 6 7 8 4 5
+         0 1 2 3 4 5
+         0 1 2 3 4 5]
+
+    hood = CustomNeighborhood(((-1, -1), (1, 1)))
+    rule = TestPartialNeighborhoodRule{:a,:a}(hood)
+    ruleset = Ruleset(rule)
+    simdata = SimData(init, ruleset, 1)
+    state = 1
+    index = (5, 5)
+    @test mapsetneighbor!(WritableGridData(first(simdata)), neighborhood(rule), rule, state, index) == 2
+    @test dest(first(simdata)) ==
+        [0 1 2 3 4 5
+         0 1 2 3 4 5
+         0 1 2 3 4 5
+         0 1 2 4 4 5
+         0 1 2 3 4 5
+         0 1 2 3 4 6]
+
 end

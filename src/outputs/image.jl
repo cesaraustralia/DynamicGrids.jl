@@ -14,12 +14,12 @@ for implementations.
 abstract type ImageOutput{T} <: GraphicOutput{T} end
 
 """
-Construct one ImageOutput from another ImageOutput
+Construct one ImageOutput from another ImageOutput or GraphicOutput
 """
 (::Type{F})(o::T; kwargs...) where F <: ImageOutput where T <: ImageOutput = F(;
     frames=frames(o),
     starttime=starttime(o),
-    endtime=endtime(o),
+    stoptime=stoptime(o),
     fps=fps(o),
     showfps=showfps(o),
     timestamp=timestamp(o),

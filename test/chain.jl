@@ -1,7 +1,7 @@
 using DynamicGrids, Test, BenchmarkTools
 
 using DynamicGrids: SimData, radius, rules, readkeys, writekeys, 
-    applyrule, sumneighbors, neighborhood, update_chainstate
+    applyrule, sumneighbors, neighborhood, update_chainstate, neighborhoodkey
 
 @testset "CellRule chain" begin
 
@@ -120,7 +120,15 @@ DynamicGrids.applyrule(rule::BlockRule, data, state, index, buf) =
          1 1 1 1 1
          1 1 1 1 1
          1 1 1 1 1]) 
-    ruleset = Ruleset(Chain(blockrule, rule); opt=NoOpt())
+
+    chain = Chain(blockrule, rule)
+    @test radius(chain) === 1
+    @test neighborhoodkey(chain) === :a
+    @test Base.tail(chain).val === (rule,)
+    @test chain[1] === blockrule
+    @test length(chain) === 2
+
+    ruleset = Ruleset(chain; opt=NoOpt())
     noopt_output = ArrayOutput(init, 3)
     @btime sim!($noopt_output, $ruleset; init=$init)
     

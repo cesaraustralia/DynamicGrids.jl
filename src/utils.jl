@@ -31,16 +31,6 @@ end
 @inline isinbounds(x::Number, max::Number, overflow::RemoveOverflow) =
     x > zero(x) && x <= max
 
-
-"""
-    hoodsize(radius)
-
-Get the size of a neighborhood dimension from its radius,
-which is always 2r + 1.
-"""
-hoodsize(hood::Neighborhood) = hoodsize(radius(hood))
-hoodsize(radius::Integer) = 2radius + 1
-
 """
 Check if a cell is masked, using the passed-in mask grid.
 """

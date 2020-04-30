@@ -52,13 +52,6 @@ setrunning!(o::Output, val) = o.running = val
 setstarttime!(output, x) = output.starttime = x
 setstoptime!(output, x) = output.stoptime = x
 
-# Placeholder methods for graphic functions that are
-# ignored in simple outputs
-settimestamp!(o::Output, f) = nothing
-fps(o::Output) = nothing
-setfps!(o::Output, x) = nothing
-showfps(o::Output) = nothing
-
 """
     isasync(o::Output)
 

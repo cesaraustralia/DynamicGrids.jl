@@ -8,6 +8,8 @@ abstract type Neighborhood{R} end
 
 radius(hood::Neighborhood{R}) where R = R
 
+
+
 """
 A Moore-style neighborhood where a square are with a center radius `(D - 1) / 2`
 where D is the diameter.
@@ -80,7 +82,7 @@ neighbors(hood::CustomNeighborhood, buf) =
 sumneighbors(hood::CustomNeighborhood, buf, state) =
     sum(neighbors(hood, buf))
 
-@inline mapsetneighbor!(data::AbstractSimData, hood::CustomNeighborhood, rule, state, index) = begin
+@inline mapsetneighbor!(data::WritableGridData, hood::CustomNeighborhood, rule, state, index) = begin
     r = radius(hood); sum = zero(state)
     # Loop over dispersal kernel grid dimensions
     for coord in coords(hood)
@@ -106,7 +108,7 @@ LayeredCustomNeighborhood(l::Tuple) =
 @inline sumneighbors(hood::LayeredCustomNeighborhood, buf, state) =
     map(layer -> sumneighbors(layer, buf, state), hood.layers)
 
-@inline mapsetneighbor!(data::AbstractSimData, hood::LayeredCustomNeighborhood, rule, state, index) =
+@inline mapsetneighbor!(data::WritableGridData, hood::LayeredCustomNeighborhood, rule, state, index) =
     map(layer -> mapsetneighbor!(data, layer, rule, state, index), hood.layers)
 
 """
@@ -136,3 +138,12 @@ radius(rules::Tuple{}, args...) = 0
 radius(rule::NeighborhoodRule, args...) = radius(neighborhood(rule))
 radius(rule::PartialNeighborhoodRule, args...) = radius(neighborhood(rule))
 radius(rule::Rule, args...) = 0
+
+"""
+    hoodsize(radius)
+
+Get the size of a neighborhood dimension from its radius,
+which is always 2r + 1.
+"""
+hoodsize(hood::Neighborhood) = hoodsize(radius(hood))
+hoodsize(radius::Integer) = 2radius + 1

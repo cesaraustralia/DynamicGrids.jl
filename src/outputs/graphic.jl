@@ -3,10 +3,17 @@ Outputs that display the simulation frames live.
 """
 abstract type GraphicOutput{T} <: Output{T} end
 
-(::Type{F})(o::T; kwargs...) where F <: GraphicOutput where T <: GraphicOutput =
-    F(; frames=frames(o), starttime=starttime(o), endtime=endtime(o),
-      fps=fps(o), showfps=showfps(o), timestamp=timestamp(o), stampframe=stampframe(o), store=store(o),
-      kwargs...)
+(::Type{F})(o::T; kwargs...) where F <: GraphicOutput where T <: GraphicOutput = F(; 
+    frames=frames(o), 
+    starttime=starttime(o), 
+    stoptime=stoptime(o),
+    fps=fps(o), 
+    showfps=showfps(o), 
+    timestamp=timestamp(o), 
+    stampframe=stampframe(o), 
+    store=store(o),
+    kwargs...
+)
 
 """
 Mixin for graphic output fields
@@ -20,13 +27,18 @@ Mixin for graphic output fields
 end
 
 # Field getters and setters
+fps(o::Output) = nothing
 fps(o::GraphicOutput) = o.fps
+setfps!(o::Output, x) = nothing
 setfps!(o::GraphicOutput, x) = o.fps = x
+showfps(o::Output) = nothing
 showfps(o::GraphicOutput) = o.showfps
 timestamp(o::GraphicOutput) = o.timestamp
 stampframe(o::GraphicOutput) = o.stampframe
-isstored(o::GraphicOutput) = o.store
+store(o::GraphicOutput) = o.store
+isstored(o::GraphicOutput) = store(o)
 
+settimestamp!(o::Output, f) = nothing
 settimestamp!(o::GraphicOutput, f) = begin
     o.timestamp = time()
     o.stampframe = f

@@ -21,6 +21,15 @@ applyrule(::TestRule, data, state, index) = 0
 
     rule = TestRule()
     ruleset = Ruleset(rule; init=init)
+
+    @test DynamicGrids.init(ruleset) === init
+    @test DynamicGrids.mask(ruleset) === nothing
+    @test DynamicGrids.overflow(ruleset) === RemoveOverflow()
+    @test DynamicGrids.opt(ruleset) === SparseOpt()
+    @test DynamicGrids.cellsize(ruleset) === 1
+    @test DynamicGrids.timestep(ruleset) === 1
+    @test DynamicGrids.ruleset(ruleset) === ruleset
+
     simdata = SimData(init, ruleset, 1)
 
     # Test maprules components

@@ -36,11 +36,10 @@ The default option is `:block`.
     style::CS                 | Block()
 end
 
-initialize!(o::REPLOutput, args...) = begin
-    o.displayoffset .= (1, 1)
+# initialise(o::REPLOutput, args...) = begin
+    # o.displayoffset .= 1
     # @async movedisplay(o)
-    o.timestamp = time()
-end
+# end
 
 isasync(o::REPLOutput) = false
 

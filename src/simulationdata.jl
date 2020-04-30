@@ -170,9 +170,6 @@ currenttimestep(d::SimData) = currenttime(d) + timestep(d) - currenttime(d)
 
 
 # Swap source and dest arrays. Allways returns regular SimData.
-swapsource(d::SimData) = begin
-    @set d.data = swapsource(d.data)
-end
 swapsource(d::Tuple) = map(swapsource, d)
 swapsource(data::GridData) = begin
     src = data.source
@@ -240,20 +237,17 @@ copystatus!(srcstatus, deststatus) = nothing
 copystatus!(srcstatus::AbstractArray, deststatus::AbstractArray) =
     @inbounds return srcstatus .= deststatus
 
-# When simdata is passed in, the existing SimData arrays are re-initialised
-initdata!(simdata::AbstractSimData, ruleset, init, starttime, nreplicates) =
-    initdata!(simdata, ruleset, init, starttime)
-# When no simdata is passed in, the existing SimData arrays are re-initialised
+# When replicates are an Integer, construct a vector of SimData
 initdata!(::Nothing, ruleset::Ruleset, init, starttime, nreplicates::Integer) =
-    [initdata!(nothing, ruleset, init, starttime, nothing) for r in 1:nreplicates]
-# When SimData with replicates is passed in, the existing SimData replicates are re-initialised
+    [SimData(init, ruleset, starttime) for r in 1:nreplicates]
+# When simdata is a Vector, the existing SimData arrays are re-initialised
 initdata!(simdata::AbstractVector{<:AbstractSimData}, ruleset, init, starttime, nreplicates::Integer) =
     map(d -> initdata!(d, ruleset, init, starttime, nothing), simdata)
+# When no simdata is passed in, create new SimData
 initdata!(::Nothing, ruleset::Ruleset, init, starttime, nreplicates::Nothing) =
     SimData(init, ruleset, starttime)
-
 # Initialise a SimData object with a new `Ruleset` and starttime.
-initdata!(simdata::AbstractSimData, ruleset::Ruleset, inits::NamedTuple, starttime) = begin
+initdata!(simdata::AbstractSimData, ruleset::Ruleset, inits::NamedTuple, starttime, nreplicates::Nothing) = begin
     map(values(simdata), values(inits)) do grid, init
         for j in 1:gridsize(grid)[2], i in 1:gridsize(grid)[1]
             @inbounds source(grid)[i, j] = dest(grid)[i, j] = init[i, j]
