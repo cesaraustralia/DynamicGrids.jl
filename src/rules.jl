@@ -146,4 +146,3 @@ Map(f; read, write) = Map{read,write}(f)
     rule.f(read...)
 @inline applyrule(rule::Map{R,W}, data, read, index) where {R,W} =
     rule.f(read)
->>>>>>> 73594d9... more tests
