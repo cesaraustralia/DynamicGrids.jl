@@ -46,8 +46,6 @@ overflow(rs::AbstractRuleset) = rs.overflow
 opt(rs::AbstractRuleset) = rs.opt
 cellsize(rs::AbstractRuleset) = rs.cellsize
 timestep(rs::AbstractRuleset) = rs.timestep
-minval(rs::AbstractRuleset) = rs.minval
-maxval(rs::AbstractRuleset) = rs.maxval
 ruleset(rs::AbstractRuleset) = rs
 
 """

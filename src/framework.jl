@@ -54,7 +54,7 @@ _chooseinit(rulesetinit, arginit) = arginit
 _chooseinit(rulesetinit::Nothing, arginit) = arginit
 _chooseinit(rulesetinit, arginit::Nothing) = rulesetinit
 _chooseinit(rulesetinit::Nothing, arginit::Nothing) =
-    error("Include an init array: either in the ruleset or with the `init` keyword")
+    throw(ArgumentError("Must include an `init` array: either in the ruleset or with the `init` keyword"))
 
 """
     resume!(output::Output, ruleset::Ruleset;
@@ -115,7 +115,7 @@ runsim!(output, args...) =
 Operations on outputs and rulesets are allways mutable and in-place.
 Operations on rules and simdata objects are functional as they are used in inner loops
 where immutability improves performance. =#
-simloop!(output::Output, simdata::SimData, fspan) = begin
+simloop!(output::Output, simdata, fspan) = begin
     settimestamp!(output, first(fspan))
     # Initialise types etc
     simdata = updatetime(simdata, 1)
@@ -146,6 +146,7 @@ end
 
 # We have to keep the original rulset as it may be modified elsewhere
 # like in an Interact.jl interface. `Ruleset` is mutable.
+precalcrules!(simdata::Vector{<:SimData}) = precalcrules!.(simdata) 
 precalcrules!(simdata::SimData) = begin
     simdata.ruleset.rules = precalcrules(rules(simdata), simdata)
     simdata

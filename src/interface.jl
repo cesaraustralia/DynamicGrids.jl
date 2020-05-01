@@ -60,7 +60,7 @@ function sumneighbors end
 """
     mapsetneighbor!(data, hood, rule, state, index)
 
-Run `setneighbors` over all cells in the neighborhood and sums its return values. 
+Run `setneighbor!` over all cells in the neighborhood and sums its return values. 
 """
 function mapsetneighbor! end
 

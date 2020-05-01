@@ -12,6 +12,12 @@ init  = [0 1 1 0;
 struct TestRule{R,W} <: Rule{R,W} end
 applyrule(::TestRule, data, state, index) = 0
 
+@testset "Must include init" begin
+    output = ArrayOutput(init, 7)
+    ruleset = Ruleset()
+    @test_throws ArgumentError sim!(output, ruleset)
+end
+
 @testset "a rule that returns zero gives zero outputs" begin
     final = [0 0 0 0;
              0 0 0 0;
@@ -21,6 +27,15 @@ applyrule(::TestRule, data, state, index) = 0
 
     rule = TestRule()
     ruleset = Ruleset(rule; init=init)
+
+    @test DynamicGrids.init(ruleset) === init
+    @test DynamicGrids.mask(ruleset) === nothing
+    @test DynamicGrids.overflow(ruleset) === RemoveOverflow()
+    @test DynamicGrids.opt(ruleset) === SparseOpt()
+    @test DynamicGrids.cellsize(ruleset) === 1
+    @test DynamicGrids.timestep(ruleset) === 1
+    @test DynamicGrids.ruleset(ruleset) === ruleset
+
     simdata = SimData(init, ruleset, 1)
 
     # Test maprules components

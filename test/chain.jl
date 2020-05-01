@@ -1,7 +1,7 @@
 using DynamicGrids, Test, BenchmarkTools
 
 using DynamicGrids: SimData, radius, rules, readkeys, writekeys, 
-    applyrule, sumneighbors, neighborhood, update_chainstate
+    applyrule, sumneighbors, neighborhood, update_chainstate, neighborhoodkey
 
 @testset "CellRule chain" begin
 
@@ -9,7 +9,7 @@ using DynamicGrids: SimData, radius, rules, readkeys, writekeys,
         2a
     end
 
-    rule2 = Map{Tuple{:b,:d},:c}() do b, d
+    rule2 = Map(read=Tuple{:b,:d}, write=:c) do b, d
         b + d
     end
 
@@ -17,7 +17,7 @@ using DynamicGrids: SimData, radius, rules, readkeys, writekeys,
         a + c + d, 3a
     end
 
-    rule4 = Map{Tuple{:a,:b,:c,:d},Tuple{:a,:b,:c,:d}}() do a, b, c, d
+    rule4 = Map(read=Tuple{:a,:b,:c,:d}, write=Tuple{:a,:b,:c,:d}) do a, b, c, d
         2a, 2b, 2c, 2d
     end
 
@@ -55,8 +55,9 @@ using DynamicGrids: SimData, radius, rules, readkeys, writekeys,
     state = (b=1, c=1, d=1, a=1)
     ind = (1, 1)
 
-    b = @benchmark applyrule($chain, $data, $state, $ind)
-    @test b.allocs == 0
+    # This breaks with --inline=no
+    # b = @benchmark applyrule($chain, $data, $state, $ind)
+    # @test b.allocs == 0
 
     output = ArrayOutput(init, 3)
     sim!(output, ruleset; init=init, tspan=(1, 3))
@@ -120,7 +121,15 @@ DynamicGrids.applyrule(rule::BlockRule, data, state, index, buf) =
          1 1 1 1 1
          1 1 1 1 1
          1 1 1 1 1]) 
-    ruleset = Ruleset(Chain(blockrule, rule); opt=NoOpt())
+
+    chain = Chain(blockrule, rule)
+    @test radius(chain) === 1
+    @test neighborhoodkey(chain) === :a
+    @test Base.tail(chain).val === (rule,)
+    @test chain[1] === blockrule
+    @test length(chain) === 2
+
+    ruleset = Ruleset(chain; opt=NoOpt())
     noopt_output = ArrayOutput(init, 3)
     @btime sim!($noopt_output, $ruleset; init=$init)
     

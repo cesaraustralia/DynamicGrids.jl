@@ -29,7 +29,6 @@ Base.@propagate_inbounds Base.getindex(o::Output, i) =
     getindex(frames(o), i)
 Base.@propagate_inbounds Base.setindex!(o::Output, x, i) = setindex!(frames(o), x, i)
 Base.push!(o::Output, x) = push!(frames(o), x)
-Base.append!(o::Output, x) = append!(frames(o), x)
 
 
 """
@@ -51,13 +50,6 @@ isrunning(o::Output) = o.running
 setrunning!(o::Output, val) = o.running = val
 setstarttime!(output, x) = output.starttime = x
 setstoptime!(output, x) = output.stoptime = x
-
-# Placeholder methods for graphic functions that are
-# ignored in simple outputs
-settimestamp!(o::Output, f) = nothing
-fps(o::Output) = nothing
-setfps!(o::Output, x) = nothing
-showfps(o::Output) = nothing
 
 """
     isasync(o::Output)
@@ -113,6 +105,7 @@ gridindex(o::Output, data::AbstractSimData) = gridindex(o, currentframe(data))
 # Every frame is frame 1 if the simulation isn't stored
 gridindex(o::Output, f::Int) = isstored(o) ? f : oneunit(f)
 
+
 storegrid!(output::Output, data::AbstractSimData) = begin
     f = gridindex(output, data)
     checkbounds(output, f)
@@ -137,14 +130,15 @@ end
 
 # Replicated frames
 storegrid!(output::Output, data::AbstractVector{<:AbstractSimData}) = begin
-    f = gridindex(output, data)
-    checkbounds(output, f)
-    for j in 1:size(output[1], 2), i in 1:size(output[1], 1)
-        replicatesum = zero(eltype(output[1]))
+    f = gridindex(output, data[1])
+    outgrid = output[f]
+    outgrid isa NamedTuple && error("replicates that output a NamedTuple not yet implemented")
+    for I in CartesianIndices(outgrid)
+        replicatesum = zero(eltype(outgrid))
         for d in data
-            @inbounds replicatesum += d[i, j]
+            @inbounds replicatesum += first(grids(d))[I]
         end
-        @inbounds output[f][i, j] = replicatesum / length(data)
+        @inbounds outgrid[I] = replicatesum / length(data)
     end
 end
 

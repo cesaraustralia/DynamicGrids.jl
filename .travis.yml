@@ -10,8 +10,9 @@ julia:
   - 1.4
   - nightly
 
-notifications:
-  email: false
+script:
+ - if [[ -a .git/shallow ]]; then git fetch --unshallow; fi
+ - julia --inline=no --project -e 'using Pkg; Pkg.build(); Pkg.test(; coverage=true)';
 
 jobs:
   allow_failures:
@@ -26,5 +27,8 @@ jobs:
                                                Pkg.instantiate()'
         - julia --project=docs/ docs/make.jl
       after_success: skip
+
+notifications:
+  email: false
 
 codecov: true

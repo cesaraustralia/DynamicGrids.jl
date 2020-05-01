@@ -14,7 +14,7 @@ applyrule(::Predation, data, (predators, prey), index) = begin
     mortality = 0.1
     prey = max(prey - caught, zero(prey)) 
     predators = predators + caught * 0.1 - predators * mortality
-    # Output is flipped from input to test that can work
+    # Output order is the reverse of input to test that can work
     prey, predators
 end
 

@@ -30,7 +30,7 @@ the initial `R`, `W` etc fields.
 end
 (::Type{T})(; kwargs...) where T<:Rule{R,W} where {R,W} = begin
     args = FieldDefaults.insert_kwargs(kwargs, T)
-    T{typeof.(args)...}(args...)
+    T{map(typeof, args)...}(args...)
 end
 
 @generated Base.keys(rule::Rule{R,W}) where {R,W} =
@@ -104,7 +104,7 @@ abstract type NeighborhoodRule{R,W} <: Rule{R,W} end
 neighborhood(rule::NeighborhoodRule) = rule.neighborhood
 neighborhoodkey(rule::NeighborhoodRule{R,W}) where {R,W} = R
 # The first argument is for the neighborhood grid
-neighborhoodkey(rule::NeighborhoodRule{Tuple{R1,Vararg},W}) where {R1,W} = R1
+neighborhoodkey(rule::NeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
 
 
 """
@@ -119,6 +119,30 @@ simular to [`NeighborhoodRule`](@ref) but for writing.
 """
 abstract type PartialNeighborhoodRule{R,W} <: PartialRule{R,W} end
 
-neighborhood(rule::PartialRule) = rule.neighborhood
+neighborhood(rule::PartialNeighborhoodRule) = rule.neighborhood
 neighborhoodkey(rule::PartialNeighborhoodRule{R,W}) where {R,W} = R
-neighborhoodkey(rule::PartialNeighborhoodRule{Tuple{R,Vararg},W}) where {R,W} = K
+neighborhoodkey(rule::PartialNeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
+
+
+"""
+A [`CellRule`](@ref) that applies a function `f` to the
+`read` grid cells and returns the `write` cells.
+
+## Example
+
+"""
+@description @flattenable struct Map{R,W,F} <: CellRule{R,W}
+    # Field | Flatten | Description
+    f::F    | false   | "Function to apply to the target values"
+end
+"""
+    Map(f; read, write)
+
+Map function f with cell values from read grid(s), write grid(s)
+"""
+Map(f; read, write) = Map{read,write}(f)
+
+@inline applyrule(rule::Map{R,W}, data, read, index) where {R<:Union{Tuple,NamedTuple},W} =
+    rule.f(read...)
+@inline applyrule(rule::Map{R,W}, data, read, index) where {R,W} =
+    rule.f(read)
