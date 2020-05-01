@@ -44,7 +44,7 @@ end
 isasync(o::REPLOutput) = false
 
 showgrid(frame::NamedTuple, o::REPLOutput, data::SimData, f, t) = 
-    showgrid(frame[1], o, f, t)
+    showgrid(first(frame), o, data, f, t)
 showgrid(frame::AbstractArray, o::REPLOutput, data::SimData, f, t) = begin
     # Print the frame
     put((0,0), o.color, replframe(o, frame))

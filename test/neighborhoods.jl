@@ -1,9 +1,9 @@
 using DynamicGrids, Test
-import DynamicGrids: neighbors, sumneighbors, SimData, radius, 
+import DynamicGrids: neighbors, sumneighbors, SimData, radius, neighbors,
        mapsetneighbor!, neighborhood, WritableGridData, dest, hoodsize, neighborhoodkey
 
 
-@testset "sumneighbors" begin
+@testset "neighbors" begin
     init = [0 0 0 1 1 1;
             1 0 1 1 0 1;
             0 1 1 1 1 1;
@@ -12,7 +12,12 @@ import DynamicGrids: neighbors, sumneighbors, SimData, radius,
             0 1 0 1 1 0]
 
     moore = RadialNeighborhood{1}()
+    buf = init[1:3, 1:3]
+
     @test hoodsize(moore) == 3 
+    @test neighbors(moore, buf) isa Base.Generator
+    @test collect(neighbors(moore, buf)) == [0, 1, 0, 0, 1, 0, 1, 1]
+    @test sum(neighbors(moore, buf)) == 4
 
     vonneumann = VonNeumannNeighborhood()
     @test hoodsize(vonneumann) == 3 
@@ -51,6 +56,9 @@ import DynamicGrids: neighbors, sumneighbors, SimData, radius,
     custom2 = CustomNeighborhood(((-1,-1), (0,-1), (1,-1), (2,-1), (0,0)))
     layered = LayeredCustomNeighborhood((CustomNeighborhood((-1,1), (-2,2)), 
                                          CustomNeighborhood((1,2), (2,2))))
+
+    @test neighbors(custom1, buf) isa Base.Generator
+    @test collect(neighbors(custom1, buf)) == [0, 1, 1, 0, 0]
 
     @test sumneighbors(custom1, buf, state) == sum(neighbors(custom1, buf)) == 2
     @test sumneighbors(custom2, buf, state) == sum(neighbors(custom2, buf)) == 0

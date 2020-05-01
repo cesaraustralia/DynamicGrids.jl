@@ -150,7 +150,7 @@ zerocolor(processor::ColorProcessor) = processor.zerocolor
 maskcolor(processor::ColorProcessor) = processor.maskcolor
 
 @inline cell2rgb(p::ColorProcessor, minval, maxval, data::RulesetOrSimData, val, I...) =
-    if !(maskcolor(p) isa Nothing) && ismasked(mask(data), I...)
+    if !(maskcolor(p) isa Nothing) && ismasked(mask(data), I)
         rgb24(maskcolor(p))
     else
         normval = normalise(val, minval, maxval)
@@ -222,13 +222,15 @@ grid2image(p::ThreeColorProcessor, minval::Tuple, maxval::Tuple,
     end
     for i in CartesianIndices(first(grids))
         img[i] = if !(maskcolor(p) isa Nothing) && ismasked(mask(data), i)
-            maskcolor(p)
+            rgb24(maskcolor(p))
         else
-            xs = map((f, mi, ma) -> normalise(f[i], mi, ma), values(grids), minval, maxval)
-            if !(zerocolor(p) isa Nothing) && all(map(x -> x .== zero(x), xs))
-                zerocolor(p)
+            xs = map(values(grids), minval, maxval) do g, mi, ma
+                normalise(g[i], mi, ma)
+            end
+            if !(zerocolor(p) isa Nothing) && all(map((x, c) -> c isa Nothing || x == zero(x), xs, colors(p)))
+                rgb24(zerocolor(p))
             else
-                combinebands(colors(p), xs)
+                rgb24(combinebands(colors(p), xs))
             end
         end
     end

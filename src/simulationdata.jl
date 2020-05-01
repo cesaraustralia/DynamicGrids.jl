@@ -150,14 +150,16 @@ data(d::SimData) = d.data
 grids(d::SimData) = d.data
 starttime(d::SimData) = d.starttime
 currenttime(d::SimData) = d.currenttime
+currenttime(d::Vector{<:SimData}) = currenttime(d[1])
 currentframe(d::SimData) = d.currentframe
 
 # Getters forwarded to data
-Base.getindex(d::SimData, key::Symbol) = getindex(grids(d), key)
+Base.getindex(d::SimData, i) = getindex(grids(d), i)
 Base.keys(d::SimData) = keys(grids(d))
 Base.values(d::SimData) = values(grids(d))
 Base.first(d::SimData) = first(grids(d))
 Base.last(d::SimData) = last(grids(d))
+
 gridsize(d::SimData) = gridsize(first(d))
 mask(d::SimData) = mask(ruleset(d))
 rules(d::SimData) = rules(ruleset(d))
@@ -184,8 +186,6 @@ updatetime(data::SimData, f::Integer) = begin
     @set data.currenttime = timefromframe(data, f)
 end
 updatetime(simdata::AbstractVector{<:SimData}, f) = updatetime.(simdata, f)
-updatetime(simdata::SimData, f) =
-    @set simdata.data = map(d -> updatetime(d, f), data(simdata))
 
 timefromframe(simdata::AbstractSimData, f::Int) =
     starttime(simdata) + (f - 1) * timestep(simdata)
@@ -213,7 +213,6 @@ end
 Initialise the block status array.
 This tracks whether anything has to be done in an area of the main array.
 =#
-updatestatus!(data::NamedTuple) = map(updatestatus!, data)
 updatestatus!(data::GridData) =
     updatestatus!(parent(source(data)), sourcestatus(data), deststatus(data), radius(data))
 updatestatus!(source, sourcestatus::Bool, deststatus::Bool, radius) = nothing
@@ -258,6 +257,8 @@ initdata!(simdata::AbstractSimData, ruleset::Ruleset, inits::NamedTuple, startti
     @set! simdata.starttime = starttime
     simdata
 end
+initdata!(simdata::AbstractSimData, ruleset::Ruleset, init::AbstractArray, starttime, nreplicates::Nothing) =
+    initdata!(simdata, ruleset, (_default_=init,), starttime, nreplicates)
 
 # Convert regular index to block index
 indtoblock(x, blocksize) = (x - 1) ÷ blocksize + 1

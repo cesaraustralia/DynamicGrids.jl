@@ -23,7 +23,6 @@ Base.tail(chain::Chain{R,W}) where {R,W} = begin
     ch = tail(val(chain))
     Chain{R,W,typeof(ch)}(ch)
 end
-Base.tail(chain::Chain{R,W,Tuple{}}) where {R,W} = Chain{R,W}(())
 Base.getindex(chain::Chain, I...) = getindex(val(chain), I...)
 Base.length(chain::Chain) = length(val(chain))
 

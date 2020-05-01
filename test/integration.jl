@@ -55,9 +55,7 @@ cycle!(A) = begin
     A[6, :] = v
 end
 
-
-
-@testset "RemoveOverflow works" begin
+@testset "Life simulation with RemoveOverflow and replicates" begin
     test2_rem = [
                  0 0 0 0 0 1 0
                  0 0 0 0 0 1 1
@@ -102,7 +100,7 @@ end
         opt=NoOpt(),
     )
     output = ArrayOutput(init, 7)
-    sim!(output, ruleset; tspan=(Date(2001, 1, 1), Date(2001, 1, 14)))
+    sim!(output, ruleset; tspan=(Date(2001, 1, 1), Date(2001, 1, 14)), nreplicates=5)
 
     @testset "NoOpt results match glider behaviour" begin
         @test output[2] == test2_rem
@@ -110,10 +108,13 @@ end
         @test output[5] == test5_rem
         @test output[7] == test7_rem
     end
+
+    REPLOutput(output)
 end
 
 
-@testset "WrapOverflow works" begin
+@testset "Life simulation with WrapOverflow" begin
+    # Loop over shifing init to make sure they all work
     for i = 1:7 
         sparse_ruleset = Ruleset(; 
             rules=(Life(),), 
@@ -140,7 +141,8 @@ end
             opt=NoOpt(),
         )
         noopt_output = ArrayOutput(init, 7)
-        sim!(noopt_output, noopt_ruleset; tspan=(Date(2001, 1, 1), Date(2001, 1, 14)))
+        sim!(noopt_output, noopt_ruleset; 
+             tspan=(Date(2001, 1, 1), Date(2001, 1, 14)))
 
         @testset "NoOpt results match glider behaviour" begin
             @test noopt_output[2] == test2
@@ -175,19 +177,20 @@ end
 end
 
 @testset "REPLOutput braile works, in Months" begin
+    inita = (_default_=init,)
     ruleset = Ruleset(; 
         rules=(Life(),), 
-        init=init, 
+        init=inita, 
         overflow=WrapOverflow(),
         timestep=Month(1),
         opt=SparseOpt(),
     )
-    output = REPLOutput(init; style=Braile(), fps=100, store=true)
+    output = REPLOutput(inita; style=Braile(), fps=100, store=true)
     sim!(output, ruleset; tspan=(Date(2010, 4), Date(2010, 7)))
     resume!(output, ruleset; tstop=Date(2010, 11))
-    @test output[2] == test2
-    @test output[3] == test3
-    @test output[5] == test5
-    @test output[7] == test7
+    @test output[2][:_default_] == test2
+    @test output[3][:_default_] == test3
+    @test output[5][:_default_] == test5
+    @test output[7][:_default_] == test7
 end
 

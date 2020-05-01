@@ -12,6 +12,12 @@ init  = [0 1 1 0;
 struct TestRule{R,W} <: Rule{R,W} end
 applyrule(::TestRule, data, state, index) = 0
 
+@testset "Must include init" begin
+    output = ArrayOutput(init, 7)
+    ruleset = Ruleset()
+    @test_throws ArgumentError sim!(output, ruleset)
+end
+
 @testset "a rule that returns zero gives zero outputs" begin
     final = [0 0 0 0;
              0 0 0 0;

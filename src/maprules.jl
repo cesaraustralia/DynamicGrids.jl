@@ -1,5 +1,4 @@
 # Internal traits for sharing methods
-struct _All_ end
 struct _Read_ end
 struct _Write_ end
 
@@ -329,8 +328,6 @@ end
 # getdata retreives GridDatGridData to match the requirements of a Rule.
 
 # Choose key source
-getdata(context::_All_, simdata::AbstractSimData) =
-    getdata(context, keys(simdata), keys(simdata), simdata)
 getdata(context::_Write_, rule::Rule, simdata::AbstractSimData) =
     getdata(context, keys(simdata), writekeys(rule), simdata::AbstractSimData)
 getdata(context::_Read_, rule::Rule, simdata::AbstractSimData) =
@@ -356,7 +353,7 @@ end
 # Choose data source
 @inline getdata(::_Write_, key::Val{K}, simdata::AbstractSimData) where K =
     key, WritableGridData(simdata[K])
-@inline getdata(::Union{_Read_,_All_}, key::Val{K}, simdata::AbstractSimData) where K =
+@inline getdata(::_Read_, key::Val{K}, simdata::AbstractSimData) where K =
     key, simdata[K]
 
 
@@ -425,7 +422,6 @@ end
 
 _vals2syms(x::Type{<:Tuple}) = map(v -> _vals2syms(v), x.parameters)
 _vals2syms(::Type{<:Val{X}}) where X = X
-
 
 #= Wrap overflow where required. This optimisation allows us to ignore
 bounds checks on neighborhoods and still use a wraparound grid. =#

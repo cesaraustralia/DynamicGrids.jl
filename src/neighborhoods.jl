@@ -74,8 +74,6 @@ coords(hood::CustomNeighborhood) = hood.coords
 # Calculate the maximum absolute value in the coords to use as the radius
 absmaxcoord(coords) = maximum((x -> maximum(abs.(x))).(coords))
 
-neighbors(rule::NeighborhoodRule, buf) =
-    neighbors(neighborhood(rule), buf)
 neighbors(hood::CustomNeighborhood, buf) =
     (buf[(coord .+ radius(hood) .+ 1)...] for coord in coords(hood))
 
@@ -131,8 +129,6 @@ radius(set::Ruleset{Tuple{}}) = NamedTuple{(),Tuple{}}(())
 # Get radius of specific key from all rules
 radius(rules::Tuple{<:Rule,Vararg}, key) =
     reduce(max, radius(i) for i in rules if key in keys(i); init=0)
-radius(rules::Tuple) = mapreduce(radius, max, rules)
-radius(rules::Tuple{}, args...) = 0
 
 # TODO radius only for neighborhood grid
 radius(rule::NeighborhoodRule, args...) = radius(neighborhood(rule))

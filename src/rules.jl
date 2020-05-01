@@ -30,7 +30,7 @@ the initial `R`, `W` etc fields.
 end
 (::Type{T})(; kwargs...) where T<:Rule{R,W} where {R,W} = begin
     args = FieldDefaults.insert_kwargs(kwargs, T)
-    T{typeof.(args)...}(args...)
+    T{map(typeof, args)...}(args...)
 end
 
 @generated Base.keys(rule::Rule{R,W}) where {R,W} =
@@ -119,7 +119,7 @@ simular to [`NeighborhoodRule`](@ref) but for writing.
 """
 abstract type PartialNeighborhoodRule{R,W} <: PartialRule{R,W} end
 
-neighborhood(rule::PartialRule) = rule.neighborhood
+neighborhood(rule::PartialNeighborhoodRule) = rule.neighborhood
 neighborhoodkey(rule::PartialNeighborhoodRule{R,W}) where {R,W} = R
 neighborhoodkey(rule::PartialNeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
 
