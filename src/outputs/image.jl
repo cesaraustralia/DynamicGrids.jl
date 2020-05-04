@@ -150,7 +150,7 @@ zerocolor(processor::ColorProcessor) = processor.zerocolor
 maskcolor(processor::ColorProcessor) = processor.maskcolor
 
 @inline cell2rgb(p::ColorProcessor, minval, maxval, data::RulesetOrSimData, val, I...) =
-    if !(maskcolor(p) isa Nothing) && ismasked(mask(data), I)
+    if !(maskcolor(p) isa Nothing) && ismasked(mask(data), I...)
         rgb24(maskcolor(p))
     else
         normval = normalise(val, minval, maxval)
