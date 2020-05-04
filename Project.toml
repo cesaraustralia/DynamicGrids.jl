@@ -21,7 +21,7 @@ Setfield = "efcf1570-3423-57d1-acb7-fd33fddbac46"
 UnicodeGraphics = "ebadf6b4-db70-5817-83da-4a19ad584e34"
 
 [compat]
-julia = "1.2, 1.3. 1.4, 1.5"
+julia = "1.2, 1.3, 1.4, 1.5"
 Colors = "0.9, 0.10, 0.11, 0.12"
 ConstructionBase = "1"
 Crayons = "4"
