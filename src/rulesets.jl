@@ -69,6 +69,8 @@ order they are passed, ie. `Ruleset(rule1, rule2, rule3)`.
 """
 @flattenable @default_kw mutable struct Ruleset{I,M,O<:Overflow,Op<:PerformanceOpt,C,T
     } <: AbstractRuleset
+    # Rules are intentionally not type stable. This allows `precalc` and Interact.jl 
+    # updates to change the rule type. Function barriers remove any performance overheads.
     rules::Tuple{Vararg{<:Rule}} | ()               | true
     init::I                      | nothing          | false
     mask::M                      | nothing          | false

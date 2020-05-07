@@ -1,9 +1,33 @@
-using DynamicGrids, Test, Colors, ColorSchemes, FieldDefaults
+using DynamicGrids, Dates, Test, Colors, ColorSchemes, FieldDefaults
 using DynamicGrids: grid2image, @Image, @Graphic, @Output, 
     processor, minval, maxval, normalise, SimData, isstored, isasync,
     initialise, finalise, delay, fps, showfps, settimestamp!, timestamp, 
-    tspan, setfps!, frames, isshowable, Red, Green, Blue, showgrid
+    tspan, setfps!, frames, isshowable, Red, Green, Blue, showgrid, rgb24, scale
 using ColorSchemes: leonardo
+
+@testset "rgb24" begin
+    @test rgb24(0.5) === 
+    rgb24(0.5, 0.5, 0.5) === 
+    rgb24((0.5, 0.5, 0.5)) ===
+    rgb24(RGB(0.5, 0.5, 0.5)) === 
+    rgb24(RGB24(0.5, 0.5, 0.5)) === RGB24(0.5)
+end
+
+@testset "normalise" begin
+    @test normalise(-.2, 0.0, 1.0) == 0.0
+    @test normalise(1.2, 0.0, 1.0) == 1.0
+    @test normalise(-.2, 0.0, nothing) == 0.0
+    @test normalise(1.2, nothing, 1.0) == 1.0
+    @test normalise(1.2, nothing, nothing) == 1.2
+end
+
+@testset "scale" begin
+    @test scale(0.0, 5.0, 10.0) == 5.0
+    @test scale(0.5, 5.0, 10.0) == 7.5
+    @test scale(1.0, nothing, 10.0) == 10.0
+    @test scale(0.0, -2.0, nothing) == -2.0
+    @test scale(1.2, nothing, nothing) == 1.2
+end
 
 init = [8.0 10.0;
         0.0  5.0]
@@ -16,7 +40,12 @@ l1 = RGB24(get(leonardo, 1))
 # Define a simple image output
 @Image @Graphic @Output mutable struct TestImageOutput{} <: ImageOutput{T} end
 
-DynamicGrids.showimage(image, o::TestImageOutput, f, t) = image 
+global images = []
+
+DynamicGrids.showimage(image, o::TestImageOutput, f, t) = begin
+    push!(images, image)
+    image
+end
 
 @testset "basic ImageOutput" begin
     output = TestImageOutput(init)
@@ -67,12 +96,11 @@ end
 
 @testset "ColorProcessor" begin
     proc = ColorProcessor(zerocolor=(1.0,0.0,0.0))
-    output = TestImageOutput((a=init,); processor=proc, minval=nothing, maxval=10.0, store=true)
-    @test minval(output) === nothing
+    output = TestImageOutput((a=init,); processor=proc, minval=0.0, maxval=10.0, store=true)
+    @test minval(output) === 0.0
     @test maxval(output) === 10.0
     @test processor(output) == ColorProcessor(zerocolor=(1.0,0.0,0.0))
     @test isstored(output) == true
-
     simdata = SimData(init, Ruleset(Life()), 1)
 
     # Test level normalisation
@@ -93,16 +121,53 @@ end
                                                          z0 l05]
 end
 
+@testset "SparseOptInspector" begin
+    init =  [
+             0 0 0 0 0 0 0
+             0 0 0 0 1 1 1
+             0 0 0 0 0 0 1
+             0 0 0 0 0 1 0
+             0 0 0 0 0 0 0
+             0 0 0 0 0 0 0
+            ]
+    ruleset = Ruleset(;
+        rules=(Life(),), 
+        init=init, 
+        timestep=Day(1), 
+        overflow=WrapOverflow(),
+        opt=SparseOpt(),
+    )
+    proc = SparseOptInspector()
+    output = TestImageOutput(init; processor=proc, minval=0.0, maxval=1.0, store=true)
+
+    @test minval(output) === 0.0
+    @test maxval(output) === 1.0
+    @test processor(output) == SparseOptInspector()
+    @test isstored(output) == true
+
+    global images = []
+    sim!(output, ruleset; tspan=(Date(2001, 1, 1), Date(2001, 1, 5)))
+    w, y, c = RGB24(1), RGB24(.5, .5, 0), RGB24(0., .5, .5) 
+    @test images[1] == [
+             y y y y y y y
+             y y y c w w w
+             y y y c c c w
+             y y y y y w c
+             y y y y y c c
+             y y y y y y y
+            ]
+end
+
 @testset "LayoutProcessor" begin
     z0 = RGB24(1, 0, 0)
     grey = ColorProcessor(zerocolor=z0)
     leo = ColorProcessor(scheme=leonardo, zerocolor=z0)
     multiinit = (a = init, b = 2init)
     proc = LayoutProcessor([:a, nothing, :b], (grey, leo))
-    output = TestImageOutput(init; processor=proc, minval=(0, nothing), maxval=(10, 20), store=true)
-    @test minval(output) === (0, nothing)
+    output = TestImageOutput(init; processor=proc, minval=(0, 0), maxval=(10, 20), store=true)
+    @test minval(output) === (0, 0)
     @test maxval(output) === (10, 20)
-    @test processor(output) === proc
+    @test processor(output) === proc 
     @test isstored(output) == true
 
     # Test image is joined from :a, nothing, :b
@@ -124,9 +189,9 @@ end
                  d=[9.0 0.0 15.0 50.0 -10.0])
     proc = ThreeColorProcessor(colors=(Green(), Red(), Blue(), nothing), zerocolor=0.9, maskcolor=0.8)
     @test proc.colors === (Green(), Red(), Blue(), nothing)
-    output = TestImageOutput(multiinit; processor=proc, minval=(4, nothing, 5, nothing), maxval=(6, nothing, 10, nothing), store=true)
-    @test minval(output) === (4, nothing, 5, nothing)
-    @test maxval(output) === (6, nothing, 10, nothing)
+    output = TestImageOutput(multiinit; processor=proc, minval=(4, 0, 5, 0), maxval=(6, 1, 10, 1), store=true)
+    @test minval(output) === (4, 0, 5, 0)
+    @test maxval(output) === (6, 1, 10, 1)
     @test processor(output) === proc
 
     # Test image is combined from red and green overlays

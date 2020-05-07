@@ -175,7 +175,7 @@ struct SparseOptInspector <: SingleGridProcessor end
             rgb24(0.0, 0.5, 0.5)
         end
     elseif normedval > 0
-        rgb24(1.0, 0.0, 0.0)
+        rgb24(1.0, 0.0, 0.0) # This (a red cell) would mean there is a bug in SparseOpt
     else
         rgb24(0.5, 0.5, 0.0)
     end
@@ -330,10 +330,11 @@ Set a value to be between zero and one, before converting to Color.
 min and max of `nothing` are assumed to be 0 and 1.
 """
 normalise(x, minval::Number, maxval::Number) =
-    min((x - minval) / (maxval - minval), oneunit(x))
+    max(min((x - minval) / (maxval - minval), oneunit(x)), zero(x))
 normalise(x, minval::Number, maxval::Nothing) =
-    (x - minval) / (onunit(minval) - minval)
-normalise(x, minval::Nothing, maxval::Number) = min(x / maxval, oneunit(x))
+    max((x - minval) / (oneunit(x) - minval), zero(x))
+normalise(x, minval::Nothing, maxval::Number) = 
+    min(x / maxval, oneunit(x), oneunit(x))
 normalise(x, minval::Nothing, maxval::Nothing) = x
 
 """

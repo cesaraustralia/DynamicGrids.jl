@@ -2,7 +2,7 @@
 """
 Simulation data specific to a singule grid.
 """
-abstract type GridData{T,N,I} end
+abstract type GridData{T,N,I} <: AbstractArray{T,N} end
 
 # Common fields for GridData and WritableGridData, which are
 # identical except for their indexing methods
@@ -26,13 +26,9 @@ GridDataOrReps = Union{GridData, Vector{<:GridData}}
       sourcestatus(d), deststatus(d), localstatus(d), buffers(d))
 
 # Array interface
-Base.length(d::GridData) = length(source(d))
+Base.size(d::GridData) = size(source(d))
 Base.firstindex(d::GridData) = firstindex(source(d))
 Base.lastindex(d::GridData) = lastindex(source(d))
-Base.size(d::GridData) = size(source(d))
-Base.iterate(d::GridData, args...) = iterate(source(d), args...)
-Base.ndims(::GridData{T,N}) where {T,N} = N
-Base.eltype(::GridData{T}) where T = T
 
 # Getters
 init(d::GridData) = d.init
@@ -81,9 +77,7 @@ ReadableGridData(init::AbstractArray, mask, radius, overflow) = begin
                      sourcestatus, deststatus, localstatus, buffers)
 end
 
-ConstructionBase.constructorof(::Type{ReadableGridData}) =
-    (init, args...) -> ReadableGridData{eltype(init),ndims(init),typeof(init),typeof.(args)...}(init, args...)
-
+Base.parent(d::ReadableGridData) = parent(source(d))
 Base.@propagate_inbounds Base.getindex(d::ReadableGridData, I...) = getindex(source(d), I...)
 
 """
@@ -93,18 +87,15 @@ source/dest array.
 """
 @GridDataMixin struct WritableGridData{} <: GridData{T,N,I} end
 
-ConstructionBase.constructorof(::Type{WritableGridData}) =
-    (init, args...) -> WritableGridData{eltype(init),ndims(init),typeof(init),typeof.(args)...}(init, args...)
-
 Base.@propagate_inbounds Base.setindex!(d::WritableGridData, x, I...) = begin
     r = radius(d)
     @inbounds dest(d)[I...] = x
     if deststatus(d) isa AbstractArray
-        bi = indtoblock.(I .+ r, 2r)
-        @inbounds deststatus(d)[bi...] = true
+        @inbounds deststatus(d)[indtoblock.(I .+ r, 2r)...] = true
     end
 end
 
+Base.parent(d::WritableGridData) = parent(dest(d))
 Base.@propagate_inbounds Base.getindex(d::WritableGridData, I...) = getindex(dest(d), I...)
 
 

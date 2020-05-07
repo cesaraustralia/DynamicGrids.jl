@@ -124,7 +124,7 @@ end
             opt=SparseOpt(),
         )
         sparse_output = ArrayOutput(init, 7)
-        sim!(sparse_output, sparse_ruleset; tspan=(Date(2001, 1, 1), Date(2001, 1, 14)))
+        sim!(sparse_output, sparse_ruleset; init=init, tspan=(Date(2001, 1, 1), Date(2001, 1, 14)))
 
         @testset "SparseOpt results match glider behaviour" begin
             @test sparse_output[2] == test2

@@ -1,7 +1,10 @@
-using DynamicGrids, Test, Setfield
+using DynamicGrids, Setfield, FieldDefaults, FieldMetadata, Test
 import DynamicGrids: applyrule, applyrule!, maprule!, 
        source, dest, currenttime, getdata, combinedata, ruleloop,
-       SimData, WritableGridData, _Read_, _Write_
+       SimData, WritableGridData, _Read_, _Write_,
+       Rule, readkeys, writekeys, @Image, @Graphic, @Output
+
+# Single grid rules
 
 init  = [0 1 1 0;
          0 1 1 0;
@@ -107,6 +110,7 @@ applyrule(::TestCellSquare, data, (state,), index) = state^2
     @test source(first(resultdata)) == final
 end
 
+
 struct PrecalcRule{R,W,P} <: Rule{R,W}
     precalc::P
 end
@@ -133,3 +137,47 @@ applyrule(rule::PrecalcRule, data, state, index) = rule.precalc[]
 end
 
 
+# Multi grid rules
+
+struct Double{R,W} <: CellRule{R,W} end
+applyrule(rule::Double, data, (predators, prey), index) = prey * 2
+
+struct Predation{R,W} <: CellRule{R,W} end
+Predation(; prey=:prey, predator=:predator) = 
+    Predation{Tuple{predator,prey},Tuple{prey,predator}}()
+applyrule(::Predation, data, (predators, prey), index) = begin
+    caught = 2predators
+    # Output order is the reverse of input to test that can work
+    prey - caught, predators + caught * 0.5
+end
+
+predation = Predation(; prey=:prey, predator=:predator)
+preyarray = [10. 10.]
+predatorarray = [1. 0.]
+init = (prey=preyarray, predator=predatorarray)
+
+@testset "multi-grid keys are inferred" begin
+    @test writekeys(predation) == (:prey, :predator)
+    @test readkeys(predation) == (:predator, :prey)
+    @test keys(predation) == (:prey, :predator)
+    @inferred writekeys(predation)
+    @inferred readkeys(predation)
+    @inferred keys(predation)
+end
+
+@testset "multi-grid keys are inferred" begin
+    @test writekeys(predation) == (:prey, :predator)
+    @test readkeys(predation) == (:predator, :prey)
+    @test keys(predation) == (:prey, :predator)
+    @inferred writekeys(predation)
+    @inferred readkeys(predation)
+    @inferred keys(predation)
+end
+
+@testset "a multi-grid predator prey rule" begin
+    ruleset = Ruleset(Double{Tuple{:predator,:prey},:prey}(), predation)
+    output = ArrayOutput(init, 12)
+    sim!(output, ruleset; init=init, tspan=(1, 3))
+    @test output[2] == (prey=[18. 20], predator=[2.0 0.0])
+    @test output[3] == (prey=[32. 40], predator=[4.0 0.0])
+end

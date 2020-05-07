@@ -1,4 +1,4 @@
-using DynamicGrids, Test
+using DynamicGrids, Setfield, Test
 import DynamicGrids: neighbors, sumneighbors, SimData, radius, neighbors,
        mapsetneighbor!, neighborhood, WritableGridData, dest, hoodsize, neighborhoodkey
 
@@ -95,11 +95,12 @@ end
     ruleA = TestNeighborhoodRule{:a,:a}(RadialNeighborhood{3}())
     ruleB = TestPartialNeighborhoodRule{Tuple{:b},Tuple{:b}}(RadialNeighborhood{2}())
     ruleset = Ruleset(ruleA, ruleB)
-    @test DynamicGrids.radius(ruleA) == 3
-    @test DynamicGrids.radius(ruleB) == 2
+    @test radius(ruleA) == 3
+    @test radius(ruleB) == 2
     @testset "ruleset returns max radii of all rule" begin
-        @test DynamicGrids.radius(ruleset) == (a=3, b=2)
+        @test radius(ruleset) == (a=3, b=2)
     end
+    @test radius(Ruleset()) == NamedTuple()
 end
 
 DynamicGrids.setneighbor!(data, hood, rule::TestPartialNeighborhoodRule,
@@ -146,4 +147,33 @@ end
          0 1 2 3 4 5
          0 1 2 3 4 6]
 
+
+    hood = LayeredCustomNeighborhood(
+        (CustomNeighborhood(((-1, -1), (1, 1))), CustomNeighborhood(((-2, -2), (2, 2))))
+    )
+    rule = TestPartialNeighborhoodRule{:a,:a}(hood)
+    @test radius(rule) === 2
+    ruleset = Ruleset(rule)
+    simdata = SimData(init, ruleset, 1)
+    state = 1
+    index = (3, 3)
+    @test mapsetneighbor!(WritableGridData(first(simdata)), neighborhood(rule), rule, state, index) == (2, 2)
+    @test dest(first(simdata)) ==
+        [1 1 2 3 4 5
+         0 2 2 3 4 5
+         0 1 2 3 4 5
+         0 1 2 4 4 5
+         0 1 2 3 5 5
+         0 1 2 3 4 5]
+end
+
+@testset "construction" begin
+    hood = CustomNeighborhood(((-1, -1), (1, 1)))
+    @set! hood.coords = ((-5, -5), (5, 5)) 
+    @test hood.coords == ((-5, -5), (5, 5))
+
+    hood = LayeredCustomNeighborhood((CustomNeighborhood(((-1, -1), (1, 1))), 
+                                      CustomNeighborhood(((-2, -2), (2, 2)))))
+    @set! hood.layers = (CustomNeighborhood(((-3, -3), (3, 3))),) 
+    @test hood.layers == (CustomNeighborhood(((-3, -3), (3, 3))),) 
 end

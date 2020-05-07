@@ -23,8 +23,6 @@ is ommitted.
 """
 struct RadialNeighborhood{R} <: AbstractRadialNeighborhood{R} end
 
-ConstructionBase.constructorof(::Type{RadialNeighborhood{R}}) where R = RadialNeighborhood{R}()
-
 neighbors(hood::AbstractRadialNeighborhood, buf) = begin
     hoodlen = hoodsize(hood)^2
     centerpoint = hoodlen ÷ 2 + 1
@@ -57,22 +55,29 @@ should be listed in column-major order for performance.
 """
 abstract type AbstractCustomNeighborhood{R} <: Neighborhood{R} end
 
+const CustomCoord = Tuple{Vararg{Int}}
+const CustomCoords = Tuple{Vararg{<:CustomCoord}}
+
 """
 Allows completely arbitrary neighborhood shapes by specifying each coordinate
 specifically.
 """
-@description @flattenable struct CustomNeighborhood{R,C} <: AbstractCustomNeighborhood{R}
+@description @flattenable struct CustomNeighborhood{R,C<:CustomCoords} <: AbstractCustomNeighborhood{R}
     coords::C | false | "A tuple of tuples of Int, containing 2-D coordinates relative to the central point"
 end
-CustomNeighborhood{R}(coords) where R = CustomNeighborhood{R,typeof(coords)}(coords)
-CustomNeighborhood(args...) = CustomNeighborhood(args)
-CustomNeighborhood(coords) = CustomNeighborhood{absmaxcoord(coords),typeof(coords)}(coords)
 
-ConstructionBase.constructorof(::Type{CustomNeighborhood}) where R = CustomNeighborhood{R}
+CustomNeighborhood{R}(coords::CustomCoords) where R = 
+    CustomNeighborhood{R,typeof(coords)}(coords)
+CustomNeighborhood(args::CustomCoord...) = CustomNeighborhood(args)
+CustomNeighborhood(coords::CustomCoords) = CustomNeighborhood{absmaxcoord(coords),typeof(coords)}(coords)
+
+ConstructionBase.constructorof(::Type{CustomNeighborhood{R,C}}) where {R,C} = CustomNeighborhood{R}
 
 coords(hood::CustomNeighborhood) = hood.coords
+
 # Calculate the maximum absolute value in the coords to use as the radius
-absmaxcoord(coords) = maximum((x -> maximum(abs.(x))).(coords))
+absmaxcoord(coords::Tuple) = maximum(map(x -> maximum(map(abs, x)), coords))
+absmaxcoord(neighborhood::CustomNeighborhood) = absmaxcoord(coords(neighborhood))
 
 neighbors(hood::CustomNeighborhood, buf) =
     (buf[(coord .+ radius(hood) .+ 1)...] for coord in coords(hood))
@@ -95,10 +100,10 @@ end
 Sets of custom neighborhoods that can have separate rules for each set.
 """
 @description struct LayeredCustomNeighborhood{R,C} <: AbstractCustomNeighborhood{R}
-    layers::C | "A tuple of tuple of custom neighborhoods"
+    layers::C | "A tuple of custom neighborhoods"
 end
-LayeredCustomNeighborhood(l::Tuple) =
-    LayeredCustomNeighborhood{maximum(absmaxcoord.(coords.(l))), typeof(l)}(l)
+LayeredCustomNeighborhood(l::Tuple{Vararg{<:CustomNeighborhood}}) =
+    LayeredCustomNeighborhood{maximum(absmaxcoord.(l)), typeof(l)}(l)
 
 @inline neighbors(hood::LayeredCustomNeighborhood, buf) =
     map(layer -> neighbors(layer, buf), hood.layers)
@@ -106,8 +111,10 @@ LayeredCustomNeighborhood(l::Tuple) =
 @inline sumneighbors(hood::LayeredCustomNeighborhood, buf, state) =
     map(layer -> sumneighbors(layer, buf, state), hood.layers)
 
-@inline mapsetneighbor!(data::WritableGridData, hood::LayeredCustomNeighborhood, rule, state, index) =
+@inline mapsetneighbor!(data::WritableGridData, hood::LayeredCustomNeighborhood, rule, state, index) = begin
+    display(data.init)
     map(layer -> mapsetneighbor!(data, layer, rule, state, index), hood.layers)
+end
 
 """
 A convenience wrapper to build a VonNeumann neighborhoods as a `CustomNeighborhood`.
@@ -119,15 +126,15 @@ VonNeumannNeighborhood() = CustomNeighborhood(((0,-1), (-1,0), (1,0), (0,1)))
 """
 Find the largest radius present in the passed in rules.
 """
-radius(set::Ruleset) = begin
-    length(rules(set)) > 0 || return NamedTuple()
-    allkeys = Tuple(union(map(keys, rules(set))...))
-    maxradii = Tuple(radius(rules(set), key) for key in allkeys)
+radius(set::Ruleset) = radius(rules(set))
+radius(rules::Tuple{Vararg{<:Rule}}) = begin
+    allkeys = Tuple(union(map(keys, rules)...))
+    maxradii = Tuple(radius(rules, key) for key in allkeys)
     return NamedTuple{allkeys}(maxradii)
 end
-radius(set::Ruleset{Tuple{}}) = NamedTuple{(),Tuple{}}(())
+radius(rules::Tuple{}) = NamedTuple{(),Tuple{}}(())
 # Get radius of specific key from all rules
-radius(rules::Tuple{<:Rule,Vararg}, key) =
+radius(rules::Tuple{Vararg{<:Rule}}, key::Symbol) =
     reduce(max, radius(i) for i in rules if key in keys(i); init=0)
 
 # TODO radius only for neighborhood grid
