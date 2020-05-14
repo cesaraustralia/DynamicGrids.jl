@@ -68,10 +68,17 @@ end
 struct TestNeighborhoodRule{R,W,N} <: NeighborhoodRule{R,W}
     neighborhood::N
 end
+DynamicGrids.applyrule(rule::TestNeighborhoodRule, data, state, index, buffer) = 
+    state
 
 struct TestPartialNeighborhoodRule{R,W,N} <: PartialNeighborhoodRule{R,W}
     neighborhood::N
 end
+DynamicGrids.applyrule!(rule::TestPartialNeighborhoodRule{R,Tuple{W1,}}, data, state, index
+                       ) where {R,W1} = 
+    data[W1][index...] = state[1]
+
+
 
 @testset "neighborhood" begin
     ruleA = TestPartialNeighborhoodRule{:a,:a}(RadialNeighborhood{3}())
@@ -92,6 +99,7 @@ end
 end
 
 @testset "radius" begin
+    init = (a=[1. 2.], b=[10. 11.])
     ruleA = TestNeighborhoodRule{:a,:a}(RadialNeighborhood{3}())
     ruleB = TestPartialNeighborhoodRule{Tuple{:b},Tuple{:b}}(RadialNeighborhood{2}())
     ruleset = Ruleset(ruleA, ruleB)
@@ -101,6 +109,10 @@ end
         @test radius(ruleset) == (a=3, b=2)
     end
     @test radius(Ruleset()) == NamedTuple()
+
+    output = ArrayOutput(init, 3)
+    sim!(output, ruleset; init=init)
+    # TODO make sure 2 radii can coexist
 end
 
 DynamicGrids.setneighbor!(data, hood, rule::TestPartialNeighborhoodRule,

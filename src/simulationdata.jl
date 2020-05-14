@@ -27,6 +27,8 @@ GridDataOrReps = Union{GridData, Vector{<:GridData}}
 
 # Array interface
 Base.size(d::GridData) = size(source(d))
+Base.axes(d::GridData) = axes(source(d))
+Base.eltype(d::GridData) = eltype(source(d))
 Base.firstindex(d::GridData) = firstindex(source(d))
 Base.lastindex(d::GridData) = lastindex(source(d))
 

@@ -109,7 +109,7 @@ end
                      0.0 0.5]
 
     # Test greyscale Image conversion
-    @test grid2image(processor(output), output, simdata, init, 1) ==
+    @test grid2image(processor(output), output, simdata, (a=init,), 1) ==
         [RGB24(0.8, 0.8, 0.8) RGB24(1.0, 1.0, 1.0)
          RGB24(1.0, 0.0, 0.0) RGB24(0.5, 0.5, 0.5)]
 

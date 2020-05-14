@@ -10,24 +10,28 @@ Rules are applied to the grid using the [`applyrule`](@ref) method.
 """
 abstract type Rule{R,W} end
 
-"""
-Default constructor for all rules.
-Sets both the read and write grids to `:_default`.
 
-Other keyword args are passed through to FieldDefaults.jl.
+#=
+Default constructors for all rules.
+Sets both the read and write grids to `:_default`.
 
 This strategy relies on a one-to-one relationship
 between all fields and their type parameters, besides
 the initial `R`, `W` etc fields.
-"""
+=#
+
+# No R,W params and no kwargs
 (::Type{T})(args...) where T<:Rule =
     T{:_default_,:_default_,map(typeof, args)...}(args...)
+# R,W but no kwargs
 (::Type{T})(args...) where T<:Rule{R,W} where {R,W} =
     T{typeof.(args)...}(args...)
-(::Type{T})(; kwargs...) where T<:Rule = begin
-    args = FieldDefaults.insert_kwargs(kwargs, T)
-    T{:_default_,:_default_,map(typeof, args)...}(args...)
-end
+# No R,W but kwargs
+(::Type{T})(; read=:_default_, write=:_default_, kwargs...) where T<:Rule =
+    T{read,write}(; kwargs...)
+# R,W and kwargs passed through to FieldDefaults.jl.
+# This means @default should be used for rule defaults, never @default_kw
+# or this will be overwritten, but also not work as it wont handle R,W.
 (::Type{T})(; kwargs...) where T<:Rule{R,W} where {R,W} = begin
     args = FieldDefaults.insert_kwargs(kwargs, T)
     T{map(typeof, args)...}(args...)
