@@ -46,3 +46,40 @@ end
 
 unwrap(::Val{X}) where X = X
 unwrap(::Type{Val{X}}) where X = X
+
+"""
+    isinferred(ruleset::Ruleset, starttime=1; init=nothing)
+
+Test if a custom rule return type is inferred and correct.
+Type-stability can give orders of magnitude improvements in performance.
+
+If there is no `init` array or `NamedTuple` in the ruleset
+it must be passed in as a keyword argument.
+
+Passing `starttime` is optional, in case the time type has some effect on the rule.
+"""
+isinferred(ruleset::Ruleset, starttime=1; init=nothing) = begin
+    init_ = chooseinit(DynamicGrids.init(ruleset), init)
+    simdata = SimData(init_, ruleset, starttime)
+    map(rules(ruleset)) do rule
+        isinferred(simdata, rule, init_)
+    end
+    true
+end
+isinferred(simdata::SimData, rule::Rule, init::AbstractArray) = begin
+    x = @inferred applyrule(rule, simdata, init[1, 1], (1, 1))
+    x isa eltype(init) ||
+        error("Returned type `$(typeof(x))` doesn't match grid eltype `$(eltype(init))`")
+    true
+end
+isinferred(simdata::SimData, rule::NeighborhoodRule, init::AbstractArray) = begin
+    buffer = first(buffers(simdata[neighborhoodkey(rule)]))
+    x = @inferred applyrule(rule, simdata, init[1, 1], (1, 1), buffer)
+    x isa eltype(init) ||
+        error("Returned type `$(typeof(x))` doesn't match grid eltype `$(eltype(init))`")
+    true
+end
+isinferred(simdata::SimData, rule::PartialRule, init::AbstractArray) = begin
+    @inferred applyrule!(rule, simdata, init[1, 1], (1, 1))
+    true
+end

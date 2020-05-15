@@ -21,6 +21,9 @@ using DynamicGrids: inbounds, isinbounds
         @test inbounds((-22,0), (10, 10), WrapOverflow()) == ((8,10),true)
         @test isinbounds((-22,0), (10, 10), WrapOverflow()) == true
     end
-
     
+end
+
+@testset "isinferred" begin
+    @test isinferred(Ruleset(Life(); init=rand(Bool, 10, 10)))
 end
