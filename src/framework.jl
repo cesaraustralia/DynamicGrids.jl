@@ -33,7 +33,7 @@ sim!(output::Output, ruleset::Ruleset;
     fspan = _tspan2fspan(tspan, timestep(ruleset))
     setstarttime!(output, starttime)
     # Copy the init array from the ruleset or keyword arg
-    init = _chooseinit(DynamicGrids.init(ruleset), init)
+    init = chooseinit(DynamicGrids.init(ruleset), init)
     simdata = initdata!(simdata, ruleset, init, starttime, nreplicates)
     # Delete grids output by the previous simulations
     initgrids!(output, init)
@@ -50,11 +50,11 @@ _tspan2fspan(tspan, tstep) = 1:lastindex(first(tspan):tstep:last(tspan))
 
 # Allows attaching an init array to the ruleset, but also passing in an
 # alternate array as a keyword arg (which will take preference).
-_chooseinit(rulesetinit, arginit) = arginit
-_chooseinit(rulesetinit::Nothing, arginit) = arginit
-_chooseinit(rulesetinit, arginit::Nothing) = rulesetinit
-_chooseinit(rulesetinit::Nothing, arginit::Nothing) =
-    throw(ArgumentError("Must include an `init` array: either in the ruleset or with the `init` keyword"))
+chooseinit(rulesetinit, arginit) = arginit
+chooseinit(rulesetinit::Nothing, arginit) = arginit
+chooseinit(rulesetinit, arginit::Nothing) = rulesetinit
+chooseinit(rulesetinit::Nothing, arginit::Nothing) =
+    throw(ArgumentError("Must include `init` grid(s): either in the `Ruleset` or with the `init` keyword"))
 
 """
     resume!(output::Output, ruleset::Ruleset;

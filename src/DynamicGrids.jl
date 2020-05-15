@@ -21,6 +21,7 @@ using Colors,
       OffsetArrays,
       REPL,
       Setfield,
+      Test,
       UnicodeGraphics
 
 using Base: tail
