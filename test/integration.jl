@@ -93,8 +93,8 @@ end
                 ]
 
     ruleset = Ruleset(; 
-        rules=(Life(),), 
-        init=init, 
+        rules=(Life{:a,:a}(),), 
+        init=(a=init,), 
         timestep=Day(2), 
         overflow=RemoveOverflow(),
         opt=NoOpt(),
@@ -108,8 +108,6 @@ end
         @test output[5] == test5_rem
         @test output[7] == test7_rem
     end
-
-    REPLOutput(output)
 end
 
 
@@ -193,4 +191,3 @@ end
     @test output[5][:_default_] == test5
     @test output[7][:_default_] == test7
 end
-

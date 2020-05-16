@@ -97,10 +97,10 @@ But it they can be distpatched on together when required for custom outputs.
 """
 function grid2image end
 
-grid2image(o::ImageOutput, data::RulesetOrSimData, grid, t::Integer) =
-    grid2image(processor(o), o, data, grid, t)
-grid2image(processor::GridProcessor, o::ImageOutput, data::RulesetOrSimData, grid, t) =
-    grid2image(processor::GridProcessor, minval(o), maxval(o), data, grid, t)
+grid2image(o::ImageOutput, data::RulesetOrSimData, grids, t::Integer) =
+    grid2image(processor(o), o, data, grids, t)
+grid2image(processor::GridProcessor, o::ImageOutput, data::RulesetOrSimData, grids, t) =
+    grid2image(processor::GridProcessor, minval(o), maxval(o), data, grids, t)
 
 """
 Grid processors that convert one grid to an image.

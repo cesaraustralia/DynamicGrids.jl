@@ -32,13 +32,11 @@ sim!(output, Ruleset(Life(b=(1,3,5,7), s=(1,3,5,7))), init; tspan=(1, 1000))
 
 $(FIELDDOCTABLE)
 """
-@description @limits @flattenable struct Life{R,W,N,B,S} <: NeighborhoodRule{R,W}
-    neighborhood::N | false | nothing | "Any Neighborhood"
-    b::B            | true  | (0, 8)  | "Array, Tuple or Iterable of integers to match neighbors when cell is empty"
-    s::S            | true  | (0, 8)  | "Array, Tuple or Iterable of integers to match neighbors cell is full"
+@description @limits @flattenable @default struct Life{R,W,N,B,S} <: NeighborhoodRule{R,W}
+    neighborhood::N | RadialNeighborhood{1}() | false | nothing | "Any Neighborhood"
+    b::B            | (3, 3)                  | true  | (0, 8)  | "Array, Tuple or Iterable of integers to match neighbors when cell is empty"
+    s::S            | (2, 3)                  | true  | (0, 8)  | "Array, Tuple or Iterable of integers to match neighbors cell is full"
 end
-Life(; read=:_default_, write=read, neighborhood=RadialNeighborhood{1}(), b=(3, 3), s=(2, 3)) =
-    Life{read,write}(neighborhood, b, s)
 
 applyrule(rule::Life, data::SimData, state, index, buf) = begin
     sum = sumneighbors(rule.neighborhood, buf, state)

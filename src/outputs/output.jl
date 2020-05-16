@@ -16,6 +16,7 @@ abstract type Output{T} <: AbstractVector{T} end
 (::Type{F})(init::NamedTuple; kwargs...) where F <: Output =
     F(; frames=[deepcopy(init)], kwargs...)
 
+# Generitc constructor that rewraps any output in another output type
 (::Type{F})(o::T; kwargs...) where F <: Output where T <: Output =
     F(; frames=frames(o), starttime=starttime(o), stoptime=stoptime(o), kwargs...)
 
@@ -142,19 +143,23 @@ storegrid!(output::Output, data::AbstractVector{<:AbstractSimData}) = begin
     end
 end
 
-"""
-Grids are preallocated and reused.
-"""
-initgrids!(o::Output, init) = begin
-    first(o) .= init
+# Grids are preallocated and reused.
+initgrids!(o::Output, init) = initgrids!(o[1], o::Output, init) 
+# Array grids are copied
+initgrids!(grid::AbstractArray, o::Output, init::AbstractArray) = begin
+    grid .= init
     for f = (firstindex(o) + 1):lastindex(o)
         @inbounds o[f] .= zero(eltype(init))
     end
     o
 end
-initgrids!(o::Output, init::NamedTuple) = begin
+# The first grid in a named tuple is used if the output is a single Array
+initgrids!(grid::AbstractArray, o::Output, init::NamedTuple) = 
+    initgrids!(grid, o, first(init))
+# All arrays are copied if both are named tuples
+initgrids!(grids::NamedTuple, o::Output, init::NamedTuple) = begin
     for key in keys(init)
-        @inbounds first(o)[key] .= init[key]
+        @inbounds grids[key] .= init[key]
     end
     for f = (firstindex(o) + 1):lastindex(o)
         for key in keys(init)

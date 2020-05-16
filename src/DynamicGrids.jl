@@ -21,6 +21,7 @@ using Colors,
       OffsetArrays,
       REPL,
       Setfield,
+      Test,
       UnicodeGraphics
 
 using Base: tail
@@ -29,8 +30,11 @@ using Lazy: @forward
 import Base: show, getindex, setindex!, lastindex, size, length, push!, append!,
              broadcast, broadcast!, similar, eltype, iterate
 
-import FieldMetadata: @description, description, @limits, limits,
-                      @flattenable, flattenable, default
+import FieldMetadata: @description, description, 
+                      @limits, limits,
+                      @flattenable, flattenable,
+                      @default, default
+
 
 
 export sim!, resume!, replay, savegif
