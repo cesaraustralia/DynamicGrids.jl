@@ -37,7 +37,7 @@ import FieldMetadata: @description, description,
 
 
 
-export sim!, resume!, replay, savegif
+export sim!, resume!, replay, savegif, isinferred
 
 export Rule, NeighborhoodRule, CellRule, PartialRule, PartialNeighborhoodRule
 
