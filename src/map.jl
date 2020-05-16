@@ -20,7 +20,7 @@ end
     # Field | Flatten | Description
     f::F    | false   | "Function to apply to the target values"
 end
-Map(f; read, write) = Map{read,write}(f)
+Map(f; read=:_default_, write=read) = Map{read,write}(f)
 
 @inline applyrule(rule::Map{R,W}, data::SimData, read, index) where {R<:Tuple,W} = begin
     let (rule, read) = (rule, read)

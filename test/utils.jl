@@ -25,5 +25,17 @@ using DynamicGrids: inbounds, isinbounds
 end
 
 @testset "isinferred" begin
-    @test isinferred(Ruleset(Life(); init=rand(Bool, 10, 10)))
+    @testset "unstable conditional" begin
+        rule = Map() do x
+            x > 1 ? 2 : 0.0
+        end
+        @test_throws ErrorException isinferred(Ruleset(rule; init=rand(Int, 10, 10)))
+    end
+    @testset "return type" begin
+        rule = Map() do x
+            round(Int, x)
+        end
+        @test isinferred(Ruleset(rule; init=rand(Int, 10, 10)))
+        @test_throws ErrorException isinferred(Ruleset(rule; init=rand(Bool, 10, 10)))
+    end
 end

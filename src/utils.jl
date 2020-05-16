@@ -68,14 +68,14 @@ isinferred(ruleset::Ruleset, starttime=1; init=nothing) = begin
 end
 isinferred(simdata::SimData, rule::Rule, init::AbstractArray) = begin
     x = @inferred applyrule(rule, simdata, init[1, 1], (1, 1))
-    x isa eltype(init) ||
+    typeof(x) == eltype(init) ||
         error("Returned type `$(typeof(x))` doesn't match grid eltype `$(eltype(init))`")
     true
 end
 isinferred(simdata::SimData, rule::NeighborhoodRule, init::AbstractArray) = begin
     buffer = first(buffers(simdata[neighborhoodkey(rule)]))
     x = @inferred applyrule(rule, simdata, init[1, 1], (1, 1), buffer)
-    x isa eltype(init) ||
+    typeof(x) == eltype(init) ||
         error("Returned type `$(typeof(x))` doesn't match grid eltype `$(eltype(init))`")
     true
 end
