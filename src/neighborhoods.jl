@@ -28,6 +28,7 @@ neighbors(hood::AbstractRadialNeighborhood, buf) = begin
     centerpoint = hoodlen ÷ 2 + 1
     (buf[i] for i in 1:hoodlen if i != centerpoint)
 end
+neighbors(rule::NeighborhoodRule, buf) = neighbors(neighborhood(rule), buf)
 
 sumneighbors(hood::AbstractRadialNeighborhood, buf, state) = sum(buf) - state
 
@@ -110,6 +111,8 @@ LayeredCustomNeighborhood(l::Tuple{Vararg{<:CustomNeighborhood}}) =
 
 @inline sumneighbors(hood::LayeredCustomNeighborhood, buf, state) =
     map(layer -> sumneighbors(layer, buf, state), hood.layers)
+@inline sumneighbors(rule::NeighborhoodRule, buf, state) =
+    sumneighbors(neighborhood(rule), buf, state)
 
 @inline mapsetneighbor!(data::WritableGridData, hood::LayeredCustomNeighborhood, rule, state, index) = begin
     display(data.init)
