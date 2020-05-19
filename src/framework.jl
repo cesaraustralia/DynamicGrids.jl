@@ -24,13 +24,17 @@ the passed in output for each time-step.
   allocation when that is important.
 """
 sim!(output::Output, ruleset::Ruleset;
-     init=nothing, tspan=(1, length(output)), fps=fps(output),
-     nreplicates=nothing, simdata=nothing) = begin
+     init=nothing, tspan::Union{Tuple,AbstractRange}=1:length(output), 
+     fps=fps(output), nreplicates=nothing, simdata=nothing) = begin
+    if tspan isa Tuple
+        tspan = first(tspan):timestep(ruleset):last(tspan)
+    elseif step(tspan) != step(ruleset)
+        throw(ArgumentError("tspan step $(step(tspan)) must equal rule step $(step(ruleset))"))
+    end
     initialise(output)
     isrunning(output) && error("A simulation is already running in this output")
     setrunning!(output, true) || error("Could not start the simulation with this output")
     starttime = first(tspan)
-    fspan = _tspan2fspan(tspan, timestep(ruleset))
     setstarttime!(output, starttime)
     # Copy the init array from the ruleset or keyword arg
     init = chooseinit(DynamicGrids.init(ruleset), init)
@@ -43,10 +47,8 @@ sim!(output::Output, ruleset::Ruleset;
     # Let the init grid be displayed as long as a normal grid
     delay(output, 1)
     # Run the simulation
-    runsim!(output, simdata, fspan)
+    runsim!(output, simdata, 1:lastindex(tspan))
 end
-
-_tspan2fspan(tspan, tstep) = 1:lastindex(first(tspan):tstep:last(tspan))
 
 # Allows attaching an init array to the ruleset, but also passing in an
 # alternate array as a keyword arg (which will take preference).
@@ -116,6 +118,7 @@ Operations on outputs and rulesets are allways mutable and in-place.
 Operations on rules and simdata objects are functional as they are used in inner loops
 where immutability improves performance. =#
 simloop!(output::Output, simdata, fspan) = begin
+    # Set the frame timestamp for fps calculation
     settimestamp!(output, first(fspan))
     # Initialise types etc
     simdata = updatetime(simdata, 1)

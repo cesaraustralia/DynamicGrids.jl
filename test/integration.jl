@@ -99,10 +99,15 @@ end
         overflow=RemoveOverflow(),
         opt=NoOpt(),
     )
-    output = ArrayOutput(init, 7)
-    sim!(output, ruleset; tspan=(Date(2001, 1, 1), Date(2001, 1, 14)), nreplicates=5)
 
-    @testset "NoOpt results match glider behaviour" begin
+    @testset "Wrong timestep throws an error" begin
+        output = ArrayOutput(init, 7)
+        @test_throws ArgumentError sim!(output, ruleset; tspan=Date(2001, 1, 1):Month(1):Date(2001, 3, 1))
+    end
+
+    @testset "Results match glider behaviour" begin
+        output = ArrayOutput(init, 7)
+        sim!(output, ruleset; tspan=(Date(2001, 1, 1):Day(2):Date(2001, 1, 14)), nreplicates=5)
         @test output[2] == test2_rem
         @test output[3] == test3_rem
         @test output[5] == test5_rem
