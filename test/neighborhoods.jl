@@ -63,6 +63,11 @@ import DynamicGrids: neighbors, sumneighbors, SimData, radius, neighbors,
     @test sumneighbors(custom1, buf, state) == sum(neighbors(custom1, buf)) == 2
     @test sumneighbors(custom2, buf, state) == sum(neighbors(custom2, buf)) == 0
     @test sumneighbors(layered, buf, state) == sum.(neighbors(layered, buf)) == (1, 2)
+
+    @testset "neighbors works on rule" begin
+        @test sum(neighbors(Life(), [0 1 1; 0 0 0; 1 1 1])) == 5
+        @test sumneighbors(Life(), [0 1 1; 0 0 0; 1 1 1], 0) == 5
+    end
 end
 
 struct TestNeighborhoodRule{R,W,N} <: NeighborhoodRule{R,W}
