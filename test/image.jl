@@ -1,16 +1,19 @@
 using DynamicGrids, Dates, Test, Colors, ColorSchemes, FieldDefaults
+using FreeTypeAbstraction
 using DynamicGrids: grid2image, @Image, @Graphic, @Output, 
     processor, minval, maxval, normalise, SimData, isstored, isasync,
     initialise, finalise, delay, fps, showfps, settimestamp!, timestamp, 
-    tspan, setfps!, frames, isshowable, Red, Green, Blue, showgrid, rgb24, scale
+    tspan, setfps!, frames, isshowable, Red, Green, Blue, showgrid, rgb, scale
 using ColorSchemes: leonardo
 
-@testset "rgb24" begin
-    @test rgb24(0.5) === 
-    rgb24(0.5, 0.5, 0.5) === 
-    rgb24((0.5, 0.5, 0.5)) ===
-    rgb24(RGB(0.5, 0.5, 0.5)) === 
-    rgb24(RGB24(0.5, 0.5, 0.5)) === RGB24(0.5)
+@testset "rgb" begin
+    @test rgb(0.5) === 
+    rgb(0.5, 0.5, 0.5) === 
+    rgb(0.5, 0.5, 0.5, 1.0) === 
+    rgb((0.5, 0.5, 0.5)) ===
+    rgb((0.5, 0.5, 0.5, 1.0)) ===
+    rgb(RGB(0.5, 0.5, 0.5)) === 
+    rgb(ARGB32(0.5, 0.5, 0.5)) === ARGB32(0.5, 0.5, 0.5, 1.0)
 end
 
 @testset "normalise" begin
@@ -32,10 +35,10 @@ end
 init = [8.0 10.0;
         0.0  5.0]
 
-l0 = RGB24(get(leonardo, 0))
-l05 = RGB24(get(leonardo, 0.5))
-l08 = RGB24(get(leonardo, 0.8))
-l1 = RGB24(get(leonardo, 1))
+l0 = ARGB32(get(leonardo, 0))
+l05 = ARGB32(get(leonardo, 0.5))
+l08 = ARGB32(get(leonardo, 0.8))
+l1 = ARGB32(get(leonardo, 1))
 
 # Define a simple image output
 @Image @Graphic @Output mutable struct TestImageOutput{} <: ImageOutput{T} end
@@ -78,8 +81,8 @@ end
     @test isshowable(output, 1)
 
     @test showgrid(output, 1, 1) ==
-        [RGB24(1.0,1.0,1.0) RGB24(1.0,1.0,1.0)
-         RGB24(0.0,0.0,0.0) RGB24(1.0,1.0,1.0)]
+        [ARGB32(1.0,1.0,1.0) ARGB32(1.0,1.0,1.0)
+         ARGB32(0.0,0.0,0.0) ARGB32(1.0,1.0,1.0)]
     savegif("test.gif", output)
     @test isfile("test.gif")
 
@@ -110,15 +113,38 @@ end
 
     # Test greyscale Image conversion
     @test grid2image(processor(output), output, simdata, (a=init,), 1) ==
-        [RGB24(0.8, 0.8, 0.8) RGB24(1.0, 1.0, 1.0)
-         RGB24(1.0, 0.0, 0.0) RGB24(0.5, 0.5, 0.5)]
+        [ARGB32(0.8, 0.8, 0.8) ARGB32(1.0, 1.0, 1.0)
+         ARGB32(1.0, 0.0, 0.0) ARGB32(0.5, 0.5, 0.5)]
 
-    @test grid2image(ColorProcessor(;scheme=leonardo), output, simdata, init, 1) == [l08 l1
-                                                                                     l0 l05]
-    z0 = RGB24(1, 0, 0)
+    proc = ColorProcessor(;scheme=leonardo)
+    @test grid2image(proc, output, simdata, init, 1) == [l08 l1
+                                                         l0 l05]
+    z0 = ARGB32(1, 0, 0)
     proc = ColorProcessor(scheme=leonardo, zerocolor=z0)
     @test grid2image(proc, output, simdata, init, 1) == [l08 l1
                                                          z0 l05]
+
+    font = "arial"
+    pixelsize = 20
+    timepos = pixelsize, pixelsize
+    textinit = zeros(200, 200)
+    face = findfont(font)
+    if face === nothing
+        font = "cantarell"
+        face = findfont(font)
+    end
+    refimage = ARGB32.(map(x -> ARGB32(1.0, 0.0, 0.0), textinit))
+    renderstring!(refimage, string(DateTime(2001)), face, pixelsize, timepos...;
+                  fcolor=ARGB32(RGB(1.0), 1.0), bcolor=ARGB32(RGB(0.0), 1.0)) 
+
+    proc = ColorProcessor(
+        zerocolor=(1.0,0.0,0.0), 
+        textconfig=TextConfig(; font=font, timepixels=pixelsize, namepixels=pixelsize) 
+    )
+    output = TestImageOutput((t=textinit,); processor=proc, store=true)
+
+    img = grid2image(proc, output, simdata, textinit, DateTime(2001))
+    @test img == refimage
 end
 
 @testset "SparseOptInspector" begin
@@ -132,7 +158,7 @@ end
             ]
     ruleset = Ruleset(;
         rules=(Life(),), 
-        init=init, 
+            init=init, 
         timestep=Day(1), 
         overflow=WrapOverflow(),
         opt=SparseOpt(),
@@ -147,7 +173,7 @@ end
 
     global images = []
     sim!(output, ruleset; tspan=(Date(2001, 1, 1), Date(2001, 1, 5)))
-    w, y, c = RGB24(1), RGB24(.5, .5, 0), RGB24(0., .5, .5) 
+    w, y, c = ARGB32(1), ARGB32(.5, .5, 0), ARGB32(0., .5, .5) 
     @test images[1] == [
              y y y y y y y
              y y y c w w w
@@ -159,11 +185,11 @@ end
 end
 
 @testset "LayoutProcessor" begin
-    z0 = RGB24(1, 0, 0)
+    z0 = ARGB32(1, 0, 0)
     grey = ColorProcessor(zerocolor=z0)
     leo = ColorProcessor(scheme=leonardo, zerocolor=z0)
     multiinit = (a = init, b = 2init)
-    proc = LayoutProcessor([:a, nothing, :b], (grey, leo))
+    proc = LayoutProcessor([:a, nothing, :b], (grey, leo), nothing)
     output = TestImageOutput(init; processor=proc, minval=(0, 0), maxval=(10, 20), store=true)
     @test minval(output) === (0, 0)
     @test maxval(output) === (10, 20)
@@ -172,13 +198,12 @@ end
 
     # Test image is joined from :a, nothing, :b
     @test grid2image(processor(output), output, Ruleset(), multiinit, 1) ==
-        [RGB24(0.8, 0.8, 0.8) RGB24(1.0, 1.0, 1.0)
-         RGB24(1.0, 0.0, 0.0) RGB24(0.5, 0.5, 0.5)
-         RGB24(0.0, 0.0, 0.0) RGB24(0.0, 0.0, 0.0)
-         RGB24(0.0, 0.0, 0.0) RGB24(0.0, 0.0, 0.0)
+        [ARGB32(0.8, 0.8, 0.8) ARGB32(1.0, 1.0, 1.0)
+         ARGB32(1.0, 0.0, 0.0) ARGB32(0.5, 0.5, 0.5)
+         ARGB32(0.0, 0.0, 0.0) ARGB32(0.0, 0.0, 0.0)
+         ARGB32(0.0, 0.0, 0.0) ARGB32(0.0, 0.0, 0.0)
          l08                  l1
          z0                   l05                 ]
-
 end
 
 @testset "ThreeColorProcessor" begin
@@ -196,5 +221,5 @@ end
 
     # Test image is combined from red and green overlays
     @test grid2image(processor(output), output, Ruleset(mask=mask), multiinit, 1) ==
-        [RGB24(0.1, 0.5, 0.0) RGB24(0.2, 0.5, 0.0) RGB24(0.0, 0.0, 1.0) RGB24(0.9, 0.9, 0.9) RGB24(0.8, 0.8, 0.8)]
+        [ARGB32(0.1, 0.5, 0.0) ARGB32(0.2, 0.5, 0.0) ARGB32(0.0, 0.0, 1.0) ARGB32(0.9, 0.9, 0.9) ARGB32(0.8, 0.8, 0.8)]
 end

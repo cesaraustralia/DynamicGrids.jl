@@ -16,6 +16,7 @@ using Colors,
       FieldDefaults,
       FieldMetadata,
       FieldDocTables,
+      FreeTypeAbstraction,
       FileIO,
       Mixers,
       OffsetArrays,
@@ -25,7 +26,6 @@ using Colors,
       UnicodeGraphics
 
 using Base: tail
-using Lazy: @forward
 
 import Base: show, getindex, setindex!, lastindex, size, length, push!, append!,
              broadcast, broadcast!, similar, eltype, iterate
@@ -57,6 +57,8 @@ export Output, GraphicOutput, ImageOutput, ArrayOutput, REPLOutput
 
 export GridProcessor, SingleGridProcessor, ColorProcessor, SparseOptInspector,
        MultiGridProcessor, ThreeColorProcessor, LayoutProcessor
+
+export TextConfig
 
 export Greyscale, Grayscale
 
