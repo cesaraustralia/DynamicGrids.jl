@@ -2,7 +2,7 @@
 const RulesetOrSimData = Union{Ruleset,AbstractSimData}
 
 """
-Graphic outputs that display the simulation grid(s) as RGB24 images.
+Graphic outputs that display the simulation grid(s) as RGB images.
 
 Although the majority of the code is maintained here to enable sharing
 and reuse, no `ImageOutput`s are provided in DynamicGrids.jl to avoid
@@ -80,16 +80,18 @@ const Grayscale = Greyscale
 
 
 """
-Grid processors convert a frame of the simulation into an RGB24 image for display.
+Grid processors convert a frame of the simulation into an RGB image for display.
 Frames may hold one or multiple grids.
 """
 abstract type GridProcessor end
+
+textconfig(::GridProcessor) = nothing
 
 """
     grid2image(o::ImageOutput, data::Union{Ruleset,SimData}, grid, t::Integer)
     grid2image(p::GridProcessor, minval, maxval, data::Union{Ruleset,SimData}, grids, t)
 
-Convert a grid or named tuple of grids to an RGB24 image, using a GridProcessor
+Convert a grid or named tuple of grids to an RGB image, using a GridProcessor
 
 [`GridProcessor`](@reg) is intentionally not dispatched with the output type in
 the methods that finally generate images, to reduce coupling.
@@ -110,17 +112,21 @@ used with a NamedTuple of grids.
 """
 abstract type SingleGridProcessor <: GridProcessor end
 
+allocimage(grid::AbstractArray) = allocimage(size(grid))
+allocimage(size::Tuple) = fill(ARGB32(0.0, 0.0, 0.0, 1.0), size)
+
 grid2image(p::SingleGridProcessor, minval, maxval,
            data::RulesetOrSimData, grids::NamedTuple, t) =
-    grid2image(p, minval, maxval, data, first(grids), t)
+grid2image(p, minval, maxval, data, first(grids), t, string(first(keys(grids))))
 grid2image(p::SingleGridProcessor, minval, maxval,
-           data::RulesetOrSimData, grid::AbstractArray, t) = begin
-    img = fill(RGB24(0), size(grid))
+           data::RulesetOrSimData, grid::AbstractArray, t, gridname=nothing) = begin
+    img = allocimage(grid)
     for j in 1:size(img, 2), i in 1:size(img, 1)
         @inbounds val = grid[i, j]
-        rgb = rgb24(cell2rgb(p, minval, maxval, data, val, i, j))
-        @inbounds img[i, j] = rgb
+        pixel = rgb(cell2rgb(p, minval, maxval, data, val, i, j))
+        @inbounds img[i, j] = pixel
     end
+    rendertext!(img, textconfig(p), gridname, t)
     img
 end
 
@@ -129,6 +135,43 @@ Processors that convert multiple grids to a single image.
 """
 abstract type MultiGridProcessor <: GridProcessor end
 
+struct TextConfig{F,NPi,NPo,TPi,TPo,FC,BC}
+    face::F
+    namepixels::NPi
+    namepos::NPo
+    timepixels::TPi
+    timepos::TPo
+    fcolor::FC
+    bcolor::BC
+end
+TextConfig(; font=nothing, namepixels=10, timepixels=10,
+           namepos=(timepixels + namepixels, timepixels),
+           timepos=(timepixels, timepixels),
+           fcolor=ARGB32(1.0), bcolor=ARGB32(RGB(0.0), 1.0),
+          ) = begin
+    face = FreeTypeAbstraction.findfont(font)
+    face isa Nothing && throw(ArgumentError("Font $font can not be found in this system"))
+    TextConfig(face, namepixels, namepos, timepixels, timepos, fcolor, bcolor)
+end
+
+rendertext!(img, config::TextConfig, name, t) = begin
+    rendername!(img, config::TextConfig, name)
+    rendertime!(img, config::TextConfig, t)
+end
+rendertext!(img, config::Nothing, name, t) = nothing
+
+rendername!(img, config::TextConfig, name) =
+    renderstring!(img, name, config.face, config.namepixels, config.namepos...;
+                  fcolor=config.fcolor, bcolor=config.bcolor)
+rendername!(img, config::Nothing, name) = nothing
+rendername!(img, config::TextConfig, name::Nothing) = nothing
+rendername!(img, config::Nothing, name::Nothing) = nothing
+
+rendertime!(img, config::TextConfig, t) =
+    renderstring!(img, string(t), config.face, config.timepixels, config.timepos...;
+                  fcolor=config.fcolor, bcolor=config.bcolor)
+rendertime!(img, config::Nothing, t) = nothing
+
 """"
     ColorProcessor(; scheme=Greyscale(), zerocolor=nothing, maskcolor=nothing)
 
@@ -136,28 +179,30 @@ Converts output grids to a colorsheme.
 
 ## Arguments / Keyword Arguments
 - `scheme`: a ColorSchemes.jl colorscheme.
-- `zerocolor`: an `RGB24` color to use when values are zero, or `nothing` to ignore.
-- `maskcolor`: an `RGB24` color to use when cells are masked, or `nothing` to ignore.
+- `zerocolor`: an `RGB` color to use when values are zero, or `nothing` to ignore.
+- `maskcolor`: an `RGB` color to use when cells are masked, or `nothing` to ignore.
 """
-@default_kw struct ColorProcessor{S,Z,M} <: SingleGridProcessor
-    scheme::S    | Greyscale()
-    zerocolor::Z | nothing
-    maskcolor::M | nothing
+@default_kw struct ColorProcessor{S,Z,M,TC} <: SingleGridProcessor
+    scheme::S      | Greyscale()
+    zerocolor::Z   | nothing
+    maskcolor::M   | nothing
+    textconfig::TC | nothing
 end
 
 scheme(processor::ColorProcessor) = processor.scheme
 zerocolor(processor::ColorProcessor) = processor.zerocolor
 maskcolor(processor::ColorProcessor) = processor.maskcolor
+textconfig(processor::ColorProcessor) = processor.textconfig
 
 @inline cell2rgb(p::ColorProcessor, minval, maxval, data::RulesetOrSimData, val, I...) =
     if !(maskcolor(p) isa Nothing) && ismasked(mask(data), I...)
-        rgb24(maskcolor(p))
+        rgb(maskcolor(p))
     else
         normval = normalise(val, minval, maxval)
         if !(zerocolor(p) isa Nothing) && normval == zero(normval)
-            rgb24(zerocolor(p))
+            rgb(zerocolor(p))
         else
-            rgb24(scheme(p), normval)
+            rgb(scheme(p), normval)
         end
     end
 
@@ -170,14 +215,14 @@ struct SparseOptInspector <: SingleGridProcessor end
     normedval = normalise(val, minval, maxval)
     if sourcestatus(first(data))[blockindex...]
         if normedval > 0
-            rgb24(normedval)
+            rgb(normedval)
         else
-            rgb24(0.0, 0.5, 0.5)
+            rgb(0.0, 0.5, 0.5)
         end
     elseif normedval > 0
-        rgb24(1.0, 0.0, 0.0) # This (a red cell) would mean there is a bug in SparseOpt
+        rgb(1.0, 0.0, 0.0) # This (a red cell) would mean there is a bug in SparseOpt
     else
-        rgb24(0.5, 0.5, 0.0)
+        rgb(0.5, 0.5, 0.0)
     end
 end
 
@@ -197,13 +242,14 @@ The final color sums are combined into a composite color image for display.
 
 ## Arguments / Keyword Arguments
 - `colors`: a tuple or `Red()`, `Green()`, `Blue()`, or `nothing` matching the number of grids.
-- `zerocolor`: an `RGB24` color to use when values are zero, or `nothing` to ignore.
-- `maskcolor`: an `RGB24` color to use when cells are masked, or `nothing` to ignore.
+- `zerocolor`: an `RGB` color to use when values are zero, or `nothing` to ignore.
+- `maskcolor`: an `RGB` color to use when cells are masked, or `nothing` to ignore.
 """
-@default_kw struct ThreeColorProcessor{C<:Tuple,Z,M} <: MultiGridProcessor
-    colors::C    | (Red(), Green(), Blue())
-    zerocolor::Z | nothing
-    maskcolor::M | nothing
+@default_kw struct ThreeColorProcessor{C<:Tuple,Z,M,TC} <: MultiGridProcessor
+    colors::C      | (Red(), Green(), Blue())
+    zerocolor::Z   | nothing
+    maskcolor::M   | nothing
+    textconfig::TC | nothing
 end
 
 colors(processor::ThreeColorProcessor) = processor.colors
@@ -212,7 +258,7 @@ maskcolor(processor::ThreeColorProcessor) = processor.maskcolor
 
 grid2image(p::ThreeColorProcessor, minval::Tuple, maxval::Tuple,
            data::RulesetOrSimData, grids::NamedTuple, t) = begin
-    img = fill(RGB24(0), size(first(grids)))
+    img = allocimage(first(grids))
     ncols, ngrids, nmin, nmax = map(length, (colors(p), grids, minval, maxval))
     if !(ngrids == ncols == nmin == nmax)
         ArgumentError(
@@ -222,15 +268,15 @@ grid2image(p::ThreeColorProcessor, minval::Tuple, maxval::Tuple,
     end
     for i in CartesianIndices(first(grids))
         img[i] = if !(maskcolor(p) isa Nothing) && ismasked(mask(data), i)
-            rgb24(maskcolor(p))
+            rgb(maskcolor(p))
         else
             xs = map(values(grids), minval, maxval) do g, mi, ma
                 normalise(g[i], mi, ma)
             end
             if !(zerocolor(p) isa Nothing) && all(map((x, c) -> c isa Nothing || x == zero(x), xs, colors(p)))
-                rgb24(zerocolor(p))
+                rgb(zerocolor(p))
             else
-                rgb24(combinebands(colors(p), xs))
+                rgb(combinebands(colors(p), xs))
             end
         end
     end
@@ -251,13 +297,18 @@ be run for each.
 - `processors`: tuple of SingleGridProcessor, one for each grid in the simulation.
   Can be `nothing` or any other value for grids not in layout.
 """
-@default_kw struct LayoutProcessor{L<:AbstractMatrix,P} <: MultiGridProcessor
-    layout::L     | throw(ArgumentError("must include an Array for the layout keyword"))
-    processors::P | throw(ArgumentError("include a tuple of processors for each grid"))
+@default_kw struct LayoutProcessor{L<:AbstractMatrix,P,TC} <: MultiGridProcessor
+    layout::L      | throw(ArgumentError("must include an Array for the layout keyword"))
+    processors::P  | throw(ArgumentError("include a tuple of processors for each grid"))
+    textconfig::TC | nothing
+    LayoutProcessor(layouts::L, processors::P, textconfig::TC) where {L,P,TC} = begin
+        processors = map(p -> (@set p.textconfig = textconfig), processors)
+        new{L,typeof(processors),TC}(layouts, processors, textconfig)
+    end
 end
 # Convenience constructor to convert Vector input to a column Matrix
-LayoutProcessor(layout::AbstractVector, processors) =
-    LayoutProcessor(reshape(layout, length(layout), 1), processors)
+LayoutProcessor(layout::AbstractVector, processors, textconfig) =
+    LayoutProcessor(reshape(layout, length(layout), 1), processors, textconfig)
 
 layout(p::LayoutProcessor) = p.layout
 processors(p::LayoutProcessor) = p.processors
@@ -273,7 +324,7 @@ grid2image(p::LayoutProcessor, minval::Tuple, maxval::Tuple,
 
     grid_ids = layout(p)
     sze = size(first(grids))
-    img = fill(RGB24(0), sze .* size(grid_ids))
+    img = allocimage(sze .* size(grid_ids))
     # Loop over the layout matrix
     for i in 1:size(grid_ids, 1), j in 1:size(grid_ids, 2)
         grid_id = grid_ids[i, j]
@@ -287,13 +338,14 @@ grid2image(p::LayoutProcessor, minval::Tuple, maxval::Tuple,
             grid_id
         end
         # Run processor for section
-        _sectionloop(processors(p)[n], img, minval[n], maxval[n], data, grids[n], t, i, j)
+        _sectionloop(processors(p)[n], img, minval[n], maxval[n], data, grids[n], i, j)
     end
     img
 end
 
-_sectionloop(processor::SingleGridProcessor, img, minval, maxval, data, grid, t, i, j) = begin
-    section = grid2image(processor, minval, maxval, data, grid, t)
+_sectionloop(processor::SingleGridProcessor, img, minval, maxval, data, grid, i, j) = begin
+    # We pass an empty string for time as we don't want to print it multiple times.
+    section = grid2image(processor, minval, maxval, data, grid, "")
     @assert eltype(section) == eltype(img)
     sze = size(section)
     # Copy section into image
@@ -333,7 +385,7 @@ normalise(x, minval::Number, maxval::Number) =
     max(min((x - minval) / (maxval - minval), oneunit(x)), zero(x))
 normalise(x, minval::Number, maxval::Nothing) =
     max((x - minval) / (oneunit(x) - minval), zero(x))
-normalise(x, minval::Nothing, maxval::Number) = 
+normalise(x, minval::Nothing, maxval::Number) =
     min(x / maxval, oneunit(x), oneunit(x))
 normalise(x, minval::Nothing, maxval::Nothing) = x
 
@@ -350,26 +402,26 @@ scale(x, min, ::Nothing) = x * (oneunit(min) - min) + min
 scale(x, ::Nothing, ::Nothing) = x
 
 """
-    rgb24(val)
+    rgb(val)
 
-Convert a number, tuple or color to an RGB24 value.
+Convert a number, tuple or color to an ARGB32 value.
 """
-rgb24(vals::Tuple) = RGB24(vals...)
-rgb24(vals...) = RGB24(vals...)
-rgb24(val::Number) = RGB24(val)
-rgb24(val::Color) = RGB24(val)
-rgb24(val::RGB24) = val
+rgb(vals::Tuple) = ARGB32(vals...)
+rgb(vals...) = ARGB32(vals...)
+rgb(val::Number) = ARGB32(RGB(val))
+rgb(val::Color) = ARGB32(val)
+rgb(val::ARGB32) = val
 """
-    rgb24(scheme, val)
+    rgb(scheme, val)
 
-Convert a color scheme and value to an RGB24 value.
+Convert a color scheme and value to an RGB value.
 """
-rgb24(scheme, val) = RGB24(get(scheme, val))
+rgb(scheme, val) = ARGB32(get(scheme, val))
 
 """
     combinebands(c::Tuple{Vararg{<:BandColor}, acc, xs)
 
-Assign values to color bands given in any order, and output as RGB24.
+Assign values to color bands given in any order, and output as RGB.
 """
 combinebands(colors, xs) = combinebands(colors, xs, (0.0, 0.0, 0.0))
 combinebands(c::Tuple{Red,Vararg}, xs, acc) =
@@ -380,4 +432,4 @@ combinebands(c::Tuple{Blue,Vararg}, xs, acc) =
     combinebands(tail(c), tail(xs), (acc[1], acc[2], acc[3] + xs[1]))
 combinebands(c::Tuple{Nothing,Vararg}, xs, acc) =
     combinebands(tail(c), tail(xs), acc)
-combinebands(c::Tuple{}, xs, acc) = RGB24(acc...)
+combinebands(c::Tuple{}, xs, acc) = rgb(acc...)
