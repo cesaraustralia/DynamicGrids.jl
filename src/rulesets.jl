@@ -48,6 +48,8 @@ cellsize(rs::AbstractRuleset) = rs.cellsize
 timestep(rs::AbstractRuleset) = rs.timestep
 ruleset(rs::AbstractRuleset) = rs
 
+Base.step(rs::AbstractRuleset) = timestep(rs)
+
 """
     Ruleset(rules...; init=nothing, mask=nothing, overflow=RemoveOverflow(), opt=SparseeOpt(), cellsize=1, timestep=1)
 

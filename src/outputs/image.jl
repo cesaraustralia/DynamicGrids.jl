@@ -53,7 +53,7 @@ maxval(o::ImageOutput) = o.maxval
 # Allow construcing a frame with the ruleset passed in instead of SimData
 showgrid(o::ImageOutput, f, t) = showgrid(o[f], o, Ruleset(), f, t)
 showgrid(grid, o::ImageOutput, data::RulesetOrSimData, f, t) =
-    showimage(grid2image(o, data, grid, f), o, data, f, t)
+    showimage(grid2image(o, data, grid, t), o, data, f, t)
 
 """
     showimage(image, output, f, t)
@@ -88,7 +88,7 @@ abstract type GridProcessor end
 textconfig(::GridProcessor) = nothing
 
 """
-    grid2image(o::ImageOutput, data::Union{Ruleset,SimData}, grid, t::Integer)
+    grid2image(o::ImageOutput, data::Union{Ruleset,SimData}, grid, t)
     grid2image(p::GridProcessor, minval, maxval, data::Union{Ruleset,SimData}, grids, t)
 
 Convert a grid or named tuple of grids to an RGB image, using a GridProcessor
@@ -99,7 +99,7 @@ But it they can be distpatched on together when required for custom outputs.
 """
 function grid2image end
 
-grid2image(o::ImageOutput, data::RulesetOrSimData, grids, t::Integer) =
+grid2image(o::ImageOutput, data::RulesetOrSimData, grids, t) =
     grid2image(processor(o), o, data, grids, t)
 grid2image(processor::GridProcessor, o::ImageOutput, data::RulesetOrSimData, grids, t) =
     grid2image(processor::GridProcessor, minval(o), maxval(o), data, grids, t)
@@ -135,6 +135,21 @@ Processors that convert multiple grids to a single image.
 """
 abstract type MultiGridProcessor <: GridProcessor end
 
+"""
+    TextConfig(; font::String, namepixels=14, timepixels=14,
+               namepos=(timepixels+namepixels, timepixels),
+               timepos=(timepixels, timepixels),
+               fcolor=ARGB32(1.0), bcolor=ARGB32(RGB(0.0), 1.0),)
+    TextConfig(face, namepixels, namepos, timepixels, timepos, fcolor, bcolor)
+
+Text configuration for printing timestep and grid name on the image.
+
+# Arguments
+
+`namepixels` and `timepixels` set the pixel size of the font. 
+`timepos` and `namepos` are tuples that set the label positions, in pixels.
+`fcolor` and `bcolor` are the foreground and background colors, as `ARGB32`.
+"""
 struct TextConfig{F,NPi,NPo,TPi,TPo,FC,BC}
     face::F
     namepixels::NPi
@@ -144,7 +159,7 @@ struct TextConfig{F,NPi,NPo,TPi,TPo,FC,BC}
     fcolor::FC
     bcolor::BC
 end
-TextConfig(; font=nothing, namepixels=10, timepixels=10,
+TextConfig(; font, namepixels=12, timepixels=12,
            namepos=(timepixels + namepixels, timepixels),
            timepos=(timepixels, timepixels),
            fcolor=ARGB32(1.0), bcolor=ARGB32(RGB(0.0), 1.0),
