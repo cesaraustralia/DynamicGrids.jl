@@ -7,13 +7,13 @@ using DynamicGrids: grid2image, @Image, @Graphic, @Output,
 using ColorSchemes: leonardo
 
 @testset "rgb" begin
-    @test rgb(0.5) === 
-    rgb(0.5, 0.5, 0.5) === 
-    rgb(0.5, 0.5, 0.5, 1.0) === 
-    rgb((0.5, 0.5, 0.5)) ===
-    rgb((0.5, 0.5, 0.5, 1.0)) ===
-    rgb(RGB(0.5, 0.5, 0.5)) === 
-    rgb(ARGB32(0.5, 0.5, 0.5)) === ARGB32(0.5, 0.5, 0.5, 1.0)
+    @test rgb(0.5) === ARGB32(0.5, 0.5, 0.5, 1.0)
+    @test rgb(0.5, 0.5, 0.5) === ARGB32(0.5, 0.5, 0.5, 1.0)
+    @test rgb(0.5, 0.5, 0.5, 1.0) === ARGB32(0.5, 0.5, 0.5, 1.0)
+    @test rgb((0.5, 0.5, 0.5)) === ARGB32(0.5, 0.5, 0.5, 1.0)
+    @test rgb((0.5, 0.5, 0.5, 1.0)) === ARGB32(0.5, 0.5, 0.5, 1.0)
+    @test rgb(RGB(0.5, 0.5, 0.5)) === ARGB32(0.5, 0.5, 0.5, 1.0)
+    @test rgb(ARGB32(0.5, 0.5, 0.5)) === ARGB32(0.5, 0.5, 0.5, 1.0)
 end
 
 @testset "normalise" begin
