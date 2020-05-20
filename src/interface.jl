@@ -41,9 +41,7 @@ The default action is to return the existing rule without change.
 function precalcrules end
 
 """
-neighbors(hood::Neighborhood, buffer)
-
-Returns an iteraterable over all cells in the neighborhood.
+Returns an iteraterable generator over all cells in the neighborhood.
 """
 function neighbors end
 

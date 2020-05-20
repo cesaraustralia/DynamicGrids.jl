@@ -11,24 +11,97 @@ Especially convenient with `do` notation.
 
 Set the cells of grid `:c` to the sum of `:a` and `:b`.
 ```julia
-rule = Map{Tuple{:a,:b},:c}() do a, b
-    a + b 
+simplerule = Map() do a, b
+    a + b
+end
+```
+
+If you need to use multiple grids (a and b), use the `read`
+and `write` arguments. If you want to use external variables,
+wrap the whole thing in a `let` block, for performance.
+
+```julia
+rule = let y = y
+    rule = Map(read=(a, b), write=b) do a, b
+        a + b * y 
+    end
 end
 ```
 """
-@description @flattenable struct Map{R,W,F} <: CellRule{R,W}
+@description @flattenable struct Cell{R,W,F} <: CellRule{R,W}
     # Field | Flatten | Description
-    f::F    | false   | "Function to apply to the target values"
+    f::F    | true    | "Function to apply to the read values"
 end
-Map(f; read=:_default_, write=read) = Map{read,write}(f)
+Cell(f; read=:_default_, write=read) = Cell{read,write}(f)
 
-@inline applyrule(rule::Map{R,W}, data::SimData, read, index) where {R<:Tuple,W} = begin
+@inline applyrule(rule::Cell, data::SimData, read, index) =
     let (rule, read) = (rule, read)
-        rule.f(read...)
+        rule.f(astuple(rule, read)...)
+    end
+const Map = Cell
+
+astuple(rule::Rule, read) = astuple(readkeys(rule), read)
+astuple(::Tuple, read) = read
+astuple(::Symbol, read) = (read,)
+
+"""
+Manu(f; read=:_default_, write=read, neighborhood=RadialNeighborhood()) 
+    Neighbors{R,W}(f)
+
+A [`NeighborhoodRule`](@ref) that receives a neighbors object
+for the first `read` grid and the passed in neighborhood, 
+followed by the cell values for the reqquired grids, as with
+`Cell`.
+
+Returned value(s) are written to the `write`/`W` grid.
+
+## Example
+
+```julia
+let x = 10
+    Manual{Tuple{:a,:b},:b}() do data, index, a, b
+        data[:b][index...] = a + b^x
     end
 end
-@inline applyrule(rule::Map{R,W}, data::SimData, read, index) where {R,W} = begin
-    let (rule, read) = (rule, read)
-        rule.f(read)
+```
+"""
+@description @flattenable struct Neighbors{R,W,F,N} <: NeighborhoodRule{R,W}
+    # Field         | Flatten | Description
+    f::F            | true    | "Function to apply to the neighborhood and read values"
+    neighborhood::N | true    | ""
+end
+Neighbors(f; read=:_default_, write=read, neighborhood=RadialNeighborhood()) = 
+    Neighbors{read,write}(f, neighborhood)
+
+@inline applyrule(rule::Neighbors, data::SimData, read, index) =
+    let hood=neighborhood(rule), rule=rule, read=astuple(rule, read)
+        rule.f(hood, read...)
+    end
+
+"""
+    Manual(f; read=:_default_, write=read) 
+    Manual{R,W}(f)
+
+A [`PartialRule`](@ref) to manually write to the array where you need to. 
+`f` is passed an indexable `data` object, and the index of the current cell, 
+followed by the requirement grid values for the index.
+
+## Example
+
+```julia
+let x = 10
+    Manual{Tuple{:a,:b},:b}() do data, index, a, b
+        data[:b][index...] = a + b^x
     end
 end
+```
+"""
+@description @flattenable struct Manual{R,W,F} <: PartialRule{R,W}
+    f::F    | true    | "Function to apply to the data, index and read values"
+end
+Manual(f; read=:_default_, write=read) = Manual{read,write}(f)
+
+@inline applyrule!(rule::Manual, data::SimData, read, index) =
+    let data=data, index=index, rule=rule, read=astuple(rule, read)
+        rule.f(hood, index, rule...)
+    end

@@ -38,12 +38,10 @@ $(FIELDDOCTABLE)
     s::S            | (2, 3)                  | true  | (0, 8)  | "Array, Tuple or Iterable of integers to match neighbors cell is full"
 end
 
-applyrule(rule::Life, data::SimData, state, index, buf) = begin
-    sum = sumneighbors(rule.neighborhood, buf, state)
+applyrule(rule::Life, data::SimData, state, index) =
     # Check if neighborhood sum matches rule for the current state
-    if sum in (rule.b, rule.s)[state+1]
+    if sum(neighborhood(rule)) in (rule.b, rule.s)[state+1]
         oneunit(state)
     else
         zero(state)
     end
-end

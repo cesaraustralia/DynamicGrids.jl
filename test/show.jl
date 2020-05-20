@@ -16,18 +16,18 @@ ruleset = Ruleset(;
 @test occursin(r"overflow = .*RemoveOverflow()", sprint(show, ruleset))
 @test occursin("timestep = 1 day", sprint(show, ruleset))
 
-rule1 = Map{:a,:b}() do a
+rule1 = Cell{:a,:b}() do a
     2a
 end
-@test occursin("Map{:a,:b}", sprint(show, rule1))
+@test occursin("Cell{:a,:b}", sprint(show, rule1))
 
-rule2 = Map{Tuple{:b,:d},:c}() do b, d
+rule2 = Cell{Tuple{:b,:d},:c}() do b, d
     b + d
 end
-@test occursin("Map{Tuple{:b,:d},:c}", sprint(show, rule2))
+@test occursin("Cell{Tuple{:b,:d},:c}", sprint(show, rule2))
 
 chain = Chain(rule1, rule2)
 
 @test occursin("Chain{Tuple{:a,:b,:d},Tuple{:b,:c}}", sprint(show, chain))
-@test occursin("    Map{:a,:b}", sprint(show, chain))
-@test occursin("    Map{Tuple{:b,:d},:c}", sprint(show, chain))
+@test occursin("    Cell{:a,:b}", sprint(show, chain))
+@test occursin("    Cell{Tuple{:b,:d},:c}", sprint(show, chain))

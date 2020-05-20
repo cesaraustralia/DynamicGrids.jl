@@ -37,7 +37,7 @@ end
 Base.show(io::IO, chain::Chain{R,W}) where {R,W} = begin
     indent = get(io, :indent, "")
     printstyled(io, indent, string("Chain{", sprint(show, R), ",", sprint(show, W), "} :"); color=:green)
-    for rule in val(chain)
+    for rule in rules(chain)
         println(io)
         print(IOContext(io, :indent => indent * "    "), rule)
     end

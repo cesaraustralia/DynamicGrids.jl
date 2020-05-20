@@ -87,24 +87,23 @@ applyrule(rule::Life, data, state, index, buffer)
 ```
 
 For each cell a neighborhood buffer will be populated containing the
-neighborhood cells, and passed to `applyrule` as the extra `buffer` argmuent.
+neighborhood cells, and passed to `applyrule` in the rule neighborhood.
 
 This allows memory optimisations and the use of BLAS routines on the
 neighborhood buffer for [`RadialNeighborhood`](@ref). It also means
-that and no bounds checking is required in neighborhood code, a major
-performance gain.
+that and no bounds checking is required in neighborhood code.
 
-`neighbors(buffer)` returns an iterator over the buffer that is generic to
+`neighbors(hood)` returns an iterator over the buffer that is generic to
 any neigborhood type - Custom shapes as well as square radial neighborhoods.
-
-`NeighborhoodRule` should read only from the state args and the neighborhood
-buffer array. The return value is written to the central cell for the next grid frame.
+A Neighborhood can also be used directly as an iterator..
 
 For neighborhood rules with multiple read grids, the first is the one
-given a neighborhood buffer.
+used for the neighborhood, the others are passed in as additional state 
+for the central cell.
 """
 abstract type NeighborhoodRule{R,W} <: Rule{R,W} end
 
+neighbors(rule::NeighborhoodRule) = neighbors(neighborhood(rule))
 neighborhood(rule::NeighborhoodRule) = rule.neighborhood
 neighborhoodkey(rule::NeighborhoodRule{R,W}) where {R,W} = R
 # The first argument is for the neighborhood grid
@@ -123,6 +122,7 @@ simular to [`NeighborhoodRule`](@ref) but for writing.
 """
 abstract type PartialNeighborhoodRule{R,W} <: PartialRule{R,W} end
 
+neighbors(rule::PartialNeighborhoodRule) = neighbors(neighborhood(rule))
 neighborhood(rule::PartialNeighborhoodRule) = rule.neighborhood
 neighborhoodkey(rule::PartialNeighborhoodRule{R,W}) where {R,W} = R
 neighborhoodkey(rule::PartialNeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1

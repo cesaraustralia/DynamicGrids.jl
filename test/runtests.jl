@@ -1,7 +1,7 @@
 using SafeTestsets
 
-@time @safetestset "rules" begin include("rules.jl") end
 @time @safetestset "chain" begin include("chain.jl") end
+@time @safetestset "rules" begin include("rules.jl") end
 @time @safetestset "neighborhoods" begin include("neighborhoods.jl") end
 @time @safetestset "simulationdata" begin include("simulationdata.jl") end
 @time @safetestset "utils" begin include("utils.jl") end

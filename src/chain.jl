@@ -6,7 +6,7 @@ together into a single function call, especially if you use `@inline` on all
 [`NeighborhoodRule`](@ref) followed by [CellRule`](@ref).
 """
 struct Chain{R,W,T<:Union{Tuple{},Tuple{Union{<:NeighborhoodRule,<:CellRule},Vararg{<:CellRule}}}} <: Rule{R,W}
-    val::T
+    rules::T
 end
 Chain(args...) = begin
     rkeys = Tuple{union(map(k -> asiterable(readkeys(k)), args)...)...}
@@ -14,17 +14,19 @@ Chain(args...) = begin
     Chain{rkeys,wkeys,typeof(args)}(args)
 end
 
-val(chain::Chain) = chain.val
+rules(chain::Chain) = chain.rules
 # Only the first rule in a chain can have a radius larger than zero.
 radius(chain::Chain) = radius(chain[1])
 neighborhoodkey(chain::Chain) = neighborhoodkey(chain[1])
+neighborhood(chain::Chain) = neighborhood(chain[1])
 
 Base.tail(chain::Chain{R,W}) where {R,W} = begin
-    ch = tail(val(chain))
+    ch = tail(rules(chain))
     Chain{R,W,typeof(ch)}(ch)
 end
-Base.getindex(chain::Chain, I...) = getindex(val(chain), I...)
-Base.length(chain::Chain) = length(val(chain))
+Base.getindex(chain::Chain, I...) = getindex(rules(chain), I...)
+Base.iterate(chain::Chain) = iterate(rules(chain))
+Base.length(chain::Chain) = length(rules(chain))
 
 """
     applyrule(rules::Chain, data, state, (i, j))

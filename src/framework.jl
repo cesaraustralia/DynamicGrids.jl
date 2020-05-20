@@ -49,6 +49,17 @@ sim!(output::Output, ruleset::Ruleset;
     # Run the simulation
     runsim!(output, simdata, 1:lastindex(tspan))
 end
+"""
+    sim!(output, rules...; init, kwargs...)
+
+Shorthand for running a rule without defining a `Ruleset`.
+
+You must pass in the `init` `Array` of `NamedTuple`, and if the `tspan` is not 
+simply a `Tuple` or `AbstractRange` of `Int`, it must be passed in as a range 
+in order to know the timestep.
+"""
+sim!(output::Output, rules::Rule...; init, tspan, kwargs...) =
+    sim!(output, Ruleset(rules...; timestep=step(tspan)), init=init, tspan=tspan, kwargs...)
 
 # Allows attaching an init array to the ruleset, but also passing in an
 # alternate array as a keyword arg (which will take preference).
@@ -159,6 +170,6 @@ precalcrules(rules::Tuple, simdata) =
     (precalcrules(rules[1], simdata), precalcrules(tail(rules), simdata)...)
 precalcrules(rules::Tuple{}, simdata) = ()
 precalcrules(chain::Chain{R,W}, simdata) where {R,W} = begin
-    ch = precalcrules(val(chain), simdata)
+    ch = precalcrules(rules(chain), simdata)
     Chain{R,W,typeof(ch)}(ch)
 end

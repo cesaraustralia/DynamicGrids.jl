@@ -1,50 +1,58 @@
 using DynamicGrids, Setfield, Test
 import DynamicGrids: neighbors, sumneighbors, SimData, radius, neighbors,
-       mapsetneighbor!, neighborhood, WritableGridData, dest, hoodsize, neighborhoodkey
+       mapsetneighbor!, neighborhood, WritableGridData, dest, hoodsize, neighborhoodkey,
+       allocbuffer, allocbuffers
 
+@testset "allocbuffers" begin
+    @test allocbuffer(Bool[1 0], 1) == Bool[0 0 0
+                                            0 0 0
+                                            0 0 0]
+    @test allocbuffer(Int[1 0], 2) == [0 0 0 0 0
+                                       0 0 0 0 0
+                                       0 0 0 0 0
+                                       0 0 0 0 0
+                                       0 0 0 0 0]
+    @test allocbuffer([1.0, 2.0], RadialNeighborhood{4}()) == zeros(Float64, 9, 9)
+    @test allocbuffers(Bool[1 0], 2) == Tuple(zeros(Bool, 5, 5) for i in 1:4)
+    @test allocbuffers([1 0], RadialNeighborhood{3}()) == Tuple(zeros(Int, 7, 7) for i in 1:6)
+end
 
 @testset "neighbors" begin
-    init = [0 0 0 1 1 1;
-            1 0 1 1 0 1;
-            0 1 1 1 1 1;
-            0 1 0 0 1 0;
-            0 0 0 0 1 1;
+    init = [0 0 0 1 1 1
+            1 0 1 1 0 1
+            0 1 1 1 1 1
+            0 1 0 0 1 0
+            0 0 0 0 1 1
             0 1 0 1 1 0]
 
-    moore = RadialNeighborhood{1}()
-    buf = init[1:3, 1:3]
+    moore = RadialNeighborhood{1}(init[1:3, 1:3])
 
-    @test hoodsize(moore) == 3 
-    @test neighbors(moore, buf) isa Base.Generator
-    @test collect(neighbors(moore, buf)) == [0, 1, 0, 0, 1, 0, 1, 1]
-    @test sum(neighbors(moore, buf)) == 4
+    @test hoodsize(moore) == 3
+    @test neighbors(moore) isa Base.Generator
+    @test collect(neighbors(moore)) == [0, 1, 0, 0, 1, 0, 1, 1]
+    @test sum(neighbors(moore)) == 4
 
     vonneumann = VonNeumannNeighborhood()
-    @test hoodsize(vonneumann) == 3 
+    @test hoodsize(vonneumann) == 3
     t = 1
 
     buf = [0 0 0
            0 1 0
            0 0 0]
-    state = buf[2, 2]
-    @test sumneighbors(moore, buf, state) == sum(neighbors(moore, buf)) == 0
-    @test sumneighbors(vonneumann, buf, state) == 0
+    @test sum(RadialNeighborhood{1}(buf)) == 0
+    @test sum(VonNeumannNeighborhood(buf)) == 0
 
     buf = [1 1 1
            1 0 1
            1 1 1]
-    state = buf[2, 2]
-    collect(neighbors(moore, buf))
-    @test sumneighbors(moore, buf, state) == sum(neighbors(moore, buf)) == 8
-    @test sumneighbors(vonneumann, buf, state) == 4
+    @test sum(RadialNeighborhood{1}(buf)) == 8
+    @test sum(VonNeumannNeighborhood(buf)) == 4
 
     buf = [1 1 1
            0 0 1
            0 0 1]
-    state = buf[2, 2]
-    @test sumneighbors(moore, buf, state) == sum(neighbors(moore, buf)) == 5
-    @test sumneighbors(vonneumann, buf, state) == 2
-
+    @test sum(RadialNeighborhood{1}(buf)) == 5
+    @test sum(VonNeumannNeighborhood(buf)) == 2
 
     buf = [0 1 0 0 1
            0 0 1 0 0
@@ -52,35 +60,35 @@ import DynamicGrids: neighbors, sumneighbors, SimData, radius, neighbors,
            0 0 1 0 1
            1 0 1 0 1]
     state = buf[3, 3]
-    custom1 = CustomNeighborhood(((-1,-1), (2,-2), (2,2), (-1,2), (0,0)))
-    custom2 = CustomNeighborhood(((-1,-1), (0,-1), (1,-1), (2,-1), (0,0)))
-    layered = LayeredCustomNeighborhood((CustomNeighborhood((-1,1), (-2,2)), 
-                                         CustomNeighborhood((1,2), (2,2))))
+    custom1 = CustomNeighborhood(((-1,-1), (2,-2), (2,2), (-1,2), (0,0)), buf)
+    custom2 = CustomNeighborhood(((-1,-1), (0,-1), (1,-1), (2,-1), (0,0)), buf)
+    layered = LayeredCustomNeighborhood(
+        (CustomNeighborhood((-1,1), (-2,2)), CustomNeighborhood((1,2), (2,2))), buf)
 
-    @test neighbors(custom1, buf) isa Base.Generator
-    @test collect(neighbors(custom1, buf)) == [0, 1, 1, 0, 0]
+    @test neighbors(custom1) isa Base.Generator
+    @test collect(neighbors(custom1)) == [0, 1, 1, 0, 0]
 
-    @test sumneighbors(custom1, buf, state) == sum(neighbors(custom1, buf)) == 2
-    @test sumneighbors(custom2, buf, state) == sum(neighbors(custom2, buf)) == 0
-    @test sumneighbors(layered, buf, state) == sum.(neighbors(layered, buf)) == (1, 2)
+    @test sum(custom1) == 2
+    @test sum(custom2) == 0
+    @test sum(layered) == (1, 2)
 
     @testset "neighbors works on rule" begin
-        @test sum(neighbors(Life(), [0 1 1; 0 0 0; 1 1 1])) == 5
-        @test sumneighbors(Life(), [0 1 1; 0 0 0; 1 1 1], 0) == 5
+        rule = Life(;neighborhood=RadialNeighborhood{1}([0 1 1; 0 0 0; 1 1 1]))
+        @test sum(neighbors(rule)) == 5
     end
 end
 
 struct TestNeighborhoodRule{R,W,N} <: NeighborhoodRule{R,W}
     neighborhood::N
 end
-DynamicGrids.applyrule(rule::TestNeighborhoodRule, data, state, index, buffer) = 
+DynamicGrids.applyrule(rule::TestNeighborhoodRule, data, state, index, buffer) =
     state
 
 struct TestPartialNeighborhoodRule{R,W,N} <: PartialNeighborhoodRule{R,W}
     neighborhood::N
 end
 DynamicGrids.applyrule!(rule::TestPartialNeighborhoodRule{R,Tuple{W1,}}, data, state, index
-                       ) where {R,W1} = 
+                       ) where {R,W1} =
     data[W1][index...] = state[1]
 
 
@@ -140,7 +148,7 @@ end
     simdata = SimData(init, ruleset, 1)
     state = 5
     index = (3, 3)
-    @test mapsetneighbor!(WritableGridData(first(simdata)), hood, rule, state, index) == 40 
+    @test mapsetneighbor!(WritableGridData(first(simdata)), hood, rule, state, index) == 40
     @test dest(first(simdata)) ==
         [0 1 2 3 4 5
          0 6 7 8 4 5
@@ -166,7 +174,8 @@ end
 
 
     hood = LayeredCustomNeighborhood(
-        (CustomNeighborhood(((-1, -1), (1, 1))), CustomNeighborhood(((-2, -2), (2, 2))))
+        (CustomNeighborhood(((-1, -1), (1, 1))), CustomNeighborhood(((-2, -2), (2, 2)))),
+        nothing,
     )
     rule = TestPartialNeighborhoodRule{:a,:a}(hood)
     @test radius(rule) === 2
@@ -186,11 +195,13 @@ end
 
 @testset "construction" begin
     hood = CustomNeighborhood(((-1, -1), (1, 1)))
-    @set! hood.coords = ((-5, -5), (5, 5)) 
+    @set! hood.coords = ((-5, -5), (5, 5))
     @test hood.coords == ((-5, -5), (5, 5))
 
-    hood = LayeredCustomNeighborhood((CustomNeighborhood(((-1, -1), (1, 1))), 
-                                      CustomNeighborhood(((-2, -2), (2, 2)))))
-    @set! hood.layers = (CustomNeighborhood(((-3, -3), (3, 3))),) 
-    @test hood.layers == (CustomNeighborhood(((-3, -3), (3, 3))),) 
+    hood = LayeredCustomNeighborhood(
+        (CustomNeighborhood(((-1, -1), (1, 1))), CustomNeighborhood(((-2, -2), (2, 2)))),
+        nothing,
+    )
+    @set! hood.layers = (CustomNeighborhood(((-3, -3), (3, 3))),)
+    @test hood.layers == (CustomNeighborhood(((-3, -3), (3, 3))),)
 end

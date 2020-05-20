@@ -37,11 +37,11 @@ import FieldMetadata: @description, description,
 
 
 
-export sim!, resume!, replay, savegif, isinferred
+export sim!, resume!, replay, savegif, isinferred, neighbors
 
 export Rule, NeighborhoodRule, CellRule, PartialRule, PartialNeighborhoodRule
 
-export Chain, Map, Life
+export Chain, Cell, Neighbors, Manual, Map, Life
 
 export AbstractRuleset, Ruleset
 
@@ -80,6 +80,7 @@ include("rules.jl")
 include("rulesets.jl")
 include("simulationdata.jl")
 include("chain.jl")
+include("neighborhoods.jl")
 include("outputs/output.jl")
 include("outputs/graphic.jl")
 include("outputs/image.jl")
@@ -89,7 +90,6 @@ include("interface.jl")
 include("framework.jl")
 include("sequencerules.jl")
 include("maprules.jl")
-include("neighborhoods.jl")
 include("utils.jl")
 include("map.jl")
 include("life.jl")

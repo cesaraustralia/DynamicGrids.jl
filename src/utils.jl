@@ -72,14 +72,21 @@ isinferred(simdata::SimData, rule::Rule, init::AbstractArray) = begin
         error("Returned type `$(typeof(x))` doesn't match grid eltype `$(eltype(init))`")
     true
 end
-isinferred(simdata::SimData, rule::NeighborhoodRule, init::AbstractArray) = begin
-    buffer = first(buffers(simdata[neighborhoodkey(rule)]))
-    x = @inferred applyrule(rule, simdata, init[1, 1], (1, 1), buffer)
-    typeof(x) == eltype(init) ||
-        error("Returned type `$(typeof(x))` doesn't match grid eltype `$(eltype(init))`")
-    true
-end
 isinferred(simdata::SimData, rule::PartialRule, init::AbstractArray) = begin
     @inferred applyrule!(rule, simdata, init[1, 1], (1, 1))
     true
 end
+
+"""
+    allocbuffers(init::AbstractArray, hood::Neighborhood)
+    allocbuffers(init::AbstractArray, radius::Int)
+
+Allocate buffers for the Neighborhood. The `init` array should 
+be of the same type as the grid the neighborhood runs on.
+"""
+allocbuffers(init::AbstractArray, hood::Neighborhood) = allocbuffers(init, radius(hood))
+allocbuffers(init::AbstractArray, r::Int) = Tuple(allocbuffer(init, r) for i in 1:2r)
+
+allocbuffer(init::AbstractArray, hood::Neighborhood) = allocbuffer(init, radius(hood))
+allocbuffer(init::AbstractArray, r::Int) = zeros(eltype(init), 2r+1, 2r+1)
+

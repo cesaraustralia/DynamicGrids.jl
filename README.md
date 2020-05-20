@@ -162,41 +162,31 @@ This example implements a very simple forest fire model:
 ```julia
 using DynamicGrids, DynamicGridsGtk, ColorSchemes, Colors
 
-const DEAD = 1
-const ALIVE = 2
-const BURNING = 3
+const DEAD, ALIVE, BURNING = 1, 2, 3
 
-# Define the Rule struct
-struct ForestFire{R,W,N,PC,PR} <: NeighborhoodRule{R,W}
-    neighborhood::N
-    prob_combustion::PC
-    prob_regrowth::PR
-end
-ForestFire(; grid=:_default_, neighborhood=RadialNeighborhood{1}(), prob_combustion=0.0001, prob_regrowth=0.01) =
-    ForestFire{grid,grid}(neighborhood, prob_combustion, prob_regrowth)
-
-# Define an `applyrule` method to be broadcasted over the grid for the `ForestFire` rule
-@inline DynamicGrids.applyrule(rule::ForestFire, data, state::Integer, index, hoodbuffer) =
-    if state == ALIVE
-        if BURNING in DynamicGrids.neighbors(rule, hoodbuffer)
-            BURNING
+rule = let prob_combustion=0.0001, prob_regrowth=0.01
+    Neighbors(RadialNeighborhood{1}()) do neighborhood, cell
+        if cell == ALIVE
+            if BURNING in neighborhood
+                BURNING
+            else
+                rand() <= prob_combustion ? BURNING : ALIVE
+            end
+        elseif cell in BURNING
+            DEAD
         else
-            rand() <= rule.prob_combustion ? BURNING : ALIVE
+            rand() <= prob_regrowth ? ALIVE : DEAD
         end
-    elseif state in BURNING
-        DEAD
-    else
-        rand() <= rule.prob_regrowth ? ALIVE : DEAD
     end
+end
 
 # Set up the init array, ruleset and output (using a Gtk window)
 init = fill(ALIVE, 400, 400)
-ruleset = Ruleset(ForestFire(); init=init)
 processor = ColorProcessor(scheme=ColorSchemes.rainbow, zerocolor=RGB24(0.0))
 output = GtkOutput(init; fps=25, minval=DEAD, maxval=BURNING, processor=processor)
 
 # Run the simulation
-sim!(output, ruleset; tspan=(1, 200))
+sim!(output, rule; init=init, tspan=(1, 200))
 
 # Save the output as a gif
 savegif("forestfire.gif", output)
@@ -229,6 +219,21 @@ output = ArrayOutput(init, 200)
 # values used in the simulation:
 
 savegif("forestfire.gif", output; minval=DEAD, maxval=BURNING, processor=processor)
+```
+
+We can also tweak the parameters while the simulation runs in atom:
+
+```julia
+using DynamicGridsInteract, FieldMetadata
+import FieldMetadata: @bounds, bounds, @description, description
+
+@bounds @description :($(typeof(rule.f)) begin
+  prob_combustion | (0.0, 0.01) | "Probability the cell will spontaneously combust"
+  prob_regrowth   | (0.0, 0.1)  | "Probability the cell will grow back"
+end
+
+output = InteractOutput(init, rule; fps=25, minval=DEAD, maxval=BURNING, processor=processor)
+display(output)
 ```
 
 
