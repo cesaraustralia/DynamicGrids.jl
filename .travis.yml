@@ -5,6 +5,11 @@ os:
   - osx
   - windows
 
+addons:
+  apt:
+    sources:
+    - fonts-cantarell
+
 julia:
   - 1.2
   - 1.4
