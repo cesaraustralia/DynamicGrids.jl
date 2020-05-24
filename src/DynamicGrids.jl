@@ -31,7 +31,7 @@ import Base: show, getindex, setindex!, lastindex, size, length, push!, append!,
              broadcast, broadcast!, similar, eltype, iterate
 
 import FieldMetadata: @description, description, 
-                      @limits, limits,
+                      @bounds, bounds,
                       @flattenable, flattenable,
                       @default, default
 
@@ -65,8 +65,8 @@ export Greyscale, Grayscale
 export CharStyle, Block, Braile
 
 
-const FIELDDOCTABLE = FieldDocTable((:Description, :Default, :Limits),
-                                    (description, default, limits);
+const FIELDDOCTABLE = FieldDocTable((:Description, :Default, :Bounds),
+                                    (description, default, bounds);
                                     truncation=(100,40,100))
 
 # Documentation templates

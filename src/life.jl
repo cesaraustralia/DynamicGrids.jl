@@ -32,7 +32,7 @@ sim!(output, Ruleset(Life(b=(1,3,5,7), s=(1,3,5,7))), init; tspan=(1, 1000))
 
 $(FIELDDOCTABLE)
 """
-@description @limits @flattenable @default struct Life{R,W,N,B,S} <: NeighborhoodRule{R,W}
+@default @flattenable @bounds @description struct Life{R,W,N,B,S} <: NeighborhoodRule{R,W}
     neighborhood::N | RadialNeighborhood{1}() | false | nothing | "Any Neighborhood"
     b::B            | (3, 3)                  | true  | (0, 8)  | "Array, Tuple or Iterable of integers to match neighbors when cell is empty"
     s::S            | (2, 3)                  | true  | (0, 8)  | "Array, Tuple or Iterable of integers to match neighbors cell is full"
