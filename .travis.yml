@@ -11,7 +11,6 @@ addons:
     - fonts-cantarell
 
 julia:
-  - 1.2
   - 1.4
   - nightly
 
