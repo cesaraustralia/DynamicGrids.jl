@@ -73,6 +73,7 @@ isinferred(simdata::SimData, rule::Rule, init::AbstractArray) = begin
     true
 end
 isinferred(simdata::SimData, rule::PartialRule, init::AbstractArray) = begin
+    simdata = @set simdata.data = map(WritableGridData, simdata.data)
     @inferred applyrule!(rule, simdata, init[1, 1], (1, 1))
     true
 end

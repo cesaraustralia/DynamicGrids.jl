@@ -119,14 +119,14 @@ grid2image(p::SingleGridProcessor, minval, maxval,
            data::RulesetOrSimData, grids::NamedTuple, t) =
 grid2image(p, minval, maxval, data, first(grids), t, string(first(keys(grids))))
 grid2image(p::SingleGridProcessor, minval, maxval,
-           data::RulesetOrSimData, grid::AbstractArray, t, gridname=nothing) = begin
+           data::RulesetOrSimData, grid::AbstractArray, t, name=nothing) = begin
     img = allocimage(grid)
     for j in 1:size(img, 2), i in 1:size(img, 1)
         @inbounds val = grid[i, j]
         pixel = rgb(cell2rgb(p, minval, maxval, data, val, i, j))
         @inbounds img[i, j] = pixel
     end
-    rendertext!(img, textconfig(p), gridname, t)
+    rendertext!(img, textconfig(p), name, t)
     img
 end
 
@@ -160,7 +160,7 @@ struct TextConfig{F,NPi,NPo,TPi,TPo,FC,BC}
     bcolor::BC
 end
 TextConfig(; font, namepixels=12, timepixels=12,
-           namepos=(timepixels + namepixels, timepixels),
+           namepos=(2timepixels + namepixels, timepixels),
            timepos=(timepixels, timepixels),
            fcolor=ARGB32(1.0), bcolor=ARGB32(RGB(0.0), 1.0),
           ) = begin
@@ -178,14 +178,16 @@ rendertext!(img, config::Nothing, name, t) = nothing
 rendername!(img, config::TextConfig, name) =
     renderstring!(img, name, config.face, config.namepixels, config.namepos...;
                   fcolor=config.fcolor, bcolor=config.bcolor)
-rendername!(img, config::Nothing, name) = nothing
 rendername!(img, config::TextConfig, name::Nothing) = nothing
+rendername!(img, config::Nothing, name) = nothing
 rendername!(img, config::Nothing, name::Nothing) = nothing
 
 rendertime!(img, config::TextConfig, t) =
     renderstring!(img, string(t), config.face, config.timepixels, config.timepos...;
                   fcolor=config.fcolor, bcolor=config.bcolor)
 rendertime!(img, config::Nothing, t) = nothing
+rendertime!(img, config::TextConfig, t::Nothing) = nothing
+rendertime!(img, config::Nothing, t::Nothing) = nothing
 
 """"
     ColorProcessor(; scheme=Greyscale(), zerocolor=nothing, maskcolor=nothing)
@@ -299,8 +301,7 @@ grid2image(p::ThreeColorProcessor, minval::Tuple, maxval::Tuple,
 end
 
 """
-LayoutProcessor(layout::Array, processors)
-    LayoutProcessor(reshape(layout, length(layout), 1), processors)
+    LayoutProcessor(layout::Array, processors)
 
 LayoutProcessor allows displaying multiple grids in a block layout,
 by specifying a layout matrix and a list of SingleGridProcessors to
@@ -311,6 +312,7 @@ be run for each.
   display them. `nothing`, `missing` or `0` values will be skipped.
 - `processors`: tuple of SingleGridProcessor, one for each grid in the simulation.
   Can be `nothing` or any other value for grids not in layout.
+- `textconfig` : [`TextConfig`] object for printing time and grid name labels.
 """
 @default_kw struct LayoutProcessor{L<:AbstractMatrix,P,TC} <: MultiGridProcessor
     layout::L      | throw(ArgumentError("must include an Array for the layout keyword"))
@@ -327,6 +329,7 @@ LayoutProcessor(layout::AbstractVector, processors, textconfig) =
 
 layout(p::LayoutProcessor) = p.layout
 processors(p::LayoutProcessor) = p.processors
+textconfig(p::LayoutProcessor) = p.textconfig
 
 grid2image(p::LayoutProcessor, minval::Tuple, maxval::Tuple,
            data::RulesetOrSimData, grids::NamedTuple, t) = begin
@@ -353,14 +356,17 @@ grid2image(p::LayoutProcessor, minval::Tuple, maxval::Tuple,
             grid_id
         end
         # Run processor for section
-        _sectionloop(processors(p)[n], img, minval[n], maxval[n], data, grids[n], i, j)
+        key = keys(grids)[n]
+        _sectionloop(processors(p)[n], img, minval[n], maxval[n], data, grids[n], key, i, j)
     end
+    println((textconfig(p), t))
+    rendertime!(img, textconfig(p), t)
     img
 end
 
-_sectionloop(processor::SingleGridProcessor, img, minval, maxval, data, grid, i, j) = begin
+_sectionloop(processor::SingleGridProcessor, img, minval, maxval, data, grid, key, i, j) = begin
     # We pass an empty string for time as we don't want to print it multiple times.
-    section = grid2image(processor, minval, maxval, data, grid, "")
+    section = grid2image(processor, minval, maxval, data, grid, nothing, string(key))
     @assert eltype(section) == eltype(img)
     sze = size(section)
     # Copy section into image

@@ -141,7 +141,7 @@ getbuffers(hood::Neighborhood, init) = getbuffers(hood, hood.buffer, init)
 getbuffers(hood::Neighborhood, buffers, init) = 
     map(b -> (@set hood.buffer = b), allocbuffers(init, hood))
 getbuffers(hood::Neighborhood, buffers::Tuple, init) = 
-    map(b -> (@set hood.buffers = b), buffers)
+    map(b -> (@set hood.buffer = b), buffers)
 
 setbuffers(chain::Chain, buffers::Tuple) = begin
     rule = chain[1]

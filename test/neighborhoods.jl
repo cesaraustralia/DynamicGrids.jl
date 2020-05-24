@@ -1,7 +1,7 @@
 using DynamicGrids, Setfield, Test
 import DynamicGrids: neighbors, sumneighbors, SimData, radius, neighbors,
        mapsetneighbor!, neighborhood, WritableGridData, dest, hoodsize, neighborhoodkey,
-       allocbuffer, allocbuffers
+       allocbuffer, allocbuffers, buffer
 
 @testset "allocbuffers" begin
     @test allocbuffer(Bool[1 0], 1) == Bool[0 0 0
@@ -27,14 +27,26 @@ end
 
     moore = RadialNeighborhood{1}(init[1:3, 1:3])
 
+    @test buffer(moore) == init[1:3, 1:3]
+    multibuffer = RadialNeighborhood{1}((zeros(Int, 3, 3), ones(Int, 3, 4)))
+    @test buffer(multibuffer) == zeros(Int, 3, 3)
     @test hoodsize(moore) == 3
+    @test moore[2, 2] == 0
+    @test length(moore) == 8
+    @test eltype(moore) == Int
     @test neighbors(moore) isa Base.Generator
     @test collect(neighbors(moore)) == [0, 1, 0, 0, 1, 0, 1, 1]
     @test sum(neighbors(moore)) == 4
 
-    vonneumann = VonNeumannNeighborhood()
+    vonneumann = VonNeumannNeighborhood(init[1:3, 1:3])
+    @test buffer(vonneumann) == init[1:3, 1:3]
     @test hoodsize(vonneumann) == 3
-    t = 1
+    @test vonneumann[2, 1] == 1
+    @test length(vonneumann) == 4
+    @test eltype(vonneumann) == Int
+    @test neighbors(vonneumann) isa Base.Generator
+    @test collect(neighbors(vonneumann)) == [1, 0, 1, 1]
+    @test sum(neighbors(vonneumann)) == 3
 
     buf = [0 0 0
            0 1 0
@@ -93,10 +105,11 @@ DynamicGrids.applyrule!(rule::TestPartialNeighborhoodRule{R,Tuple{W1,}}, data, s
 
 
 
-@testset "neighborhood" begin
+@testset "neighborhood rules" begin
     ruleA = TestPartialNeighborhoodRule{:a,:a}(RadialNeighborhood{3}())
     ruleB = TestPartialNeighborhoodRule{Tuple{:b},Tuple{:b}}(RadialNeighborhood{2}())
     ruleset = Ruleset(ruleA, ruleB)
+    @test neighbors(ruleA) isa Base.Generator
     @test neighborhood(ruleA) == RadialNeighborhood{3}()
     @test neighborhood(ruleB) == RadialNeighborhood{2}()
     @test neighborhoodkey(ruleA) == :a
@@ -105,6 +118,7 @@ DynamicGrids.applyrule!(rule::TestPartialNeighborhoodRule{R,Tuple{W1,}}, data, s
     ruleA = TestNeighborhoodRule{:a,:a}(RadialNeighborhood{3}())
     ruleB = TestNeighborhoodRule{Tuple{:b},Tuple{:b}}(RadialNeighborhood{2}())
     ruleset = Ruleset(ruleA, ruleB)
+    @test neighbors(ruleA) isa Base.Generator
     @test neighborhood(ruleA) == RadialNeighborhood{3}()
     @test neighborhood(ruleB) == RadialNeighborhood{2}()
     @test neighborhoodkey(ruleA) == :a

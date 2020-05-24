@@ -58,8 +58,17 @@ You must pass in the `init` `Array` of `NamedTuple`, and if the `tspan` is not
 simply a `Tuple` or `AbstractRange` of `Int`, it must be passed in as a range 
 in order to know the timestep.
 """
-sim!(output::Output, rules::Rule...; init, tspan, kwargs...) =
-    sim!(output, Ruleset(rules...; timestep=step(tspan)), init=init, tspan=tspan, kwargs...)
+sim!(output::Output, rules::Rule...; init, tspan, 
+     overflow=RemoveOverflow(), 
+     opt=SparseeOpt(), 
+     mask=nothing,
+     cellsize=1,
+     kwargs...) = begin
+    ruleset = Ruleset(rules...; 
+        timestep=step(tspan), mask=mask, cellsize=cellsize, opt=opt, overflow=overflow,
+    )
+    sim!(output, ruleset; init=init, tspan=tspan, kwargs...)
+end
 
 # Allows attaching an init array to the ruleset, but also passing in an
 # alternate array as a keyword arg (which will take preference).

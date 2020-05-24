@@ -59,6 +59,7 @@ tstart = DateTime(2001)
     @test firstindex(grida) == 1
     @test lastindex(grida) == 20
     @test size(grida) == (4, 5)
+    @test axes(grida) == (0:3, 0:4)
     @test ndims(grida) == 2
     @test eltype(grida) == Int
     @test ismasked(grida, 1, 1) == false

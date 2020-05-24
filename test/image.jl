@@ -124,27 +124,27 @@ end
     @test grid2image(proc, output, simdata, init, 1) == [l08 l1
                                                          z0 l05]
 
-    font = "arial"
-    pixelsize = 20
-    timepos = pixelsize, pixelsize
-    textinit = zeros(200, 200)
-    face = findfont(font)
-    if face === nothing
-        font = "cantarell"
+    @testset "text captions" begin
+        font = "arial"
+        pixelsize = 20
+        timepos = pixelsize, pixelsize
+        textinit = zeros(200, 200)
         face = findfont(font)
-    end
-    refimage = ARGB32.(map(x -> ARGB32(1.0, 0.0, 0.0), textinit))
-    renderstring!(refimage, string(DateTime(2001)), face, pixelsize, timepos...;
-                  fcolor=ARGB32(RGB(1.0), 1.0), bcolor=ARGB32(RGB(0.0), 1.0)) 
+        if face === nothing
+            font = "cantarell"
+            face = findfont(font)
+        end
+        refimg = ARGB32.(map(x -> ARGB32(1.0, 0.0, 0.0), textinit))
+        renderstring!(refimg, string(DateTime(2001)), face, pixelsize, timepos...;
+                      fcolor=ARGB32(RGB(1.0), 1.0), bcolor=ARGB32(RGB(0.0), 1.0)) 
 
-    proc = ColorProcessor(
-        zerocolor=(1.0,0.0,0.0), 
         textconfig=TextConfig(; font=font, timepixels=pixelsize, namepixels=pixelsize) 
-    )
-    output = TestImageOutput((t=textinit,); processor=proc, store=true)
+        proc = ColorProcessor(zerocolor=(1.0,0.0,0.0), textconfig=textconfig)
+        output = TestImageOutput((t=textinit,); processor=proc, store=true)
 
-    img = grid2image(proc, output, simdata, textinit, DateTime(2001))
-    @test img == refimage
+        img = grid2image(proc, output, simdata, textinit, DateTime(2001))
+        @test img == refimg
+    end
 end
 
 @testset "SparseOptInspector" begin
@@ -195,6 +195,7 @@ end
     @test maxval(output) === (10, 20)
     @test processor(output) === proc 
     @test isstored(output) == true
+    simdata = SimData(init, Ruleset(Life()), 1)
 
     # Test image is joined from :a, nothing, :b
     @test grid2image(processor(output), output, Ruleset(), multiinit, 1) ==
@@ -204,6 +205,38 @@ end
          ARGB32(0.0, 0.0, 0.0) ARGB32(0.0, 0.0, 0.0)
          l08                  l1
          z0                   l05                 ]
+
+    @testset "text captions" begin
+        font = "arial"
+        timepixels = 20
+        timepos = timepixels, timepixels
+        textinit = (a=zeros(200, 200), b=zeros(200, 200))
+        face = findfont(font)
+        if face === nothing
+            font = "cantarell"
+            face = findfont(font)
+        end
+        refimg = cat(fill(ARGB32(1, 0, 0), 200, 200), fill(ARGB32(0), 200, 200), fill(ARGB32(1, 0, 0), 200, 200); dims=1)
+        renderstring!(refimg, string(DateTime(2001)), face, timepixels, timepos...;
+                      fcolor=ARGB32(RGB(1.0), 1.0), bcolor=ARGB32(RGB(0.0), 1.0)) 
+
+        namepixels = 15
+        nameposa = 2timepixels + namepixels, timepixels
+        renderstring!(refimg, "a", face, namepixels, nameposa...;
+                      fcolor=ARGB32(RGB(1.0), 1.0), bcolor=ARGB32(RGB(0.0), 1.0)) 
+        nameposb = 2timepixels + namepixels + 400, timepixels
+        renderstring!(refimg, "b", face, namepixels, nameposb...;
+                      fcolor=ARGB32(RGB(1.0), 1.0), bcolor=ARGB32(RGB(0.0), 1.0)) 
+
+        textconfig = TextConfig(; font=font, timepixels=timepixels, namepixels=namepixels)
+        proc = LayoutProcessor([:a, nothing, :b], (grey, leo), textconfig)
+
+        output = TestImageOutput((t=textinit,); processor=proc, store=true)
+
+        img = grid2image(proc, (0, 0), (1, 1), simdata, textinit, DateTime(2001));
+        plot(img)
+        @test img == refimg
+    end
 end
 
 @testset "ThreeColorProcessor" begin

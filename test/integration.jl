@@ -48,7 +48,7 @@ test7 = [
         ]
 
 # Allow testing with a few variants of the above
-cycle!(A) = begin
+cycletests!(A) = begin
     v = A[1, :]
     @inbounds copyto!(A, CartesianIndices((1:5, 1:7)),
                       A, CartesianIndices((2:6, 1:7)))
@@ -92,8 +92,8 @@ end
                  0 0 0 0 0 0 0
                 ]
 
-    ruleset = Ruleset(; 
-        rules=(Life{:a,:a}(),), 
+    rule = Life{:a,:a}(neighborhood=RadialNeighborhood{1}())
+    ruleset = Ruleset(rule; 
         init=(a=init,), 
         timestep=Day(2), 
         overflow=RemoveOverflow(),
@@ -107,7 +107,13 @@ end
 
     @testset "Results match glider behaviour" begin
         output = ArrayOutput(init, 7)
-        sim!(output, ruleset; tspan=(Date(2001, 1, 1):Day(2):Date(2001, 1, 14)), nreplicates=5)
+        sim!(output, rule; 
+             init=(a=init,), 
+             overflow=RemoveOverflow(),
+             opt=NoOpt(),
+             tspan=(Date(2001, 1, 1):Day(2):Date(2001, 1, 14)), 
+             nreplicates=5
+        )
         @test output[2] == test2_rem
         @test output[3] == test3_rem
         @test output[5] == test5_rem
@@ -119,8 +125,10 @@ end
 @testset "Life simulation with WrapOverflow" begin
     # Loop over shifing init to make sure they all work
     for i = 1:7 
+        bufs = zeros(Int, 3, 3), zeros(Int, 3, 3)
+        rule = Life(neighborhood=RadialNeighborhood{1}(bufs))
         sparse_ruleset = Ruleset(; 
-            rules=(Life(),), 
+            rules=(rule,), 
             init=init, 
             timestep=Day(2), 
             overflow=WrapOverflow(),
@@ -153,11 +161,11 @@ end
             @test noopt_output[5] == test5
             @test noopt_output[7] == test7
         end
-        cycle!(init)
-        cycle!(test2)
-        cycle!(test3)
-        cycle!(test5)
-        cycle!(test7)
+        cycletests!(init)
+        cycletests!(test2)
+        cycletests!(test3)
+        cycletests!(test5)
+        cycletests!(test7)
     end
 end
 

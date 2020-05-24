@@ -24,9 +24,11 @@ Base.tail(chain::Chain{R,W}) where {R,W} = begin
     ch = tail(rules(chain))
     Chain{R,W,typeof(ch)}(ch)
 end
-Base.getindex(chain::Chain, I...) = getindex(rules(chain), I...)
+Base.getindex(chain::Chain, i) = getindex(rules(chain), i)
 Base.iterate(chain::Chain) = iterate(rules(chain))
 Base.length(chain::Chain) = length(rules(chain))
+Base.firstindex(chain::Chain) = firstindex(rules(chain))
+Base.lastindex(chain::Chain) = lastindex(rules(chain))
 
 """
     applyrule(rules::Chain, data, state, (i, j))

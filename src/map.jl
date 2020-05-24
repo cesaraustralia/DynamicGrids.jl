@@ -70,7 +70,7 @@ end
     f::F            | true    | "Function to apply to the neighborhood and read values"
     neighborhood::N | true    | ""
 end
-Neighbors(f; read=:_default_, write=read, neighborhood=RadialNeighborhood()) = 
+Neighbors(f; read=:_default_, write=read, neighborhood=RadialNeighborhood{1}()) = 
     Neighbors{read,write}(f, neighborhood)
 
 @inline applyrule(rule::Neighbors, data::SimData, read, index) =
@@ -103,5 +103,5 @@ Manual(f; read=:_default_, write=read) = Manual{read,write}(f)
 
 @inline applyrule!(rule::Manual, data::SimData, read, index) =
     let data=data, index=index, rule=rule, read=astuple(rule, read)
-        rule.f(hood, index, rule...)
+        rule.f(data, index, read...)
     end

@@ -92,7 +92,7 @@ end
 
 @testset "NeighbourhoodRule, CellRule chain" begin
 
-    hoodrule = Neighbors{:a,:a}(RadialNeighborhood{1}()) do hood, a
+    hoodrule = Neighbors(read=:a) do hood, a
         sum(hood)
     end
 
@@ -123,8 +123,12 @@ end
     @test radius(chain) === 1
     @test neighborhoodkey(chain) === :a
     @test rules(Base.tail(chain)) === (rule,)
-    @test chain[1] === hoodrule
+    @test chain[1] === first(chain) === hoodrule
+    @test chain[end] === last(chain) === rule
     @test length(chain) === 2
+    @test iterate(chain) === (hoodrule, 2)
+    @test firstindex(chain) === 1
+    @test lastindex(chain) === 2
 
     ruleset = Ruleset(chain; opt=NoOpt())
     noopt_output = ArrayOutput(init, 3)
