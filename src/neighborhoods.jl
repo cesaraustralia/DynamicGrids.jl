@@ -206,7 +206,7 @@ radius(rules::Tuple{Vararg{<:Rule}}, key::Symbol) =
 
 # TODO radius only for neighborhood grid
 radius(rule::NeighborhoodRule, args...) = radius(neighborhood(rule))
-radius(rule::PartialNeighborhoodRule, args...) = radius(neighborhood(rule))
+radius(rule::ManualNeighborhoodRule, args...) = radius(neighborhood(rule))
 radius(rule::Rule, args...) = 0
 
 """

@@ -1,6 +1,6 @@
 """
-    Map{R,W}(f)
-    Map(f; read, write)
+    Cell{R,W}(f)
+    Cell(f; read, write)
 
 A [`CellRule`](@ref) that applies a function `f` to the
 `read` grid cells and returns the `write` cells.
@@ -11,7 +11,7 @@ Especially convenient with `do` notation.
 
 Set the cells of grid `:c` to the sum of `:a` and `:b`.
 ```julia
-simplerule = Map() do a, b
+simplerule = Cell() do a, b
     a + b
 end
 ```
@@ -22,7 +22,7 @@ wrap the whole thing in a `let` block, for performance.
 
 ```julia
 rule = let y = y
-    rule = Map(read=(a, b), write=b) do a, b
+    rule = Cell(read=(a, b), write=b) do a, b
         a + b * y 
     end
 end
@@ -82,7 +82,7 @@ Neighbors(f; read=:_default_, write=read, neighborhood=RadialNeighborhood{1}()) 
     Manual(f; read=:_default_, write=read) 
     Manual{R,W}(f)
 
-A [`PartialRule`](@ref) to manually write to the array where you need to. 
+A [`ManualRule`](@ref) to manually write to the array where you need to. 
 `f` is passed an indexable `data` object, and the index of the current cell, 
 followed by the requirement grid values for the index.
 
@@ -96,7 +96,7 @@ let x = 10
 end
 ```
 """
-@description @flattenable struct Manual{R,W,F} <: PartialRule{R,W}
+@description @flattenable struct Manual{R,W,F} <: ManualRule{R,W}
     f::F    | true    | "Function to apply to the data, index and read values"
 end
 Manual(f; read=:_default_, write=read) = Manual{read,write}(f)

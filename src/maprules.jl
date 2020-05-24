@@ -28,7 +28,7 @@ _maybeupdate_dest!(ds::Tuple, rule) =
     map(d -> _maybeupdate_dest!(d, rule), ds)
 _maybeupdate_dest!(d::WritableGridData, rule::Rule) =
     handleoverflow!(d)
-_maybeupdate_dest!(d::WritableGridData, rule::PartialRule) = begin
+_maybeupdate_dest!(d::WritableGridData, rule::ManualRule) = begin
     @inbounds parent(dest(d)) .= parent(source(d))
     handleoverflow!(d)
 end
@@ -46,7 +46,7 @@ ruleloop(::PerformanceOpt, rule::Rule, simdata::SimData, rkeys, rgrids, wkeys, w
     end
 end
 
-ruleloop(::PerformanceOpt, rule::PartialRule, simdata::SimData, rkeys, rgrids, wkeys, wgrids) = begin
+ruleloop(::PerformanceOpt, rule::ManualRule, simdata::SimData, rkeys, rgrids, wkeys, wgrids) = begin
     nrows, ncols = gridsize(data(simdata)[1])
     for j in 1:ncols, i in 1:nrows
         ismasked(mask(simdata), i, j) && continue

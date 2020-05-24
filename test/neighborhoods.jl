@@ -96,18 +96,18 @@ end
 DynamicGrids.applyrule(rule::TestNeighborhoodRule, data, state, index, buffer) =
     state
 
-struct TestPartialNeighborhoodRule{R,W,N} <: PartialNeighborhoodRule{R,W}
+struct TestManualNeighborhoodRule{R,W,N} <: ManualNeighborhoodRule{R,W}
     neighborhood::N
 end
-DynamicGrids.applyrule!(rule::TestPartialNeighborhoodRule{R,Tuple{W1,}}, data, state, index
+DynamicGrids.applyrule!(rule::TestManualNeighborhoodRule{R,Tuple{W1,}}, data, state, index
                        ) where {R,W1} =
     data[W1][index...] = state[1]
 
 
 
 @testset "neighborhood rules" begin
-    ruleA = TestPartialNeighborhoodRule{:a,:a}(RadialNeighborhood{3}())
-    ruleB = TestPartialNeighborhoodRule{Tuple{:b},Tuple{:b}}(RadialNeighborhood{2}())
+    ruleA = TestManualNeighborhoodRule{:a,:a}(RadialNeighborhood{3}())
+    ruleB = TestManualNeighborhoodRule{Tuple{:b},Tuple{:b}}(RadialNeighborhood{2}())
     ruleset = Ruleset(ruleA, ruleB)
     @test neighbors(ruleA) isa Base.Generator
     @test neighborhood(ruleA) == RadialNeighborhood{3}()
@@ -128,7 +128,7 @@ end
 @testset "radius" begin
     init = (a=[1. 2.], b=[10. 11.])
     ruleA = TestNeighborhoodRule{:a,:a}(RadialNeighborhood{3}())
-    ruleB = TestPartialNeighborhoodRule{Tuple{:b},Tuple{:b}}(RadialNeighborhood{2}())
+    ruleB = TestManualNeighborhoodRule{Tuple{:b},Tuple{:b}}(RadialNeighborhood{2}())
     ruleset = Ruleset(ruleA, ruleB)
     @test radius(ruleA) == 3
     @test radius(ruleB) == 2
@@ -142,7 +142,7 @@ end
     # TODO make sure 2 radii can coexist
 end
 
-DynamicGrids.setneighbor!(data, hood, rule::TestPartialNeighborhoodRule,
+DynamicGrids.setneighbor!(data, hood, rule::TestManualNeighborhoodRule,
              state, hood_index, dest_index) = begin
     data[dest_index...] += state
     state
@@ -157,7 +157,7 @@ end
             0 1 2 3 4 5]
 
     hood = RadialNeighborhood{1}()
-    rule = TestPartialNeighborhoodRule{:a,:a}(hood)
+    rule = TestManualNeighborhoodRule{:a,:a}(hood)
     ruleset = Ruleset(rule)
     simdata = SimData(init, ruleset, 1)
     state = 5
@@ -172,7 +172,7 @@ end
          0 1 2 3 4 5]
 
     hood = CustomNeighborhood(((-1, -1), (1, 1)))
-    rule = TestPartialNeighborhoodRule{:a,:a}(hood)
+    rule = TestManualNeighborhoodRule{:a,:a}(hood)
     ruleset = Ruleset(rule)
     simdata = SimData(init, ruleset, 1)
     state = 1
@@ -191,7 +191,7 @@ end
         (CustomNeighborhood(((-1, -1), (1, 1))), CustomNeighborhood(((-2, -2), (2, 2)))),
         nothing,
     )
-    rule = TestPartialNeighborhoodRule{:a,:a}(hood)
+    rule = TestManualNeighborhoodRule{:a,:a}(hood)
     @test radius(rule) === 2
     ruleset = Ruleset(rule)
     simdata = SimData(init, ruleset, 1)

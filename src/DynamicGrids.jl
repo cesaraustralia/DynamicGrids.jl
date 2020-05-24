@@ -39,7 +39,7 @@ import FieldMetadata: @description, description,
 
 export sim!, resume!, replay, savegif, isinferred, neighbors
 
-export Rule, NeighborhoodRule, CellRule, PartialRule, PartialNeighborhoodRule
+export Rule, NeighborhoodRule, CellRule, ManualRule, ManualNeighborhoodRule
 
 export Chain, Cell, Neighbors, Manual, Map, Life
 

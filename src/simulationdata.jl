@@ -79,7 +79,7 @@ Base.parent(d::ReadableGridData) = parent(source(d))
 Base.@propagate_inbounds Base.getindex(d::ReadableGridData, I...) = getindex(source(d), I...)
 
 """
-WriteableGridData is passed to rules `<: PartialRule`, and can be written to directly as
+WriteableGridData is passed to rules `<: ManualRule`, and can be written to directly as
 an array. This handles updates to block optimisations and writing to the correct
 source/dest array.
 """

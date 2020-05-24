@@ -1,8 +1,8 @@
 using DynamicGrids, Dates, Test, Colors, ColorSchemes, FieldDefaults
 using FreeTypeAbstraction
-using DynamicGrids: grid2image, @Image, @Graphic, @Output, 
+using DynamicGrids: grid2image, @Image, @Graphic, @Output,
     processor, minval, maxval, normalise, SimData, isstored, isasync,
-    initialise, finalise, delay, fps, showfps, settimestamp!, timestamp, 
+    initialise, finalise, delay, fps, showfps, settimestamp!, timestamp,
     tspan, setfps!, frames, isshowable, Red, Green, Blue, showgrid, rgb, scale
 using ColorSchemes: leonardo
 
@@ -134,12 +134,12 @@ end
             font = "cantarell"
             face = findfont(font)
         end
-        refimg = ARGB32.(map(x -> ARGB32(1.0, 0.0, 0.0), textinit))
+        refimg = ARGB32.(map(x -> ARGB32(1.0, 0.0, 0.0, 1.0), textinit))
         renderstring!(refimg, string(DateTime(2001)), face, pixelsize, timepos...;
-                      fcolor=ARGB32(RGB(1.0), 1.0), bcolor=ARGB32(RGB(0.0), 1.0)) 
+                      fcolor=ARGB32(1.0, 1.0, 1.0, 1.0), bcolor=ARGB32(0.0, 0.0, 0.0, 1.0))
 
-        textconfig=TextConfig(; font=font, timepixels=pixelsize, namepixels=pixelsize) 
-        proc = ColorProcessor(zerocolor=(1.0,0.0,0.0), textconfig=textconfig)
+        textconfig=TextConfig(; font=font, timepixels=pixelsize, namepixels=pixelsize)
+        proc = ColorProcessor(zerocolor=ARGB32(1.0, 0.0, 0.0, 1.0), textconfig=textconfig)
         output = TestImageOutput((t=textinit,); processor=proc, store=true)
 
         img = grid2image(proc, output, simdata, textinit, DateTime(2001))
@@ -157,9 +157,9 @@ end
              0 0 0 0 0 0 0
             ]
     ruleset = Ruleset(;
-        rules=(Life(),), 
-            init=init, 
-        timestep=Day(1), 
+        rules=(Life(),),
+            init=init,
+        timestep=Day(1),
         overflow=WrapOverflow(),
         opt=SparseOpt(),
     )
@@ -173,7 +173,7 @@ end
 
     global images = []
     sim!(output, ruleset; tspan=(Date(2001, 1, 1), Date(2001, 1, 5)))
-    w, y, c = ARGB32(1), ARGB32(.5, .5, 0), ARGB32(0., .5, .5) 
+    w, y, c = ARGB32(1), ARGB32(.5, .5, 0), ARGB32(0., .5, .5)
     @test images[1] == [
              y y y y y y y
              y y y c w w w
@@ -193,7 +193,7 @@ end
     output = TestImageOutput(init; processor=proc, minval=(0, 0), maxval=(10, 20), store=true)
     @test minval(output) === (0, 0)
     @test maxval(output) === (10, 20)
-    @test processor(output) === proc 
+    @test processor(output) === proc
     @test isstored(output) == true
     simdata = SimData(init, Ruleset(Life()), 1)
 
@@ -218,15 +218,15 @@ end
         end
         refimg = cat(fill(ARGB32(1, 0, 0), 200, 200), fill(ARGB32(0), 200, 200), fill(ARGB32(1, 0, 0), 200, 200); dims=1)
         renderstring!(refimg, string(DateTime(2001)), face, timepixels, timepos...;
-                      fcolor=ARGB32(RGB(1.0), 1.0), bcolor=ARGB32(RGB(0.0), 1.0)) 
+                      fcolor=ARGB32(RGB(1.0), 1.0), bcolor=ARGB32(RGB(0.0), 1.0))
 
         namepixels = 15
         nameposa = 2timepixels + namepixels, timepixels
         renderstring!(refimg, "a", face, namepixels, nameposa...;
-                      fcolor=ARGB32(RGB(1.0), 1.0), bcolor=ARGB32(RGB(0.0), 1.0)) 
+                      fcolor=ARGB32(RGB(1.0), 1.0), bcolor=ARGB32(RGB(0.0), 1.0))
         nameposb = 2timepixels + namepixels + 400, timepixels
         renderstring!(refimg, "b", face, namepixels, nameposb...;
-                      fcolor=ARGB32(RGB(1.0), 1.0), bcolor=ARGB32(RGB(0.0), 1.0)) 
+                      fcolor=ARGB32(RGB(1.0), 1.0), bcolor=ARGB32(RGB(0.0), 1.0))
 
         textconfig = TextConfig(; font=font, timepixels=timepixels, namepixels=namepixels)
         proc = LayoutProcessor([:a, nothing, :b], (grey, leo), textconfig)
@@ -234,15 +234,14 @@ end
         output = TestImageOutput((t=textinit,); processor=proc, store=true)
 
         img = grid2image(proc, (0, 0), (1, 1), simdata, textinit, DateTime(2001));
-        plot(img)
         @test img == refimg
     end
 end
 
 @testset "ThreeColorProcessor" begin
     mask = Bool[1 1 1 1 0]
-    multiinit = (a=[5.0 5.0 4.0 4.0 5.0], 
-                 b=[0.1 0.2 0.0 0.0 4.0], 
+    multiinit = (a=[5.0 5.0 4.0 4.0 5.0],
+                 b=[0.1 0.2 0.0 0.0 4.0],
                  c=[5.0 5.0 10.0 5.0 0.6],
                  d=[9.0 0.0 15.0 50.0 -10.0])
     proc = ThreeColorProcessor(colors=(Green(), Red(), Blue(), nothing), zerocolor=0.9, maskcolor=0.8)

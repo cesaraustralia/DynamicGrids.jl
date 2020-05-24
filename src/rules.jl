@@ -70,13 +70,13 @@ is not guaranteed to have correct results, and should not be done.
 abstract type CellRule{R,W} <: Rule{R,W} end
 
 """
-PartialRule is for rules that manually write to whichever cells of the grid
+ManualRule is for rules that manually write to whichever cells of the grid
 that they choose, instead of automatically updating every cell with their output.
 
 Updates to the destination grids data must be performed manually by
 `data[:key] = x`. Updating block status is handled automatically on write.
 """
-abstract type PartialRule{R,W} <: Rule{R,W} end
+abstract type ManualRule{R,W} <: Rule{R,W} end
 
 """
 A Rule that only accesses a neighborhood centered around the current cell.
@@ -114,15 +114,15 @@ neighborhoodkey(rule::NeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
 A Rule that only writes to its neighborhood, defined by its radius distance from the
 current point.
 
-PartialNeighborhood rules must return their radius with a `radius()` method, although
+ManualNeighborhood rules must return their radius with a `radius()` method, although
 by default this will be called on the result of `neighborhood(rule)`.
 
 TODO: performance optimisations with a neighborhood buffer,
 simular to [`NeighborhoodRule`](@ref) but for writing.
 """
-abstract type PartialNeighborhoodRule{R,W} <: PartialRule{R,W} end
+abstract type ManualNeighborhoodRule{R,W} <: ManualRule{R,W} end
 
-neighbors(rule::PartialNeighborhoodRule) = neighbors(neighborhood(rule))
-neighborhood(rule::PartialNeighborhoodRule) = rule.neighborhood
-neighborhoodkey(rule::PartialNeighborhoodRule{R,W}) where {R,W} = R
-neighborhoodkey(rule::PartialNeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
+neighbors(rule::ManualNeighborhoodRule) = neighbors(neighborhood(rule))
+neighborhood(rule::ManualNeighborhoodRule) = rule.neighborhood
+neighborhoodkey(rule::ManualNeighborhoodRule{R,W}) where {R,W} = R
+neighborhoodkey(rule::ManualNeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1

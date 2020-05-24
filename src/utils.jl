@@ -72,7 +72,7 @@ isinferred(simdata::SimData, rule::Rule, init::AbstractArray) = begin
         error("Returned type `$(typeof(x))` doesn't match grid eltype `$(eltype(init))`")
     true
 end
-isinferred(simdata::SimData, rule::PartialRule, init::AbstractArray) = begin
+isinferred(simdata::SimData, rule::ManualRule, init::AbstractArray) = begin
     simdata = @set simdata.data = map(WritableGridData, simdata.data)
     @inferred applyrule!(rule, simdata, init[1, 1], (1, 1))
     true

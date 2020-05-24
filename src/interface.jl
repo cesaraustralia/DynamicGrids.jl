@@ -17,10 +17,10 @@ function applyrule end
 
 
 """
-    applyrule!(rule::PartialRule, data, state, index)
+    applyrule!(rule::ManualRule, data, state, index)
 
 A rule that manually writes to the grid data array, 
-used in all rules inheriting from [`PartialRule`](@ref).
+used in all rules inheriting from [`ManualRule`](@ref).
 
 ### Arguments:
 see [`applyrule`](@ref)
