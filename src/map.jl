@@ -45,21 +45,20 @@ astuple(::Tuple, read) = read
 astuple(::Symbol, read) = (read,)
 
 """
-Manu(f; read=:_default_, write=read, neighborhood=RadialNeighborhood()) 
+Neighbors(f; read=:_default_, write=read, neighborhood=RadialNeighborhood()) 
     Neighbors{R,W}(f)
 
-A [`NeighborhoodRule`](@ref) that receives a neighbors object
-for the first `read` grid and the passed in neighborhood, 
-followed by the cell values for the reqquired grids, as with
-`Cell`.
+A [`NeighborhoodRule`](@ref) that receives a neighbors object for the first 
+`read` grid and the passed in neighborhood, followed by the cell values for 
+the reqquired grids, as with [`Cell`](@ref).
 
 Returned value(s) are written to the `write`/`W` grid.
 
 ## Example
 
 ```julia
-let x = 10
-    Manual{Tuple{:a,:b},:b}() do data, index, a, b
+rule = let x = 10
+    Neighbors{Tuple{:a,:b},:b}() do hood, a, b
         data[:b][index...] = a + b^x
     end
 end
@@ -89,7 +88,7 @@ followed by the requirement grid values for the index.
 ## Example
 
 ```julia
-let x = 10
+rule = let x = 10
     Manual{Tuple{:a,:b},:b}() do data, index, a, b
         data[:b][index...] = a + b^x
     end
