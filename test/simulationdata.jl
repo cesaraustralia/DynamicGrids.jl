@@ -1,6 +1,6 @@
 using DynamicGrids, OffsetArrays, Test, Dates
 using DynamicGrids: initdata!, data, init, mask, radius, overflow, source, 
-    dest, sourcestatus, deststatus, localstatus, buffers, gridsize,
+    dest, sourcestatus, deststatus, localstatus, gridsize,
     ruleset, grids, starttime, currenttime, currentframe, grids, SimData, 
     updatetime, ismasked, currenttimestep, WritableGridData
 
@@ -50,18 +50,16 @@ tstart = DateTime(2001)
         [0 1 0 0
          0 1 0 0
          0 0 0 0]
-    @test buffers(grida) == 
-        [[0 0 0; 0 0 0; 0 0 0], [0 0 0; 0 0 0; 0 0 0]]
 
     @test parent(source(gridb)) == parent(dest(gridb)) == 
         [2 2 2
          2 2 2]
     @test sourcestatus(gridb) == deststatus(gridb) == true
-    @test buffers(gridb) === nothing
 
     @test firstindex(grida) == 1
     @test lastindex(grida) == 20
     @test size(grida) == (4, 5)
+    @test axes(grida) == (0:3, 0:4)
     @test ndims(grida) == 2
     @test eltype(grida) == Int
     @test ismasked(grida, 1, 1) == false

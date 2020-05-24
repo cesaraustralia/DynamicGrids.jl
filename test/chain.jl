@@ -5,19 +5,19 @@ using DynamicGrids: SimData, radius, rules, readkeys, writekeys,
 
 @testset "CellRule chain" begin
 
-    rule1 = Map(read=:a, write=:b) do a
+    rule1 = Cell(read=:a, write=:b) do a
         2a
     end
 
-    rule2 = Map(read=Tuple{:b,:d}, write=:c) do b, d
+    rule2 = Cell(read=Tuple{:b,:d}, write=:c) do b, d
         b + d
     end
 
-    rule3 = Map(read=Tuple{:a,:c,:d}, write=Tuple{:d,:e}) do a, c, d
+    rule3 = Cell(read=Tuple{:a,:c,:d}, write=Tuple{:d,:e}) do a, c, d
         a + c + d, 3a
     end
 
-    rule4 = Map(read=Tuple{:a,:b,:c,:d}, write=Tuple{:a,:b,:c,:d}) do a, b, c, d
+    rule4 = Cell{Tuple{:a,:b,:c,:d},Tuple{:a,:b,:c,:d}}() do a, b, c, d
         2a, 2b, 2c, 2d
     end
 
@@ -89,17 +89,14 @@ using DynamicGrids: SimData, radius, rules, readkeys, writekeys,
 
 end
 
-struct BlockRule{R,W} <: NeighborhoodRule{R,W,} end
-
-DynamicGrids.neighborhood(::BlockRule) = RadialNeighborhood{1}()
-
-DynamicGrids.applyrule(rule::BlockRule, data, state, index, buf) =
-    sumneighbors(neighborhood(rule), buf, state)
 
 @testset "NeighbourhoodRule, CellRule chain" begin
-    blockrule = BlockRule{:a,:a}()
 
-    rule = Map{Tuple{:a,:c},:b}() do b, c
+    hoodrule = Neighbors(read=:a) do hood, a
+        sum(hood)
+    end
+
+    rule = Cell{Tuple{:a,:c},:b}() do b, c
         b + c 
     end
 
@@ -122,18 +119,22 @@ DynamicGrids.applyrule(rule::BlockRule, data, state, index, buf) =
          1 1 1 1 1
          1 1 1 1 1]) 
 
-    chain = Chain(blockrule, rule)
+    chain = Chain(hoodrule, rule)
     @test radius(chain) === 1
     @test neighborhoodkey(chain) === :a
-    @test Base.tail(chain).val === (rule,)
-    @test chain[1] === blockrule
+    @test rules(Base.tail(chain)) === (rule,)
+    @test chain[1] === first(chain) === hoodrule
+    @test chain[end] === last(chain) === rule
     @test length(chain) === 2
+    @test iterate(chain) === (hoodrule, 2)
+    @test firstindex(chain) === 1
+    @test lastindex(chain) === 2
 
     ruleset = Ruleset(chain; opt=NoOpt())
     noopt_output = ArrayOutput(init, 3)
     @btime sim!($noopt_output, $ruleset; init=$init)
     
-    ruleset = Ruleset(Chain(blockrule, rule); opt=SparseOpt())
+    ruleset = Ruleset(Chain(hoodrule, rule); opt=SparseOpt())
     sparseopt_output = ArrayOutput(init, 3)
     @btime sim!($sparseopt_output, $ruleset; init=$init)
 
@@ -161,5 +162,4 @@ DynamicGrids.applyrule(rule::BlockRule, data, state, index, buf) =
          4 5 9 5 4
          3 3 5 3 3
          2 3 4 3 2]
-
 end

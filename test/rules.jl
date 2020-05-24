@@ -85,11 +85,11 @@ applyrule(::TestRule, data, state, index) = 0
     @test source(resultdata[:_default_]) == final
 end
 
-struct TestPartial{R,W} <: PartialRule{R,W} end
-applyrule!(::TestPartial, data, state, index) = 0
+struct TestManual{R,W} <: ManualRule{R,W} end
+applyrule!(::TestManual, data, state, index) = 0
 
 @testset "A partial rule that returns zero does nothing" begin
-    rule = TestPartial()
+    rule = TestManual()
     ruleset = Ruleset(rule; init=init)
     # Test type stability
     simdata = SimData(init, ruleset, 1)
@@ -103,8 +103,8 @@ applyrule!(::TestPartial, data, state, index) = 0
     @test source(resultdata[:_default_]) == init
 end
 
-struct TestPartialWrite{R,W} <: PartialRule{R,W} end
-applyrule!(::TestPartialWrite, data, state, index) = data[:_default_][index[1], 2] = 0
+struct TestManualWrite{R,W} <: ManualRule{R,W} end
+applyrule!(::TestManualWrite, data, state, index) = data[:_default_][index[1], 2] = 0
 
 @testset "A partial rule that writes to dest affects output" begin
     final = [0 0 1 0;
@@ -113,7 +113,7 @@ applyrule!(::TestPartialWrite, data, state, index) = data[:_default_][index[1], 
              0 0 1 0;
              0 0 1 0]
 
-    rule = TestPartialWrite()
+    rule = TestManualWrite()
     ruleset = Ruleset(rule; init=init)
     simdata = SimData(init, ruleset, 1)
     resultdata = maprule!(simdata, rule)

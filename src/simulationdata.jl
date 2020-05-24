@@ -6,7 +6,7 @@ abstract type GridData{T,N,I} <: AbstractArray{T,N} end
 
 # Common fields for GridData and WritableGridData, which are
 # identical except for their indexing methods
-@mix struct GridDataMixin{T,N,I<:AbstractArray{T,N},M,R,O,S,St,LSt,B}
+@mix struct GridDataMixin{T,N,I<:AbstractArray{T,N},M,R,O,S,St,LSt}
     init::I
     mask::M
     radius::R
@@ -16,14 +16,13 @@ abstract type GridData{T,N,I} <: AbstractArray{T,N} end
     sourcestatus::St
     deststatus::St
     localstatus::LSt
-    buffers::B
 end
 
 GridDataOrReps = Union{GridData, Vector{<:GridData}}
 
 (::Type{T})(d::GridData) where T <: GridData =
     T(init(d), mask(d), radius(d), overflow(d), source(d), dest(d),
-      sourcestatus(d), deststatus(d), localstatus(d), buffers(d))
+      sourcestatus(d), deststatus(d), localstatus(d))
 
 # Array interface
 Base.size(d::GridData) = size(source(d))
@@ -42,7 +41,6 @@ dest(d::GridData) = d.dest
 sourcestatus(d::GridData) = d.sourcestatus
 deststatus(d::GridData) = d.deststatus
 localstatus(d::GridData) = d.localstatus
-buffers(d::GridData) = d.buffers
 gridsize(d::GridData) = size(init(d))
 
 
@@ -65,25 +63,23 @@ ReadableGridData(init::AbstractArray, mask, radius, overflow) = begin
         deststatus = deepcopy(sourcestatus)
         updatestatus!(source, sourcestatus, deststatus, r)
 
-        buffers = [zeros(eltype(init), hoodsize, hoodsize) for i in 1:blocksize]
         localstatus = zeros(Bool, 2, 2)
     else
         source = deepcopy(init)
         sourcestatus = deststatus = true
-        buffers = nothing
         localstatus = nothing
     end
     dest = deepcopy(source)
 
     ReadableGridData(init, mask, radius, overflow, source, dest,
-                     sourcestatus, deststatus, localstatus, buffers)
+                     sourcestatus, deststatus, localstatus)
 end
 
 Base.parent(d::ReadableGridData) = parent(source(d))
 Base.@propagate_inbounds Base.getindex(d::ReadableGridData, I...) = getindex(source(d), I...)
 
 """
-WriteableGridData is passed to rules `<: PartialRule`, and can be written to directly as
+WriteableGridData is passed to rules `<: ManualRule`, and can be written to directly as
 an array. This handles updates to block optimisations and writing to the correct
 source/dest array.
 """

@@ -48,6 +48,8 @@ cellsize(rs::AbstractRuleset) = rs.cellsize
 timestep(rs::AbstractRuleset) = rs.timestep
 ruleset(rs::AbstractRuleset) = rs
 
+Base.step(rs::AbstractRuleset) = timestep(rs)
+
 """
     Ruleset(rules...; init=nothing, mask=nothing, overflow=RemoveOverflow(), opt=SparseeOpt(), cellsize=1, timestep=1)
 
@@ -67,7 +69,7 @@ order they are passed, ie. `Ruleset(rule1, rule2, rule3)`.
 - `timestep`: timestep size for all rules. eg. `Month(1)` or `1u"s"`.
   Available from `applyrule` with `timestep(data)`
 """
-@flattenable @default_kw mutable struct Ruleset{I,M,O<:Overflow,Op<:PerformanceOpt,C,T
+@default_kw @flattenable mutable struct Ruleset{I,M,O<:Overflow,Op<:PerformanceOpt,C,T
     } <: AbstractRuleset
     # Rules are intentionally not type stable. This allows `precalc` and Interact.jl 
     # updates to change the rule type. Function barriers remove any performance overheads.

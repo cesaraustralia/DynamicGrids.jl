@@ -16,6 +16,7 @@ using Colors,
       FieldDefaults,
       FieldMetadata,
       FieldDocTables,
+      FreeTypeAbstraction,
       FileIO,
       Mixers,
       OffsetArrays,
@@ -25,23 +26,22 @@ using Colors,
       UnicodeGraphics
 
 using Base: tail
-using Lazy: @forward
 
 import Base: show, getindex, setindex!, lastindex, size, length, push!, append!,
              broadcast, broadcast!, similar, eltype, iterate
 
 import FieldMetadata: @description, description, 
-                      @limits, limits,
+                      @bounds, bounds,
                       @flattenable, flattenable,
                       @default, default
 
 
 
-export sim!, resume!, replay, savegif, isinferred
+export sim!, resume!, replay, savegif, isinferred, neighbors
 
-export Rule, NeighborhoodRule, CellRule, PartialRule, PartialNeighborhoodRule
+export Rule, NeighborhoodRule, CellRule, ManualRule, ManualNeighborhoodRule
 
-export Chain, Map, Life
+export Chain, Cell, Neighbors, Manual, Map, Life
 
 export AbstractRuleset, Ruleset
 
@@ -58,13 +58,15 @@ export Output, GraphicOutput, ImageOutput, ArrayOutput, REPLOutput
 export GridProcessor, SingleGridProcessor, ColorProcessor, SparseOptInspector,
        MultiGridProcessor, ThreeColorProcessor, LayoutProcessor
 
+export TextConfig
+
 export Greyscale, Grayscale
 
 export CharStyle, Block, Braile
 
 
-const FIELDDOCTABLE = FieldDocTable((:Description, :Default, :Limits),
-                                    (description, default, limits);
+const FIELDDOCTABLE = FieldDocTable((:Description, :Default, :Bounds),
+                                    (description, default, bounds);
                                     truncation=(100,40,100))
 
 # Documentation templates
@@ -78,6 +80,7 @@ include("rules.jl")
 include("rulesets.jl")
 include("simulationdata.jl")
 include("chain.jl")
+include("neighborhoods.jl")
 include("outputs/output.jl")
 include("outputs/graphic.jl")
 include("outputs/image.jl")
@@ -87,7 +90,6 @@ include("interface.jl")
 include("framework.jl")
 include("sequencerules.jl")
 include("maprules.jl")
-include("neighborhoods.jl")
 include("utils.jl")
 include("map.jl")
 include("life.jl")

@@ -65,8 +65,8 @@ Ruleset
 Rule
 CellRule
 NeighborhoodRule
-PartialRule
-PartialNeighborhoodRule
+ManualRule
+ManualNeighborhoodRule
 Map          
 Chain
 Life

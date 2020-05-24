@@ -28,7 +28,7 @@ _maybeupdate_dest!(ds::Tuple, rule) =
     map(d -> _maybeupdate_dest!(d, rule), ds)
 _maybeupdate_dest!(d::WritableGridData, rule::Rule) =
     handleoverflow!(d)
-_maybeupdate_dest!(d::WritableGridData, rule::PartialRule) = begin
+_maybeupdate_dest!(d::WritableGridData, rule::ManualRule) = begin
     @inbounds parent(dest(d)) .= parent(source(d))
     handleoverflow!(d)
 end
@@ -46,7 +46,7 @@ ruleloop(::PerformanceOpt, rule::Rule, simdata::SimData, rkeys, rgrids, wkeys, w
     end
 end
 
-ruleloop(::PerformanceOpt, rule::PartialRule, simdata::SimData, rkeys, rgrids, wkeys, wgrids) = begin
+ruleloop(::PerformanceOpt, rule::ManualRule, simdata::SimData, rkeys, rgrids, wkeys, wgrids) = begin
     nrows, ncols = gridsize(data(simdata)[1])
     for j in 1:ncols, i in 1:nrows
         ismasked(mask(simdata), i, j) && continue
@@ -69,9 +69,10 @@ ruleloop(opt::NoOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighborho
     blockrows, blockcols = indtoblock.(size(src), blocksize)
     # curstatus and newstatus track active status for 4 local blocks
     # Get the preallocated neighborhood buffers
-    bufs = buffers(griddata)
     # Center of the buffer for both axes
     bufcenter = r + 1
+    buffers = getbuffers(rule, init(griddata))
+    bufrules = setbuffers(rule, buffers)
 
     #= Run the rule row by row. When we move along a row by one cell, we access only
     a single new column of data the same hight of the nighborhood, and move the existing
@@ -97,20 +98,20 @@ ruleloop(opt::NoOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighborho
                     for b in 1:rowsinblock
                         for x = 1:hoodsize
                             val = src[i + b + x - 2, y]
-                            @inbounds bufs[b][x, y] = val
+                            @inbounds buffers[b][x, y] = val
                         end
                     end
                 end
             else
                 # Move the neighborhood buffers accross one column
                 for b in 1:rowsinblock
-                    @inbounds buf = bufs[b]
+                    @inbounds buf = buffers[b]
                     # copyto! uses linear indexing, so 2d dims are transformed manually
                     @inbounds copyto!(buf, 1, buf, hoodsize + 1, (hoodsize - 1) * hoodsize)
                 end
                 # Copy a new column to each neighborhood buffer
                 for b in 1:rowsinblock
-                    @inbounds buf = bufs[b]
+                    @inbounds buf = buffers[b]
                     for x in 1:hoodsize
                         @inbounds buf[x, hoodsize] = src[i + b + x - 2, j + 2r]
                     end
@@ -126,15 +127,28 @@ ruleloop(opt::NoOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighborho
                 # Which block row are we in
                 curblocki = b <= r ? 1 : 2
                 # Run the rule using buffer b
-                buf = bufs[b]
                 readval = readgrids(keys2vals(readkeys(rule)), rgrids, I...)
                 #read = buf[bufcenter, bufcenter]
-                writeval = applyrule(rule, simdata, readval, I, buf)
+                writeval = applyrule(bufrules[b], simdata, readval, I)
                 writegrids!(wgrids, writeval, I...)
             end
         end
     end
 end
+
+getbuffers(rule::Rule, init) = getbuffers(neighborhood(rule), init)
+getbuffers(hood::Neighborhood, init) = getbuffers(hood, hood.buffer, init)
+getbuffers(hood::Neighborhood, buffers, init) = 
+    map(b -> (@set hood.buffer = b), allocbuffers(init, hood))
+getbuffers(hood::Neighborhood, buffers::Tuple, init) = 
+    map(b -> (@set hood.buffer = b), buffers)
+
+setbuffers(chain::Chain, buffers::Tuple) = begin
+    rule = chain[1]
+    map(b -> Chain((@set rule.neighborhood = b), tail(rules(chain))...), buffers)
+end
+setbuffers(rule::NeighborhoodRule, buffers::Tuple) = 
+    map(b -> (@set rule.neighborhood = b), buffers)
 
 ruleloop(opt::SparseOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:NeighborhoodRule,Vararg}}},
          simdata::SimData, rkeys, rgrids, wkeys, wgrids) where {R,W} = begin
@@ -158,9 +172,10 @@ ruleloop(opt::SparseOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighb
     # Initialise status for the dest. Is this needed?
     # deststatus(data) .= false
     # Get the preallocated neighborhood buffers
-    bufs = buffers(griddata)
     # Center of the buffer for both axes
     bufcenter = r + 1
+    buffers = getbuffers(rule, init(griddata))
+    bufrules = setbuffers(rule, buffers)
 
     #= Run the rule row by row. When we move along a row by one cell, we access only
     a single new column of data the same hight of the nighborhood, and move the existing
@@ -232,7 +247,7 @@ ruleloop(opt::SparseOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighb
                     for b in 1:rowsinblock
                         for x = 1:hoodsize
                             val = src[i + b + x - 2, jstart + y - 1]
-                            @inbounds bufs[b][x, y] = val
+                            @inbounds buffers[b][x, y] = val
                         end
                     end
                 end
@@ -249,13 +264,13 @@ ruleloop(opt::SparseOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighb
                 else
                     # Move the neighborhood buffers accross one column
                     for b in 1:rowsinblock
-                        @inbounds buf = bufs[b]
+                        @inbounds buf = buffers[b]
                         # copyto! uses linear indexing, so 2d dims are transformed manually
                         @inbounds copyto!(buf, 1, buf, hoodsize + 1, (hoodsize - 1) * hoodsize)
                     end
                     # Copy a new column to each neighborhood buffer
                     for b in 1:rowsinblock
-                        @inbounds buf = bufs[b]
+                        @inbounds buf = buffers[b]
                         for x in 1:hoodsize
                             @inbounds buf[x, hoodsize] = src[i + b + x - 2, j + 2r]
                         end
@@ -269,10 +284,9 @@ ruleloop(opt::SparseOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighb
                     # Which block row are we in
                     curblocki = b <= r ? 1 : 2
                     # Run the rule using buffer b
-                    buf = bufs[b]
                     readval = readgrids(keys2vals(readkeys(rule)), rgrids, I...)
                     #read = buf[bufcenter, bufcenter]
-                    writeval = applyrule(rule, simdata, readval, I, buf)
+                    writeval = applyrule(bufrules[b], simdata, readval, I)
                     writegrids!(wgrids, writeval, I...)
                     # Update the status for the block
                     cellstatus = if writeval isa NamedTuple
@@ -298,8 +312,8 @@ end
 
 @generated function readgrids(rkeys::Tuple, rdata::Tuple, I...)
     expr = Expr(:tuple)
-    for p in 1:length(rdata.parameters)
-        push!(expr.args, :(@inbounds rdata[$p][I...]))
+    for i in 1:length(rdata.parameters)
+        push!(expr.args, :(@inbounds rdata[$i][I...]))
     end
     quote
         keys = map(unwrap, rkeys)
@@ -311,10 +325,10 @@ readgrids(rkeys::Val, rdata::ReadableGridData, I...) =
     (return @inbounds rdata[I...])
 
 
-@generated writegrids!(wdata::Tuple, vals, I...) = begin
+@generated writegrids!(wdata::Tuple, vals::Union{Tuple,NamedTuple}, I...) = begin
     expr = Expr(:block)
-    for p in 1:length(wdata.parameters)
-        push!(expr.args, :(@inbounds wdata[$p].dest[I...] = vals[$p]))
+    for i in 1:length(wdata.parameters)
+        push!(expr.args, :(@inbounds dest(wdata[$i])[I...] = vals[$i]))
     end
     push!(expr.args, :(nothing))
     expr

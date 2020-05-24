@@ -24,13 +24,17 @@ the passed in output for each time-step.
   allocation when that is important.
 """
 sim!(output::Output, ruleset::Ruleset;
-     init=nothing, tspan=(1, length(output)), fps=fps(output),
-     nreplicates=nothing, simdata=nothing) = begin
+     init=nothing, tspan::Union{Tuple,AbstractRange}=1:length(output), 
+     fps=fps(output), nreplicates=nothing, simdata=nothing) = begin
+    if tspan isa Tuple
+        tspan = first(tspan):timestep(ruleset):last(tspan)
+    elseif step(tspan) != step(ruleset)
+        throw(ArgumentError("tspan step $(step(tspan)) must equal rule step $(step(ruleset))"))
+    end
     initialise(output)
     isrunning(output) && error("A simulation is already running in this output")
     setrunning!(output, true) || error("Could not start the simulation with this output")
     starttime = first(tspan)
-    fspan = _tspan2fspan(tspan, timestep(ruleset))
     setstarttime!(output, starttime)
     # Copy the init array from the ruleset or keyword arg
     init = chooseinit(DynamicGrids.init(ruleset), init)
@@ -43,10 +47,28 @@ sim!(output::Output, ruleset::Ruleset;
     # Let the init grid be displayed as long as a normal grid
     delay(output, 1)
     # Run the simulation
-    runsim!(output, simdata, fspan)
+    runsim!(output, simdata, 1:lastindex(tspan))
 end
+"""
+    sim!(output, rules...; init, kwargs...)
 
-_tspan2fspan(tspan, tstep) = 1:lastindex(first(tspan):tstep:last(tspan))
+Shorthand for running a rule without defining a `Ruleset`.
+
+You must pass in the `init` `Array` of `NamedTuple`, and if the `tspan` is not 
+simply a `Tuple` or `AbstractRange` of `Int`, it must be passed in as a range 
+in order to know the timestep.
+"""
+sim!(output::Output, rules::Rule...; init, tspan, 
+     overflow=RemoveOverflow(), 
+     opt=SparseeOpt(), 
+     mask=nothing,
+     cellsize=1,
+     kwargs...) = begin
+    ruleset = Ruleset(rules...; 
+        timestep=step(tspan), mask=mask, cellsize=cellsize, opt=opt, overflow=overflow,
+    )
+    sim!(output, ruleset; init=init, tspan=tspan, kwargs...)
+end
 
 # Allows attaching an init array to the ruleset, but also passing in an
 # alternate array as a keyword arg (which will take preference).
@@ -116,6 +138,7 @@ Operations on outputs and rulesets are allways mutable and in-place.
 Operations on rules and simdata objects are functional as they are used in inner loops
 where immutability improves performance. =#
 simloop!(output::Output, simdata, fspan) = begin
+    # Set the frame timestamp for fps calculation
     settimestamp!(output, first(fspan))
     # Initialise types etc
     simdata = updatetime(simdata, 1)
@@ -156,6 +179,6 @@ precalcrules(rules::Tuple, simdata) =
     (precalcrules(rules[1], simdata), precalcrules(tail(rules), simdata)...)
 precalcrules(rules::Tuple{}, simdata) = ()
 precalcrules(chain::Chain{R,W}, simdata) where {R,W} = begin
-    ch = precalcrules(val(chain), simdata)
+    ch = precalcrules(rules(chain), simdata)
     Chain{R,W,typeof(ch)}(ch)
 end

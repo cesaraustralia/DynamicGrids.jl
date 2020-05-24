@@ -17,10 +17,10 @@ function applyrule end
 
 
 """
-    applyrule!(rule::PartialRule, data, state, index)
+    applyrule!(rule::ManualRule, data, state, index)
 
 A rule that manually writes to the grid data array, 
-used in all rules inheriting from [`PartialRule`](@ref).
+used in all rules inheriting from [`ManualRule`](@ref).
 
 ### Arguments:
 see [`applyrule`](@ref)
@@ -41,9 +41,7 @@ The default action is to return the existing rule without change.
 function precalcrules end
 
 """
-neighbors(hood::Neighborhood, buffer)
-
-Returns an iteraterable over all cells in the neighborhood.
+Returns an iteraterable generator over all cells in the neighborhood.
 """
 function neighbors end
 

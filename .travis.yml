@@ -5,8 +5,10 @@ os:
   - osx
   - windows
 
+before_install:
+  - if [ "$TRAVIS_OS_NAME" = "linux" ]; then sudo apt-get -y install fonts-cantarell; fi
+
 julia:
-  - 1.2
   - 1.4
   - nightly
 
