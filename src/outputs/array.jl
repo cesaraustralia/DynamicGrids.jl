@@ -1,4 +1,7 @@
 """
+    ArrayOutput(init; tspan::Range) 
+    ArrayOutput(init, length::Integer)
+
 A simple output that stores each step of the simulation in a vector of arrays.
 
 ### Arguments:
@@ -7,7 +10,9 @@ A simple output that stores each step of the simulation in a vector of arrays.
 """
 @Output mutable struct ArrayOutput{T} <: Output{T} end
 
-ArrayOutput(init, length::Integer; kwargs...) = begin
+ArrayOutput(init::Union{NamedTuple,AbstractArray}; tspan::AbstractRange, kwargs...) = 
+    ArrayOutput(init, length(tspan); kwargs...)
+ArrayOutput(init::Union{NamedTuple,AbstractArray}, length::Integer; kwargs...) = begin
     frames = [deepcopy(init)]
     append!(frames, zerogrids(init, length-1))
     ArrayOutput(; frames=frames, kwargs...)

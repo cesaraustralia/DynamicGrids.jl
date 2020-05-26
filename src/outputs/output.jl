@@ -16,7 +16,7 @@ abstract type Output{T} <: AbstractVector{T} end
 (::Type{F})(init::NamedTuple; kwargs...) where F <: Output =
     F(; frames=[deepcopy(init)], kwargs...)
 
-# Generitc constructor that rewraps any output in another output type
+# Generic constructor that rewraps any output in another output type
 (::Type{F})(o::T; kwargs...) where F <: Output where T <: Output =
     F(; frames=frames(o), starttime=starttime(o), stoptime=stoptime(o), kwargs...)
 
