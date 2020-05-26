@@ -27,7 +27,7 @@ ConstructionBase.constructorof(::Type{<:T}) where T <: Neighborhood{R} where R =
 
 radius(hood::Neighborhood{R}) where R = R
 buffer(hood::Neighborhood{<:Any,<:Tuple}) = first(hood.buffer)
-buffer(hood::Neighborhood{<:Any,<:AbstractArray}) = hood.buffer
+buffer(hood::Neighborhood) = hood.buffer
 
 Base.eltype(hood::Neighborhood) = eltype(buffer(hood))
 Base.iterate(hood::Neighborhood, args...) = iterate(neighbors(hood), args...)

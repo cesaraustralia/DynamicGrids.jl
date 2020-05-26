@@ -72,7 +72,7 @@ ruleloop(opt::NoOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighborho
     # Center of the buffer for both axes
     bufcenter = r + 1
     # Build multiple rules for each neighborhood buffer
-    bufrules = spreadbuffers(rule, init)
+    bufrules = spreadbuffers(rule, init(griddata))
     buffers = map(r -> buffer(neighborhood(r)), bufrules)
 
     #= Run the rule row by row. When we move along a row by one cell, we access only
@@ -205,8 +205,7 @@ ruleloop(opt::SparseOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighb
                 end
                 # Skip this block
                 skippedlastblock = true
-                # Run the rest of the chain if it exists and works on
-                # grids other than the block/neighborhood grid
+                # Run the rest of the chain if it exists
                 if rule isa Chain && length(rule) > 1 && length(rkeys) > 1 
                     # Loop over the grid COLUMNS inside the block
                     for j in jstart:jstop
