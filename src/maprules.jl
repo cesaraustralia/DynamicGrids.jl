@@ -71,8 +71,9 @@ ruleloop(opt::NoOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighborho
     # Get the preallocated neighborhood buffers
     # Center of the buffer for both axes
     bufcenter = r + 1
-    buffers = getbuffers(rule, init(griddata))
-    bufrules = setbuffers(rule, buffers)
+    # Build multiple rules for each neighborhood buffer
+    bufrules = spreadbuffers(rule, init)
+    buffers = map(r -> buffer(neighborhood(r)), bufrules)
 
     #= Run the rule row by row. When we move along a row by one cell, we access only
     a single new column of data the same hight of the nighborhood, and move the existing
@@ -136,20 +137,6 @@ ruleloop(opt::NoOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighborho
     end
 end
 
-getbuffers(rule::Rule, init) = getbuffers(neighborhood(rule), init)
-getbuffers(hood::Neighborhood, init) = getbuffers(hood, hood.buffer, init)
-getbuffers(hood::Neighborhood, buffers, init) = 
-    map(b -> (@set hood.buffer = b), allocbuffers(init, hood))
-getbuffers(hood::Neighborhood, buffers::Tuple, init) = 
-    map(b -> (@set hood.buffer = b), buffers)
-
-setbuffers(chain::Chain, buffers::Tuple) = begin
-    rule = chain[1]
-    map(b -> Chain((@set rule.neighborhood = b), tail(rules(chain))...), buffers)
-end
-setbuffers(rule::NeighborhoodRule, buffers::Tuple) = 
-    map(b -> (@set rule.neighborhood = b), buffers)
-
 ruleloop(opt::SparseOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:NeighborhoodRule,Vararg}}},
          simdata::SimData, rkeys, rgrids, wkeys, wgrids) where {R,W} = begin
 
@@ -174,8 +161,8 @@ ruleloop(opt::SparseOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighb
     # Get the preallocated neighborhood buffers
     # Center of the buffer for both axes
     bufcenter = r + 1
-    buffers = getbuffers(rule, init(griddata))
-    bufrules = setbuffers(rule, buffers)
+    bufrules = spreadbuffers(rule, init(griddata))
+    buffers = map(r -> buffer(neighborhood(r)), bufrules)
 
     #= Run the rule row by row. When we move along a row by one cell, we access only
     a single new column of data the same hight of the nighborhood, and move the existing
@@ -218,8 +205,9 @@ ruleloop(opt::SparseOpt, rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:Neighb
                 end
                 # Skip this block
                 skippedlastblock = true
-                # Run the rest of the chain if it exists
-                if rule isa Chain && length(rule) > 1
+                # Run the rest of the chain if it exists and works on
+                # grids other than the block/neighborhood grid
+                if rule isa Chain && length(rule) > 1 && length(rkeys) > 1 
                     # Loop over the grid COLUMNS inside the block
                     for j in jstart:jstop
                         # Loop over the grid ROWS inside the block

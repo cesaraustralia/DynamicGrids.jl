@@ -209,6 +209,17 @@ radius(rule::NeighborhoodRule, args...) = radius(neighborhood(rule))
 radius(rule::ManualNeighborhoodRule, args...) = radius(neighborhood(rule))
 radius(rule::Rule, args...) = 0
 
+
+# Build rules and neighborhoods for each buffer, so they
+# don't have to be constructed in the loop
+spreadbuffers(chain::Chain, grid) = 
+    map(r -> Chain(r, tail(rules(chain))...), spreadbuffers(rules(chain)[1], grid))
+spreadbuffers(rule::Rule, grid) = spreadbuffers(rule, neighborhood(rule), buffer(neighborhood(rule)), grid)
+spreadbuffers(rule::NeighborhoodRule, hood::Neighborhood, buffers, grid) = 
+    spreadbuffers(rule, hood, allocbuffers(grid, hood), grid)
+spreadbuffers(rule::NeighborhoodRule, hood::Neighborhood, buffers::Tuple, grid) = 
+    map(b -> (@set rule.neighborhood.buffer = b), buffers)
+
 """
     hoodsize(radius)
 
