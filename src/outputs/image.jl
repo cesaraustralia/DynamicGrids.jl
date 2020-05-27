@@ -160,8 +160,8 @@ struct TextConfig{F,NPi,NPo,TPi,TPo,FC,BC}
     bcolor::BC
 end
 TextConfig(; font, namepixels=12, timepixels=12,
-           namepos=(2timepixels + namepixels, timepixels),
-           timepos=(timepixels, timepixels),
+           namepos=(3timepixels + namepixels, timepixels),
+           timepos=(2timepixels, timepixels),
            fcolor=ARGB32(1.0), bcolor=ARGB32(RGB(0.0), 1.0),
           ) = begin
     face = FreeTypeAbstraction.findfont(font)
@@ -210,6 +210,10 @@ scheme(processor::ColorProcessor) = processor.scheme
 zerocolor(processor::ColorProcessor) = processor.zerocolor
 maskcolor(processor::ColorProcessor) = processor.maskcolor
 textconfig(processor::ColorProcessor) = processor.textconfig
+
+# Show colorscheme in Atom etc
+Base.show(io::IO, m::MIME"image/svg+xml", p::ColorProcessor) =
+    show(io, m, scheme(p))
 
 @inline cell2rgb(p::ColorProcessor, minval, maxval, data::RulesetOrSimData, val, I...) =
     if !(maskcolor(p) isa Nothing) && ismasked(mask(data), I...)
