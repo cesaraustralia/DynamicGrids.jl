@@ -14,33 +14,43 @@ for implementations.
 abstract type ImageOutput{T} <: GraphicOutput{T} end
 
 """
-Construct one ImageOutput from another ImageOutput or GraphicOutput
+Construct one ImageOutput from another Output
 """
-(::Type{F})(o::T; kwargs...) where F <: ImageOutput where T <: ImageOutput = F(;
+(::Type{F})(o::T; 
     frames=frames(o),
-    starttime=starttime(o),
-    stoptime=stoptime(o),
+    init=init(o),
+    mask=mask(o),
+    tspan=tspan(o),
     fps=fps(o),
-    showfps=showfps(o),
-    timestamp=timestamp(o),
-    stampframe=stampframe(o),
+    timestamp=0.0,
+    stampframe=1,
     store=store(o),
     processor=processor(o),
     minval=minval(o),
     maxval=maxval(o),
-    kwargs...
-)
+    kwargs...) where F <: ImageOutput where T <: Output = 
+    F(; frames=frames, init=init, mask=mask, tspan=tspan, fps=fps, timestamp=timestamp, 
+        stampframe=stampframe, store=store, processor=processor, minval=minval, 
+        maxval=maxval, kwargs...)
 
 """
 Mixin fields for `ImageOutput`s
 """
-@premix @default_kw struct Image{P,Mi,Ma}
-    processor::P | ColorProcessor()
-    minval::Mi   | 0
-    maxval::Ma   | 1
+@premix struct Image{P,Min,Max}
+    processor::P
+    minval::Min
+    maxval::Max
 end
 
-processor(o::Output) = Greyscale()
+# Generic ImageOutput constructor. Converts an init array to vector of arrays.
+(::Type{T})(init::Union{NamedTuple,AbstractMatrix}; mask=nothing, tspan, fps=25.0, 
+            store=false, processor=ColorProcessor(), minval=0, maxval=1, kwargs...
+           ) where T <: ImageOutput =
+    T(; frames=[deepcopy(init)], init=init, mask=mask, running=false, tspan=tspan, 
+      fps=fps, timestamp=0.0, stampframe=1, store=store, 
+      processor=processor, minval=minval, maxval=maxval, kwargs...)
+
+processor(o::Output) = ColorProcessor()
 processor(o::ImageOutput) = o.processor
 
 minval(o::Output) = 0
@@ -88,8 +98,8 @@ abstract type GridProcessor end
 textconfig(::GridProcessor) = nothing
 
 """
-    grid2image(o::ImageOutput, data::Union{Ruleset,SimData}, grid, t)
-    grid2image(p::GridProcessor, minval, maxval, data::Union{Ruleset,SimData}, grids, t)
+    grid2image(o::ImageOutput, data::Union{Ruleset,SimData}, grids, t)
+    grid2image(p::GridProcessor, o::ImageOutput, data::Union{Ruleset,SimData}, grids, t)
 
 Convert a grid or named tuple of grids to an RGB image, using a GridProcessor
 
@@ -101,8 +111,6 @@ function grid2image end
 
 grid2image(o::ImageOutput, data::RulesetOrSimData, grids, t) =
     grid2image(processor(o), o, data, grids, t)
-grid2image(processor::GridProcessor, o::ImageOutput, data::RulesetOrSimData, grids, t) =
-    grid2image(processor::GridProcessor, minval(o), maxval(o), data, grids, t)
 
 """
 Grid processors that convert one grid to an image.
@@ -115,15 +123,15 @@ abstract type SingleGridProcessor <: GridProcessor end
 allocimage(grid::AbstractArray) = allocimage(size(grid))
 allocimage(size::Tuple) = fill(ARGB32(0.0, 0.0, 0.0, 1.0), size)
 
-grid2image(p::SingleGridProcessor, minval, maxval,
-           data::RulesetOrSimData, grids::NamedTuple, t) =
-grid2image(p, minval, maxval, data, first(grids), t, string(first(keys(grids))))
-grid2image(p::SingleGridProcessor, minval, maxval,
-           data::RulesetOrSimData, grid::AbstractArray, t, name=nothing) = begin
+grid2image(p::SingleGridProcessor, o::ImageOutput, data::RulesetOrSimData, grids::NamedTuple, t) =
+    grid2image(p, o, data, first(grids), t, string(first(keys(grids))))
+grid2image(p::SingleGridProcessor, o::Output, data::RulesetOrSimData, grid::AbstractArray, t, name=nothing) =
+    grid2image(p, mask(o), minval(o), maxval(o), data, grid, t, name)
+grid2image(p::SingleGridProcessor, mask, minval, maxval, data::RulesetOrSimData, grid::AbstractArray, t, name=nothing) = begin
     img = allocimage(grid)
     for j in 1:size(img, 2), i in 1:size(img, 1)
         @inbounds val = grid[i, j]
-        pixel = rgb(cell2rgb(p, minval, maxval, data, val, i, j))
+        pixel = rgb(cell2rgb(p, mask, minval, maxval, data, val, i, j))
         @inbounds img[i, j] = pixel
     end
     rendertext!(img, textconfig(p), name, t)
@@ -215,8 +223,8 @@ textconfig(processor::ColorProcessor) = processor.textconfig
 Base.show(io::IO, m::MIME"image/svg+xml", p::ColorProcessor) =
     show(io, m, scheme(p))
 
-@inline cell2rgb(p::ColorProcessor, minval, maxval, data::RulesetOrSimData, val, I...) =
-    if !(maskcolor(p) isa Nothing) && ismasked(mask(data), I...)
+@inline cell2rgb(p::ColorProcessor, mask, minval, maxval, data::RulesetOrSimData, val, I...) =
+    if !(maskcolor(p) isa Nothing) && ismasked(mask, I...)
         rgb(maskcolor(p))
     else
         normval = normalise(val, minval, maxval)
@@ -229,7 +237,7 @@ Base.show(io::IO, m::MIME"image/svg+xml", p::ColorProcessor) =
 
 struct SparseOptInspector <: SingleGridProcessor end
 
-@inline cell2rgb(p::SparseOptInspector, minval, maxval, data::AbstractSimData, val, I...) = begin
+@inline cell2rgb(p::SparseOptInspector, mask, minval, maxval, data::AbstractSimData, val, I...) = begin
     r = radius(first(grids(data)))
     blocksize = 2r
     blockindex = indtoblock.((I[1] + r,  I[2] + r), blocksize)
@@ -277,10 +285,9 @@ colors(processor::ThreeColorProcessor) = processor.colors
 zerocolor(processor::ThreeColorProcessor) = processor.zerocolor
 maskcolor(processor::ThreeColorProcessor) = processor.maskcolor
 
-grid2image(p::ThreeColorProcessor, minval::Tuple, maxval::Tuple,
-           data::RulesetOrSimData, grids::NamedTuple, t) = begin
+grid2image(p::ThreeColorProcessor, o::ImageOutput, data::RulesetOrSimData, grids::NamedTuple, t) = begin
     img = allocimage(first(grids))
-    ncols, ngrids, nmin, nmax = map(length, (colors(p), grids, minval, maxval))
+    ncols, ngrids, nmin, nmax = map(length, (colors(p), grids, minval(o), maxval(o)))
     if !(ngrids == ncols == nmin == nmax)
         ArgumentError(
             "Number of grids ($ngrids), processor colors ($ncols), " *
@@ -288,10 +295,10 @@ grid2image(p::ThreeColorProcessor, minval::Tuple, maxval::Tuple,
         ) |> throw
     end
     for i in CartesianIndices(first(grids))
-        img[i] = if !(maskcolor(p) isa Nothing) && ismasked(mask(data), i)
+        img[i] = if !(maskcolor(p) isa Nothing) && ismasked(mask(o), i)
             rgb(maskcolor(p))
         else
-            xs = map(values(grids), minval, maxval) do g, mi, ma
+            xs = map(values(grids), minval(o), maxval(o)) do g, mi, ma
                 normalise(g[i], mi, ma)
             end
             if !(zerocolor(p) isa Nothing) && all(map((x, c) -> c isa Nothing || x == zero(x), xs, colors(p)))
@@ -335,9 +342,9 @@ layout(p::LayoutProcessor) = p.layout
 processors(p::LayoutProcessor) = p.processors
 textconfig(p::LayoutProcessor) = p.textconfig
 
-grid2image(p::LayoutProcessor, minval::Tuple, maxval::Tuple,
-           data::RulesetOrSimData, grids::NamedTuple, t) = begin
-    ngrids, nmin, nmax = map(length, (grids, minval, maxval))
+grid2image(p::LayoutProcessor, o::ImageOutput, data::RulesetOrSimData, grids::NamedTuple, t
+          ) = begin
+    ngrids, nmin, nmax = map(length, (grids, minval(o), maxval(o)))
     if !(ngrids == nmin == nmax)
         ArgumentError(
             "Number of grids ($ngrids), minval ($nmin) and maxval ($nmax) must be the same"
@@ -361,16 +368,15 @@ grid2image(p::LayoutProcessor, minval::Tuple, maxval::Tuple,
         end
         # Run processor for section
         key = keys(grids)[n]
-        _sectionloop(processors(p)[n], img, minval[n], maxval[n], data, grids[n], key, i, j)
+        _sectionloop(processors(p)[n], img, mask(o), minval(o)[n], maxval(o)[n], data, grids[n], key, i, j)
     end
-    println((textconfig(p), t))
     rendertime!(img, textconfig(p), t)
     img
 end
 
-_sectionloop(processor::SingleGridProcessor, img, minval, maxval, data, grid, key, i, j) = begin
+_sectionloop(processor::SingleGridProcessor, img, mask, minval, maxval, data, grid, key, i, j) = begin
     # We pass an empty string for time as we don't want to print it multiple times.
-    section = grid2image(processor, minval, maxval, data, grid, nothing, string(key))
+    section = grid2image(processor, mask, minval, maxval, data, grid, nothing, string(key))
     @assert eltype(section) == eltype(img)
     sze = size(section)
     # Copy section into image
@@ -388,10 +394,15 @@ Write the output array to a gif. You must pass a processor keyword argument for 
 
 Saving very large gifs may trigger a bug in Imagemagick.
 """
-savegif(filename::String, o::Output, ruleset=Ruleset();
-        processor=processor(o), minval=minval(o), maxval=maxval(o), kwargs...) = begin
+savegif(filename::String, o::Output, ruleset=Ruleset(); 
+        minval=mival(o), maxval=maxval(o), processor=processor(o), kwargs...) = begin
+    im_o = NoDisplayImageOutput(o; maxval=maxval, minval=minval, processor=processor)
+    savegif(filename, im_o, ruleset; kwargs...) 
+end
+savegif(filename::String, o::ImageOutput, ruleset=Ruleset();
+        processor=processor(o), kwargs...) = begin
     images = map(frames(o), collect(firstindex(o):lastindex(o))) do frame, t
-        grid2image(processor, minval, maxval, ruleset, frame, t)
+        grid2image(processor, o, ruleset, frame, t)
     end
     array = cat(images..., dims=3)
     FileIO.save(filename, array; kwargs...)
@@ -458,3 +469,10 @@ combinebands(c::Tuple{Blue,Vararg}, xs, acc) =
 combinebands(c::Tuple{Nothing,Vararg}, xs, acc) =
     combinebands(tail(c), tail(xs), acc)
 combinebands(c::Tuple{}, xs, acc) = rgb(acc...)
+
+@Image @Graphic @Output struct NoDisplayImageOutput{T} <: ImageOutput{T} end
+
+NoDisplayImageOutput(; frames, init, mask, running, tspan, fps, 
+    timestamp, stampframe, store, processor, minval, maxval, kwargs...) =
+    NoDisplayImageOutput(frames, init, mask, running, tspan, fps, timestamp, stampframe, 
+                         store, processor, minval, maxval)

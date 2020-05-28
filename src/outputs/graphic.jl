@@ -3,36 +3,27 @@ Outputs that display the simulation frames live.
 """
 abstract type GraphicOutput{T} <: Output{T} end
 
-(::Type{F})(o::T; kwargs...) where F <: GraphicOutput where T <: GraphicOutput = F(; 
-    frames=frames(o), 
-    starttime=starttime(o), 
-    stoptime=stoptime(o),
-    fps=fps(o), 
-    showfps=showfps(o), 
-    timestamp=timestamp(o), 
-    stampframe=stampframe(o), 
-    store=store(o),
-    kwargs...
-)
-
 """
 Mixin for graphic output fields
 """
-@premix @default_kw struct Graphic{FPS,SFPS,TS,SF}
-    fps::FPS       | 25.0
-    showfps::SFPS  | 25.0
-    timestamp::TS  | 0.0
-    stampframe::SF | 1
-    store::Bool    | false
+@premix struct Graphic{FPS,TS,SF,S}
+    fps::FPS
+    timestamp::TS
+    stampframe::SF
+    store::S
 end
+
+# Generic GraphicOutput constructor. Converts an init array to vector of arrays.
+(::Type{T})(init::Union{NamedTuple,AbstractMatrix}; mask=nothing, fps=25.0, store=false, kwargs...
+           ) where T <: GraphicOutput =
+    T(; frames=[deepcopy(init)], init=init, mask=mask, running=false, fps=fps, timestamp=0.0, 
+      stampframe=1, store=store, kwargs...)
 
 # Field getters and setters
 fps(o::Output) = nothing
 fps(o::GraphicOutput) = o.fps
 setfps!(o::Output, x) = nothing
 setfps!(o::GraphicOutput, x) = o.fps = x
-showfps(o::Output) = nothing
-showfps(o::GraphicOutput) = o.showfps
 timestamp(o::GraphicOutput) = o.timestamp
 stampframe(o::GraphicOutput) = o.stampframe
 store(o::GraphicOutput) = o.store

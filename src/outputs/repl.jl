@@ -10,16 +10,18 @@ struct Block <: CharStyle end
 struct Braile <: CharStyle end
 
 """
+    REPLOutput(init; tspan, fps=25.0, store=false, color=:white, cutoff=0.5 style=Block())
+
 An output that is displayed directly in the REPL. It can either store or discard
 simulation frames.
 
 ### Arguments:
-- `frames`: Single init array or vector of arrays
+- `init`: initialisation Array or NamedTuple of arrays.
 
 ### Keyword Arguments:
-- `fps::Real`: frames per second to run at
-- `showfps::Real`: maximum displayed frames per second
-- `store::Bool`: store frames or not
+- `tspan`: `AbstractRange` timespan for the simulation
+- `fps::Real`: frames per second to display the simulation
+- `store::Bool`: whether ot store the simulation frames for later use
 - `color`: a color from Crayons.jl
 - `cutoff::Real`: the cutoff point to display a full or empty cell. Default is `0.5`
 - `style::CharStyle`: `Block()` or `Braile()` style printing. `Braile` uses 1/4 the screen space.
@@ -29,12 +31,15 @@ REPLOutput(init)
 ```
 The default option is `:block`.
 """
-@Graphic @Output mutable struct REPLOutput{Co,Cu,CS} <: GraphicOutput{T}
-    displayoffset::Array{Int} | [1, 1]
-    color::Co                 | :white
-    cutoff::Cu                | 0.5
-    style::CS                 | Block()
+@Graphic @Output mutable struct REPLOutput{Co,St,Cu} <: GraphicOutput{T}
+    color::Co  
+    style::St 
+    cutoff::Cu
 end
+REPLOutput(; frames, init, mask, running, tspan, fps, timestamp, stampframe, store,
+           color=:white, cutoff=0.5, style=Block()) =
+    REPLOutput(frames, init, mask, running, tspan, fps, timestamp, stampframe, 
+               store, color, style, cutoff) 
 
 # initialise(o::REPLOutput, args...) = begin
     # o.displayoffset .= 1
@@ -87,42 +92,9 @@ replframe(o, frame) = begin
     # Limit output area to available terminal size.
     dispy, dispx = displaysize(stdout)
     youtput, xoutput = outputsize = size(frame)
-    yoffset, xoffset = o.displayoffset
+    yoffset, xoffset = (0, 0)
 
     yrange = max(1, ystep * yoffset):min(youtput, ystep * (dispy + yoffset - 1))
     xrange = max(1, xstep * xoffset):min(xoutput, xstep * (dispx + xoffset - 1))
     f(view(Array(frame), yrange, xrange), o.cutoff)
 end
-
-# Keyboard scrolling: currently broken
-
-# const XSCROLL = 4
-# const YSCROLL = 8
-# const PAGESCROLL = 40
-
-# movedisplay(o) =
-#     while is_running(o)
-#         c = REPLGamesBase.readKey()
-#         c == "Up"      && move_y!(o, -YSCROLL)
-#         c == "Down"    && move_y!(o, YSCROLL)
-#         c == "Left"    && move_x!(o, -XSCROLL)
-#         c == "Right"   && move_x!(o, XSCROLL)
-#         c == "PgUp"    && move_y!(o, -PAGESCROLL)
-#         c == "PgDown"  && move_y!(o, PAGESCROLL)
-#         c == "Ctrl-C"  && set_running!(o, false)
-#     end
-
-# move_y!(o::REPLOutput{:block}, n) = move_y!(n, XBLOCK)
-# move_x!(o::REPLOutput{:block}, n) = move_x!(n, XBLOCK)
-# move_y!(o::REPLOutput{:braile}, n) = move_y!(n, XBRAILE)
-# move_x!(o::REPLOutput{:braile}, n) = move_x!(n, XBRAILE)
-# move_y!(n, yscale) = begin
-#     dispy, _ = displaysize(stdout)
-#     y = size(o[1], 1)
-#     o.displayoffset[1] = max(0, min(y ÷ yscale - dispy, o.displayoffset[1] + n))
-# end
-# move_x!(n, xscale) = begin
-#     _, dispx = displaysize(stdout)
-#     x = size(o[1], 2)
-#     o.displayoffset[2] = max(0, min(x ÷ xscale - dispx, o.displayoffset[2] + n))
-# end

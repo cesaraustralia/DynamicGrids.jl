@@ -108,7 +108,6 @@ DynamicGrids.applyrule!(rule::TestManualNeighborhoodRule{R,Tuple{W1,}}, data, st
 @testset "neighborhood rules" begin
     ruleA = TestManualNeighborhoodRule{:a,:a}(RadialNeighborhood{3}())
     ruleB = TestManualNeighborhoodRule{Tuple{:b},Tuple{:b}}(RadialNeighborhood{2}())
-    ruleset = Ruleset(ruleA, ruleB)
     @test neighbors(ruleA) isa Base.Generator
     @test neighborhood(ruleA) == RadialNeighborhood{3}()
     @test neighborhood(ruleB) == RadialNeighborhood{2}()
@@ -117,7 +116,6 @@ DynamicGrids.applyrule!(rule::TestManualNeighborhoodRule{R,Tuple{W1,}}, data, st
 
     ruleA = TestNeighborhoodRule{:a,:a}(RadialNeighborhood{3}())
     ruleB = TestNeighborhoodRule{Tuple{:b},Tuple{:b}}(RadialNeighborhood{2}())
-    ruleset = Ruleset(ruleA, ruleB)
     @test neighbors(ruleA) isa Base.Generator
     @test neighborhood(ruleA) == RadialNeighborhood{3}()
     @test neighborhood(ruleB) == RadialNeighborhood{2}()
@@ -137,8 +135,8 @@ end
     end
     @test radius(Ruleset()) == NamedTuple()
 
-    output = ArrayOutput(init, 3)
-    sim!(output, ruleset; init=init)
+    output = ArrayOutput(init; tspan=1:3)
+    sim!(output, ruleset)
     # TODO make sure 2 radii can coexist
 end
 
@@ -159,7 +157,7 @@ end
     hood = RadialNeighborhood{1}()
     rule = TestManualNeighborhoodRule{:a,:a}(hood)
     ruleset = Ruleset(rule)
-    simdata = SimData(init, ruleset, 1)
+    simdata = SimData(init, nothing, ruleset, 1)
     state = 5
     index = (3, 3)
     @test mapsetneighbor!(WritableGridData(first(simdata)), hood, rule, state, index) == 40
@@ -174,7 +172,7 @@ end
     hood = CustomNeighborhood(((-1, -1), (1, 1)))
     rule = TestManualNeighborhoodRule{:a,:a}(hood)
     ruleset = Ruleset(rule)
-    simdata = SimData(init, ruleset, 1)
+    simdata = SimData(init, nothing, ruleset, 1)
     state = 1
     index = (5, 5)
     @test mapsetneighbor!(WritableGridData(first(simdata)), neighborhood(rule), rule, state, index) == 2
@@ -194,7 +192,7 @@ end
     rule = TestManualNeighborhoodRule{:a,:a}(hood)
     @test radius(rule) === 2
     ruleset = Ruleset(rule)
-    simdata = SimData(init, ruleset, 1)
+    simdata = SimData(init, nothing, ruleset, 1)
     state = 1
     index = (3, 3)
     @test mapsetneighbor!(WritableGridData(first(simdata)), neighborhood(rule), rule, state, index) == (2, 2)

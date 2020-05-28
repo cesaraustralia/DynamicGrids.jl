@@ -28,7 +28,7 @@ rule = let y = y
 end
 ```
 """
-@description @flattenable struct Cell{R,W,F} <: CellRule{R,W}
+@flattenable @description struct Cell{R,W,F} <: CellRule{R,W}
     # Field | Flatten | Description
     f::F    | true    | "Function to apply to the read values"
 end
@@ -64,7 +64,7 @@ rule = let x = 10
 end
 ```
 """
-@description @flattenable struct Neighbors{R,W,F,N} <: NeighborhoodRule{R,W}
+@flattenable @description struct Neighbors{R,W,F,N} <: NeighborhoodRule{R,W}
     # Field         | Flatten | Description
     f::F            | true    | "Function to apply to the neighborhood and read values"
     neighborhood::N | true    | ""
@@ -95,7 +95,8 @@ rule = let x = 10
 end
 ```
 """
-@description @flattenable struct Manual{R,W,F} <: ManualRule{R,W}
+@flattenable @description struct Manual{R,W,F} <: ManualRule{R,W}
+    # Field | Flatten | Description
     f::F    | true    | "Function to apply to the data, index and read values"
 end
 Manual(f; read=:_default_, write=read) = Manual{read,write}(f)

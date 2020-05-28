@@ -1,7 +1,8 @@
+
 """
-    sim!(output, ruleset;
-         init=nothing,
-         tstpan=(1, length(output)),
+    sim!(output, [ruleset=ruleset(output)];
+         init=init(ruleset),
+         tstpan=tspan(output),
          fps=fps(output),
          simdata=nothing,
          nreplicates=nothing)
@@ -23,32 +24,34 @@ the passed in output for each time-step.
 - `simdata`: a [`SimData`](@ref) object. Keeping it between simulations can reduce memory
   allocation when that is important.
 """
-sim!(output::Output, ruleset::Ruleset;
-     init=nothing, tspan::Union{Tuple,AbstractRange}=1:length(output), 
-     fps=fps(output), nreplicates=nothing, simdata=nothing) = begin
-    if tspan isa Tuple
-        tspan = first(tspan):timestep(ruleset):last(tspan)
-    elseif step(tspan) != step(ruleset)
+sim!(output::Output, ruleset=ruleset(output);
+     init=init(output), 
+     tspan=tspan(output), 
+     fps=fps(output), 
+     nreplicates=nothing, 
+     simdata=nothing) = begin
+
+    # Some rules are only valid for a set time-step size.
+    step(ruleset) !== nothing && step(ruleset) != step(tspan) &&
         throw(ArgumentError("tspan step $(step(tspan)) must equal rule step $(step(ruleset))"))
-    end
+
     initialise(output)
     isrunning(output) && error("A simulation is already running in this output")
     setrunning!(output, true) || error("Could not start the simulation with this output")
-    starttime = first(tspan)
-    setstarttime!(output, starttime)
+    setstarttime!(output, first(tspan))
     # Copy the init array from the ruleset or keyword arg
-    init = chooseinit(DynamicGrids.init(ruleset), init)
-    simdata = initdata!(simdata, ruleset, init, starttime, nreplicates)
+    simdata = initdata!(simdata, init, mask(output), ruleset, tspan, nreplicates)
     # Delete grids output by the previous simulations
     initgrids!(output, init)
     setfps!(output, fps)
     # Show the first grid
-    showgrid(output, simdata, 1, starttime)
+    showgrid(output, simdata, 1, tspan)
     # Let the init grid be displayed as long as a normal grid
     delay(output, 1)
     # Run the simulation
     runsim!(output, simdata, 1:lastindex(tspan))
 end
+
 """
     sim!(output, rules...; init, kwargs...)
 
@@ -58,25 +61,19 @@ You must pass in the `init` `Array` of `NamedTuple`, and if the `tspan` is not
 simply a `Tuple` or `AbstractRange` of `Int`, it must be passed in as a range 
 in order to know the timestep.
 """
-sim!(output::Output, rules::Rule...; init, tspan, 
+sim!(output::Output, rules::Rule...; 
+     tspan=tspan(output), 
      overflow=RemoveOverflow(), 
-     opt=SparseeOpt(), 
+     opt=SparseOpt(), 
      mask=nothing,
+     init=init(output),
      cellsize=1,
      kwargs...) = begin
     ruleset = Ruleset(rules...; 
-        timestep=step(tspan), mask=mask, cellsize=cellsize, opt=opt, overflow=overflow,
+        timestep=step(tspan), cellsize=cellsize, opt=opt, overflow=overflow
     )
-    sim!(output, ruleset; init=init, tspan=tspan, kwargs...)
+    sim!(output::Output, ruleset; tspan=tspan, init=init)
 end
-
-# Allows attaching an init array to the ruleset, but also passing in an
-# alternate array as a keyword arg (which will take preference).
-chooseinit(rulesetinit, arginit) = arginit
-chooseinit(rulesetinit::Nothing, arginit) = arginit
-chooseinit(rulesetinit, arginit::Nothing) = rulesetinit
-chooseinit(rulesetinit::Nothing, arginit::Nothing) =
-    throw(ArgumentError("Must include `init` grid(s): either in the `Ruleset` or with the `init` keyword"))
 
 """
     resume!(output::Output, ruleset::Ruleset;
@@ -103,24 +100,26 @@ array will not be accepted.
 - `simdata`: a [`SimData`](@ref) object. Keeping it between simulations can reduce memory
   allocation when that is important.
 """
-resume!(output::Output, ruleset::Ruleset;
+resume!(output::Output, ruleset::Ruleset=ruleset(output);
         tstop=stoptime(output), fps=fps(output),
         simdata=nothing, nreplicates=nothing) = begin
     initialise(output)
     length(output) > 0 || error("There is no simulation to resume. Run `sim!` first")
     isrunning(output) && error("A simulation is already running in this output")
     setrunning!(output, true) || error("Could not start the simulation with this output")
-    tstart = starttime(output)
-    lastframe = lastindex(tstart:timestep(ruleset):stoptime(output))
-    stopframe = lastindex(tstart:timestep(ruleset):tstop)
+    lastframe = lastindex(tspan(output))
+    newtspan = tspan(output)[1]:step(tspan(output)):tstop
+    stopframe = lastindex(newtspan)
+
     fspan = lastframe:stopframe
+    setstoptime!(output, tstop)
     # Use the last frame of the existing simulation as the init frame
     if lastframe <= length(output)
         init = output[lastframe]
     else
         init = first(output)
     end
-    simdata = initdata!(simdata, ruleset, init, tstart, nreplicates)
+    simdata = initdata!(simdata, init, mask(output), ruleset, newtspan, nreplicates)
     setfps!(output, fps)
     runsim!(output, simdata, fspan)
 end

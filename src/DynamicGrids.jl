@@ -12,6 +12,7 @@ end DynamicGrids
 using Colors,
       ConstructionBase,
       Crayons,
+      DimensionalData,
       DocStringExtensions,
       FieldDefaults,
       FieldMetadata,
@@ -37,7 +38,7 @@ import FieldMetadata: @description, description,
 
 
 
-export sim!, resume!, replay, savegif, isinferred, neighbors
+export sim!, resume!, replay, savegif, isinferred, neighbors, rules
 
 export Rule, NeighborhoodRule, CellRule, ManualRule, ManualNeighborhoodRule
 

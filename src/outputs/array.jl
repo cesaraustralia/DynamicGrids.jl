@@ -1,21 +1,27 @@
 """
-    ArrayOutput(init; tspan::Range) 
-    ArrayOutput(init, length::Integer)
+    ArrayOutput(init; tspan::AbstractRange) 
 
 A simple output that stores each step of the simulation in a vector of arrays.
 
-### Arguments:
-- `frames`: Single init array or vector of arrays
-- `length`: The length of the output.
+## Arguments:
+- `init`: initialisation `Array` or `NamedTuple` of `Array`
+
+## Keyword Argument:
+- `tspan`: `AbstractRange` timespan for the simulation
 """
 @Output mutable struct ArrayOutput{T} <: Output{T} end
 
-ArrayOutput(init, length::Integer; kwargs...) = begin
-    frames = [deepcopy(init)]
-    append!(frames, zerogrids(init, length-1))
-    ArrayOutput(; frames=frames, kwargs...)
+ArrayOutput(init; mask=nothing, tspan, kwargs...) = begin
+    frames = zerogrids(init, length(tspan))
+    frames[1] = deepcopy(init)
+    running = false
+    if length(kwargs) > 1
+        @warn "additional keyword arguments not use: $kwargs"
+    end
+    ArrayOutput(frames, init, mask, running, tspan)
 end
 
-zerogrids(initgrid::AbstractArray, nframes) = [zero(initgrid) for f in 1:nframes]
+zerogrids(initgrid::AbstractArray, nframes) = 
+    [zero(initgrid) for f in 1:nframes]
 zerogrids(initgrids::NamedTuple, nframes) =
     [map(grid -> zero(grid), initgrids) for f in 1:nframes]

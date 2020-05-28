@@ -48,7 +48,7 @@ unwrap(::Val{X}) where X = X
 unwrap(::Type{Val{X}}) where X = X
 
 """
-    isinferred(ruleset::Ruleset, starttime=1; init=nothing)
+    isinferred(output::Output, ruleset::Ruleset)
 
 Test if a custom rule return type is inferred and correct.
 Type-stability can give orders of magnitude improvements in performance.
@@ -58,11 +58,12 @@ it must be passed in as a keyword argument.
 
 Passing `starttime` is optional, in case the time type has some effect on the rule.
 """
-isinferred(ruleset::Ruleset, starttime=1; init=nothing) = begin
-    init_ = chooseinit(DynamicGrids.init(ruleset), init)
-    simdata = SimData(init_, ruleset, starttime)
+isinferred(output::Output, rules::Rule...) = 
+    isinferred(output, Ruleset(rules...))
+isinferred(output::Output, ruleset::Ruleset) = begin
+    simdata = SimData(init(output), mask(output), ruleset, tspan(output))
     map(rules(ruleset)) do rule
-        isinferred(simdata, rule, init_)
+        isinferred(simdata, rule, init(output))
     end
     true
 end

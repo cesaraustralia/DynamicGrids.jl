@@ -21,7 +21,6 @@ using DynamicGrids: inbounds, isinbounds
         @test inbounds((-22,0), (10, 10), WrapOverflow()) == ((8,10),true)
         @test isinbounds((-22,0), (10, 10), WrapOverflow()) == true
     end
-    
 end
 
 @testset "isinferred" begin
@@ -31,15 +30,18 @@ end
                 x > 1 ? 2 : 0.0
             end
         end
-        @test_throws ErrorException isinferred(Ruleset(rule; init=rand(Int, 10, 10)))
+        output = ArrayOutput(rand(Int, 10, 10); tspan=1:10)
+        @test_throws ErrorException isinferred(output, rule)
     end
 
     @testset "return type" begin
         rule = Neighbors(RadialNeighborhood{1}(zeros(Bool, 3, 3))) do hood, x
             round(Int, x + sum(hood))
         end
-        @test isinferred(Ruleset(rule; init=rand(Int, 10, 10)))
-        @test_throws ErrorException isinferred(Ruleset(rule; init=rand(Bool, 10, 10)))
+        output = ArrayOutput(rand(Int, 10, 10); tspan=1:10)
+        @test isinferred(output, rule)
+        output = ArrayOutput(rand(Bool, 10, 10); tspan=1:10)
+        @test_throws ErrorException isinferred(output, rule)
     end
 
     @testset "let blocks" begin
@@ -47,14 +49,18 @@ end
         rule = Manual() do data, index, x
             data[1][index...] = round(Int, x + a)
         end
-        @test_throws ErrorException isinferred(Ruleset(rule; init=zeros(Int, 10, 10)))
+        output = ArrayOutput(zeros(Int, 10, 10); tspan=1:10)
+        @test_throws ErrorException isinferred(output, Ruleset(rule))
         a = 0.7
         rule = let a = a
             Manual() do data, index, x
                 data[1][index...] = round(Int, x + a)
             end
         end
-        @test isinferred(Ruleset(rule; init=zeros(Int, 10, 10)))
+
+        output = ArrayOutput(zeros(Int, 10, 10); tspan=1:10)
+        @test isinferred(output, Ruleset(rule))
     end
 
+    # TODO: implement/test for NamedTuple init
 end

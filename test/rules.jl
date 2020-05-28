@@ -10,13 +10,6 @@ init  = [0 1 1 0;
          0 1 1 0;
          0 1 1 0]
 
-@testset "Ruleset or sim must include an init grid" begin
-    output = ArrayOutput(init, 7)
-    ruleset = Ruleset()
-    @test_throws ArgumentError sim!(output, ruleset)
-end
-
-
 struct AddOneRule{R,W} <: Rule{R,W} end
 DynamicGrids.applyrule(::AddOneRule, data, state, args...) = state + 1
 
@@ -24,16 +17,12 @@ DynamicGrids.applyrule(::AddOneRule, data, state, args...) = state + 1
     init = [0.0 4.0 0.0
             0.0 5.0 8.0
             3.0 6.0 0.0]
-
     mask = Bool[0 1 0
                 0 1 1
                 1 1 0]
-
-    rules = Ruleset(AddOneRule{:_default_,:_default_}(); init=init, mask=mask)
-
-    output = ArrayOutput(init, 3)
-    sim!(output, rules; tspan=(1, 3))
-
+    rules = Ruleset(AddOneRule{:_default_,:_default_}())
+    output = ArrayOutput(init; tspan=1:3, mask=mask)
+    sim!(output, rules)
     @test output[1] == [0.0 4.0 0.0
                         0.0 5.0 8.0
                         3.0 6.0 0.0]
@@ -59,17 +48,15 @@ applyrule(::TestRule, data, state, index) = 0
              0 0 0 0]
 
     rule = TestRule{:a,:a}()
-    ruleset = Ruleset(rule; init=(a=init,))
+    ruleset = Ruleset(rule)
 
-    @test DynamicGrids.init(ruleset)[:a] === init
-    @test DynamicGrids.mask(ruleset) === nothing
     @test DynamicGrids.overflow(ruleset) === RemoveOverflow()
     @test DynamicGrids.opt(ruleset) === SparseOpt()
     @test DynamicGrids.cellsize(ruleset) === 1
-    @test DynamicGrids.timestep(ruleset) === 1
+    @test DynamicGrids.timestep(ruleset) === nothing
     @test DynamicGrids.ruleset(ruleset) === ruleset
 
-    simdata = SimData(init, ruleset, 1)
+    simdata = SimData(init, nothing, ruleset, 1)
 
     # Test maprules components
     rkeys, rdata = getdata(_Read_(), rule, simdata)
@@ -90,9 +77,9 @@ applyrule!(::TestManual, data, state, index) = 0
 
 @testset "A partial rule that returns zero does nothing" begin
     rule = TestManual()
-    ruleset = Ruleset(rule; init=init)
+    ruleset = Ruleset(rule)
     # Test type stability
-    simdata = SimData(init, ruleset, 1)
+    simdata = SimData(init, nothing, ruleset, 1)
     rkeys, rdata = getdata(_Read_(), rule, simdata)
     wkeys, wdata = getdata(_Write_(), rule, simdata)
     newsimdata = @set simdata.data = combinedata(wkeys, wdata, rkeys, rdata)
@@ -114,8 +101,8 @@ applyrule!(::TestManualWrite, data, state, index) = data[:_default_][index[1], 2
              0 0 1 0]
 
     rule = TestManualWrite()
-    ruleset = Ruleset(rule; init=init)
-    simdata = SimData(init, ruleset, 1)
+    ruleset = Ruleset(rule)
+    simdata = SimData(init, nothing, ruleset, 1)
     resultdata = maprule!(simdata, rule)
     @test source(first(resultdata)) == final
 end
@@ -134,8 +121,8 @@ applyrule(::TestCellSquare, data, (state,), index) = state^2
              144 225 324 441]
     rule = Chain(TestCellTriple(), 
                  TestCellSquare())
-    ruleset = Ruleset(rule; init=init)
-    simdata = SimData(init, ruleset, 1)
+    ruleset = Ruleset(rule)
+    simdata = SimData(init, nothing, ruleset, 1)
     resultdata = maprule!(simdata, ruleset.rules[1]);
     @test source(first(resultdata)) == final
 end
@@ -159,9 +146,9 @@ applyrule(rule::PrecalcRule, data, state, index) = rule.precalc[]
              3 3]
 
     rule = PrecalcRule(1)
-    ruleset = Ruleset(rule; init=init)
-    output = ArrayOutput(init, 3)
-    sim!(output, ruleset; tspan=(1, 3))
+    ruleset = Ruleset(rule)
+    output = ArrayOutput(init; tspan=1:3)
+    sim!(output, ruleset)
     @test output[2] == out2
     @test output[3] == out3
 end
@@ -207,8 +194,8 @@ end
 @testset "Multi-grid rules work" begin
     init = (prey=[10. 10.], predator=[1. 0.])
     ruleset = Ruleset(DoubleY{Tuple{:predator,:prey},:prey}(), predation)
-    output = ArrayOutput(init, 3)
-    sim!(output, ruleset; init=init, tspan=(1, 3))
+    output = ArrayOutput(init; tspan=1:3)
+    sim!(output, ruleset; init=init)
     @test output[2] == (prey=[18. 20.], predator=[2. 0.])
     @test output[3] == (prey=[32. 40.], predator=[4. 0.])
 end
@@ -216,8 +203,8 @@ end
 @testset "Multi-grid rules work" begin
     init = (prey=[10. 10.], predator=[0. 0.])
     ruleset = Ruleset(HalfX{:prey,Tuple{:prey,:predator}}())
-    output = ArrayOutput(init, 3)
-    sim!(output, ruleset; init=init, tspan=(1, 3))
+    output = ArrayOutput(init; tspan=1:3)
+    sim!(output, ruleset)
     @test output[2] == (prey=[10. 10.], predator=[5. 5.])
     @test output[3] == (prey=[10. 10.], predator=[5. 5.])
 end

@@ -109,27 +109,28 @@ A simdata object is accessable in `applyrule` as the second parameter.
 Multiple grids can be indexed into using their key. Single grids
 can be indexed as if SimData is regular array.
 """
-struct SimData{I,D,Ru,STi,CTi,CFr} <: AbstractSimData
+struct SimData{I,D,Ru,TS,CFr} <: AbstractSimData
     init::I
     data::D
     ruleset::Ru
-    starttime::STi
-    currenttime::CTi
+    tspan::TS
     currentframe::CFr
 end
-SimData(init::AbstractArray, ruleset::Ruleset, starttime) =
-    SimData((_default_=init,), ruleset::Ruleset, starttime)
-SimData(init::NamedTuple, ruleset::Ruleset, starttime) = begin
+SimData(init::AbstractArray, mask::Union{Nothing,AbstractArray}, ruleset::Ruleset, tspan) =
+    SimData((_default_=init,), mask, ruleset::Ruleset, tspan)
+SimData(init::NamedTuple, mask::Union{Nothing,AbstractArray}, ruleset::Ruleset, tspan) = begin
     # Calculate the neighborhood radus (and grid padding) for each grid
     radii = NamedTuple{keys(init)}(get(radius(ruleset), key, 0) for key in keys(init))
     # Construct the SimData for each grid
     griddata = map(init, radii) do in, ra
-        ReadableGridData(in, mask(ruleset), ra, overflow(ruleset))
+        ReadableGridData(in, mask, ra, overflow(ruleset))
     end
-    SimData(init, griddata, ruleset, starttime)
+    SimData(init, griddata, ruleset, tspan)
 end
-SimData(init, griddata, ruleset::Ruleset, starttime) =
-    SimData(init, griddata, ruleset, starttime, starttime, 1)
+SimData(init::NamedTuple, griddata::NamedTuple, ruleset::Ruleset, tspan) = begin
+    currentframe = 1; 
+    SimData(init, griddata, ruleset, tspan, currentframe)
+end
 
 
 # Getters
@@ -137,8 +138,10 @@ init(d::SimData) = d.init
 ruleset(d::SimData) = d.ruleset
 data(d::SimData) = d.data
 grids(d::SimData) = d.data
-starttime(d::SimData) = d.starttime
-currenttime(d::SimData) = d.currenttime
+tspan(d::SimData) = d.tspan
+starttime(d::SimData) = first(tspan(d))
+timestep(d::SimData) = step(tspan(d))
+currenttime(d::SimData) = tspan(d)[currentframe(d)]
 currenttime(d::Vector{<:SimData}) = currenttime(d[1])
 currentframe(d::SimData) = d.currentframe
 
@@ -150,13 +153,13 @@ Base.first(d::SimData) = first(grids(d))
 Base.last(d::SimData) = last(grids(d))
 
 gridsize(d::SimData) = gridsize(first(d))
-mask(d::SimData) = mask(ruleset(d))
+mask(d::SimData) = mask(first(d))
 rules(d::SimData) = rules(ruleset(d))
 overflow(d::SimData) = overflow(ruleset(d))
 opt(d::SimData) = opt(ruleset(d))
-timestep(d::SimData) = timestep(ruleset(d))
+timestep(d::SimData) = step(tspan(d))
 
-# Get the actual current timestep, ie. not variable periods like Month
+# Get the actual current timestep, e.g. seconds instead of variable periods like Month
 currenttimestep(d::SimData) = currenttime(d) + timestep(d) - currenttime(d)
 
 
@@ -172,12 +175,8 @@ end
 # Uptate timestamp
 updatetime(data::SimData, f::Integer) = begin
     @set! data.currentframe = f
-    @set data.currenttime = timefromframe(data, f)
 end
 updatetime(simdata::AbstractVector{<:SimData}, f) = updatetime.(simdata, f)
-
-timefromframe(simdata::AbstractSimData, f::Int) =
-    starttime(simdata) + (f - 1) * timestep(simdata)
 
 #=
 Find the maximum radius required by all rules
@@ -226,16 +225,16 @@ copystatus!(srcstatus::AbstractArray, deststatus::AbstractArray) =
     @inbounds return srcstatus .= deststatus
 
 # When replicates are an Integer, construct a vector of SimData
-initdata!(::Nothing, ruleset::Ruleset, init, starttime, nreplicates::Integer) =
-    [SimData(init, ruleset, starttime) for r in 1:nreplicates]
+initdata!(::Nothing, init, mask, ruleset::Ruleset, tspan, nreplicates::Integer) =
+    [SimData(init, mask, ruleset, tspan) for r in 1:nreplicates]
 # When simdata is a Vector, the existing SimData arrays are re-initialised
-initdata!(simdata::AbstractVector{<:AbstractSimData}, ruleset, init, starttime, nreplicates::Integer) =
-    map(d -> initdata!(d, ruleset, init, starttime, nothing), simdata)
+initdata!(simdata::AbstractVector{<:AbstractSimData}, init, mask, ruleset, tspan, nreplicates::Integer) =
+    map(d -> initdata!(d, init, mask, ruleset, tspan, nothing), simdata)
 # When no simdata is passed in, create new SimData
-initdata!(::Nothing, ruleset::Ruleset, init, starttime, nreplicates::Nothing) =
-    SimData(init, ruleset, starttime)
-# Initialise a SimData object with a new `Ruleset` and starttime.
-initdata!(simdata::AbstractSimData, ruleset::Ruleset, inits::NamedTuple, starttime, nreplicates::Nothing) = begin
+initdata!(::Nothing, init, mask, ruleset::Ruleset, tspan, nreplicates::Nothing) =
+    SimData(init, mask, ruleset, tspan)
+# Initialise a SimData object with a new `Ruleset` and tspan.
+initdata!(simdata::AbstractSimData, inits::NamedTuple, mask, ruleset::Ruleset, tspan, nreplicates::Nothing) = begin
     map(values(simdata), values(inits)) do grid, init
         for j in 1:gridsize(grid)[2], i in 1:gridsize(grid)[1]
             @inbounds source(grid)[i, j] = dest(grid)[i, j] = init[i, j]
@@ -243,11 +242,11 @@ initdata!(simdata::AbstractSimData, ruleset::Ruleset, inits::NamedTuple, startti
         updatestatus!(grid)
     end
     @set! simdata.ruleset = ruleset
-    @set! simdata.starttime = starttime
+    @set! simdata.tspan = tspan
     simdata
 end
-initdata!(simdata::AbstractSimData, ruleset::Ruleset, init::AbstractArray, starttime, nreplicates::Nothing) =
-    initdata!(simdata, ruleset, (_default_=init,), starttime, nreplicates)
+initdata!(simdata::AbstractSimData, init::AbstractArray, mask, ruleset::Ruleset, tspan, nreplicates::Nothing) =
+    initdata!(simdata, (_default_=init,), mask, ruleset, tspan, nreplicates)
 
 # Convert regular index to block index
 indtoblock(x, blocksize) = (x - 1) ÷ blocksize + 1

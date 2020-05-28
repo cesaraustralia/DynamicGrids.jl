@@ -10,15 +10,16 @@ and in many cases can be used interchangeably.
 """
 abstract type Output{T} <: AbstractVector{T} end
 
-# Generic ouput constructor. Converts an init array to vector of arrays.
-(::Type{F})(init::AbstractMatrix; kwargs...) where F <: Output =
-    F(; frames=[deepcopy(init)], kwargs...)
-(::Type{F})(init::NamedTuple; kwargs...) where F <: Output =
-    F(; frames=[deepcopy(init)], kwargs...)
-
-# Generic constructor that rewraps any output in another output type
-(::Type{F})(o::T; kwargs...) where F <: Output where T <: Output =
-    F(; frames=frames(o), starttime=starttime(o), stoptime=stoptime(o), kwargs...)
+"""
+Mixin of basic fields for all outputs
+"""
+@premix struct Output{T,A<:AbstractVector{T},I,M}
+    frames::A
+    init::I
+    mask::M
+    running::Bool
+    tspan::AbstractRange # Intentionally not type-stable
+end
 
 # Forward base methods to the frames array
 Base.parent(o::Output) = frames(o)
@@ -26,31 +27,43 @@ Base.length(o::Output) = length(frames(o))
 Base.size(o::Output) = size(frames(o))
 Base.firstindex(o::Output) = firstindex(frames(o))
 Base.lastindex(o::Output) = lastindex(frames(o))
-Base.@propagate_inbounds Base.getindex(o::Output, i) =
+Base.@propagate_inbounds Base.getindex(o::Output, i::Union{Int,AbstractVector,Colon}) =
     getindex(frames(o), i)
-Base.@propagate_inbounds Base.setindex!(o::Output, x, i) = setindex!(frames(o), x, i)
+Base.@propagate_inbounds Base.setindex!(o::Output, x, i::Union{Int,AbstractVector,Colon}) =
+    setindex!(frames(o), x, i)
 Base.push!(o::Output, x) = push!(frames(o), x)
 
-
-"""
-Mixin of basic fields for all outputs
-"""
-@premix @default_kw struct Output{T,A<:AbstractVector{T}}
-    frames::A      | []
-    running::Bool  | false
-    starttime::Any | 1
-    stoptime::Any  | 1
+DimensionalData.DimensionalArray(o::Output{<:NamedTuple}; key=first(keys(o[1]))) = 
+    cat(map(f -> f[key], frames(o)...); dims=timedim(o))
+DimensionalData.DimensionalArray(o::Output{<:DimensionalArray}) = 
+    cat(frames(o)...; dims=timedim(o))
+DimensionalData.dims(o::Output) = begin
+    ts = tspan(o)
+    val = isstored(o) ? ts : ts[end]:step(ts):ts[end]
+    (Ti(val; mode=Sampled(Ordered(), Regular(step(ts)), Intervals(Start()))),)
 end
+
 
 # Getters and setters
 frames(o::Output) = o.frames
-starttime(o::Output) = o.starttime
-stoptime(o::Output) = o.stoptime
-tspan(o::Output) = (stoptime(o), starttime(o))
+init(o::Output) = o.init
+mask(o::Output) = o.mask
+tspan(o::Output) = o.tspan
+starttime(o::Output) = first(tspan(o))
+stoptime(o::Output) = last(tspan(o))
+Base.step(o::Output) = step(tspan(o))
 isrunning(o::Output) = o.running
-setrunning!(o::Output, val) = o.running = val
-setstarttime!(output, x) = output.starttime = x
-setstoptime!(output, x) = output.stoptime = x
+ruleset(o::Output) =
+    throw(ArgumentError("No ruleset for output. Pass one to `sim!` as the second argument"))
+
+setrunning!(o::Output, val) =
+    o.running = val
+settspan!(output, tspan) =
+    output.tspan = tspan
+setstarttime!(output, start) =
+    output.tspan = start:step(output.tspan):last(output.tspan)
+setstoptime!(output, stop) =
+    output.tspan = first(output.tspan):step(output.tspan):stop
 
 """
     isasync(o::Output)
@@ -144,7 +157,7 @@ storegrid!(output::Output, data::AbstractVector{<:AbstractSimData}) = begin
 end
 
 # Grids are preallocated and reused.
-initgrids!(o::Output, init) = initgrids!(o[1], o::Output, init) 
+initgrids!(o::Output, init) = initgrids!(o[1], o::Output, init)
 # Array grids are copied
 initgrids!(grid::AbstractArray, o::Output, init::AbstractArray) = begin
     grid .= init
@@ -154,7 +167,7 @@ initgrids!(grid::AbstractArray, o::Output, init::AbstractArray) = begin
     o
 end
 # The first grid in a named tuple is used if the output is a single Array
-initgrids!(grid::AbstractArray, o::Output, init::NamedTuple) = 
+initgrids!(grid::AbstractArray, o::Output, init::NamedTuple) =
     initgrids!(grid, o, first(init))
 # All arrays are copied if both are named tuples
 initgrids!(grids::NamedTuple, o::Output, init::NamedTuple) = begin
