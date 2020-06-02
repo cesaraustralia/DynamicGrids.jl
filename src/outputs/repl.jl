@@ -31,15 +31,18 @@ REPLOutput(init)
 ```
 The default option is `:block`.
 """
-@Graphic @Output mutable struct REPLOutput{Co,St,Cu} <: GraphicOutput{T}
+mutable struct REPLOutput{T,F<:AbstractVector{T},E,GC,Co,St,Cu} <: GraphicOutput{T}
+    frames::F
+    running::Bool
+    extent::E
+    graphicconfig::GC
     color::Co  
     style::St 
     cutoff::Cu
 end
-REPLOutput(; frames, init, mask, running, tspan, fps, timestamp, stampframe, store,
-           color=:white, cutoff=0.5, style=Block()) =
-    REPLOutput(frames, init, mask, running, tspan, fps, timestamp, stampframe, 
-               store, color, style, cutoff) 
+REPLOutput(; frames, running, extent, graphicconfig,
+           color=:white, cutoff=0.5, style=Block(), kwargs...) =
+    REPLOutput(frames, running, extent, graphicconfig, color, style, cutoff) 
 
 # initialise(o::REPLOutput, args...) = begin
     # o.displayoffset .= 1

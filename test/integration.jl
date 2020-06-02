@@ -105,20 +105,21 @@ end
     end
 
     @testset "Results match glider behaviour" begin
-        output = ArrayOutput((a=init,); tspan=tspan=(Date(2001, 1, 1):Day(2):Date(2001, 1, 14)))
+        output = ArrayOutput((a=init,); tspan=(Date(2001, 1, 1):Day(2):Date(2001, 1, 14)))
         sim!(output, rule; overflow=RemoveOverflow(), nreplicates=5)
         @test output[2][:a] == test2_rem
         @test output[3][:a] == test3_rem
         @test output[5][:a] == test5_rem
         @test output[7][:a] == test7_rem
     end
+
 end
 
 
 @testset "Life simulation with WrapOverflow" begin
     # Loop over shifing init to make sure they all work
     for i = 1:7 
-        bufs = zeros(Int, 3, 3), zeros(Int, 3, 3)
+        bufs = (zeros(Int, 3, 3), zeros(Int, 3, 3))
         rule = Life(neighborhood=RadialNeighborhood{1}(bufs))
         sparse_ruleset = Ruleset(; 
             rules=(rule,), 
@@ -169,6 +170,8 @@ end
     )
     tspan=0u"s":5u"s":6u"s"
     output = REPLOutput(init; tspan=tspan, style=Block(), fps=100, store=true)
+    DynamicGrids.isstored(output)
+    DynamicGrids.store(output)
     sim!(output, ruleset)
     resume!(output, ruleset; tstop=30u"s")
     @test output[2] == test2
@@ -179,8 +182,7 @@ end
 
 @testset "REPLOutput braile works, in Months" begin
     init_a = (_default_=init,)
-    ruleset = Ruleset(; 
-        rules=(Life(),), 
+    ruleset = Ruleset(Life(); 
         overflow=WrapOverflow(),
         timestep=Month(1),
         opt=SparseOpt(),

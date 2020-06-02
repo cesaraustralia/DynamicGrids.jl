@@ -179,7 +179,7 @@ rule = let prob_combustion=0.0001, prob_regrowth=0.01
     end
 end
 
-# Set up the init array, ruleset and output (using a Gtk window)
+# Set up the init array and output (using a Gtk window)
 init = fill(ALIVE, 400, 400)
 processor = ColorProcessor(scheme=ColorSchemes.rainbow, zerocolor=RGB24(0.0))
 output = GtkOutput(init; tspan=1:200, fps=25, minval=DEAD, maxval=BURNING, processor=processor)
@@ -197,8 +197,8 @@ savegif("forestfire.gif", output)
 Timing the simulation for 200 steps, the performance is quite good:
 
 ```julia
-output = ArrayOutput(init, 200)
-@time sim!(output, ruleset; tspan=(1, 200))
+output = ArrayOutput(init; tspan=1:200)
+@time sim!(output, ruleset)
  1.384755 seconds (640 allocations: 2.569 MiB)
 
 # To save a gif of the ArrayOutput we need to pass in a processor and the min and max
@@ -206,22 +206,6 @@ output = ArrayOutput(init, 200)
 
 savegif("forestfire.gif", output; minval=DEAD, maxval=BURNING, processor=processor)
 ```
-
-We can also tweak the parameters while the simulation runs in atom:
-
-```julia
-using DynamicGridsInteract, FieldMetadata
-import FieldMetadata: @bounds, bounds, @description, description
-
-@bounds @description :($(typeof(rule.f)) begin
-    prob_combustion | (0.0, 0.01) | "Probability the cell will spontaneously combust"
-    prob_regrowth   | (0.0, 0.1)  | "Probability the cell will grow back"
-end
-
-output = InteractOutput(init, rule; fps=25, minval=DEAD, maxval=BURNING, processor=processor)
-display(output)
-```
-
 
 ## Alternatives
 

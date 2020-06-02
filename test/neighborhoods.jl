@@ -1,5 +1,5 @@
 using DynamicGrids, Setfield, Test
-import DynamicGrids: neighbors, sumneighbors, SimData, radius, neighbors,
+import DynamicGrids: neighbors, sumneighbors, SimData, Extent, radius, neighbors,
        mapsetneighbor!, neighborhood, WritableGridData, dest, hoodsize, neighborhoodkey,
        allocbuffer, allocbuffers, buffer
 
@@ -28,7 +28,7 @@ end
     moore = RadialNeighborhood{1}(init[1:3, 1:3])
 
     @test buffer(moore) == init[1:3, 1:3]
-    multibuffer = RadialNeighborhood{1}((zeros(Int, 3, 3), ones(Int, 3, 4)))
+    multibuffer = RadialNeighborhood{1}(zeros(Int, 3, 3))
     @test buffer(multibuffer) == zeros(Int, 3, 3)
     @test hoodsize(moore) == 3
     @test moore[2, 2] == 0
@@ -157,7 +157,8 @@ end
     hood = RadialNeighborhood{1}()
     rule = TestManualNeighborhoodRule{:a,:a}(hood)
     ruleset = Ruleset(rule)
-    simdata = SimData(init, nothing, ruleset, 1)
+    extent = Extent((_default_=init,), nothing, 1:1, nothing)
+    simdata = SimData(extent, ruleset)
     state = 5
     index = (3, 3)
     @test mapsetneighbor!(WritableGridData(first(simdata)), hood, rule, state, index) == 40
@@ -172,7 +173,8 @@ end
     hood = CustomNeighborhood(((-1, -1), (1, 1)))
     rule = TestManualNeighborhoodRule{:a,:a}(hood)
     ruleset = Ruleset(rule)
-    simdata = SimData(init, nothing, ruleset, 1)
+    extent = Extent((_default_=init,), nothing, 1:1, nothing)
+    simdata = SimData(extent, ruleset)
     state = 1
     index = (5, 5)
     @test mapsetneighbor!(WritableGridData(first(simdata)), neighborhood(rule), rule, state, index) == 2
@@ -192,7 +194,8 @@ end
     rule = TestManualNeighborhoodRule{:a,:a}(hood)
     @test radius(rule) === 2
     ruleset = Ruleset(rule)
-    simdata = SimData(init, nothing, ruleset, 1)
+    extent = Extent((_default_=init,), nothing, 1:1, nothing)
+    simdata = SimData(extent, ruleset)
     state = 1
     index = (3, 3)
     @test mapsetneighbor!(WritableGridData(first(simdata)), neighborhood(rule), rule, state, index) == (2, 2)

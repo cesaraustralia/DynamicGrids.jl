@@ -1,7 +1,7 @@
 using DynamicGrids, OffsetArrays, Test, Dates
 using DynamicGrids: initdata!, data, init, mask, radius, overflow, source, 
     dest, sourcestatus, deststatus, localstatus, gridsize,
-    ruleset, grids, starttime, currentframe, grids, SimData, 
+    ruleset, grids, starttime, currentframe, grids, SimData, Extent,
     updatetime, ismasked, currenttimestep, WritableGridData
 
 inita = [0 1 1
@@ -15,7 +15,9 @@ rs = Ruleset(life, timestep=Day(1))
 tspan = DateTime(2001):Day(1):DateTime(2001, 2)
 
 @testset "initdata!" begin
-    simdata = initdata!(nothing, initab, nothing, rs, tspan, nothing)
+
+    extent = Extent(initab, nothing, tspan, nothing)
+    simdata = initdata!(nothing, extent, rs, nothing)
     @test simdata isa SimData
     @test init(simdata) == initab
     @test ruleset(simdata) === rs
@@ -62,14 +64,16 @@ tspan = DateTime(2001):Day(1):DateTime(2001, 2)
     @test eltype(grida) == Int
     @test ismasked(grida, 1, 1) == false
 
-    initdata!(simdata, initab, nothing, rs, tspan, nothing)
+    extent = Extent(initab, nothing, tspan, nothing)
+    initdata!(simdata, extent, rs, nothing)
 end
 
 @testset "initdata! with :_default_" begin
     initx = [1 0]
     rs = Ruleset(Life())
-    simdata = initdata!(nothing, initx, nothing, rs, tspan, nothing)
-    simdata2 = initdata!(simdata, initx, nothing, rs, tspan, nothing)
+    extent = Extent((_default_=initx,), nothing, tspan, nothing)
+    simdata = initdata!(nothing, extent, rs, nothing)
+    simdata2 = initdata!(simdata, extent, rs, nothing)
     @test keys(simdata2) == (:_default_,)
     @test DynamicGrids.ruleset(simdata2) === rs
     @test DynamicGrids.init(simdata2[:_default_]) == [1 0]
@@ -81,12 +85,13 @@ end
 
 @testset "initdata! with replicates" begin
     nreps = 2
-    simdata = initdata!(nothing, initab, nothing, rs, tspan, nreps)
+    extent = Extent(initab, nothing, tspan, nothing)
+    simdata = initdata!(nothing, extent, rs, nreps)
     @test simdata isa Vector{<:SimData}
     @test all(DynamicGrids.ruleset.(simdata) .== Ref(rs))
     @test all(map(DynamicGrids.tspan, simdata) .== Ref(tspan))
     @test all(keys.(DynamicGrids.grids.(simdata)) .== Ref(keys(initab)))
-    simdata2 = initdata!(simdata, initab, nothing, rs, tspan, nreps)
+    simdata2 = initdata!(simdata, extent, rs, nreps)
 end
 
 # TODO more comprehensively unit test? a lot of this is

@@ -1,8 +1,8 @@
 using DynamicGrids, Setfield, FieldMetadata, Test
 import DynamicGrids: applyrule, applyrule!, maprule!, 
-       source, dest, currenttime, getdata, combinedata, ruleloop,
+       source, dest, currenttime, getgrids, combinegrids, ruleloop,
        SimData, WritableGridData, _Read_, _Write_,
-       Rule, readkeys, writekeys, @Image, @Graphic, @Output
+       Rule, Extent, readkeys, writekeys
 
 init  = [0 1 1 0;
          0 1 1 0;
@@ -49,6 +49,7 @@ applyrule(::TestRule, data, state, index) = 0
 
     rule = TestRule{:a,:a}()
     ruleset = Ruleset(rule)
+    mask = nothing
 
     @test DynamicGrids.overflow(ruleset) === RemoveOverflow()
     @test DynamicGrids.opt(ruleset) === SparseOpt()
@@ -56,17 +57,18 @@ applyrule(::TestRule, data, state, index) = 0
     @test DynamicGrids.timestep(ruleset) === nothing
     @test DynamicGrids.ruleset(ruleset) === ruleset
 
-    simdata = SimData(init, nothing, ruleset, 1)
+    extent = Extent((_default_=init,), nothing, 1:1, nothing)
+    simdata = SimData(extent, ruleset)
 
     # Test maprules components
-    rkeys, rdata = getdata(_Read_(), rule, simdata)
-    wkeys, wdata = getdata(_Write_(), rule, simdata)
+    rkeys, rgrids = getgrids(_Read_(), rule, simdata)
+    wkeys, wgrids = getgrids(_Write_(), rule, simdata)
     @test rkeys == Val{:_default_}()
     @test wkeys == Val{:_default_}()
-    newsimdata = @set simdata.data = combinedata(rkeys, rdata, wkeys, wdata)
-    @test newsimdata.data[1] isa WritableGridData
+    newsimdata = @set simdata.grids = combinegrids(rkeys, rgrids, wkeys, wgrids)
+    @test newsimdata.grids[1] isa WritableGridData
     # Test type stability
-    @inferred ruleloop(NoOpt(), rule, newsimdata, rkeys, rdata, wkeys, wdata)
+    @inferred ruleloop(NoOpt(), rule, newsimdata, rkeys, rgrids, wkeys, wgrids, mask)
     
     resultdata = maprule!(simdata, rule)
     @test source(resultdata[:_default_]) == final
@@ -78,13 +80,15 @@ applyrule!(::TestManual, data, state, index) = 0
 @testset "A partial rule that returns zero does nothing" begin
     rule = TestManual()
     ruleset = Ruleset(rule)
+    mask = nothing
     # Test type stability
-    simdata = SimData(init, nothing, ruleset, 1)
-    rkeys, rdata = getdata(_Read_(), rule, simdata)
-    wkeys, wdata = getdata(_Write_(), rule, simdata)
-    newsimdata = @set simdata.data = combinedata(wkeys, wdata, rkeys, rdata)
+    extent = Extent((_default_=init,), nothing, 1:1, nothing)
+    simdata = SimData(extent, ruleset)
+    rkeys, rgrids = getgrids(_Read_(), rule, simdata)
+    wkeys, wgrids = getgrids(_Write_(), rule, simdata)
+    newsimdata = @set simdata.grids = combinegrids(wkeys, wgrids, rkeys, rgrids)
 
-    @inferred ruleloop(NoOpt(), rule, newsimdata, rkeys, rdata, wkeys, wdata)
+    @inferred ruleloop(NoOpt(), rule, newsimdata, rkeys, rgrids, wkeys, wgrids, mask)
 
     resultdata = maprule!(simdata, rule)
     @test source(resultdata[:_default_]) == init
@@ -102,7 +106,8 @@ applyrule!(::TestManualWrite, data, state, index) = data[:_default_][index[1], 2
 
     rule = TestManualWrite()
     ruleset = Ruleset(rule)
-    simdata = SimData(init, nothing, ruleset, 1)
+    extent = Extent((_default_=init,), nothing, 1:1, nothing)
+    simdata = SimData(extent, ruleset)
     resultdata = maprule!(simdata, rule)
     @test source(first(resultdata)) == final
 end
@@ -122,7 +127,8 @@ applyrule(::TestCellSquare, data, (state,), index) = state^2
     rule = Chain(TestCellTriple(), 
                  TestCellSquare())
     ruleset = Ruleset(rule)
-    simdata = SimData(init, nothing, ruleset, 1)
+    extent = Extent((_default_=init,), nothing, 1:1, nothing)
+    simdata = SimData(extent, ruleset)
     resultdata = maprule!(simdata, ruleset.rules[1]);
     @test source(first(resultdata)) == final
 end
@@ -131,8 +137,8 @@ end
 struct PrecalcRule{R,W,P} <: Rule{R,W}
     precalc::P
 end
-DynamicGrids.precalcrules(rule::PrecalcRule, data) = 
-    PrecalcRule(currenttime(data))
+DynamicGrids.precalcrules(rule::PrecalcRule, simdata) = 
+    PrecalcRule(currenttime(simdata))
 applyrule(rule::PrecalcRule, data, state, index) = rule.precalc[]
 
 @testset "Rule precalculations work" begin

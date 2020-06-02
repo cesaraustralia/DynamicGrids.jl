@@ -49,19 +49,16 @@ ruleset(rs::AbstractRuleset) = rs
 Base.step(rs::AbstractRuleset) = timestep(rs)
 
 """
-    Ruleset(rules...; overflow=RemoveOverflow(), opt=SparseOpt(), cellsize=1, timestep=1)
+    Ruleset(rules...; overflow=RemoveOverflow(), opt=SparseOpt(), cellsize=1, timestep=nothing)
 
 A container for holding a sequence of `Rule`and simulaiton details like overflow handing 
 and optimisation.  Rules will be run in the order they are passed, ie. `Ruleset(rule1, rule2, rule3)`.
 
 ## Keyword Arguments
-- `overflow`: determine what to do with overflow of grid edges.
-  Options are `RemoveOverflow()` or `WrapOverflow()`.
-  Available from `applyrule` with `overflow(data)`
+- `opt`: a [`PerformanceOpt`](@ref) to specificy optimisations like [`SparseOpt`](@ref).
+- `overflow`: what to do with overflow of grid edges. Options are `RemoveOverflow()` or `WrapOverflow()`.
 - `cellsize`: Size of cells.
-  Available from `applyrule` with `timestep(data)`
-- `timestep`: timestep size for all rules. eg. `Month(1)` or `1u"s"`.
-  Available from `applyrule` with `timestep(data)`
+- `timestep`: fixed timestep where this is reuired for some rules. eg. `Month(1)` or `1u"s"`.
 """
 @default_kw @flattenable mutable struct Ruleset{O<:Overflow,Op<:PerformanceOpt,C,T} <: AbstractRuleset
     # Rules are intentionally not type stable. This allows `precalc` and Interact.jl 

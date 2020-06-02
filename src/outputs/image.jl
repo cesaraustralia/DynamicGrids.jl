@@ -1,3 +1,14 @@
+struct ImageConfig{P,Min,Max}
+    processor::P
+    minval::Min
+    maxval::Max
+end
+ImageConfig(; processor=ColorProcessor(), minval=0, maxval=1, kwargs...) = 
+    ImageConfig(processor, minval, maxval)
+
+processor(ic::ImageConfig) = ic.processor
+minval(ic::ImageConfig) = ic.minval
+maxval(ic::ImageConfig) = ic.maxval
 
 const RulesetOrSimData = Union{Ruleset,AbstractSimData}
 
@@ -16,48 +27,28 @@ abstract type ImageOutput{T} <: GraphicOutput{T} end
 """
 Construct one ImageOutput from another Output
 """
-(::Type{F})(o::T; 
-    frames=frames(o),
-    init=init(o),
-    mask=mask(o),
-    tspan=tspan(o),
-    fps=fps(o),
-    timestamp=0.0,
-    stampframe=1,
-    store=store(o),
-    processor=processor(o),
-    minval=minval(o),
-    maxval=maxval(o),
-    kwargs...) where F <: ImageOutput where T <: Output = 
-    F(; frames=frames, init=init, mask=mask, tspan=tspan, fps=fps, timestamp=timestamp, 
-        stampframe=stampframe, store=store, processor=processor, minval=minval, 
-        maxval=maxval, kwargs...)
-
-"""
-Mixin fields for `ImageOutput`s
-"""
-@premix struct Image{P,Min,Max}
-    processor::P
-    minval::Min
-    maxval::Max
-end
+(::Type{F})(o::T; frames=frames(o), extent=extent(o), graphicconfig=graphicconfig(o),
+    imageconfig=imageconfig(o), kwargs...) where F <: ImageOutput where T <: Output = 
+    F(; frames=frames, running=false, extent=extent, graphicconfig=graphicconfig, 
+      imageconfig=imagconfig, kwargs...)
 
 # Generic ImageOutput constructor. Converts an init array to vector of arrays.
-(::Type{T})(init::Union{NamedTuple,AbstractMatrix}; mask=nothing, tspan, fps=25.0, 
-            store=false, processor=ColorProcessor(), minval=0, maxval=1, kwargs...
-           ) where T <: ImageOutput =
-    T(; frames=[deepcopy(init)], init=init, mask=mask, running=false, tspan=tspan, 
-      fps=fps, timestamp=0.0, stampframe=1, store=store, 
-      processor=processor, minval=minval, maxval=maxval, kwargs...)
+(::Type{T})(init::Union{NamedTuple,AbstractMatrix}; 
+            extent=nothing, graphicconfig=nothing, imageconfig=nothing, kwargs...
+           ) where T <: ImageOutput = begin
+    extent = extent isa Nothing ? Extent(; init=init, kwargs...) : extent
+    graphicconfig = graphicconfig isa Nothing ? GraphicConfig(; kwargs...) : extent
+    imageconfig = imageconfig isa Nothing ? ImageConfig(; kwargs...) : imageconfig
+    T(; frames=[deepcopy(init)], running=false, 
+      extent=extent, graphicconfig=graphicconfig, imageconfig=imageconfig, kwargs...)
+end
 
-processor(o::Output) = ColorProcessor()
-processor(o::ImageOutput) = o.processor
+imageconfig(o::Output) = ImageConfig()
+imageconfig(o::ImageOutput) = o.imageconfig
 
-minval(o::Output) = 0
-minval(o::ImageOutput) = o.minval
-
-maxval(o::Output) = 1
-maxval(o::ImageOutput) = o.maxval
+processor(o::Output) = processor(imageconfig(o))
+minval(o::Output) = minval(imageconfig(o))
+maxval(o::Output) = maxval(imageconfig(o))
 
 
 # Allow construcing a frame with the ruleset passed in instead of SimData
@@ -470,9 +461,13 @@ combinebands(c::Tuple{Nothing,Vararg}, xs, acc) =
     combinebands(tail(c), tail(xs), acc)
 combinebands(c::Tuple{}, xs, acc) = rgb(acc...)
 
-@Image @Graphic @Output struct NoDisplayImageOutput{T} <: ImageOutput{T} end
+mutable struct NoDisplayImageOutput{T,F<:AbstractVector{T},E,GC,IC} <: ImageOutput{T}
+    frames::F
+    running::Bool 
+    extent::E
+    graphicconfig::GC
+    imageconfig::IC
+end
 
-NoDisplayImageOutput(; frames, init, mask, running, tspan, fps, 
-    timestamp, stampframe, store, processor, minval, maxval, kwargs...) =
-    NoDisplayImageOutput(frames, init, mask, running, tspan, fps, timestamp, stampframe, 
-                         store, processor, minval, maxval)
+NoDisplayImageOutput(; frames, running, extent, graphicconfig, imageconfig, kwargs...) =
+    NoDisplayImageOutput(frames, running, extent, graphicconfig, imageconfig)
