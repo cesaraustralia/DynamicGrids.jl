@@ -1,6 +1,5 @@
 using Documenter, DynamicGrids
-using DynamicGrids: @Output, @Graphic, @Image, applyrule, applyrule!,
-      setneighbor!, mapsetneighbor!, neighbors, sumneighbors,
+using DynamicGrids: applyrule, applyrule!, setneighbor!, mapsetneighbor!, neighbors, sumneighbors,
       AbstractSimData, SimData, GridData, ReadableGridData, WritableGridData
 
 makedocs(

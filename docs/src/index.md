@@ -21,26 +21,26 @@ init = round.(Int8, max.(0.0, rand(-2.0:0.1:1.0, 70,70)))
 model = Ruleset(Life())
 
 # Use an output that shows the cellular automata as blocks in the REPL
-output = REPLOutput(init; fps=5)
+output = REPLOutput(init; tspan=1:50, fps=5)
 
-sim!(output, model; init=init, tspan=(1, 50))
+sim!(output, model)
 ```
 
 More life-like examples:
 
 ```julia
 # Morley
-sim!(output, Ruleset(Life(b=[3,6,8], s=[2,4,5]); init=init))
+sim!(output, Ruleset(Life(b=[3,6,8], s=[2,4,5]))
 
 # 2x2
-sim!(output, Ruleset(Life(b=[3,6], s=[1,2,5]); init=init))
+sim!(output, Ruleset(Life(b=[3,6], s=[1,2,5])))
 
 # Dimoeba
 init1 = round.(Int8, max.(0.0, rand(70,70)))
 sim!(output, Ruleset(Life(b=[3,5,6,7,8], s=[5,6,7,8]); init=init1))
 
 ## No death
-sim!(output, Ruleset(Life(b=[3], s=[0,1,2,3,4,5,6,7,8]); init))
+sim!(output, Ruleset(Life(b=[3], s=[0,1,2,3,4,5,6,7,8])))
 
 ## 34 life
 sim!(output, Ruleset(Life(b=[3,4], s=[3,4])); init=init, fps=10)
@@ -63,13 +63,15 @@ any number of grids.
 ```@docs
 Ruleset
 Rule
-CellRule
-NeighborhoodRule
-ManualRule
-ManualNeighborhoodRule
-Map          
 Chain
+CellRule
+Cell
+NeighborhoodRule
+Neighbors
 Life
+ManualRule
+Manual
+ManualNeighborhoodRule
 ```
 
 ```@docs
@@ -79,7 +81,7 @@ applyrule!
 
 ## Neighborhoods
 
-Neighborhoods define a pattern of cells surrounding the current cell, 
+Neighborhoods define a pattern of cells surrounding the current cell,
 and how they are combined to update the value of the current cell.
 
 ```@docs
@@ -111,26 +113,17 @@ REPLOutput
 ImageOutput
 ```
 
-
-Dynamic grids uses [Mixers.jl](https://github.com/rafaqz/Mixers.jl) mixins
-to simplify specifying custom outputs with the required fields.
-
-```@docs
-@Output
-@Graphic
-@Image
-```
-
 ### Grid processors
 
 ```@docs
 GridProcessor
-SingleGridProcessor 
+SingleGridProcessor
 ColorProcessor
 MultiGridProcessor
 ThreeColorProcessor
 LayoutProcessor
 Greyscale
+Grayscale
 ```
 
 ### Gifs
@@ -139,13 +132,24 @@ Greyscale
 savegif
 ```
 
-## Overflow
+## Ruleset config
+
+### Overflow
 
 ```@docs
 Overflow
 WrapOverflow
 RemoveOverflow
 ```
+
+### Optimisation
+
+```@docs
+PerformanceOpt
+NoOpt
+SparseOpt
+```
+
 
 ## Internal data handling
 

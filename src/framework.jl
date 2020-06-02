@@ -1,7 +1,10 @@
+
 """
-    sim!(output, ruleset;
-         init=nothing,
-         tstpan=(1, length(output)),
+    sim!(output, [ruleset=ruleset(output)];
+         init=init(output),
+         mask=mask(output),
+         tstpan=tspan(output),
+         aux=aux(output),
          fps=fps(output),
          simdata=nothing,
          nreplicates=nothing)
@@ -11,72 +14,68 @@ the passed in output for each time-step.
 
 ### Arguments
 - `output`: An [`Output`](@ref) to store grids or display them on the screen.
-- `ruleset`: A [`Ruleset`](@ref) containing one ore more [`Rule`](@ref)s.
-  These will each be run in sequence.
+- `ruleset`: A [`Ruleset`](@ref) containing one ore more [`Rule`](@ref)s. If the output
+  has a `Ruleset` attached, it will be used.
 
 ### Keyword Arguments
-- `init`: the initialisation array. If not passed, the [`Ruleset`](@ref) must contain an `init` array.
+
+Theses are the taken from the output argument by default.
+
+- `init`: optional array or NamedTuple of arrays.
+- `mask`: a `Bool` array matching the init array size. `false` cells do not run.
+- `aux`: a `NamedTuple` of auxilary data to be used by rules.
 - `tspan`: a tuple holding the start and end of the timespan the simulaiton will run for.
-  Taken from the output length if not passed in.
 - `fps`: the frames per second to display. Will be taken from the output if not passed in.
 - `nreplicates`: the number of replicates to combine in stochastic simulations
 - `simdata`: a [`SimData`](@ref) object. Keeping it between simulations can reduce memory
   allocation when that is important.
 """
-sim!(output::Output, ruleset::Ruleset;
-     init=nothing, tspan::Union{Tuple,AbstractRange}=1:length(output), 
-     fps=fps(output), nreplicates=nothing, simdata=nothing) = begin
-    if tspan isa Tuple
-        tspan = first(tspan):timestep(ruleset):last(tspan)
-    elseif step(tspan) != step(ruleset)
+sim!(output::Output, ruleset=ruleset(output);
+     init=init(output),
+     mask=mask(output),
+     tspan=tspan(output),
+     aux=aux(output),
+     fps=fps(output),
+     nreplicates=nothing,
+     simdata=nothing) = begin
+
+    # Some rules are only valid for a set time-step size.
+    step(ruleset) !== nothing && step(ruleset) != step(tspan) &&
         throw(ArgumentError("tspan step $(step(tspan)) must equal rule step $(step(ruleset))"))
-    end
+
+    # Rebuild Extent to allow kwarg alterations
+    extent = Extent(asnamedtuple(init), mask, tspan, aux)
+    # Set up output
     initialise(output)
     isrunning(output) && error("A simulation is already running in this output")
     setrunning!(output, true) || error("Could not start the simulation with this output")
-    starttime = first(tspan)
-    setstarttime!(output, starttime)
-    # Copy the init array from the ruleset or keyword arg
-    init = chooseinit(DynamicGrids.init(ruleset), init)
-    simdata = initdata!(simdata, ruleset, init, starttime, nreplicates)
+    setstarttime!(output, first(tspan))
+    # Create or update the combined data object for the simulation
+    simdata = initdata!(simdata, extent, ruleset, nreplicates)
     # Delete grids output by the previous simulations
     initgrids!(output, init)
+    # Set run speed for GraphicOutputs
     setfps!(output, fps)
     # Show the first grid
-    showgrid(output, simdata, 1, starttime)
+    showgrid(output, simdata, 1, tspan)
     # Let the init grid be displayed as long as a normal grid
     delay(output, 1)
-    # Run the simulation
+    # Run the simulation over simdata and a unitrange
     runsim!(output, simdata, 1:lastindex(tspan))
 end
+
 """
-    sim!(output, rules...; init, kwargs...)
+    sim!(output, rules...; kwargs...)
 
 Shorthand for running a rule without defining a `Ruleset`.
-
-You must pass in the `init` `Array` of `NamedTuple`, and if the `tspan` is not 
-simply a `Tuple` or `AbstractRange` of `Int`, it must be passed in as a range 
-in order to know the timestep.
 """
-sim!(output::Output, rules::Rule...; init, tspan, 
-     overflow=RemoveOverflow(), 
-     opt=SparseeOpt(), 
-     mask=nothing,
-     cellsize=1,
+sim!(output::Output, rules::Rule...;
+     tspan=tspan(output),
+     overflow=RemoveOverflow(),
      kwargs...) = begin
-    ruleset = Ruleset(rules...; 
-        timestep=step(tspan), mask=mask, cellsize=cellsize, opt=opt, overflow=overflow,
-    )
-    sim!(output, ruleset; init=init, tspan=tspan, kwargs...)
+    ruleset = Ruleset(rules...; timestep=step(tspan), kwargs...)
+    sim!(output::Output, ruleset; tspan=tspan, kwargs...)
 end
-
-# Allows attaching an init array to the ruleset, but also passing in an
-# alternate array as a keyword arg (which will take preference).
-chooseinit(rulesetinit, arginit) = arginit
-chooseinit(rulesetinit::Nothing, arginit) = arginit
-chooseinit(rulesetinit, arginit::Nothing) = rulesetinit
-chooseinit(rulesetinit::Nothing, arginit::Nothing) =
-    throw(ArgumentError("Must include `init` grid(s): either in the `Ruleset` or with the `init` keyword"))
 
 """
     resume!(output::Output, ruleset::Ruleset;
@@ -85,9 +84,8 @@ chooseinit(rulesetinit::Nothing, arginit::Nothing) =
             simdata=nothing,
             nreplicates=nothing)
 
-Restart the simulation where you stopped last time. For arguments see [`sim!`](@ref).
-The keyword arg `tadd` indicates the number of grid frames to add, and of course an init
-array will not be accepted.
+Restart the simulation from where you stopped last time. For arguments see [`sim!`](@ref).
+The keyword arg `stop` can be used to extend the length of the simulation.
 
 ### Arguments
 - `output`: An [`Output`](@ref) to store grids or display them on the screen.
@@ -95,33 +93,41 @@ array will not be accepted.
   These will each be run in sequence.
 
 ### Keyword Arguments (optional
-- `init`: the initialisation array. If not passed, the [`Ruleset`](@ref) must contain
-  an `init` array.
-- `tstop`: the stop time for the simulation. Taken from the output length if not passed in.
-- `fps`: the frames per second to display. Taken from the output if not passed in.
+- `init`: an optional initialisation array
+- `tstop`: the new stop time for the simulation. Taken from the output length by default.
+- `fps`: the frames per second to display. Taken from the output by default.
 - `nreplicates`: the number of replicates to combine in stochastic simulations
-- `simdata`: a [`SimData`](@ref) object. Keeping it between simulations can reduce memory
-  allocation when that is important.
+- `simdata`: a [`SimData`](@ref) object. Keeping it between simulations can improve performance
+  when that is important
 """
-resume!(output::Output, ruleset::Ruleset;
-        tstop=stoptime(output), fps=fps(output),
-        simdata=nothing, nreplicates=nothing) = begin
+resume!(output::Output, ruleset::Ruleset=ruleset(output);
+        tstop=stoptime(output),
+        fps=fps(output),
+        simdata=nothing,
+        nreplicates=nothing) = begin
+    # Initialise
     initialise(output)
+    # Check status and arguments
     length(output) > 0 || error("There is no simulation to resume. Run `sim!` first")
     isrunning(output) && error("A simulation is already running in this output")
     setrunning!(output, true) || error("Could not start the simulation with this output")
-    tstart = starttime(output)
-    lastframe = lastindex(tstart:timestep(ruleset):stoptime(output))
-    stopframe = lastindex(tstart:timestep(ruleset):tstop)
+
+    # Calculate new timespan
+    lastframe = lastindex(tspan(output))
+    new_tspan = tspan(output)[1]:step(tspan(output)):tstop
+    stopframe = lastindex(new_tspan)
     fspan = lastframe:stopframe
+    setstoptime!(output, tstop)
     # Use the last frame of the existing simulation as the init frame
     if lastframe <= length(output)
         init = output[lastframe]
     else
         init = first(output)
     end
-    simdata = initdata!(simdata, ruleset, init, tstart, nreplicates)
+
     setfps!(output, fps)
+    extent = Extent(asnamedtuple(init), mask(output), new_tspan, aux(output))
+    simdata = initdata!(simdata, extent, ruleset, nreplicates)
     runsim!(output, simdata, fspan)
 end
 
@@ -158,18 +164,18 @@ simloop!(output::Output, simdata, fspan) = begin
         # Exit gracefully
         if !isrunning(output) || f == last(fspan)
             showgrid(output, simdata, f, currenttime(simdata))
-            setrunning!(output, false)
             setstoptime!(output, currenttime(simdata))
             finalise(output)
             break
         end
     end
+    setrunning!(output, false)
     output
 end
 
 # We have to keep the original rulset as it may be modified elsewhere
 # like in an Interact.jl interface. `Ruleset` is mutable.
-precalcrules!(simdata::Vector{<:SimData}) = precalcrules!.(simdata) 
+precalcrules!(simdata::Vector{<:SimData}) = precalcrules!.(simdata)
 precalcrules!(simdata::SimData) = begin
     simdata.ruleset.rules = precalcrules(rules(simdata), simdata)
     simdata

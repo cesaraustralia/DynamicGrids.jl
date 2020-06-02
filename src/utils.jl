@@ -37,18 +37,19 @@ end
 """
 Check if a cell is masked, using the passed-in mask grid.
 """
-@inline ismasked(data::AbstractSimData, I...) = ismasked(mask(data), I...)
-@inline ismasked(data::GridData, I...) = ismasked(mask(data), I...)
-@inline ismasked(mask::Nothing, I...) = false
-@inline ismasked(mask::AbstractArray, I...) = begin
+ismasked(data::AbstractSimData, I...) = ismasked(mask(data), I...)
+ismasked(data::GridData, I...) = ismasked(mask(data), I...)
+ismasked(mask::Nothing, I...) = false
+ismasked(mask::AbstractArray, I...) = begin
     @inbounds return !(mask[I...])
 end
 
+unwrap(x) = x
 unwrap(::Val{X}) where X = X
 unwrap(::Type{Val{X}}) where X = X
 
 """
-    isinferred(ruleset::Ruleset, starttime=1; init=nothing)
+    isinferred(output::Output, ruleset::Ruleset)
 
 Test if a custom rule return type is inferred and correct.
 Type-stability can give orders of magnitude improvements in performance.
@@ -58,11 +59,14 @@ it must be passed in as a keyword argument.
 
 Passing `starttime` is optional, in case the time type has some effect on the rule.
 """
-isinferred(ruleset::Ruleset, starttime=1; init=nothing) = begin
-    init_ = chooseinit(DynamicGrids.init(ruleset), init)
-    simdata = SimData(init_, ruleset, starttime)
+isinferred(output::Output, rules::Rule...) = 
+    isinferred(output, Ruleset(rules...))
+isinferred(output::Output, ruleset::Ruleset) = begin
+    ext = extent(output)
+    ext = @set ext.init = asnamedtuple(init(output))
+    simdata = SimData(ext, ruleset)
     map(rules(ruleset)) do rule
-        isinferred(simdata, rule, init_)
+        isinferred(simdata, rule, init(output))
     end
     true
 end
@@ -73,7 +77,7 @@ isinferred(simdata::SimData, rule::Rule, init::AbstractArray) = begin
     true
 end
 isinferred(simdata::SimData, rule::ManualRule, init::AbstractArray) = begin
-    simdata = @set simdata.data = map(WritableGridData, simdata.data)
+    simdata = @set simdata.grids = map(WritableGridData, simdata.grids)
     @inferred applyrule!(rule, simdata, init[1, 1], (1, 1))
     true
 end
@@ -91,3 +95,6 @@ allocbuffers(init::AbstractArray, r::Int) = Tuple(allocbuffer(init, r) for i in 
 allocbuffer(init::AbstractArray, hood::Neighborhood) = allocbuffer(init, radius(hood))
 allocbuffer(init::AbstractArray, r::Int) = zeros(eltype(init), 2r+1, 2r+1)
 
+asnamedtuple(x::NamedTuple) = x
+asnamedtuple(x::AbstractArray) = (_default_=x,)
+asnamedtuple(e::Extent) = Extent(asnamedtuple(init(e)), mask(e), tspan(e), aux(e))

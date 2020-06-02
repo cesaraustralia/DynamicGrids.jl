@@ -28,7 +28,7 @@ rule = let y = y
 end
 ```
 """
-@description @flattenable struct Cell{R,W,F} <: CellRule{R,W}
+@flattenable @description struct Cell{R,W,F} <: CellRule{R,W}
     # Field | Flatten | Description
     f::F    | true    | "Function to apply to the read values"
 end
@@ -52,7 +52,12 @@ A [`NeighborhoodRule`](@ref) that receives a neighbors object for the first
 `read` grid and the passed in neighborhood, followed by the cell values for 
 the reqquired grids, as with [`Cell`](@ref).
 
-Returned value(s) are written to the `write`/`W` grid.
+Returned value(s) are written to the `write`/`W` grid. 
+
+As with all NeighborhoodRule, you do not have to check bounds at grid edges, 
+that is handled for you by growing the grid to match the neighborhood radius.
+Using [`SparseOpt`](@ref) may imrove neighborhood performance when zero values
+are both common and can be safely ignored.
 
 ## Example
 
@@ -63,8 +68,9 @@ rule = let x = 10
     end
 end
 ```
+The `let` block greatly imroves performance.
 """
-@description @flattenable struct Neighbors{R,W,F,N} <: NeighborhoodRule{R,W}
+@flattenable @description struct Neighbors{R,W,F,N} <: NeighborhoodRule{R,W}
     # Field         | Flatten | Description
     f::F            | true    | "Function to apply to the neighborhood and read values"
     neighborhood::N | true    | ""
@@ -94,8 +100,10 @@ rule = let x = 10
     end
 end
 ```
+The `let` block greatly imroves performance.
 """
-@description @flattenable struct Manual{R,W,F} <: ManualRule{R,W}
+@flattenable @description struct Manual{R,W,F} <: ManualRule{R,W}
+    # Field | Flatten | Description
     f::F    | true    | "Function to apply to the data, index and read values"
 end
 Manual(f; read=:_default_, write=read) = Manual{read,write}(f)
@@ -104,3 +112,17 @@ Manual(f; read=:_default_, write=read) = Manual{read,write}(f)
     let data=data, index=index, rule=rule, read=astuple(rule, read)
         rule.f(data, index, read...)
     end
+
+"""
+    method(rule)
+
+Get the method of a `Cell`, `Neighbors`, or `Manual` rule.
+"""
+method(rule::Union{Cell,Neighbors,Manual}) = rule.f
+"""
+    methodtype(rule)
+
+Get the method type of a `Cell`, `Neighbors`, or `Manual` rule.
+This is useful in combination with FieldMetadata.jl macros.
+"""
+methodtype(rule::Union{Cell,Neighbors,Manual}) = typeof(method(rule))

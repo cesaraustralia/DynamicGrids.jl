@@ -1,48 +1,53 @@
+
+mutable struct GraphicConfig{FPS,TS,SF}
+    fps::FPS
+    timestamp::TS
+    stampframe::SF
+    store::Bool
+end
+GraphicConfig(; fps=25.0, store=false, kwargs...) =
+    GraphicConfig(fps, 0.0, 1, store)
+
+
+fps(gc::GraphicConfig) = gc.fps
+timestamp(gc::GraphicConfig) = gc.timestamp
+stampframe(gc::GraphicConfig) = gc.stampframe
+store(gc::GraphicConfig) = gc.store
+setfps!(gc::GraphicConfig, x) = gc.fps = x
+settimestamp!(o::GraphicConfig, f) = begin
+    o.timestamp = time()
+    o.stampframe = f
+end
+
 """
 Outputs that display the simulation frames live.
 """
 abstract type GraphicOutput{T} <: Output{T} end
 
-(::Type{F})(o::T; kwargs...) where F <: GraphicOutput where T <: GraphicOutput = F(; 
-    frames=frames(o), 
-    starttime=starttime(o), 
-    stoptime=stoptime(o),
-    fps=fps(o), 
-    showfps=showfps(o), 
-    timestamp=timestamp(o), 
-    stampframe=stampframe(o), 
-    store=store(o),
-    kwargs...
-)
-
-"""
-Mixin for graphic output fields
-"""
-@premix @default_kw struct Graphic{FPS,SFPS,TS,SF}
-    fps::FPS       | 25.0
-    showfps::SFPS  | 25.0
-    timestamp::TS  | 0.0
-    stampframe::SF | 1
-    store::Bool    | false
+# Generic ImageOutput constructor. Converts an init array to vector of arrays.
+(::Type{T})(init::Union{NamedTuple,AbstractMatrix}; extent=nothing, graphicconfig=nothing, 
+            kwargs...) where T <: GraphicOutput = begin
+    extent = extent isa Nothing ? Extent(; init=init, kwargs...) : extent
+    graphicconfig = graphicconfig isa Nothing ? GraphicConfig(; kwargs...) : graphicconfig
+    T(; frames=[deepcopy(init)], running=false, 
+      extent=extent, graphicconfig=graphicconfig, kwargs...)
 end
+
+graphicconfig(o::Output) = GraphicConfig()
+graphicconfig(o::GraphicOutput) = o.graphicconfig
 
 # Field getters and setters
-fps(o::Output) = nothing
-fps(o::GraphicOutput) = o.fps
-setfps!(o::Output, x) = nothing
-setfps!(o::GraphicOutput, x) = o.fps = x
-showfps(o::Output) = nothing
-showfps(o::GraphicOutput) = o.showfps
-timestamp(o::GraphicOutput) = o.timestamp
-stampframe(o::GraphicOutput) = o.stampframe
-store(o::GraphicOutput) = o.store
+fps(o::GraphicOutput) = fps(graphicconfig(o))
+timestamp(o::GraphicOutput) = timestamp(graphicconfig(o))
+stampframe(o::GraphicOutput) = stampframe(graphicconfig(o))
+store(o::GraphicOutput) = store(graphicconfig(o))
 isstored(o::GraphicOutput) = store(o)
 
+setfps!(o::Output, x) = nothing
+setfps!(o::GraphicOutput, x) = setfps!(graphicconfig(o), x)
+
 settimestamp!(o::Output, f) = nothing
-settimestamp!(o::GraphicOutput, f) = begin
-    o.timestamp = time()
-    o.stampframe = f
-end
+settimestamp!(o::GraphicOutput, f) = settimestamp!(graphicconfig(o), f)
 
 # Output interface
 # Delay output to maintain the frame rate

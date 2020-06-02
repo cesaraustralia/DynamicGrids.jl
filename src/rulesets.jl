@@ -40,8 +40,6 @@ struct NoOpt <: PerformanceOpt end
 abstract type AbstractRuleset end
 
 # Getters
-init(rs::AbstractRuleset) = rs.init
-mask(rs::AbstractRuleset) = rs.mask
 overflow(rs::AbstractRuleset) = rs.overflow
 opt(rs::AbstractRuleset) = rs.opt
 cellsize(rs::AbstractRuleset) = rs.cellsize
@@ -51,35 +49,25 @@ ruleset(rs::AbstractRuleset) = rs
 Base.step(rs::AbstractRuleset) = timestep(rs)
 
 """
-    Ruleset(rules...; init=nothing, mask=nothing, overflow=RemoveOverflow(), opt=SparseeOpt(), cellsize=1, timestep=1)
+    Ruleset(rules...; overflow=RemoveOverflow(), opt=SparseOpt(), cellsize=1, timestep=nothing)
 
-A container for holding a sequence of `Rule`, an `init`
-array and other simulaiton details. Rules will be run in the
-order they are passed, ie. `Ruleset(rule1, rule2, rule3)`.
+A container for holding a sequence of `Rule`and simulaiton details like overflow handing 
+and optimisation.  Rules will be run in the order they are passed, ie. `Ruleset(rule1, rule2, rule3)`.
 
 ## Keyword Arguments
-- `init`: init grid(s) to use if none are supplied to `sim!`.
-  An `AbstractArray`, a `NamedTuple` of `AbsractactArray`, or `nothing`.
-- `mask`: An array of Bool matching the size of `init`. Cells that are `false` will not run.
-- `overflow`: determine what to do with overflow of grid edges.
-  Options are `RemoveOverflow()` or `WrapOverflow()`.
-  Available from `applyrule` with `overflow(data)`
+- `opt`: a [`PerformanceOpt`](@ref) to specificy optimisations like [`SparseOpt`](@ref).
+- `overflow`: what to do with overflow of grid edges. Options are `RemoveOverflow()` or `WrapOverflow()`.
 - `cellsize`: Size of cells.
-  Available from `applyrule` with `timestep(data)`
-- `timestep`: timestep size for all rules. eg. `Month(1)` or `1u"s"`.
-  Available from `applyrule` with `timestep(data)`
+- `timestep`: fixed timestep where this is reuired for some rules. eg. `Month(1)` or `1u"s"`.
 """
-@default_kw @flattenable mutable struct Ruleset{I,M,O<:Overflow,Op<:PerformanceOpt,C,T
-    } <: AbstractRuleset
+@default_kw @flattenable mutable struct Ruleset{O<:Overflow,Op<:PerformanceOpt,C,T} <: AbstractRuleset
     # Rules are intentionally not type stable. This allows `precalc` and Interact.jl 
     # updates to change the rule type. Function barriers remove any performance overheads.
     rules::Tuple{Vararg{<:Rule}} | ()               | true
-    init::I                      | nothing          | false
-    mask::M                      | nothing          | false
     overflow::O                  | RemoveOverflow() | false
     opt::Op                      | SparseOpt()      | false
     cellsize::C                  | 1                | false
-    timestep::T                  | 1                | false
+    timestep::T                  | nothing          | false
 end
 Ruleset(rules::Vararg{<:Rule}; kwargs...) = Ruleset(; rules=rules, kwargs...)
 

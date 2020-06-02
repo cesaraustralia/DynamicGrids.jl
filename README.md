@@ -20,9 +20,8 @@ running the included game of life model `Life()`:
 using DynamicGrids, Crayons
 
 init = rand(Bool, 150, 200)
-output = REPLOutput(init; fps=30, color=Crayon(foreground=:red, background=:black, bold=true))
-ruleset = Ruleset(Life(); init=init)
-sim!(output, ruleset; tspan=(1, 200))
+output = REPLOutput(init; tspan=1:200, fps=30, color=Crayon(foreground=:red, background=:black, bold=true))
+sim!(output, Life())
 ```
 
 ![REPL life](https://github.com/cesaraustralia/DynamicGrids.jl/blob/media/life.gif?raw=true)
@@ -43,21 +42,22 @@ specific `applyrule` method that operates on each of the active cells in the gri
 Rules come in a number of flavours (outlined in the 
 [docs](https://cesaraustralia.github.io/DynamicGrids.jl/stable/#Rules-1)), which allow
 assumptions to be made about running them that can greatly improve performance.
-Rules are joined in a `Ruleset` object and run in sequence:
+Rules are added to a `Ruleset`, with some additional parameters:
 
 ```
-ruleset = Ruleset(Life(2, 3))
+ruleset = Ruleset(Life(2, 3); opt=SparseOpt())
 ```
 
-The `Ruleset` wrapper seems a little redundant here, but multiple models can be
-combined in a `Ruleset`. Each rule will be run for the whole grid, in sequence,
-using appropriate optimisations depending on the parent types of each rule:
+Multiple models can be combined in a `Ruleset`. Each rule will be run for the
+whole grid, in sequence, using appropriate optimisations depending on the parent
+types of each rule:
 
 ```julia
-ruleset = Ruleset(rule1, rule2)
+ruleset = Ruleset(rule1, rule2; timestep=Day(1), opt=SparseOpt())
 ```
 
-For better performance (often ~2x), models included in a `Chain` object will be
+
+For better performance (often ~2x or more), models included in a `Chain` object will be
 combined into a single model, using only one array read and write. This
 optimisation is limited to `CellRule`, or a `NeighborhoodRule`
 followed by `CellRule`. If the `@inline` compiler macro is used on all
@@ -68,16 +68,15 @@ efficient function call.
 ruleset = Ruleset(rule1, Chain(rule2, rule3, rule4))
 ```
 
-A `Ruleset` can also hold rules that act on multiple grids. These may
-either run side by side independently (say for live comparative analysis), or
-interact.
+A `Ruleset` can hold rules that act on multiple grids. These may either run side
+by side independently (say for live comparative analysis), or may interact.
 
 
 ## Init
 
-The init array may be any AbstractArray or a NamedTuple of AbstractArray, 
+`init` may be any `AbstractArray` or a `NamedTuple` of `AbstractArray`, 
 It contains whatever initialisation data is required to start the simulation. 
-The array type, size and element type of the init array determine the types
+The array type, size and element type of the `init` object determine the types
 used in the simulation, as well as providing the initial conditions:
 
 ```juli
@@ -96,7 +95,7 @@ or passed into a simulation, where it will take preference over the `Ruleset` in
 sim!(output, rulset; init=init)
 ```
 
-For multiple grids, init is a NamedTuple of equal-sized arrays
+For multiple grids, `init` is a `NamedTuple` of equal-sized arrays
 matching the names given to each `Ruleset` :
 
 ```julia
@@ -125,14 +124,14 @@ initialised with the init array, but in this case it also requires the number
 of simulation frames to preallocate before the simulation runs.
 
 ```julia
-output = ArrayOutput(init, 10)
+output = ArrayOutput(init; tspan=1:10)
 ```
 
 The `REPLOutput` shown above is an inbuilt `GraphicOutput` that can be useful for checking a
 simulation when working in a terminal or over ssh:
 
 ```julia
-output = REPLOutput(init)
+output = REPLOutput(init; tspan=1:100)
 ```
 
 `ImageOutput` is the most complex class of outputs, allowing full color visual
@@ -180,13 +179,13 @@ rule = let prob_combustion=0.0001, prob_regrowth=0.01
     end
 end
 
-# Set up the init array, ruleset and output (using a Gtk window)
+# Set up the init array and output (using a Gtk window)
 init = fill(ALIVE, 400, 400)
 processor = ColorProcessor(scheme=ColorSchemes.rainbow, zerocolor=RGB24(0.0))
-output = GtkOutput(init; fps=25, minval=DEAD, maxval=BURNING, processor=processor)
+output = GtkOutput(init; tspan=1:200, fps=25, minval=DEAD, maxval=BURNING, processor=processor)
 
 # Run the simulation
-sim!(output, rule; init=init, tspan=(1, 200))
+sim!(output, rule)
 
 # Save the output as a gif
 savegif("forestfire.gif", output)
@@ -195,24 +194,11 @@ savegif("forestfire.gif", output)
 ![forestfire](https://user-images.githubusercontent.com/2534009/72052469-5450c580-3319-11ea-8948-5196d1c6fd33.gif)
 
 
-
-We could also use a "windy" custom neighborhood:
-
-```julia
-windyhood = CustomNeighborhood((1,1), (1,2), (1,3), (2,1), (3,1))
-ruleset = Ruleset(ForestFire(; neighborhood=windyhood); init=init)
-sim!(output, ruleset; tspan=(1, 200))
-savegif("windy_forestfire.gif", output)
-```
-
-![windy_forestfire](https://user-images.githubusercontent.com/2534009/72198637-a95d1a80-3484-11ea-8b77-25a4a94b3943.gif)
-
-
 Timing the simulation for 200 steps, the performance is quite good:
 
 ```julia
-output = ArrayOutput(init, 200)
-@time sim!(output, ruleset; tspan=(1, 200))
+output = ArrayOutput(init; tspan=1:200)
+@time sim!(output, ruleset)
  1.384755 seconds (640 allocations: 2.569 MiB)
 
 # To save a gif of the ArrayOutput we need to pass in a processor and the min and max
@@ -220,22 +206,6 @@ output = ArrayOutput(init, 200)
 
 savegif("forestfire.gif", output; minval=DEAD, maxval=BURNING, processor=processor)
 ```
-
-We can also tweak the parameters while the simulation runs in atom:
-
-```julia
-using DynamicGridsInteract, FieldMetadata
-import FieldMetadata: @bounds, bounds, @description, description
-
-@bounds @description :($(typeof(rule.f)) begin
-  prob_combustion | (0.0, 0.01) | "Probability the cell will spontaneously combust"
-  prob_regrowth   | (0.0, 0.1)  | "Probability the cell will grow back"
-end
-
-output = InteractOutput(init, rule; fps=25, minval=DEAD, maxval=BURNING, processor=processor)
-display(output)
-```
-
 
 ## Alternatives
 

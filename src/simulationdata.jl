@@ -109,38 +109,42 @@ A simdata object is accessable in `applyrule` as the second parameter.
 Multiple grids can be indexed into using their key. Single grids
 can be indexed as if SimData is regular array.
 """
-struct SimData{I,D,Ru,STi,CTi,CFr} <: AbstractSimData
-    init::I
-    data::D
+struct SimData{E,G,Ru,CFr} <: AbstractSimData
+    extent::E
+    grids::G
     ruleset::Ru
-    starttime::STi
-    currenttime::CTi
     currentframe::CFr
 end
-SimData(init::AbstractArray, ruleset::Ruleset, starttime) =
-    SimData((_default_=init,), ruleset::Ruleset, starttime)
-SimData(init::NamedTuple, ruleset::Ruleset, starttime) = begin
+SimData(extent, ruleset::Ruleset) = begin
+    extent = asnamedtuple(extent)
     # Calculate the neighborhood radus (and grid padding) for each grid
-    radii = NamedTuple{keys(init)}(get(radius(ruleset), key, 0) for key in keys(init))
+    keys_ = keys(init(extent))
+    radii = NamedTuple{keys_}(get(radius(ruleset), key, 0) for key in keys_)
     # Construct the SimData for each grid
-    griddata = map(init, radii) do in, ra
-        ReadableGridData(in, mask(ruleset), ra, overflow(ruleset))
+    griddata = map(init(extent), radii) do in, ra
+        ReadableGridData(in, mask(extent), ra, overflow(ruleset))
     end
-    SimData(init, griddata, ruleset, starttime)
+    SimData(extent, griddata, ruleset)
 end
-SimData(init, griddata, ruleset::Ruleset, starttime) =
-    SimData(init, griddata, ruleset, starttime, starttime, 1)
+SimData(extent, griddata::NamedTuple, ruleset::Ruleset) = begin
+    currentframe = 1; 
+    SimData(extent, griddata, ruleset, currentframe)
+end
 
 
 # Getters
-init(d::SimData) = d.init
+extent(d::SimData) = d.extent
 ruleset(d::SimData) = d.ruleset
-data(d::SimData) = d.data
-grids(d::SimData) = d.data
-starttime(d::SimData) = d.starttime
-currenttime(d::SimData) = d.currenttime
-currenttime(d::Vector{<:SimData}) = currenttime(d[1])
+grids(d::SimData) = d.grids
 currentframe(d::SimData) = d.currentframe
+init(d::SimData) = init(extent(d))
+mask(d::SimData) = mask(first(d))
+aux(d::SimData) = aux(extent(d))
+tspan(d::SimData) = tspan(extent(d))
+starttime(d::SimData) = first(tspan(d))
+timestep(d::SimData) = step(tspan(d))
+currenttime(d::SimData) = tspan(d)[currentframe(d)]
+currenttime(d::Vector{<:SimData}) = currenttime(d[1])
 
 # Getters forwarded to data
 Base.getindex(d::SimData, i) = getindex(grids(d), i)
@@ -150,34 +154,28 @@ Base.first(d::SimData) = first(grids(d))
 Base.last(d::SimData) = last(grids(d))
 
 gridsize(d::SimData) = gridsize(first(d))
-mask(d::SimData) = mask(ruleset(d))
 rules(d::SimData) = rules(ruleset(d))
 overflow(d::SimData) = overflow(ruleset(d))
 opt(d::SimData) = opt(ruleset(d))
-timestep(d::SimData) = timestep(ruleset(d))
 
-# Get the actual current timestep, ie. not variable periods like Month
+# Get the actual current timestep, e.g. seconds instead of variable periods like Month
 currenttimestep(d::SimData) = currenttime(d) + timestep(d) - currenttime(d)
 
 
 # Swap source and dest arrays. Allways returns regular SimData.
 swapsource(d::Tuple) = map(swapsource, d)
-swapsource(data::GridData) = begin
-    src = data.source
-    dst = data.dest
-    @set! data.dest = src
-    @set data.source = dst
+swapsource(grid::GridData) = begin
+    src = grid.source
+    dst = grid.dest
+    @set! grid.dest = src
+    @set grid.source = dst
 end
 
 # Uptate timestamp
-updatetime(data::SimData, f::Integer) = begin
-    @set! data.currentframe = f
-    @set data.currenttime = timefromframe(data, f)
+updatetime(simdata::SimData, f::Integer) = begin
+    @set! simdata.currentframe = f
 end
 updatetime(simdata::AbstractVector{<:SimData}, f) = updatetime.(simdata, f)
-
-timefromframe(simdata::AbstractSimData, f::Int) =
-    starttime(simdata) + (f - 1) * timestep(simdata)
 
 #=
 Find the maximum radius required by all rules
@@ -202,8 +200,8 @@ end
 Initialise the block status array.
 This tracks whether anything has to be done in an area of the main array.
 =#
-updatestatus!(data::GridData) =
-    updatestatus!(parent(source(data)), sourcestatus(data), deststatus(data), radius(data))
+updatestatus!(grid::GridData) =
+    updatestatus!(parent(source(grid)), sourcestatus(grid), deststatus(grid), radius(grid))
 updatestatus!(source, sourcestatus::Bool, deststatus::Bool, radius) = nothing
 updatestatus!(source, sourcestatus, deststatus, radius) = begin
     blocksize = 2radius
@@ -218,36 +216,34 @@ updatestatus!(source, sourcestatus, deststatus, radius) = begin
     end
 end
 
-copystatus!(data::Tuple{Vararg{<:GridData}}) = map(copystatus!, data)
-copystatus!(data::GridData) =
-    copystatus!(sourcestatus(data), deststatus(data))
+copystatus!(grid::Tuple{Vararg{<:GridData}}) = map(copystatus!, grid)
+copystatus!(grid::GridData) =
+    copystatus!(sourcestatus(grid), deststatus(grid))
 copystatus!(srcstatus, deststatus) = nothing
 copystatus!(srcstatus::AbstractArray, deststatus::AbstractArray) =
     @inbounds return srcstatus .= deststatus
 
 # When replicates are an Integer, construct a vector of SimData
-initdata!(::Nothing, ruleset::Ruleset, init, starttime, nreplicates::Integer) =
-    [SimData(init, ruleset, starttime) for r in 1:nreplicates]
+initdata!(::Nothing, extent, ruleset::Ruleset, nreplicates::Integer) =
+    [SimData(extent, ruleset) for r in 1:nreplicates]
 # When simdata is a Vector, the existing SimData arrays are re-initialised
-initdata!(simdata::AbstractVector{<:AbstractSimData}, ruleset, init, starttime, nreplicates::Integer) =
-    map(d -> initdata!(d, ruleset, init, starttime, nothing), simdata)
+initdata!(simdata::AbstractVector{<:AbstractSimData}, extent, ruleset, nreplicates::Integer) =
+    map(d -> initdata!(d, extent, ruleset, nothing), simdata)
 # When no simdata is passed in, create new SimData
-initdata!(::Nothing, ruleset::Ruleset, init, starttime, nreplicates::Nothing) =
-    SimData(init, ruleset, starttime)
-# Initialise a SimData object with a new `Ruleset` and starttime.
-initdata!(simdata::AbstractSimData, ruleset::Ruleset, inits::NamedTuple, starttime, nreplicates::Nothing) = begin
-    map(values(simdata), values(inits)) do grid, init
+initdata!(::Nothing, extent, ruleset::Ruleset, nreplicates::Nothing) =
+    SimData(extent, ruleset)
+# Initialise a SimData object with a new `Extent` and `Ruleset`.
+initdata!(simdata::AbstractSimData, extent::Extent, ruleset::Ruleset, nreplicates::Nothing) = begin
+    map(values(simdata), values(init(extent))) do grid, init
         for j in 1:gridsize(grid)[2], i in 1:gridsize(grid)[1]
             @inbounds source(grid)[i, j] = dest(grid)[i, j] = init[i, j]
         end
         updatestatus!(grid)
     end
+    @set! simdata.extent = extent
     @set! simdata.ruleset = ruleset
-    @set! simdata.starttime = starttime
     simdata
 end
-initdata!(simdata::AbstractSimData, ruleset::Ruleset, init::AbstractArray, starttime, nreplicates::Nothing) =
-    initdata!(simdata, ruleset, (_default_=init,), starttime, nreplicates)
 
 # Convert regular index to block index
 indtoblock(x, blocksize) = (x - 1) ÷ blocksize + 1

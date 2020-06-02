@@ -1,7 +1,7 @@
 using DynamicGrids, OffsetArrays, Test, Dates
 using DynamicGrids: initdata!, data, init, mask, radius, overflow, source, 
     dest, sourcestatus, deststatus, localstatus, gridsize,
-    ruleset, grids, starttime, currenttime, currentframe, grids, SimData, 
+    ruleset, grids, starttime, currentframe, grids, SimData, Extent,
     updatetime, ismasked, currenttimestep, WritableGridData
 
 inita = [0 1 1
@@ -12,22 +12,22 @@ initab = (a=inita, b=initb)
 
 life = Life(read=:a, write=:a);
 rs = Ruleset(life, timestep=Day(1))
-tstart = DateTime(2001)
+tspan = DateTime(2001):Day(1):DateTime(2001, 2)
 
 @testset "initdata!" begin
-    simdata = initdata!(nothing, rs, initab, tstart, nothing)
+
+    extent = Extent(initab, nothing, tspan, nothing)
+    simdata = initdata!(nothing, extent, rs, nothing)
     @test simdata isa SimData
     @test init(simdata) == initab
     @test ruleset(simdata) === rs
-    @test starttime(simdata) === tstart
+    @test DynamicGrids.tspan(simdata) === tspan
     @test currentframe(simdata) === 1
-    @test currenttime(simdata) === tstart
     @test first(simdata) === simdata[:a]
     @test last(simdata) === simdata[:b]
     @test overflow(simdata) === RemoveOverflow()
     @test gridsize(simdata) == (2, 3)
     updated = updatetime(simdata, 2)
-    @test currenttime(updated) === tstart + Day(1)
     @test currenttimestep(simdata) == Millisecond(86400000)
 
     gs = grids(simdata)
@@ -64,14 +64,16 @@ tstart = DateTime(2001)
     @test eltype(grida) == Int
     @test ismasked(grida, 1, 1) == false
 
-    initdata!(simdata, rs, initab, tstart, nothing)
+    extent = Extent(initab, nothing, tspan, nothing)
+    initdata!(simdata, extent, rs, nothing)
 end
 
 @testset "initdata! with :_default_" begin
     initx = [1 0]
     rs = Ruleset(Life())
-    simdata = initdata!(nothing, rs, initx, tstart, nothing)
-    simdata2 = initdata!(simdata, rs, initx, tstart, nothing)
+    extent = Extent((_default_=initx,), nothing, tspan, nothing)
+    simdata = initdata!(nothing, extent, rs, nothing)
+    simdata2 = initdata!(simdata, extent, rs, nothing)
     @test keys(simdata2) == (:_default_,)
     @test DynamicGrids.ruleset(simdata2) === rs
     @test DynamicGrids.init(simdata2[:_default_]) == [1 0]
@@ -83,12 +85,13 @@ end
 
 @testset "initdata! with replicates" begin
     nreps = 2
-    simdata = initdata!(nothing, rs, initab, tstart, nreps)
+    extent = Extent(initab, nothing, tspan, nothing)
+    simdata = initdata!(nothing, extent, rs, nreps)
     @test simdata isa Vector{<:SimData}
     @test all(DynamicGrids.ruleset.(simdata) .== Ref(rs))
-    @test all(DynamicGrids.starttime.(simdata) .== Ref(tstart))
+    @test all(map(DynamicGrids.tspan, simdata) .== Ref(tspan))
     @test all(keys.(DynamicGrids.grids.(simdata)) .== Ref(keys(initab)))
-    simdata2 = initdata!(simdata, rs, initab, tstart, nreps)
+    simdata2 = initdata!(simdata, extent, rs, nreps)
 end
 
 # TODO more comprehensively unit test? a lot of this is

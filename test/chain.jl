@@ -1,7 +1,7 @@
 using DynamicGrids, Test, BenchmarkTools
 
 using DynamicGrids: SimData, radius, rules, readkeys, writekeys, 
-    applyrule, sumneighbors, neighborhood, update_chainstate, neighborhoodkey
+    applyrule, sumneighbors, neighborhood, update_chainstate, neighborhoodkey, Extent
 
 @testset "CellRule chain" begin
 
@@ -43,7 +43,7 @@ using DynamicGrids: SimData, radius, rules, readkeys, writekeys,
 
     ruleset = Ruleset(chain)
     init = (a=agrid, b=bgrid, c=cgrid, d=dgrid, e=egrid)
-    data = SimData(init, ruleset, 1)
+    data = SimData(Extent(init=init, tspan=1:1), ruleset)
 
     @test radius(ruleset) == (b=0, c=0, d=0, e=0, a=0)
 
@@ -59,8 +59,8 @@ using DynamicGrids: SimData, radius, rules, readkeys, writekeys,
     # b = @benchmark applyrule($chain, $data, $state, $ind)
     # @test b.allocs == 0
 
-    output = ArrayOutput(init, 3)
-    sim!(output, ruleset; init=init, tspan=(1, 3))
+    output = ArrayOutput(init; tspan=1:3)
+    sim!(output, ruleset)
 
     @test output[2][:a] == [2 0 0  
                             0 0 4]
@@ -92,8 +92,8 @@ end
 
 @testset "NeighbourhoodRule, CellRule chain" begin
 
-    hoodrule = Neighbors(read=:a) do hood, a
-        sum(hood)
+    hoodrule = Neighbors(read=:a) do neighborhodhood, cell
+        sum(neighborhodhood)
     end
 
     rule = Cell{Tuple{:a,:c},:b}() do b, c
@@ -131,11 +131,11 @@ end
     @test lastindex(chain) === 2
 
     ruleset = Ruleset(chain; opt=NoOpt())
-    noopt_output = ArrayOutput(init, 3)
-    @btime sim!($noopt_output, $ruleset; init=$init)
+    noopt_output = ArrayOutput(init; tspan=1:3)
+    @btime sim!($noopt_output, $ruleset)
     
     ruleset = Ruleset(Chain(hoodrule, rule); opt=SparseOpt())
-    sparseopt_output = ArrayOutput(init, 3)
+    sparseopt_output = ArrayOutput(init; tspan=1:3)
     @btime sim!($sparseopt_output, $ruleset; init=$init)
 
     noopt_output[2][:a] == sparseopt_output[2][:a] ==

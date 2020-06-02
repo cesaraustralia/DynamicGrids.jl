@@ -10,15 +10,11 @@ and in many cases can be used interchangeably.
 """
 abstract type Output{T} <: AbstractVector{T} end
 
-# Generic ouput constructor. Converts an init array to vector of arrays.
-(::Type{F})(init::AbstractMatrix; kwargs...) where F <: Output =
-    F(; frames=[deepcopy(init)], kwargs...)
-(::Type{F})(init::NamedTuple; kwargs...) where F <: Output =
-    F(; frames=[deepcopy(init)], kwargs...)
-
-# Generic constructor that rewraps any output in another output type
-(::Type{F})(o::T; kwargs...) where F <: Output where T <: Output =
-    F(; frames=frames(o), starttime=starttime(o), stoptime=stoptime(o), kwargs...)
+# Generic ImageOutput constructor. Converts an init array to vector of arrays.
+(::Type{T})(init::Union{NamedTuple,AbstractMatrix}; extent=nothing, kwargs...) where T <: Output = begin
+    extent = extent isa Nothing ? Extent(; init=init, kwargs...) : extent
+    T(; frames=[deepcopy(init)], running=false, extent=extent, kwargs...)
+end
 
 # Forward base methods to the frames array
 Base.parent(o::Output) = frames(o)
@@ -26,31 +22,42 @@ Base.length(o::Output) = length(frames(o))
 Base.size(o::Output) = size(frames(o))
 Base.firstindex(o::Output) = firstindex(frames(o))
 Base.lastindex(o::Output) = lastindex(frames(o))
-Base.@propagate_inbounds Base.getindex(o::Output, i) =
+Base.@propagate_inbounds Base.getindex(o::Output, i::Union{Int,AbstractVector,Colon}) =
     getindex(frames(o), i)
-Base.@propagate_inbounds Base.setindex!(o::Output, x, i) = setindex!(frames(o), x, i)
+Base.@propagate_inbounds Base.setindex!(o::Output, x, i::Union{Int,AbstractVector,Colon}) =
+    setindex!(frames(o), x, i)
 Base.push!(o::Output, x) = push!(frames(o), x)
 
-
-"""
-Mixin of basic fields for all outputs
-"""
-@premix @default_kw struct Output{T,A<:AbstractVector{T}}
-    frames::A      | []
-    running::Bool  | false
-    starttime::Any | 1
-    stoptime::Any  | 1
+DimensionalData.DimensionalArray(o::Output{<:NamedTuple}; key=first(keys(o[1]))) = 
+    cat(map(f -> f[key], frames(o)...); dims=timedim(o))
+DimensionalData.DimensionalArray(o::Output{<:DimensionalArray}) = 
+    cat(frames(o)...; dims=timedim(o))
+DimensionalData.dims(o::Output) = begin
+    ts = tspan(o)
+    val = isstored(o) ? ts : ts[end]:step(ts):ts[end]
+    (Ti(val; mode=Sampled(Ordered(), Regular(step(ts)), Intervals(Start()))),)
 end
+
 
 # Getters and setters
 frames(o::Output) = o.frames
-starttime(o::Output) = o.starttime
-stoptime(o::Output) = o.stoptime
-tspan(o::Output) = (stoptime(o), starttime(o))
 isrunning(o::Output) = o.running
+extent(o::Output) = o.extent
+init(o::Output) = init(extent(o))
+mask(o::Output) = mask(extent(o))
+tspan(o::Output) = tspan(extent(o))
+aux(o::Output) = aux(extent(o))
+starttime(o::Output) = first(tspan(o))
+stoptime(o::Output) = last(tspan(o))
+Base.step(o::Output) = step(tspan(o))
+ruleset(o::Output) =
+    throw(ArgumentError("No ruleset on the output. Pass one to `sim!` as the second argument"))
+fps(o::Output) = nothing
+
 setrunning!(o::Output, val) = o.running = val
-setstarttime!(output, x) = output.starttime = x
-setstoptime!(output, x) = output.stoptime = x
+settspan!(o::Output, tspan) = settspan!(extent(o), tspan)
+setstarttime!(o::Output, start) = setstarttime!(extent(o), start)
+setstoptime!(o::Output, stop) = setstoptime!(extent(o), stop)
 
 """
     isasync(o::Output)
@@ -122,49 +129,60 @@ storegrid!(::Type{<:AbstractArray}, output::Output, simdata::AbstractSimData, f:
     outgrid = output[f]
     _storeloop(outgrid, first(grids(simdata)))
 end
-_storeloop(outgrid, grid) = begin
-    fill!(outgrid, zero(eltype(outgrid)))
-    for I in CartesianIndices(outgrid)
-        @inbounds outgrid[I] = grid[I]
+_storeloop(outgrid, grid) =
+    for j in axes(outgrid, 2), i in axes(outgrid, 1) 
+        @inbounds outgrid[i, j] = grid[i, j]
     end
-end
 
 # Replicated frames
-storegrid!(output::Output, data::AbstractVector{<:AbstractSimData}) = begin
+storegrid!(output::Output{<:AbstractArray}, data::AbstractVector{<:AbstractSimData}) = begin
     f = gridindex(output, data[1])
     outgrid = output[f]
-    outgrid isa NamedTuple && error("replicates that output a NamedTuple not yet implemented")
     for I in CartesianIndices(outgrid)
         replicatesum = zero(eltype(outgrid))
-        for d in data
-            @inbounds replicatesum += first(grids(d))[I]
+        for g in grids.(data)
+            @inbounds replicatesum += first(g)[I]
         end
         @inbounds outgrid[I] = replicatesum / length(data)
     end
 end
+storegrid!(output::Output{<:NamedTuple}, data::AbstractVector{<:AbstractSimData}) = begin
+    f = gridindex(output, data[1])
+    outgrids = output[f]
+    gridsreps = NamedTuple{keys(first(data))}(map(d -> d[key], data) for key in keys(first(data)))
+    map(outgrids, gridsreps) do outgrid, gridreps
+        for I in CartesianIndices(outgrid)
+            replicatesum = zero(eltype(outgrid))
+            for gr in gridreps
+                @inbounds replicatesum += gr[I]
+            end
+            @inbounds outgrid[I] = replicatesum / length(data)
+        end
+    end
+end
 
 # Grids are preallocated and reused.
-initgrids!(o::Output, init) = initgrids!(o[1], o::Output, init) 
+initgrids!(o::Output, init) = initgrids!(o[1], o::Output, init)
 # Array grids are copied
 initgrids!(grid::AbstractArray, o::Output, init::AbstractArray) = begin
     grid .= init
-    for f = (firstindex(o) + 1):lastindex(o)
-        @inbounds o[f] .= zero(eltype(init))
-    end
+    # for f = (firstindex(o) + 1):lastindex(o)
+        # @inbounds o[f] .= zero(eltype(init))
+    # end
     o
 end
 # The first grid in a named tuple is used if the output is a single Array
-initgrids!(grid::AbstractArray, o::Output, init::NamedTuple) = 
+initgrids!(grid::AbstractArray, o::Output, init::NamedTuple) =
     initgrids!(grid, o, first(init))
 # All arrays are copied if both are named tuples
 initgrids!(grids::NamedTuple, o::Output, init::NamedTuple) = begin
     for key in keys(init)
         @inbounds grids[key] .= init[key]
     end
-    for f = (firstindex(o) + 1):lastindex(o)
-        for key in keys(init)
-            @inbounds o[f][key] .= zero(eltype(init[key]))
-        end
-    end
+    # for f = (firstindex(o) + 1):lastindex(o)
+    #     for key in keys(init)
+    #         fill!(o[f][key], zero(eltype(init[key])))
+    #     end
+    # end
     o
 end

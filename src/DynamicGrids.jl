@@ -12,6 +12,7 @@ end DynamicGrids
 using Colors,
       ConstructionBase,
       Crayons,
+      DimensionalData,
       DocStringExtensions,
       FieldDefaults,
       FieldMetadata,
@@ -37,7 +38,7 @@ import FieldMetadata: @description, description,
 
 
 
-export sim!, resume!, replay, savegif, isinferred, neighbors
+export sim!, resume!, replay, savegif, isinferred, neighbors, rules, method, methodtype
 
 export Rule, NeighborhoodRule, CellRule, ManualRule, ManualNeighborhoodRule
 
@@ -78,6 +79,7 @@ const FIELDDOCTABLE = FieldDocTable((:Description, :Default, :Bounds),
 
 include("rules.jl")
 include("rulesets.jl")
+include("extent.jl")
 include("simulationdata.jl")
 include("chain.jl")
 include("neighborhoods.jl")
@@ -90,6 +92,7 @@ include("interface.jl")
 include("framework.jl")
 include("sequencerules.jl")
 include("maprules.jl")
+include("overflow.jl")
 include("utils.jl")
 include("map.jl")
 include("life.jl")

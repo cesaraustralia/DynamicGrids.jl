@@ -4,29 +4,28 @@ Neighborhoods define how surrounding cells are related to the current cell.
 The `neighbors` function returns the sum of surrounding cells, as defined
 by the neighborhood.
 
-Neighborhoods are iterable, so 
+Neighborhoods are iterable, so
 
 for n in hood
-    if n > 3 
-end   
+    if n > 3
+end
 
-If the allocation of neighborhood buffers during the simulation is costly 
+If the allocation of neighborhood buffers during the simulation is costly
 (it usually isn't) you can use `allocbuffers` or preallocate them:
 
 ```julia
 RadialNeighborhood{3}(allocbuffers(3, init))
 ```
 
-You can also change the length of the buffers tuple to 
+You can also change the length of the buffers tuple to
 experiment with cache performance.
 """
 abstract type Neighborhood{R,B} end
 
-ConstructionBase.constructorof(::Type{<:T}) where T <: Neighborhood{R} where R = 
+ConstructionBase.constructorof(::Type{<:T}) where T <: Neighborhood{R} where R =
     T.name.wrapper{R}
 
 radius(hood::Neighborhood{R}) where R = R
-buffer(hood::Neighborhood{<:Any,<:Tuple}) = first(hood.buffer)
 buffer(hood::Neighborhood) = hood.buffer
 
 Base.eltype(hood::Neighborhood) = eltype(buffer(hood))
@@ -61,18 +60,18 @@ Radial neighborhoods calculate the surrounding neighborhood
 from the radius around the central cell. The central cell
 is omitted.
 
-The `buffer` argument may be required for performance 
+The `buffer` argument may be required for performance
 optimisation, see [`Neighborhood`] for details.
 """
-struct RadialNeighborhood{R,B} <: AbstractRadialNeighborhood{R,B} 
+struct RadialNeighborhood{R,B} <: AbstractRadialNeighborhood{R,B}
     buffer::B
 end
 RadialNeighborhood{R}(buffer=nothing) where R =
     RadialNeighborhood{R,typeof(buffer)}(buffer)
 
 # Custom `sum` for performance:w
-Base.sum(hood::RadialNeighborhood, cell=_centerval(hood)) = 
-    sum(buffer(hood)) - cell 
+Base.sum(hood::RadialNeighborhood, cell=_centerval(hood)) =
+    sum(buffer(hood)) - cell
 
 _centerval(hood) = buffer(hood)[radius(hood) + 1, radius(hood) + 1]
 
@@ -110,15 +109,15 @@ const CustomCoords = Tuple{Vararg{<:CustomCoord}}
     CustomNeighborhood(coords::Tuple{Tuple{Vararg{Int}}}, [buffer=nothing])
     CustomNeighborhood{R}(coords::Tuple, buffer)
 
-Allows arbitrary neighborhood shapes by specifying each coord, which are simply 
-`Tuple`s of `Int` distance (positive and negative) from the central point. 
+Allows arbitrary neighborhood shapes by specifying each coord, which are simply
+`Tuple`s of `Int` distance (positive and negative) from the central point.
 
-The neighborhood radius is calculated from the most distance coordinate. 
+The neighborhood radius is calculated from the most distance coordinate.
 For simplicity the buffer read from the main grid is a square with sides
-`2R + 1` around the central point, and is not shrunk or offset to match the 
+`2R + 1` around the central point, and is not shrunk or offset to match the
 coordinates if they are not symmetrical.
 
-The `buffer` argument may be required for performance 
+The `buffer` argument may be required for performance
 optimisation, see [`Neighborhood`] for more details.
 """
 @description @flattenable struct CustomNeighborhood{R,C<:CustomCoords,B} <: AbstractCustomNeighborhood{R,B}
@@ -132,7 +131,7 @@ CustomNeighborhood(coords::CustomCoords, buffer=nothing) =
 CustomNeighborhood{R}(coords::CustomCoords, buffer) where R =
     CustomNeighborhood{R,typeof(coords),typeof(buffer)}(coords, buffer)
 
-ConstructionBase.constructorof(::Type{CustomNeighborhood{R,C,B}}) where {R,C,B} = 
+ConstructionBase.constructorof(::Type{CustomNeighborhood{R,C,B}}) where {R,C,B} =
     CustomNeighborhood{R}
 
 coords(hood::CustomNeighborhood) = hood.coords
@@ -187,7 +186,7 @@ A convenience wrapper to build a VonNeumann neighborhoods as a `CustomNeighborho
 
 TODO: variable radius
 """
-VonNeumannNeighborhood(buffer=nothing) = 
+VonNeumannNeighborhood(buffer=nothing) =
     CustomNeighborhood(((0,-1), (-1,0), (1,0), (0,1)), buffer)
 
 """
@@ -212,13 +211,16 @@ radius(rule::Rule, args...) = 0
 
 # Build rules and neighborhoods for each buffer, so they
 # don't have to be constructed in the loop
-spreadbuffers(chain::Chain, grid) = 
-    map(r -> Chain(r, tail(rules(chain))...), spreadbuffers(rules(chain)[1], grid))
-spreadbuffers(rule::Rule, grid) = spreadbuffers(rule, neighborhood(rule), buffer(neighborhood(rule)), grid)
-spreadbuffers(rule::NeighborhoodRule, hood::Neighborhood, buffers, grid) = 
-    spreadbuffers(rule, hood, allocbuffers(grid, hood), grid)
-spreadbuffers(rule::NeighborhoodRule, hood::Neighborhood, buffers::Tuple, grid) = 
-    map(b -> (@set rule.neighborhood.buffer = b), buffers)
+spreadbuffers(chain::Chain, init::AbstractArray) = begin
+    buffers, bufrules = spreadbuffers(rules(chain)[1], init)
+    buffers, map(r -> Chain(r, tail(rules(chain))...), bufrules)
+end
+spreadbuffers(rule::Rule, init::AbstractArray) =
+    spreadbuffers(rule, neighborhood(rule), buffer(neighborhood(rule)), init)
+spreadbuffers(rule::NeighborhoodRule, hood::Neighborhood, buffers::Nothing, init::AbstractArray) =
+    spreadbuffers(rule::NeighborhoodRule, hood::Neighborhood, allocbuffers(init, hood), init)
+spreadbuffers(rule::NeighborhoodRule, hood::Neighborhood, buffers::Tuple, init::AbstractArray) =
+    buffers, map(b -> (@set rule.neighborhood.buffer = b), buffers)
 
 """
     hoodsize(radius)
