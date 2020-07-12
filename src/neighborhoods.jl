@@ -14,7 +14,7 @@ If the allocation of neighborhood buffers during the simulation is costly
 (it usually isn't) you can use `allocbuffers` or preallocate them:
 
 ```julia
-RadialNeighborhood{3}(allocbuffers(3, init))
+Moore{3}(allocbuffers(3, init))
 ```
 
 You can also change the length of the buffers tuple to
@@ -54,28 +54,35 @@ neighbors(hood::AbstractRadialNeighborhood) = begin
 end
 
 """
-    RadialNeighborhood{R}([buffer])
+    Moore(radius::Int=1)
 
 Radial neighborhoods calculate the surrounding neighborhood
 from the radius around the central cell. The central cell
 is omitted.
 
 The `buffer` argument may be required for performance
-optimisation, see [`Neighborhood`] for details.
+optimisation, see [`Neighborhood`](@ref) for details.
 """
-struct RadialNeighborhood{R,B} <: AbstractRadialNeighborhood{R,B}
+struct Moore{R,B} <: AbstractRadialNeighborhood{R,B}
     buffer::B
 end
-RadialNeighborhood{R}(buffer=nothing) where R =
-    RadialNeighborhood{R,typeof(buffer)}(buffer)
+# Buffer is updated later during the simulation.
+# but can be passed in now to avoid the allocation.
+# This might be bad design. SimData could instead hold a list of
+# ruledata for the rule that holds this buffer, with 
+# the neighborhood. So you can do neighbors(data)
+Moore(radius::Int=1, buffer=nothing) = 
+    Moore{radius}(buffer)
+Moore{R}(buffer=nothing) where R =
+    Moore{R,typeof(buffer)}(buffer)
 
-# Custom `sum` for performance:w
-Base.sum(hood::RadialNeighborhood, cell=_centerval(hood)) =
+# Neighborhood specific `sum` for performance:w
+Base.sum(hood::Moore, cell=_centerval(hood)) =
     sum(buffer(hood)) - cell
 
 _centerval(hood) = buffer(hood)[radius(hood) + 1, radius(hood) + 1]
 
-Base.length(hood::RadialNeighborhood{R}) where R = (2R + 1)^2 - 1
+Base.length(hood::Moore{R}) where R = (2R + 1)^2 - 1
 
 @inline mapsetneighbor!(data::WritableGridData, hood::AbstractRadialNeighborhood, rule, state, index) = begin
     r = radius(hood)
@@ -95,19 +102,20 @@ Base.length(hood::RadialNeighborhood{R}) where R = (2R + 1)^2 - 1
 end
 
 """
-Custom neighborhoods are tuples of custom coordinates (also tuples) specified in relation
-to the central point of the current cell. They can be any arbitrary shape or size, but
-should be listed in column-major order for performance.
+Positional neighborhoods are tuples of custom coordinates (also tuples) 
+specified in relation to the central point of the current cell. They can 
+be any arbitrary shape or size, but should be listed in column-major order 
+for performance.
 """
-abstract type AbstractCustomNeighborhood{R,B} <: Neighborhood{R,B} end
+abstract type AbstractPositional{R,B} <: Neighborhood{R,B} end
 
 const CustomCoord = Tuple{Vararg{Int}}
-const CustomCoords = Tuple{Vararg{<:CustomCoord}}
+const CustomCoords = Union{AbstractArray{<:CustomCoord},Tuple{Vararg{<:CustomCoord}}}
 
 """
-    CustomNeighborhood(coord::Tuple{Vararg{Int}}...)
-    CustomNeighborhood(coords::Tuple{Tuple{Vararg{Int}}}, [buffer=nothing])
-    CustomNeighborhood{R}(coords::Tuple, buffer)
+    Positional(coord::Tuple{Vararg{Int}}...)
+    Positional(coords::Tuple{Tuple{Vararg{Int}}}, [buffer=nothing])
+    Positional{R}(coords::Tuple, buffer)
 
 Allows arbitrary neighborhood shapes by specifying each coord, which are simply
 `Tuple`s of `Int` distance (positive and negative) from the central point.
@@ -120,33 +128,38 @@ coordinates if they are not symmetrical.
 The `buffer` argument may be required for performance
 optimisation, see [`Neighborhood`] for more details.
 """
-@description @flattenable struct CustomNeighborhood{R,C<:CustomCoords,B} <: AbstractCustomNeighborhood{R,B}
+@description @flattenable struct Positional{R,C<:CustomCoords,B} <: AbstractPositional{R,B}
     coords::C | false | "A tuple of tuples of Int, containing 2-D coordinates relative to the central point"
     buffer::B
 end
 
-CustomNeighborhood(args::CustomCoord...) = CustomNeighborhood(args)
-CustomNeighborhood(coords::CustomCoords, buffer=nothing) =
-    CustomNeighborhood{absmaxcoord(coords)}(coords, buffer)
-CustomNeighborhood{R}(coords::CustomCoords, buffer) where R =
-    CustomNeighborhood{R,typeof(coords),typeof(buffer)}(coords, buffer)
+Positional(args::CustomCoord...) = Positional(args)
+Positional(coords::CustomCoords, buffer=nothing) =
+    Positional{absmaxcoord(coords)}(coords, buffer)
+Positional{R}(coords::CustomCoords, buffer=nothing) where R =
+    Positional{R,typeof(coords),typeof(buffer)}(coords, buffer)
 
-ConstructionBase.constructorof(::Type{CustomNeighborhood{R,C,B}}) where {R,C,B} =
-    CustomNeighborhood{R}
+ConstructionBase.constructorof(::Type{Positional{R,C,B}}) where {R,C,B} =
+    Positional{R}
 
-coords(hood::CustomNeighborhood) = hood.coords
+coords(hood::Positional) = hood.coords
 
-Base.length(hood::CustomNeighborhood) = length(coords(hood))
+Base.length(hood::Positional) = length(coords(hood))
 
 # Calculate the maximum absolute value in the coords to use as the radius
-absmaxcoord(coords::Tuple) = maximum(map(x -> maximum(map(abs, x)), coords))
-absmaxcoord(neighborhood::CustomNeighborhood) = absmaxcoord(coords(neighborhood))
+absmaxcoord(coords::Union{AbstractArray,Tuple}) = maximum(map(x -> maximum(map(abs, x)), coords))
+absmaxcoord(neighborhood::Positional) = absmaxcoord(coords(neighborhood))
 
-neighbors(hood::CustomNeighborhood) =
+"""
+    neighbors(hood::Positional)
+
+Returns an iterator over the `Positional` neighborhood 
+cells around the current index.
+"""
+neighbors(hood::Positional) =
     (buffer(hood)[(coord .+ radius(hood) .+ 1)...] for coord in coords(hood))
 
-
-@inline mapsetneighbor!(data::WritableGridData, hood::CustomNeighborhood, rule, state, index) = begin
+@inline mapsetneighbor!(data::WritableGridData, hood::Positional, rule, state, index) = begin
     r = radius(hood); sum = zero(state)
     # Loop over dispersal kernel grid dimensions
     for coord in coords(hood)
@@ -158,36 +171,59 @@ neighbors(hood::CustomNeighborhood) =
 end
 
 """
-Sets of custom neighborhoods that can have separate rules for each set.
+    LayeredPositional(layers::Positional...)
+
+Sets of [`Positional`](@ref) neighborhoods that can have separate rules for each set.
+
+`neighbors` for `LayeredPositional` returns a tuple of iterators
+for each neighborhood layer.
 """
-@description struct LayeredCustomNeighborhood{R,L,B} <: AbstractCustomNeighborhood{R,B}
-    layers::L  | "A tuple of custom neighborhoods"
+@description struct LayeredPositional{R,L,B} <: AbstractPositional{R,B}
+    layers::L | "A tuple of custom neighborhoods"
     buffer::B | _
 end
-LayeredCustomNeighborhood(layers::Tuple{Vararg{<:CustomNeighborhood}}, buffer) =
-    LayeredCustomNeighborhood{maximum(absmaxcoord.(layers))}(layers, buffer)
-LayeredCustomNeighborhood{R}(layers, buffer) where R = begin
+LayeredPositional(layers::Positional...) =
+    LayeredPositional(layers)
+LayeredPositional(layers::Tuple{Vararg{<:Positional}}, buffer=nothing) =
+    LayeredPositional{maximum(map(radius, layers))}(layers, buffer)
+LayeredPositional{R}(layers, buffer) where R = begin
     # Child layers must have the same buffer
     layers = map(l -> (@set l.buffer = buffer), layers)
-    LayeredCustomNeighborhood{R,typeof(layers),typeof(buffer)}(layers, buffer)
+    LayeredPositional{R,typeof(layers),typeof(buffer)}(layers, buffer)
 end
 
 
-@inline neighbors(hood::LayeredCustomNeighborhood) =
+"""
+    neighbors(hood::Positional)
+
+Returns a tuple of iterators over each `Positional` neighborhood 
+layer for the cells around the current index.
+"""
+@inline neighbors(hood::LayeredPositional) =
     map(l -> neighbors(l), hood.layers)
 
-@inline Base.sum(hood::LayeredCustomNeighborhood) = map(sum, neighbors(hood))
+@inline Base.sum(hood::LayeredPositional) = map(sum, neighbors(hood))
 
-@inline mapsetneighbor!(data::WritableGridData, hood::LayeredCustomNeighborhood, rule, state, index) =
+@inline mapsetneighbor!(data::WritableGridData, hood::LayeredPositional, rule, state, index) =
     map(layer -> mapsetneighbor!(data, layer, rule, state, index), hood.layers)
 
 """
-A convenience wrapper to build a VonNeumann neighborhoods as a `CustomNeighborhood`.
+    VonNeumann(radius=1)
 
-TODO: variable radius
+A convenience wrapper to build Von-Neumann neighborhoods as 
+a [`Positional`](@ref) neighborhood.
 """
-VonNeumannNeighborhood(buffer=nothing) =
-    CustomNeighborhood(((0,-1), (-1,0), (1,0), (0,1)), buffer)
+VonNeumann(radius=1, buffer=nothing) = begin
+    coords = Tuple{Int,Int}[]
+    rng = -radius:radius
+    for j in rng, i in rng
+        distance = abs(i) + abs(j)
+        if distance <= radius && distance > 0
+            push!(coords, (i, j))
+        end
+    end
+    Positional(coords, buffer)
+end
 
 """
 Find the largest radius present in the passed in rules.
@@ -223,6 +259,19 @@ spreadbuffers(rule::NeighborhoodRule, hood::Neighborhood, buffers::Tuple, init::
     buffers, map(b -> (@set rule.neighborhood.buffer = b), buffers)
 
 """
+    allocbuffers(init::AbstractArray, hood::Neighborhood)
+    allocbuffers(init::AbstractArray, radius::Int)
+
+Allocate buffers for the Neighborhood. The `init` array should 
+be of the same type as the grid the neighborhood runs on.
+"""
+allocbuffers(init::AbstractArray, hood::Neighborhood) = allocbuffers(init, radius(hood))
+allocbuffers(init::AbstractArray, r::Int) = Tuple(allocbuffer(init, r) for i in 1:2r)
+
+allocbuffer(init::AbstractArray, hood::Neighborhood) = allocbuffer(init, radius(hood))
+allocbuffer(init::AbstractArray, r::Int) = zeros(eltype(init), 2r+1, 2r+1)
+
+"""
     hoodsize(radius)
 
 Get the size of a neighborhood dimension from its radius,
@@ -230,4 +279,3 @@ which is always 2r + 1.
 """
 @inline hoodsize(hood::Neighborhood) = hoodsize(radius(hood))
 @inline hoodsize(radius::Integer) = 2radius + 1
-

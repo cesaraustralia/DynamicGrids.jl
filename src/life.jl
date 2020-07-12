@@ -30,18 +30,16 @@ output = REPLOutput(init; fps=60, color=:yellow)
 sim!(output, Ruleset(Life(b=(1,3,5,7), s=(1,3,5,7))), init; tspan=(1, 1000))
 ```
 
-$(FIELDDOCTABLE)
 """
 @default @flattenable @bounds @description struct Life{R,W,N,B,S} <: NeighborhoodRule{R,W}
-    neighborhood::N | RadialNeighborhood{1}() | false | nothing | "Any Neighborhood"
-    b::B            | (3, 3)                  | true  | (0, 8)  | "Array, Tuple or Iterable of integers to match neighbors when cell is empty"
-    s::S            | (2, 3)                  | true  | (0, 8)  | "Array, Tuple or Iterable of integers to match neighbors cell is full"
+    neighborhood::N | Moore(1) | false | nothing | "Any Neighborhood"
+    b::B            | (3, 3)   | true  | (0, 8)  | "Array, Tuple or Iterable of integers to match neighbors when cell is empty"
+    s::S            | (2, 3)   | true  | (0, 8)  | "Array, Tuple or Iterable of integers to match neighbors cell is full"
 end
 
-applyrule(rule::Life, data::SimData, state, index) =
-    # Check if neighborhood sum matches rule for the current state
-    if sum(neighborhood(rule)) in (rule.b, rule.s)[state+1]
-        oneunit(state)
-    else
-        zero(state)
-    end
+const life_states =
+    (false, false, false, true, false, false, false, false, false),
+    (false, false, true,  true, false, false, false, false, false)
+
+applyrule(data::SimData, rule::Life, state, I) =
+    life_states[state + 1][sum(neighbors(rule)) + 1]

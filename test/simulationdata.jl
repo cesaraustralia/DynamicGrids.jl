@@ -12,16 +12,16 @@ initab = (a=inita, b=initb)
 
 life = Life(read=:a, write=:a);
 rs = Ruleset(life, timestep=Day(1))
-tspan = DateTime(2001):Day(1):DateTime(2001, 2)
+tspan_ = DateTime(2001):Day(1):DateTime(2001, 2)
 
 @testset "initdata!" begin
 
-    extent = Extent(initab, nothing, tspan, nothing)
+    extent = Extent(initab, nothing, tspan_, nothing)
     simdata = initdata!(nothing, extent, rs, nothing)
     @test simdata isa SimData
     @test init(simdata) == initab
     @test ruleset(simdata) === rs
-    @test DynamicGrids.tspan(simdata) === tspan
+    @test tspan(simdata) === tspan_
     @test currentframe(simdata) === 1
     @test first(simdata) === simdata[:a]
     @test last(simdata) === simdata[:b]
@@ -44,12 +44,9 @@ tspan = DateTime(2001):Day(1):DateTime(2001, 2)
     @test parent(grida) == parent(source(grida)) == parent(source(wgrida))
     @test parent(wgrida) === parent(dest(grida)) === parent(dest(wgrida))
 
-    # This seems like too much outer padding
-    # - should there be that one row and colum extra?
     @test sourcestatus(grida) == deststatus(grida) == 
-        [0 1 0 0
-         0 1 0 0
-         0 0 0 0]
+        [0 1 0
+         0 1 0]
 
     @test parent(source(gridb)) == parent(dest(gridb)) == 
         [2 2 2
@@ -64,14 +61,14 @@ tspan = DateTime(2001):Day(1):DateTime(2001, 2)
     @test eltype(grida) == Int
     @test ismasked(grida, 1, 1) == false
 
-    extent = Extent(initab, nothing, tspan, nothing)
+    extent = Extent(initab, nothing, tspan_, nothing)
     initdata!(simdata, extent, rs, nothing)
 end
 
 @testset "initdata! with :_default_" begin
     initx = [1 0]
     rs = Ruleset(Life())
-    extent = Extent((_default_=initx,), nothing, tspan, nothing)
+    extent = Extent((_default_=initx,), nothing, tspan_, nothing)
     simdata = initdata!(nothing, extent, rs, nothing)
     simdata2 = initdata!(simdata, extent, rs, nothing)
     @test keys(simdata2) == (:_default_,)
@@ -85,11 +82,11 @@ end
 
 @testset "initdata! with replicates" begin
     nreps = 2
-    extent = Extent(initab, nothing, tspan, nothing)
+    extent = Extent(initab, nothing, tspan_, nothing)
     simdata = initdata!(nothing, extent, rs, nreps)
     @test simdata isa Vector{<:SimData}
     @test all(DynamicGrids.ruleset.(simdata) .== Ref(rs))
-    @test all(map(DynamicGrids.tspan, simdata) .== Ref(tspan))
+    @test all(map(tspan, simdata) .== Ref(tspan_))
     @test all(keys.(DynamicGrids.grids.(simdata)) .== Ref(keys(initab)))
     simdata2 = initdata!(simdata, extent, rs, nreps)
 end

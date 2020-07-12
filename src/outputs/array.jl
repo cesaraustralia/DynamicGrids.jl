@@ -19,7 +19,3 @@ ArrayOutput(; frames, running, extent, kwargs...) = begin
     append!(frames, zerogrids(init(extent), length(tspan(extent))-1))
     ArrayOutput(frames, running, extent)
 end
-
-zerogrids(initgrid::AbstractArray, nframes) = [zero(initgrid) for f in 1:nframes]
-zerogrids(initgrids::NamedTuple, nframes) =
-    [map(grid -> zero(grid), initgrids) for f in 1:nframes]

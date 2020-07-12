@@ -1,4 +1,10 @@
 
+"""
+    GraphicConfig(; fps=25.0, store=false, kwargs...) =
+    GraphicConfig(fps, timestamp, stampframe, store)
+
+Config and variables for graphic outputs.
+"""
 mutable struct GraphicConfig{FPS,TS,SF}
     fps::FPS
     timestamp::TS
@@ -21,6 +27,11 @@ end
 
 """
 Outputs that display the simulation frames live.
+
+All `GraphicOutputs` have a [`GraphicConfig`](@ref) object 
+and provide a [`showframe`](@ref) method.
+
+See [`REPLOutput`](@ref) for an example.
 """
 abstract type GraphicOutput{T} <: Output{T} end
 
@@ -55,13 +66,13 @@ delay(o::GraphicOutput, f) =
     sleep(max(0.0, timestamp(o) + (f - stampframe(o))/fps(o) - time()))
 isshowable(o::GraphicOutput, f) = true # TODO working max fps. o.timestamp + (t - tlast(o))/o.maxfps < time()
 
-storegrid!(o::GraphicOutput, data::AbstractSimData) = begin
-    f = gridindex(o, data)
+storeframe!(o::GraphicOutput, data::AbstractSimData) = begin
+    f = frameindex(o, data)
     if isstored(o)
         _pushgrid!(eltype(o), o)
     end
-    storegrid!(eltype(o), o, data, f)
-    isshowable(o, currentframe(data)) && showgrid(o, data, currentframe(data), currenttime(data))
+    storeframe!(eltype(o), o, data, f)
+    isshowable(o, currentframe(data)) && showframe(o, data, currentframe(data), currenttime(data))
 end
 
 _pushgrid!(::Type{<:NamedTuple}, o::GraphicOutput) =
@@ -69,6 +80,6 @@ _pushgrid!(::Type{<:NamedTuple}, o::GraphicOutput) =
 _pushgrid!(::Type{<:AbstractArray}, o::GraphicOutput) =
     push!(o, similar(o[1]))
 
-# Get frame f from output and call showgrid again
-showgrid(o::GraphicOutput, data::AbstractSimData, f, t) =
-    showgrid(o[gridindex(o, f)], o, data, f, t)
+# Get frame f from output and call showframe again
+showframe(o::GraphicOutput, data::AbstractSimData, f, t) =
+    showframe(o[frameindex(o, f)], o, data, f, t)

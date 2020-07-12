@@ -4,7 +4,7 @@
 DynamicGrids
 ```
 
-## More Examples
+## Examples
 
 While this package isn't designed or optimised specifically to run the game of
 life, it's a simple demonstration of what it can do. This example runs a
@@ -12,10 +12,10 @@ game of life and displays it in a REPLOutput.
 
 
 ```@example
-using DynamicGrids
+using DynamicGrids, Distributions
 
 # Build a random starting grid
-init = round.(Int8, max.(0.0, rand(-2.0:0.1:1.0, 70,70)))
+init = Bool.(rand(Binomial(1, 0.5), 70, 70))
 
 # Use the default game of life model
 model = Ruleset(Life())
@@ -87,10 +87,10 @@ and how they are combined to update the value of the current cell.
 ```@docs
 Neighborhood
 AbstractRadialNeighborhood
-RadialNeighborhood
-AbstractCustomNeighborhood
-CustomNeighborhood
-LayeredCustomNeighborhood
+Moore
+VonNeumann
+Positional
+LayeredPositional
 ```
 
 ```@docs
@@ -111,6 +111,13 @@ ArrayOutput
 GraphicOutput
 REPLOutput
 ImageOutput
+GifOutput
+```
+
+```@docs
+DynamicGrids.Extent
+DynamicGrids.GraphicConfig
+DynamicGrids.ImageConfig
 ```
 
 ### Grid processors
@@ -118,12 +125,14 @@ ImageOutput
 ```@docs
 GridProcessor
 SingleGridProcessor
+SparseOptInspector
 ColorProcessor
 MultiGridProcessor
 ThreeColorProcessor
 LayoutProcessor
 Greyscale
 Grayscale
+TextConfig
 ```
 
 ### Gifs

@@ -44,20 +44,13 @@ REPLOutput(; frames, running, extent, graphicconfig,
            color=:white, cutoff=0.5, style=Block(), kwargs...) =
     REPLOutput(frames, running, extent, graphicconfig, color, style, cutoff) 
 
-# initialise(o::REPLOutput, args...) = begin
-    # o.displayoffset .= 1
-    # @async movedisplay(o)
-# end
-
-isasync(o::REPLOutput) = false
-
-showgrid(frame::NamedTuple, o::REPLOutput, data::SimData, f, t) = 
-    showgrid(first(frame), o, data, f, t)
-showgrid(frame::AbstractArray, o::REPLOutput, data::SimData, f, t) = begin
+showframe(frame::NamedTuple, o::REPLOutput, data::SimData, f, t) = 
+    showframe(first(frame), o, data, f, t)
+showframe(frame::AbstractArray, o::REPLOutput, data::SimData, f, t) = begin
     # Print the frame
-    put((0,0), o.color, replframe(o, frame))
+    put((0, 0), o.color, replframe(o, frame))
     # Print the timestamp in the top right corner
-    put((0,0), o.color, string("Grid: $f at time $t"))
+    put((0, 0), o.color, string("Time $t"))
 end
 
 # Terminal commands
