@@ -76,7 +76,7 @@ grid that they choose, instead of automatically updating every cell with their o
 `NeighborhoodRule` is applied with the method:
 
 ```julia
-applyrule!(data, rule::Life, state, I)
+applyrule!(data, rule, state, I)
 ```
 
 Note the `!` bang - this method alters the state of `data`.
@@ -96,7 +96,7 @@ A Rule that only accesses a neighborhood centered around the current cell.
 `NeighborhoodRule` is applied with the method:
 
 ```julia
-applyrule(data, rule::Life, state, I)
+applyrule(data, rule, state, I)
 ```
 
 For each cell a neighborhood buffer will be populated containing the
@@ -202,8 +202,8 @@ Returned value(s) are written to the `write`/`W` grid.
 As with all [`NeighborhoodRule`](@ref), you do not have to check bounds at 
 grid edges, that is handled for you internally.
 
-Using [`SparseOpt`](@ref) may improve neighborhood performance when zero values
-are common, and can be safely ignored.
+Using [`SparseOpt`](@ref) may improve neighborhood performance 
+when zero values are common and can be safely ignored.
 
 ## Example
 
@@ -214,7 +214,8 @@ rule = let x = 10
     end
 end
 ```
-The `let` block greatly imroves performance.
+
+The `let` block may improve performance.
 """
 @flattenable @description struct Neighbors{R,W,F,N} <: NeighborhoodRule{R,W}
     # Field         | Flatten | Description

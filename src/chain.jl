@@ -3,7 +3,7 @@
 without intermediate reads or writes from grids. They are potentially compiled
 together into a single function call, especially if you use `@inline` on all
 `applyrule`. methods. `Chain` can hold either all [`CellRule`](@ref) or
-[`NeighborhoodRule`](@ref) followed by [CellRule`](@ref).
+[`NeighborhoodRule`](@ref) followed by [`CellRule`](@ref).
 """
 struct Chain{R,W,T<:Union{Tuple{},Tuple{Union{<:NeighborhoodRule,<:CellRule},Vararg{<:CellRule}}}} <: Rule{R,W}
     rules::T

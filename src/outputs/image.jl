@@ -4,7 +4,7 @@
 
 Common configuration component for all [`ImageOutput`](@ref).
 
-Holds an [`Processor`](@ref). 
+Holds a [`GridProcessor`](@ref). 
 `minval` and `maxval` fields normalise grid values between zero and one, 
 for use with Colorshemes.jl. `nothing` values are considered to represent 
 zero and one, and will not be normalised.
@@ -102,8 +102,8 @@ const Grayscale = Greyscale
 
 
 """
-Grid processors convert a frame of the simulation into an RGB image for display.
-Frames may hold one or multiple grids.
+Grid processors convert a frame of the simulation into an RGB 
+image for display. Frames may be one or multiple grids.
 """
 abstract type GridProcessor end
 
@@ -115,7 +115,7 @@ textconfig(::GridProcessor) = nothing
 
 Convert a grid or named tuple of grids to an RGB image, using a GridProcessor
 
-[`GridProcessor`](@reg) is intentionally not dispatched with the output type in
+[`GridProcessor`](@ref) is intentionally not dispatched with the output type in
 the methods that finally generate images, to reduce coupling.
 But it they can be distpatched on together when required for custom outputs.
 """
@@ -226,6 +226,9 @@ Converts output grids to a colorsheme.
     maskcolor::M   | nothing
     textconfig::TC | nothing
 end
+ColorProcessor(scheme::S, zerocolor::Z=nothing, maskcolor::M=nothing, textconfig::TC=nothing
+              ) where {S,Z,M,TC} =
+    ColorProcessor{S,Z,M,TC}(scheme, zerocolor, maskcolor, textconfig)
 
 scheme(processor::ColorProcessor) = processor.scheme
 zerocolor(processor::ColorProcessor) = processor.zerocolor
@@ -337,7 +340,7 @@ end
     LayoutProcessor(layout::Array, processors, textconfig)
 
 LayoutProcessor allows displaying multiple grids in a block layout,
-by specifying a layout matrix and a list of [`SingleGridProcessors`](@ref) 
+by specifying a layout matrix and a list of [`SingleGridProcessor`](@ref) 
 to be run for each.
 
 ## Arguments
@@ -349,10 +352,10 @@ to be run for each.
 """
 @default_kw struct LayoutProcessor{L<:AbstractMatrix,P,TC} <: MultiGridProcessor
     layout::L      | throw(ArgumentError("must include an Array for the layout keyword"))
-    processors::P  | throw(ArgumentError("include a tuple of processors for each grid"))
+    processors::P  | throw(ArgumentError("must include a tuple of processors, one for each grid"))
     textconfig::TC | nothing
     LayoutProcessor(layouts::L, processors::P, textconfig::TC) where {L,P,TC} = begin
-        processors = map(p -> (@set p.textconfig = textconfig), processors)
+        processors = map(p -> (@set p.textconfig = textconfig), map(_asprocessor, processors))
         new{L,typeof(processors),TC}(layouts, processors, textconfig)
     end
 end
@@ -360,9 +363,13 @@ end
 LayoutProcessor(layout::AbstractVector, processors, textconfig) =
     LayoutProcessor(reshape(layout, length(layout), 1), processors, textconfig)
 
+_asprocessor(p::GridProcessor) = p
+_asprocessor(x) = ColorProcessor(x)
+
 layout(p::LayoutProcessor) = p.layout
 processors(p::LayoutProcessor) = p.processors
 textconfig(p::LayoutProcessor) = p.textconfig
+
 
 grid2image(p::LayoutProcessor, o::ImageOutput, data::RulesetOrSimData, grids::NamedTuple, t
           ) = begin

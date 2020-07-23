@@ -52,8 +52,7 @@ export Chain, Cell, Neighbors, Manual, Map, Life
 export AbstractRuleset, Ruleset
 
 export Neighborhood, AbstractRadialNeighborhood, Moore,
-       Custom, Positional, LayeredPositional,
-       VonNeumann
+       AbstractPositional, Positional, VonNeumann, LayeredPositional
 
 export PerformanceOpt, NoOpt, SparseOpt
 
