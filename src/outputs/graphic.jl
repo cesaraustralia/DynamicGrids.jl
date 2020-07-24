@@ -1,4 +1,6 @@
 
+const RulesetOrSimData = Union{AbstractRuleset,AbstractSimData}
+
 """
     GraphicConfig(; fps=25.0, store=false, kwargs...) =
     GraphicConfig(fps, timestamp, stampframe, store)
@@ -81,5 +83,6 @@ _pushgrid!(::Type{<:AbstractArray}, o::GraphicOutput) =
     push!(o, similar(o[1]))
 
 # Get frame f from output and call showframe again
-showframe(o::GraphicOutput, data::AbstractSimData, f, t) =
+showframe(o::GraphicOutput, f, t) = showframe(o, Ruleset(), f, t)
+showframe(o::GraphicOutput, data::RulesetOrSimData, f, t) =
     showframe(o[frameindex(o, f)], o, data, f, t)

@@ -23,8 +23,6 @@ processor(ic::ImageConfig) = ic.processor
 minval(ic::ImageConfig) = ic.minval
 maxval(ic::ImageConfig) = ic.maxval
 
-const RulesetOrSimData = Union{Ruleset,AbstractSimData}
-
 """
 Graphic outputs that display the simulation frames as RGB images.
 
