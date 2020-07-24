@@ -9,6 +9,7 @@ module DynamicGrids
     replace(text, "```julia" => "```@example")
 end DynamicGrids
 
+
 using Colors,
       ConstructionBase,
       Crayons,
@@ -26,6 +27,8 @@ using Colors,
       Test,
       UnicodeGraphics
 
+const DG = DynamicGrids
+
 using Base: tail
 
 import Base: show, getindex, setindex!, lastindex, size, length, push!, append!,
@@ -37,8 +40,10 @@ import FieldMetadata: @description, description,
                       @default, default
 
 
+export sim!, resume!, replay, savegif, isinferred, method, methodtype 
 
-export sim!, resume!, replay, savegif, isinferred, neighbors, rules, method, methodtype
+export rules, neighbors, inbounds, isinbounds, radius, gridsize, 
+       currenttime, currenttimestep, timestep, tspan
 
 export Rule, NeighborhoodRule, CellRule, ManualRule, ManualNeighborhoodRule
 
@@ -46,15 +51,14 @@ export Chain, Cell, Neighbors, Manual, Map, Life
 
 export AbstractRuleset, Ruleset
 
-export Neighborhood, AbstractRadialNeighborhood, RadialNeighborhood,
-       AbstractCustomNeighborhood, CustomNeighborhood, LayeredCustomNeighborhood,
-       VonNeumannNeighborhood
+export Neighborhood, AbstractRadialNeighborhood, Moore,
+       AbstractPositional, Positional, VonNeumann, LayeredPositional
 
 export PerformanceOpt, NoOpt, SparseOpt
 
 export Overflow, RemoveOverflow, WrapOverflow
 
-export Output, GraphicOutput, ImageOutput, ArrayOutput, REPLOutput
+export Output, GraphicOutput, ImageOutput, ArrayOutput, REPLOutput, GifOutput
 
 export GridProcessor, SingleGridProcessor, ColorProcessor, SparseOptInspector,
        MultiGridProcessor, ThreeColorProcessor, LayoutProcessor
@@ -88,13 +92,13 @@ include("outputs/graphic.jl")
 include("outputs/image.jl")
 include("outputs/array.jl")
 include("outputs/repl.jl")
+include("outputs/gif.jl")
 include("interface.jl")
 include("framework.jl")
 include("sequencerules.jl")
 include("maprules.jl")
 include("overflow.jl")
 include("utils.jl")
-include("map.jl")
 include("life.jl")
 include("show.jl")
 

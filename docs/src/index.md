@@ -4,55 +4,6 @@
 DynamicGrids
 ```
 
-## More Examples
-
-While this package isn't designed or optimised specifically to run the game of
-life, it's a simple demonstration of what it can do. This example runs a
-game of life and displays it in a REPLOutput.
-
-
-```@example
-using DynamicGrids
-
-# Build a random starting grid
-init = round.(Int8, max.(0.0, rand(-2.0:0.1:1.0, 70,70)))
-
-# Use the default game of life model
-model = Ruleset(Life())
-
-# Use an output that shows the cellular automata as blocks in the REPL
-output = REPLOutput(init; tspan=1:50, fps=5)
-
-sim!(output, model)
-```
-
-More life-like examples:
-
-```julia
-# Morley
-sim!(output, Ruleset(Life(b=[3,6,8], s=[2,4,5]))
-
-# 2x2
-sim!(output, Ruleset(Life(b=[3,6], s=[1,2,5])))
-
-# Dimoeba
-init1 = round.(Int8, max.(0.0, rand(70,70)))
-sim!(output, Ruleset(Life(b=[3,5,6,7,8], s=[5,6,7,8]); init=init1))
-
-## No death
-sim!(output, Ruleset(Life(b=[3], s=[0,1,2,3,4,5,6,7,8])))
-
-## 34 life
-sim!(output, Ruleset(Life(b=[3,4], s=[3,4])); init=init, fps=10)
-
-# Replicator
-init2 = round.(Int8, max.(0.0, rand(70,70)))
-init2[:, 1:30] .= 0
-init2[21:50, :] .= 0
-sim!(output, Ruleset(Life(b=[1,3,5,7], s=[1,3,5,7])); init=init2)
-```
-
-
 ## Rules
 
 Rules define simulation behaviour. They hold data relevant to the simulation,
@@ -87,10 +38,11 @@ and how they are combined to update the value of the current cell.
 ```@docs
 Neighborhood
 AbstractRadialNeighborhood
-RadialNeighborhood
-AbstractCustomNeighborhood
-CustomNeighborhood
-LayeredCustomNeighborhood
+Moore
+VonNeumann
+AbstractPositional
+Positional
+LayeredPositional
 ```
 
 ```@docs
@@ -111,6 +63,7 @@ ArrayOutput
 GraphicOutput
 REPLOutput
 ImageOutput
+GifOutput
 ```
 
 ### Grid processors
@@ -118,18 +71,28 @@ ImageOutput
 ```@docs
 GridProcessor
 SingleGridProcessor
+SparseOptInspector
 ColorProcessor
 MultiGridProcessor
 ThreeColorProcessor
 LayoutProcessor
 Greyscale
 Grayscale
+TextConfig
 ```
 
 ### Gifs
 
 ```@docs
 savegif
+```
+
+### Internal components for outputs
+
+```@docs
+DynamicGrids.Extent
+DynamicGrids.GraphicConfig
+DynamicGrids.ImageConfig
 ```
 
 ## Ruleset config

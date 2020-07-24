@@ -69,8 +69,7 @@ isasync(o::Output) = false
 """
     isasync(o::Output)
 
-Check if the output is storing each grid frame,
-or just the the current one.
+Check if the output is storing each frame, or just the the current one.
 """
 isstored(o::Output) = true
 
@@ -102,30 +101,30 @@ but other outputs just do nothing and continue.
 """
 delay(o::Output, f) = nothing
 """
-    showgrid(o::Output, args...)
+    showframe(o::Output, args...)
 
 Show the grid(s) in the output, if it can do that.
 """
-showgrid(o::Output, args...) = nothing
+showframe(o::Output, args...) = nothing
 
 # Grid strorage and updating
-gridindex(o::Output, data::AbstractSimData) = gridindex(o, currentframe(data))
+frameindex(o::Output, data::AbstractSimData) = frameindex(o, currentframe(data))
 # Every frame is frame 1 if the simulation isn't stored
-gridindex(o::Output, f::Int) = isstored(o) ? f : oneunit(f)
+frameindex(o::Output, f::Int) = isstored(o) ? f : oneunit(f)
 
 
-storegrid!(output::Output, data::AbstractSimData) = begin
-    f = gridindex(output, data)
+storeframe!(output::Output, data::AbstractSimData) = begin
+    f = frameindex(output, data)
     checkbounds(output, f)
-    storegrid!(eltype(output), output, data, f)
+    storeframe!(eltype(output), output, data, f)
 end
-storegrid!(::Type{<:NamedTuple}, output::Output, simdata::AbstractSimData, f::Int) = begin
+storeframe!(::Type{<:NamedTuple}, output::Output, simdata::AbstractSimData, f::Int) = begin
     map(values(grids(simdata)), keys(simdata)) do grid, key
         outgrid = output[f][key]
         _storeloop(outgrid, grid)
     end
 end
-storegrid!(::Type{<:AbstractArray}, output::Output, simdata::AbstractSimData, f::Int) = begin
+storeframe!(::Type{<:AbstractArray}, output::Output, simdata::AbstractSimData, f::Int) = begin
     outgrid = output[f]
     _storeloop(outgrid, first(grids(simdata)))
 end
@@ -135,8 +134,8 @@ _storeloop(outgrid, grid) =
     end
 
 # Replicated frames
-storegrid!(output::Output{<:AbstractArray}, data::AbstractVector{<:AbstractSimData}) = begin
-    f = gridindex(output, data[1])
+storeframe!(output::Output{<:AbstractArray}, data::AbstractVector{<:AbstractSimData}) = begin
+    f = frameindex(output, data[1])
     outgrid = output[f]
     for I in CartesianIndices(outgrid)
         replicatesum = zero(eltype(outgrid))
@@ -146,8 +145,8 @@ storegrid!(output::Output{<:AbstractArray}, data::AbstractVector{<:AbstractSimDa
         @inbounds outgrid[I] = replicatesum / length(data)
     end
 end
-storegrid!(output::Output{<:NamedTuple}, data::AbstractVector{<:AbstractSimData}) = begin
-    f = gridindex(output, data[1])
+storeframe!(output::Output{<:NamedTuple}, data::AbstractVector{<:AbstractSimData}) = begin
+    f = frameindex(output, data[1])
     outgrids = output[f]
     gridsreps = NamedTuple{keys(first(data))}(map(d -> d[key], data) for key in keys(first(data)))
     map(outgrids, gridsreps) do outgrid, gridreps

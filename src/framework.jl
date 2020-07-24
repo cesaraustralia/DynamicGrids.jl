@@ -37,8 +37,9 @@ sim!(output::Output, ruleset=ruleset(output);
      aux=aux(output),
      fps=fps(output),
      nreplicates=nothing,
-     simdata=nothing) = begin
+     simdata=nothing, kwargs...) = begin
 
+    gridsize(init) == gridsize(DG.init(output)) || throw(ArgumentError("init size does not match output init"))
     # Some rules are only valid for a set time-step size.
     step(ruleset) !== nothing && step(ruleset) != step(tspan) &&
         throw(ArgumentError("tspan step $(step(tspan)) must equal rule step $(step(ruleset))"))
@@ -57,7 +58,7 @@ sim!(output::Output, ruleset=ruleset(output);
     # Set run speed for GraphicOutputs
     setfps!(output, fps)
     # Show the first grid
-    showgrid(output, simdata, 1, tspan)
+    showframe(output, simdata, 1, tspan)
     # Let the init grid be displayed as long as a normal grid
     delay(output, 1)
     # Run the simulation over simdata and a unitrange
@@ -71,7 +72,6 @@ Shorthand for running a rule without defining a `Ruleset`.
 """
 sim!(output::Output, rules::Rule...;
      tspan=tspan(output),
-     overflow=RemoveOverflow(),
      kwargs...) = begin
     ruleset = Ruleset(rules...; timestep=step(tspan), kwargs...)
     sim!(output::Output, ruleset; tspan=tspan, kwargs...)
@@ -156,14 +156,14 @@ simloop!(output::Output, simdata, fspan) = begin
         # Run the ruleset and setup data for the next iteration
         simdata = sequencerules!(simdata)
         # Save/do something with the the current grid
-        storegrid!(output, simdata)
+        storeframe!(output, simdata)
         # Let interface things happen
         isasync(output) && yield()
         # Stick to the FPS
         delay(output, f)
         # Exit gracefully
         if !isrunning(output) || f == last(fspan)
-            showgrid(output, simdata, f, currenttime(simdata))
+            showframe(output, simdata, f, currenttime(simdata))
             setstoptime!(output, currenttime(simdata))
             finalise(output)
             break

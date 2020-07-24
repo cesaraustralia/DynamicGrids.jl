@@ -58,11 +58,10 @@ ReadableGridData(init::AbstractArray, mask, radius, overflow) = begin
         hoodsize = 2r + 1
         blocksize = 2r
         source = addpadding(init, r)
-        nblocs = indtoblock.(size(source), blocksize) .+ 1
+        nblocs = indtoblock.(size(source), blocksize)
         sourcestatus = zeros(Bool, nblocs)
         deststatus = deepcopy(sourcestatus)
         updatestatus!(source, sourcestatus, deststatus, r)
-
         localstatus = zeros(Bool, 2, 2)
     else
         source = deepcopy(init)
@@ -94,7 +93,8 @@ Base.@propagate_inbounds Base.setindex!(d::WritableGridData, x, I...) = begin
 end
 
 Base.parent(d::WritableGridData) = parent(dest(d))
-Base.@propagate_inbounds Base.getindex(d::WritableGridData, I...) = getindex(dest(d), I...)
+Base.@propagate_inbounds Base.getindex(d::WritableGridData, I...) = 
+    getindex(dest(d), I...)
 
 
 
@@ -109,11 +109,11 @@ A simdata object is accessable in `applyrule` as the second parameter.
 Multiple grids can be indexed into using their key. Single grids
 can be indexed as if SimData is regular array.
 """
-struct SimData{E,G,Ru,CFr} <: AbstractSimData
-    extent::E
+struct SimData{G<:NamedTuple,E,Ru,F} <: AbstractSimData
     grids::G
+    extent::E
     ruleset::Ru
-    currentframe::CFr
+    currentframe::F
 end
 SimData(extent, ruleset::Ruleset) = begin
     extent = asnamedtuple(extent)
@@ -124,11 +124,11 @@ SimData(extent, ruleset::Ruleset) = begin
     griddata = map(init(extent), radii) do in, ra
         ReadableGridData(in, mask(extent), ra, overflow(ruleset))
     end
-    SimData(extent, griddata, ruleset)
+    SimData(griddata, extent, ruleset)
 end
-SimData(extent, griddata::NamedTuple, ruleset::Ruleset) = begin
+SimData(griddata::NamedTuple, extent, ruleset::Ruleset) = begin
     currentframe = 1; 
-    SimData(extent, griddata, ruleset, currentframe)
+    SimData(griddata, extent, ruleset, currentframe)
 end
 
 
@@ -147,7 +147,15 @@ currenttime(d::SimData) = tspan(d)[currentframe(d)]
 currenttime(d::Vector{<:SimData}) = currenttime(d[1])
 
 # Getters forwarded to data
-Base.getindex(d::SimData, i) = getindex(grids(d), i)
+Base.getindex(d::SimData, i::Symbol) = 
+    getindex(grids(d), i)
+# For resolving method ambiguity
+Base.getindex(d::SimData{<:NamedTuple{(:_default_,)}}, i::Symbol) = 
+    getindex(grids(d), i)
+Base.getindex(d::SimData{<:NamedTuple{(:_default_,)}}, I...) = 
+    getindex(first(grids(d)), I...)
+Base.setindex!(d::SimData{<:NamedTuple{(:_default_,)}}, x, I...) = 
+    setindex!(first(grids(d)), x, I...)
 Base.keys(d::SimData) = keys(grids(d))
 Base.values(d::SimData) = values(grids(d))
 Base.first(d::SimData) = first(grids(d))
@@ -168,7 +176,11 @@ swapsource(grid::GridData) = begin
     src = grid.source
     dst = grid.dest
     @set! grid.dest = src
-    @set grid.source = dst
+    @set! grid.source = dst
+    srcstatus = grid.sourcestatus
+    dststatus = grid.deststatus
+    @set! grid.deststatus = srcstatus
+    @set grid.sourcestatus = dststatus
 end
 
 # Uptate timestamp
@@ -215,13 +227,6 @@ updatestatus!(source, sourcestatus, deststatus, radius) = begin
         end
     end
 end
-
-copystatus!(grid::Tuple{Vararg{<:GridData}}) = map(copystatus!, grid)
-copystatus!(grid::GridData) =
-    copystatus!(sourcestatus(grid), deststatus(grid))
-copystatus!(srcstatus, deststatus) = nothing
-copystatus!(srcstatus::AbstractArray, deststatus::AbstractArray) =
-    @inbounds return srcstatus .= deststatus
 
 # When replicates are an Integer, construct a vector of SimData
 initdata!(::Nothing, extent, ruleset::Ruleset, nreplicates::Integer) =

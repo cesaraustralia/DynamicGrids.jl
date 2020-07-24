@@ -29,3 +29,7 @@ setstarttime!(e::Extent, start) =
     e.tspan = start:step(tspan(e)):last(tspan(e))
 setstoptime!(e::Extent, stop) =
     e.tspan = first(tspan(e)):step(tspan(e)):stop
+
+gridsize(extent::Extent) = gridsize(init(extent))
+gridsize(A::AbstractArray) = size(A)
+gridsize(nt::NamedTuple) = size(first(nt))

@@ -6,31 +6,38 @@ struct _Write_ end
 maprule!(simdata::SimData, rule::Rule) = begin
     rkeys, rgrids = getgrids(_Read_(), rule, simdata)
     wkeys, wgrids = getgrids(_Write_(), rule, simdata)
-    # Copy the source to dest for grids we are writing to,
-    # if they need to be copied
-    _maybeupdate_dest!(wgrids, rule)
+    # Copy the source to dest for grids we are writing to, if needed
+    maybeupdatedest!(wgrids, rule)
+    # Copy or zero out overflow where needed
+    handleoverflow!(wgrids)
     # Combine read and write grids to a temporary simdata object
     tempsimdata = @set simdata.grids = combinegrids(rkeys, rgrids, wkeys, wgrids)
     # Run the rule loop
     ruleloop(opt(simdata), rule, tempsimdata, rkeys, rgrids, wkeys, wgrids, mask(simdata))
-    # Copy the source status to dest status for all write grids
-    copystatus!(wgrids)
+    # Copy the dest status to dest status if it is in use
+    maybecopystatus!(wgrids)
     # Swap the dest/source of grids that were written to
     wgrids = swapsource(wgrids) |> _to_readonly
     # Combine the written grids with the original simdata
     replacegrids(simdata, wkeys, wgrids)
 end
 
+
+maybecopystatus!(grid::Tuple{Vararg{<:GridData}}) = map(maybecopystatus!, grid)
+maybecopystatus!(grid::GridData) =
+    maybecopystatus!(sourcestatus(grid), deststatus(grid))
+maybecopystatus!(srcstatus, deststatus) = nothing
+maybecopystatus!(srcstatus::AbstractArray, deststatus::AbstractArray) =
+    @inbounds return srcstatus .= deststatus 
+
 _to_readonly(data::Tuple) = map(ReadableGridData, data)
 _to_readonly(data::WritableGridData) = ReadableGridData(data)
 
-_maybeupdate_dest!(ds::Tuple, rule) =
-    map(d -> _maybeupdate_dest!(d, rule), ds)
-_maybeupdate_dest!(d::WritableGridData, rule::Rule) =
-    handleoverflow!(d)
-_maybeupdate_dest!(d::WritableGridData, rule::ManualRule) = begin
+maybeupdatedest!(ds::Tuple, rule) =
+    map(d -> maybeupdatedest!(d, rule), ds)
+maybeupdatedest!(d::WritableGridData, rule::Rule) = nothing
+maybeupdatedest!(d::WritableGridData, rule::ManualRule) = begin
     copy!(parent(dest(d)), parent(source(d)))
-    handleoverflow!(d)
 end
 
 # Separated out for both modularity and as a function barrier for type stability
@@ -40,7 +47,7 @@ ruleloop(::PerformanceOpt, rule::Rule, simdata::SimData, rkeys, rgrids, wkeys, w
     for j in 1:ncols, i in 1:nrows
         ismasked(mask, i, j) && continue
         readval = readgrids(rkeys, rgrids, i, j)
-        writeval = applyrule(rule, simdata, readval, (i, j))
+        writeval = applyrule(simdata, rule, readval, (i, j))
         writegrids!(wgrids, writeval, i, j)
     end
 end
@@ -50,7 +57,7 @@ ruleloop(::PerformanceOpt, rule::ManualRule, simdata::SimData, rkeys, rgrids, wk
     for j in 1:ncols, i in 1:nrows
         ismasked(mask, i, j) && continue
         readval = readgrids(rkeys, rgrids, i, j)
-        applyrule!(rule, simdata, readval, (i, j))
+        applyrule!(simdata, rule, readval, (i, j))
     end
 end
 
@@ -59,7 +66,7 @@ ruleloop(::SparseOpt, rule::ManualRule, simdata::SimData, rkey, rgrid::GridData,
         runsparse(rgrid) do i, j
             ismasked(mask, i, j) && return
             readval = readgrids(rkey, rgrid, i, j)
-            applyrule!(rule, simdata, readval, (i, j))
+            applyrule!(simdata, rule, readval, (i, j))
             return
         end
     end
@@ -157,16 +164,19 @@ ruleloop(opt::NoOpt, rule, simdata::SimData, rkeys, rgrids, wkeys, wgrids,
                 end
             end
 
-            curblockj = indtoblock(j, blocksize)
             # Loop over the grid ROWS inside the block
             for b in 1:rowsinblock
                 I = i + b - 1, j
                 ismasked(mask, I...) && continue
-                # Which block row are we in
-                curblocki = b <= r ? 1 : 2
                 # Run the rule using buffer b
-                readval = readgrids(keys2vals(readkeys(rule)), rgrids, I...)
-                writeval = applyrule(bufrules[b], simdata, readval, I)
+                readval = if rgrids isa Tuple
+                    # Get all vals from grids
+                    readgrids(keys2vals(readkeys(rule)), rgrids, I...)
+                else
+                    # Get single val from buffer center
+                    buffers[b][r + 1, r + 1] 
+                end
+                writeval = applyrule(simdata, bufrules[b], readval, I)
                 writegrids!(wgrids, writeval, I...)
             end
         end
@@ -188,13 +198,16 @@ ruleloop(opt::SparseOpt, rule, simdata::SimData, rkeys, rgrids, wkeys, wgrids,
     should be in fast local memory. =#
 
     # Initialise status for the dest. Is this needed?
-    # deststatus(data) .= false
     srcstatus, dststatus = sourcestatus(griddata), deststatus(griddata)
+    dststatus .= false
+
     # curstatus and newstatus track active status for 4 local blocks
     newstatus = localstatus(griddata)
+    valtype = eltype(dst)
 
     # Loop down the block COLUMN
-    for bi = 1:size(srcstatus, 1) - 1
+    for bi = 1:size(srcstatus, 1)
+        lastblockrow = bi == size(srcstatus, 1)
         i = blocktoind(bi, blocksize)
         # Get current block
         rowsinblock = min(blocksize, nrows - blocksize * (bi - 1))
@@ -202,30 +215,37 @@ ruleloop(opt::SparseOpt, rule, simdata::SimData, rkeys, rgrids, wkeys, wgrids,
         freshbuffer = true
 
         # Initialise block status for the start of the row
-        @inbounds bs11, bs12 = srcstatus[bi,     1], srcstatus[bi,     2]
-        @inbounds bs21, bs22 = srcstatus[bi + 1, 1], srcstatus[bi + 1, 2]
+        @inbounds bs11, bs12 = srcstatus[bi, 1], srcstatus[bi, 2]
+        bs21, bs22 = if bi == size(srcstatus, 1)
+            false, false
+        else
+            @inbounds srcstatus[bi + 1, 1], srcstatus[bi + 1, 2]
+        end
         newstatus .= false
 
         # Loop along the block ROW. This is faster because we are reading
         # 1 column from the main array for 2 blocks at each step, not actually along the row.
-        for bj = 1:size(srcstatus, 2) - 1
+        for bj = 1:size(srcstatus, 2)
+            lastblockcol = bj == size(srcstatus, 2)
             @inbounds newstatus[1, 1] = newstatus[1, 2]
             @inbounds newstatus[2, 1] = newstatus[2, 2]
             @inbounds newstatus[1, 2] = false
             @inbounds newstatus[2, 2] = false
 
-            # Get current block status from the source status array
             bs11, bs21 = bs12, bs22
-            @inbounds bs12, bs22 = srcstatus[bi, bj + 1], srcstatus[bi + 1, bj + 1]
+            bs12, bs22 = if lastblockcol
+                # This is the last block, the second half wont run
+                false, false
+            else
+                # Get current block status from the source status array
+                @inbounds srcstatus[bi, bj + 1], lastblockrow ? false : srcstatus[bi + 1, bj + 1]
+            end
 
             jstart = blocktoind(bj, blocksize)
             jstop = min(jstart + blocksize - 1, ncols)
 
-            # Use this block unless it or its neighbors are active
+            # Skip this block it and its neighbors are inactive
             if !(bs11 | bs12 | bs21 | bs22)
-                if !skippedlastblock
-                    newstatus .= false
-                end
                 # Skip this block
                 skippedlastblock = true
                 # Run the rest of the chain if it exists
@@ -237,7 +257,7 @@ ruleloop(opt::SparseOpt, rule, simdata::SimData, rkeys, rgrids, wkeys, wgrids,
                             I = i + b - 1, j
                             ismasked(mask, I...) && continue
                             read = readgrids(rkeys, rgrids, I...)
-                            write = applyrule(tail(rule), simdata, read, I)
+                            write = applyrule(simdata, tail(rule), read, I)
                             if wgrids isa Tuple
                                 map(wgrids, write) do d, w
                                     @inbounds dest(d)[I...] = w
@@ -247,15 +267,30 @@ ruleloop(opt::SparseOpt, rule, simdata::SimData, rkeys, rgrids, wkeys, wgrids,
                             end
                         end
                     end
+                else
+                    for j in jstart:jstop
+                        for b in 1:rowsinblock
+                            I = i + b - 1, j
+                            if wgrids isa Tuple
+                                map(wgrids) do wg
+                                    @inbounds dest(wg)[I...] = zero(valtype)
+                                end
+                            else
+                                @inbounds dest(wgrids)[I...] = zero(valtype)
+                            end
+                        end
+                    end
                 end
                 continue
             end
 
             # Reinitialise neighborhood buffers if we have skipped a section of the array
             if skippedlastblock
-                for y = 1:hoodsize, b in 1:rowsinblock, x = 1:hoodsize
-                    val = src[i + b + x - 2, jstart + y - 1]
-                    @inbounds buffers[b][x, y] = val
+                for y = 1:hoodsize 
+                    for b in 1:rowsinblock, x = 1:hoodsize
+                        @inbounds val = src[i + b + x - 2, jstart + y - 1]
+                        @inbounds buffers[b][x, y] = val
+                    end
                 end
                 skippedlastblock = false
                 freshbuffer = true
@@ -263,8 +298,8 @@ ruleloop(opt::SparseOpt, rule, simdata::SimData, rkeys, rgrids, wkeys, wgrids,
 
             # Loop over the grid COLUMNS inside the block
             for j in jstart:jstop
-                # Which block column are we in
-                curblockj = j - jstart < r ? 1 : 2
+                # Which block column are we in, 1 or 2
+                curblockj = (j - jstart) ÷ r + 1
                 if freshbuffer
                     freshbuffer = false
                 else
@@ -272,7 +307,7 @@ ruleloop(opt::SparseOpt, rule, simdata::SimData, rkeys, rgrids, wkeys, wgrids,
                     for b in 1:rowsinblock
                         @inbounds buf = buffers[b]
                         # copyto! uses linear indexing, so 2d dims are transformed manually
-                        @inbounds copyto!(buf, 1, buf, hoodsize + 1, (hoodsize - 1) * hoodsize)
+                        copyto!(buf, 1, buf, hoodsize + 1, (hoodsize - 1) * hoodsize)
                     end
                     # Copy a new column to each neighborhood buffer
                     for b in 1:rowsinblock
@@ -287,33 +322,45 @@ ruleloop(opt::SparseOpt, rule, simdata::SimData, rkeys, rgrids, wkeys, wgrids,
                 for b in 1:rowsinblock
                     I = i + b - 1, j
                     ismasked(mask, I...) && continue
-                    # Which block row are we in
-                    curblocki = b <= r ? 1 : 2
-                    # Run the rule using buffer b
-                    readval = readgrids(keys2vals(readkeys(rule)), rgrids, I...)
-                    writeval = applyrule(bufrules[b], simdata, readval, I)
-                    writegrids!(wgrids, writeval, I...)
+                    # Which block row are we in, 1 or 2
+                    curblocki = (b - 1) ÷ r + 1
+                    readval = if rgrids isa Tuple
+                        # Get all vals from grids
+                        readgrids(keys2vals(readkeys(rule)), rgrids, I...)
+                    else
+                        # Get single val from buffer center
+                        @inbounds buffers[b][r + 1, r + 1] 
+                    end
+                    @inbounds writeval = applyrule(simdata, bufrules[b], readval, I)
+                    @inbounds writegrids!(wgrids, writeval, I...)
                     # Update the status for the block
                     cellstatus = if writeval isa NamedTuple
                         @inbounds val = writeval[neighborhoodkey(rule)]
                         val != zero(val)
                     else
-                        writeval != zero(writeval)
+                        writeval != zero(valtype)
                     end
                     @inbounds newstatus[curblocki, curblockj] |= cellstatus
                 end
 
                 # Combine blocks with the previous rows / cols
                 @inbounds dststatus[bi, bj] |= newstatus[1, 1]
-                @inbounds dststatus[bi, bj+1] |= newstatus[1, 2]
-                @inbounds dststatus[bi+1, bj] |= newstatus[2, 1]
-                # Start new block fresh to remove old status
-                @inbounds dststatus[bi+1, bj+1] = newstatus[2, 2]
+                if !lastblockcol
+                    @inbounds dststatus[bi, bj+1] |= newstatus[1, 2]
+                end
+                if !lastblockrow
+                    @inbounds dststatus[bi+1, bj] |= newstatus[2, 1]
+                    # Start new block fresh to remove old status
+                    if !lastblockcol
+                        @inbounds dststatus[bi+1, bj+1] = newstatus[2, 2]
+                    end
+                end
             end
         end
     end
-    srcstatus .= dststatus
 end
+
+
 
 
 # Low-level tools for fetching, manipulating and writing 
@@ -343,7 +390,7 @@ readgrids(rkeys::Val, rdata::ReadableGridData, I...) =
     expr
 end
 writegrids!(wdata::GridData{T}, val::T, I...) where T = begin
-    @inbounds wdata.dest[I...] = val
+    @inbounds dest(wdata)[I...] = val
     nothing
 end
 

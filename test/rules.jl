@@ -4,14 +4,14 @@ import DynamicGrids: applyrule, applyrule!, maprule!,
        SimData, WritableGridData, _Read_, _Write_,
        Rule, Extent, readkeys, writekeys
 
-init  = [0 1 1 0;
-         0 1 1 0;
-         0 1 1 0;
-         0 1 1 0;
+init  = [0 1 1 0
+         0 1 1 0
+         0 1 1 0
+         0 1 1 0
          0 1 1 0]
 
 struct AddOneRule{R,W} <: Rule{R,W} end
-DynamicGrids.applyrule(::AddOneRule, data, state, args...) = state + 1
+DynamicGrids.applyrule(data, ::AddOneRule, state, args...) = state + 1
 
 @testset "Rulset mask ignores false cells" begin
     init = [0.0 4.0 0.0
@@ -38,7 +38,7 @@ end
 # Single grid rules
 
 struct TestRule{R,W} <: Rule{R,W} end
-applyrule(::TestRule, data, state, index) = 0
+applyrule(data, ::TestRule, state, index) = 0
 
 @testset "A rule that returns zero gives zero outputs" begin
     final = [0 0 0 0
@@ -75,7 +75,7 @@ applyrule(::TestRule, data, state, index) = 0
 end
 
 struct TestManual{R,W} <: ManualRule{R,W} end
-applyrule!(::TestManual, data, state, index) = 0
+applyrule!(data, ::TestManual, state, index) = 0
 
 @testset "A partial rule that returns zero does nothing" begin
     rule = TestManual()
@@ -95,7 +95,7 @@ applyrule!(::TestManual, data, state, index) = 0
 end
 
 struct TestManualWrite{R,W} <: ManualRule{R,W} end
-applyrule!(::TestManualWrite, data, state, index) = data[:_default_][index[1], 2] = 0
+applyrule!(data, ::TestManualWrite, state, index) = data[:_default_][index[1], 2] = 0
 
 @testset "A partial rule that writes to dest affects output" begin
     final = [0 0 1 0;
@@ -113,10 +113,10 @@ applyrule!(::TestManualWrite, data, state, index) = data[:_default_][index[1], 2
 end
 
 struct TestCellTriple{R,W} <: CellRule{R,W} end
-applyrule(::TestCellTriple, data, state, index) = 3state
+applyrule(data, ::TestCellTriple, state, index) = 3state
 
 struct TestCellSquare{R,W} <: CellRule{R,W} end
-applyrule(::TestCellSquare, data, (state,), index) = state^2
+applyrule(data, ::TestCellSquare, (state,), index) = state^2
 
 @testset "Chained cell rules work" begin
     init  = [0 1 2 3;
@@ -139,7 +139,7 @@ struct PrecalcRule{R,W,P} <: Rule{R,W}
 end
 DynamicGrids.precalcrules(rule::PrecalcRule, simdata) = 
     PrecalcRule(currenttime(simdata))
-applyrule(rule::PrecalcRule, data, state, index) = rule.precalc[]
+applyrule(data, rule::PrecalcRule, state, index) = rule.precalc[]
 
 @testset "Rule precalculations work" begin
     init  = [1 1;
@@ -163,15 +163,15 @@ end
 # Multi grid rules
 
 struct DoubleY{R,W} <: CellRule{R,W} end
-applyrule(rule::DoubleY, data, (x, y), index) = y * 2
+applyrule(data, rule::DoubleY, (x, y), index) = y * 2
 
 struct HalfX{R,W} <: CellRule{R,W} end
-applyrule(rule::HalfX, data, x, index) = x, x * 0.5
+applyrule(data, rule::HalfX, x, index) = x, x * 0.5
 
 struct Predation{R,W} <: CellRule{R,W} end
 Predation(; prey=:prey, predator=:predator) = 
     Predation{Tuple{predator,prey},Tuple{prey,predator}}()
-applyrule(::Predation, data, (predators, prey), index) = begin
+applyrule(data, ::Predation, (predators, prey), index) = begin
     caught = 2predators
     # Output order is the reverse of input to test that can work
     prey - caught, predators + caught * 0.5
@@ -216,21 +216,21 @@ end
 end
 
 @testset "life with generic constructors" begin
-    @test Life(RadialNeighborhood{1}(), (1, 1), (5, 5)) ==
-          Life(; neighborhood=RadialNeighborhood{1}(), b=(1, 1), s=(5, 5))
-    @test Life{:a,:b}(RadialNeighborhood{1}(), (1, 1), (5, 5)) ==
-          Life(; read=:a, write=:b, neighborhood=RadialNeighborhood{1}(), b=(1, 1), s=(5, 5));
+    @test Life(Moore(1), (1, 1), (5, 5)) ==
+          Life(; neighborhood=Moore(1), b=(1, 1), s=(5, 5))
+    @test Life{:a,:b}(Moore(1), (1, 1), (5, 5)) ==
+          Life(; read=:a, write=:b, neighborhood=Moore(1), b=(1, 1), s=(5, 5));
     @test Life(read=:a, write=:b) == Life{:a,:b}()
     @test Life() == Life(; read=:_default_)
 end
 
 @testset "generic ConstructionBase compatability" begin
-    life = Life{:x,:y}(; neighborhood=RadialNeighborhood{2}(), b=(1, 1), s=(2, 2))
+    life = Life{:x,:y}(; neighborhood=Moore(2), b=(1, 1), s=(2, 2))
     @set! life.b = (5, 6)
 
     @test life.b == (5, 6)
     @test life.s == (2, 2)
     @test readkeys(life) == :x
     @test writekeys(life) == :y
-    @test DynamicGrids.neighborhood(life) == RadialNeighborhood{2}()
+    @test DynamicGrids.neighborhood(life) == Moore(2)
 end

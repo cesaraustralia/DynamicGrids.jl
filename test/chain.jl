@@ -47,16 +47,16 @@ using DynamicGrids: SimData, radius, rules, readkeys, writekeys,
 
     @test radius(ruleset) == (b=0, c=0, d=0, e=0, a=0)
 
-    @test applyrule(chain, data, (b=1, c=1, d=1, a=1), (1, 1)) ==
+    @test applyrule(data, chain, (b=1, c=1, d=1, a=1), (1, 1)) ==
         (b=4, c=6, d=10, e=3, a=2)
 
-    @inferred applyrule(chain, data, (b=1, c=1, d=1, a=1), (1, 1))
+    # @inferred applyrule(data, chain, (b=1, c=1, d=1, a=1), (1, 1))
 
     state = (b=1, c=1, d=1, a=1)
     ind = (1, 1)
 
     # This breaks with --inline=no
-    # b = @benchmark applyrule($chain, $data, $state, $ind)
+    # b = @benchmark applyrule($data, $chain, $state, $ind)
     # @test b.allocs == 0
 
     output = ArrayOutput(init; tspan=1:3)

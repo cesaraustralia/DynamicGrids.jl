@@ -3,7 +3,7 @@
 without intermediate reads or writes from grids. They are potentially compiled
 together into a single function call, especially if you use `@inline` on all
 `applyrule`. methods. `Chain` can hold either all [`CellRule`](@ref) or
-[`NeighborhoodRule`](@ref) followed by [CellRule`](@ref).
+[`NeighborhoodRule`](@ref) followed by [`CellRule`](@ref).
 """
 struct Chain{R,W,T<:Union{Tuple{},Tuple{Union{<:NeighborhoodRule,<:CellRule},Vararg{<:CellRule}}}} <: Rule{R,W}
     rules::T
@@ -31,7 +31,7 @@ Base.firstindex(chain::Chain) = firstindex(rules(chain))
 Base.lastindex(chain::Chain) = lastindex(rules(chain))
 
 """
-    applyrule(rules::Chain, data, state, (i, j))
+    applyrule(data, rules::Chain, state, (i, j))
 
 Chained rules. If a [`Chain`](@ref) of rules is passed to `applyrule`, run them
 sequentially for each cell. This can have much beter performance as no writes
@@ -39,28 +39,31 @@ occur between rules, and they are essentially compiled together into compound
 rules. This gives correct results only for [`CellRule`](@ref), or for a single
 [`NeighborhoodRule`](@ref) followed by [`CellRule`](@ref).
 """
-@inline applyrule(chain::Chain, data::SimData, state, index, args...) = begin
-    newstate = applyrule(chain::Chain, chain[1], data, state, index, args...)
-end
-@inline applyrule(chain::Chain{R,W,Tuple{}}, data::SimData, state, index, args...
-                 ) where {R,W} =
+@inline applyrule(data::SimData, chain::Chain, state, index) =
+    chainrule(data, chain::Chain, chain[1], state, index)
+@inline applyrule(data::SimData, chain::Chain{R,W,Tuple{}}, state, index) where {R,W} =
     chainstate(chain, map(Val, writekeys(chain)), state)
 
-@inline applyrule(chain::Chain, rule::Rule{RR,RW}, data::SimData, state, index, args...
+@inline chainrule(data::SimData, chain::Chain, rule::Rule{RR,RW}, state, index
                   ) where {RR,RW} = begin
+    # Get the state needed by this rule
     read = chainstate(chain, Val{RR}, state)
-    write = applyrule(rule, data, read, index, args...)
+    # Run the rule
+    write = applyrule(data, rule, read, index)
+    # Create new state with the result and state from other rules
     newstate = update_chainstate(chain, rule, state, write)
-    applyrule(tail(chain), data, newstate, index)
+    # Run applyrule on the rest of the chain
+    applyrule(data, tail(chain), newstate, index)
 end
-@inline applyrule(chain::Chain, rule::Rule{RR,RW}, data::SimData, state, index, args...
+@inline chainrule(data::SimData, chain::Chain, rule::Rule{RR,RW}, state, index, args...
                   ) where {RR<:Tuple,RW} = begin
     read = chainstate(chain, (map(Val, readkeys(rule))...,), state)
-    write = applyrule(rule, data, read, index, args...)
+    write = applyrule(data, rule, read, index)
     newstate = update_chainstate(chain, rule, state, write)
-    applyrule(tail(chain), data, newstate, index)
+    applyrule(data, tail(chain), newstate, index)
 end
 
+# Get state as a NamedTuple or single value
 @inline chainstate(chain::Chain, keys::Tuple, state) = begin
     keys = map(unwrap, keys)
     vals = map(k -> state[k], keys)
@@ -69,6 +72,8 @@ end
 @inline chainstate(chain::Chain, key::Type{<:Val}, state) =
     state[unwrap(key)]
 
+# Merge new state with previous state 
+# Returning a new NamedTuple with all keys having the most recent state
 @generated update_chainstate(chain::Chain{CR,CW}, rule::Rule{RR,RW}, state::NamedTuple{K,V}, writestate::Tuple
                             ) where {CR,CW,RR,RW,K,V} = begin
     expr = Expr(:tuple)
@@ -90,7 +95,6 @@ end
         NamedTuple{$keys}(newstate)
     end
 end
-
 @generated update_chainstate(chain::Chain{CR,CW}, rule::Rule{RR,RW}, state::NamedTuple{K,V}, writestate
                             ) where {CR,CW,RR,RW,K,V} = begin
     expr = Expr(:tuple)

@@ -1,5 +1,5 @@
 using DynamicGrids, Test
-using DynamicGrids: isshowable, gridindex, storegrid!, SimData
+using DynamicGrids: isshowable, frameindex, storeframe!, SimData
 
 @testset "Output construction" begin
     init = [10.0 11.0
@@ -8,7 +8,7 @@ using DynamicGrids: isshowable, gridindex, storegrid!, SimData
     output1 = ArrayOutput(init; tspan=1:1)
     ruleset = Ruleset(Life())
 
-    @test gridindex(output1, 5) == 5 
+    @test frameindex(output1, 5) == 5 
     @test isshowable(output1, 5) == false
 
     # Test pushing new frames to an output
