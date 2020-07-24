@@ -47,10 +47,13 @@ sim!(output, Life(b=(1,3,5,7), s=(1,3,5,7)))
     s::S            | (2, 3)   | true  | (0, 8)  | "Array, Tuple or Iterable of integers to match neighbors cell is full"
     lookup::L       | _        | false | _       | _
     Life{R,W,N,B,S,L}(neighborhood::N, b::B, s::S, lookup::L) where {R,W,N,B,S,L} = begin
-        lookup = (i in b for i in 0:8), (i in s for i in 0:8)
+        lookup = Tuple(i in b for i in 0:8), Tuple(i in s for i in 0:8)
         new{R,W,N,B,S,typeof(lookup)}(neighborhood, b, s, lookup)
     end
 end
+Life(neighborhood, b, s) = Life(neighborhood, b, s, nothing) 
+Life{R,W}(neighborhood, b, s) where {R,W} = Life{R,W}(neighborhood, b, s, nothing) 
+
 
 """
     applyrule(data::SimData, rule::Life, state, I)
