@@ -1,15 +1,5 @@
 using DynamicGrids, Test, Dates, Unitful
 
-
-using DynamicGrids
-
-using Distributions
-init = Bool.(rand(Binomial(1, 0.5), 20, 20))
-ruleset = Ruleset(Life())
-output = REPLOutput(init; tspan=1:50, fps=5)
-sim!(output, ruleset)
-
-
 # life glider sims
 
 # Test all cycled variants of the array
@@ -31,7 +21,7 @@ cyclej!(arrays) = begin
     end
 end
 
-test67 = (
+test6_7 = (
     init =  Bool[
              0 0 0 0 0 0 0
              0 0 0 0 1 1 1
@@ -82,7 +72,7 @@ test67 = (
             ]
 )
 
-test56 = (
+test5_6 = (
     init =  Bool[
              0 0 0 0 0 0
              0 0 0 1 1 1
@@ -130,7 +120,7 @@ test56 = (
 
 @testset "Life simulation with WrapOverflow" begin
     # Test on two sizes to test half blocks on both axes
-    for test in (test56, test67)
+    for test in (test5_6, test6_7)
         # Loop over shifing init arrays to make sure they all work
         for i = 1:size(test[:init], 1)
             for j = 1:size(test[:init], 2)
@@ -271,19 +261,19 @@ end
         opt=NoOpt(),
     )
     tspan=0u"s":5u"s":6u"s"
-    output = REPLOutput(test67[:init]; tspan=tspan, style=Block(), fps=100, store=true)
+    output = REPLOutput(test6_7[:init]; tspan=tspan, style=Block(), fps=100, store=true)
     DynamicGrids.isstored(output)
     DynamicGrids.store(output)
     sim!(output, ruleset)
     resume!(output, ruleset; tstop=30u"s")
-    @test output[2] == test67[:test2]
-    @test output[3] == test67[:test3]
-    @test output[5] == test67[:test5]
-    @test output[7] == test67[:test7]
+    @test output[2] == test6_7[:test2]
+    @test output[3] == test6_7[:test3]
+    @test output[5] == test6_7[:test5]
+    @test output[7] == test6_7[:test7]
 end
 
 @testset "REPLOutput braile works, in Months" begin
-    init_a = (_default_=test67[:init],)
+    init_a = (_default_=test6_7[:init],)
     ruleset = Ruleset(Life();
         overflow=WrapOverflow(),
         timestep=Month(1),
@@ -292,11 +282,11 @@ end
     tspan = Date(2010, 4):Month(1):Date(2010, 7)
     output = REPLOutput(init_a; tspan=tspan, style=Braile(), fps=100, store=true)
     sim!(output, ruleset)
-    @test output[2][:_default_] == test67[:test2]
-    @test output[3][:_default_] == test67[:test3]
+    @test output[2][:_default_] == test6_7[:test2]
+    @test output[3][:_default_] == test6_7[:test3]
     @test DynamicGrids.tspan(output) == Date(2010, 4):Month(1):Date(2010, 7)
     resume!(output, ruleset; tstop=Date(2010, 11))
     @test DynamicGrids.tspan(output) == Date(2010, 4):Month(1):Date(2010, 11)
-    @test output[5][:_default_] == test67[:test5]
-    @test output[7][:_default_] == test67[:test7]
+    @test output[5][:_default_] == test6_7[:test5]
+    @test output[7][:_default_] == test6_7[:test7]
 end

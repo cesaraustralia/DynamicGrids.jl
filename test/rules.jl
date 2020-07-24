@@ -4,10 +4,10 @@ import DynamicGrids: applyrule, applyrule!, maprule!,
        SimData, WritableGridData, _Read_, _Write_,
        Rule, Extent, readkeys, writekeys
 
-init  = [0 1 1 0;
-         0 1 1 0;
-         0 1 1 0;
-         0 1 1 0;
+init  = [0 1 1 0
+         0 1 1 0
+         0 1 1 0
+         0 1 1 0
          0 1 1 0]
 
 struct AddOneRule{R,W} <: Rule{R,W} end
