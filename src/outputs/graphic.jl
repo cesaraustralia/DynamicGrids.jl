@@ -20,7 +20,7 @@ GraphicConfig(; fps=25.0, store=false, kwargs...) =
 fps(gc::GraphicConfig) = gc.fps
 timestamp(gc::GraphicConfig) = gc.timestamp
 stampframe(gc::GraphicConfig) = gc.stampframe
-stoppedframe(gc::GraphicConfig) = gc.stampframe
+stoppedframe(gc::GraphicConfig) = gc.stoppedframe
 store(gc::GraphicConfig) = gc.store
 setfps!(gc::GraphicConfig, x) = gc.fps = x
 settimestamp!(o::GraphicConfig, f) = begin

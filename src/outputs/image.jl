@@ -224,9 +224,8 @@ Converts output grids to a colorsheme.
     maskcolor::M   | nothing
     textconfig::TC | nothing
 end
-ColorProcessor(scheme::S, zerocolor::Z=nothing, maskcolor::M=nothing, textconfig::TC=nothing
-              ) where {S,Z,M,TC} =
-    ColorProcessor{S,Z,M,TC}(scheme, zerocolor, maskcolor, textconfig)
+ColorProcessor(scheme, zerocolor=nothing, maskcolor=nothing) =
+    ColorProcessor(scheme, zerocolor, maskcolor, nothing)
 
 scheme(processor::ColorProcessor) = processor.scheme
 zerocolor(processor::ColorProcessor) = processor.zerocolor

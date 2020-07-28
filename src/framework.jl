@@ -58,7 +58,7 @@ sim!(output::Output, ruleset=ruleset(output);
     # Set run speed for GraphicOutputs
     setfps!(output, fps)
     # Show the first grid
-    showframe(output, simdata, 1, tspan)
+    showframe(output, simdata, 1, first(tspan))
     # Let the init grid be displayed as long as a normal grid
     delay(output, 1)
     # Run the simulation over simdata and a unitrange
@@ -121,7 +121,7 @@ resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
     if stoppedframe_ <= length(output)
         init = output[stoppedframe_]
     else
-        init = first(output) # This should never happen, could be an error instead
+        init = output[1]
     end
 
     setfps!(output, fps)
