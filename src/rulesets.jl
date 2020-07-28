@@ -5,10 +5,18 @@ or jump extends outside of the grid.
 """
 abstract type Overflow end
 
-"Wrap cords that overflow boundaries back to the opposite side"
+"""
+    WrapOverflow()
+
+Wrap cords that overflow boundaries back to the opposite side
+"""
 struct WrapOverflow <: Overflow end
 
-"Remove coords that overflow boundaries"
+"""
+    RemoveOverflow()
+
+Remove coords that overflow boundaries
+"""
 struct RemoveOverflow <: Overflow end
 
 """
@@ -17,6 +25,8 @@ Performance optimisations to use in the simulation.
 abstract type PerformanceOpt end
 
 """
+    SparseOpt()
+
 An optimisation that ignores all zero values in the grid.
 
 For low-density simulations performance may improve by
@@ -24,10 +34,16 @@ orders of magnitude, as only used cells are run.
 
 This is complicated for optimising neighborhoods - they
 must run if they contain just one non-zero cell.
+
+This is best demonstrated with this gif, where the grey areas do not run:
+
+![SparseOpt demonstration](https://raw.githubusercontent.com/cesaraustralia/DynamicGrids.jl/media/complexlife_spareseopt.gif)
 """
 struct SparseOpt <: PerformanceOpt end
 
 """
+    NoOpt()
+
 Run the simulation without performance optimisations
 besides basic high performance programming.
 
