@@ -16,7 +16,7 @@ tspan_ = DateTime(2001):Day(1):DateTime(2001, 2)
 
 @testset "initdata!" begin
 
-    extent = Extent(initab, nothing, tspan_, nothing)
+    extent = Extent(; init=initab, tspan=tspan_)
     simdata = initdata!(nothing, extent, rs, nothing)
     @test simdata isa SimData
     @test init(simdata) == initab
@@ -61,14 +61,14 @@ tspan_ = DateTime(2001):Day(1):DateTime(2001, 2)
     @test eltype(grida) == Int
     @test ismasked(grida, 1, 1) == false
 
-    extent = Extent(initab, nothing, tspan_, nothing)
+    extent = Extent(; init=initab, tspan=tspan_)
     initdata!(simdata, extent, rs, nothing)
 end
 
 @testset "initdata! with :_default_" begin
     initx = [1 0]
     rs = Ruleset(Life())
-    extent = Extent((_default_=initx,), nothing, tspan_, nothing)
+    extent = Extent(; init=(_default_=initx,), tspan=tspan_)
     simdata = initdata!(nothing, extent, rs, nothing)
     simdata2 = initdata!(simdata, extent, rs, nothing)
     @test keys(simdata2) == (:_default_,)
@@ -82,7 +82,7 @@ end
 
 @testset "initdata! with replicates" begin
     nreps = 2
-    extent = Extent(initab, nothing, tspan_, nothing)
+    extent = Extent(; init=initab, tspan=tspan_)
     simdata = initdata!(nothing, extent, rs, nreps)
     @test simdata isa Vector{<:SimData}
     @test all(DynamicGrids.ruleset.(simdata) .== Ref(rs))

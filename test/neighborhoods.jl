@@ -163,7 +163,7 @@ end
     hood = Moore(1)
     rule = TestManualNeighborhoodRule{:a,:a}(hood)
     ruleset = Ruleset(rule)
-    extent = Extent((_default_=init,), nothing, 1:1, nothing)
+    extent = Extent(; init=(_default_=init,), tspan=1:1)
     simdata = SimData(extent, ruleset)
     state = 5
     index = (3, 3)
@@ -179,7 +179,7 @@ end
     hood = Positional(((-1, -1), (1, 1)))
     rule = TestManualNeighborhoodRule{:a,:a}(hood)
     ruleset = Ruleset(rule)
-    extent = Extent((_default_=init,), nothing, 1:1, nothing)
+    extent = Extent(; init=(_default_=init,), tspan=1:1)
     simdata = SimData(extent, ruleset)
     state = 1
     index = (5, 5)
@@ -200,7 +200,7 @@ end
     rule = TestManualNeighborhoodRule{:a,:a}(hood)
     @test radius(rule) === 2
     ruleset = Ruleset(rule)
-    extent = Extent((_default_=init,), nothing, 1:1, nothing)
+    extent = Extent(; init=(_default_=init,), tspan=1:1)
     simdata = SimData(extent, ruleset)
     state = 1
     index = (3, 3)

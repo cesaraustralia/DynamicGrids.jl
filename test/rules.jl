@@ -57,7 +57,7 @@ applyrule(data, ::TestRule, state, index) = 0
     @test DynamicGrids.timestep(ruleset) === nothing
     @test DynamicGrids.ruleset(ruleset) === ruleset
 
-    extent = Extent((_default_=init,), nothing, 1:1, nothing)
+    extent = Extent(; init=(_default_=init,), tspan=1:1)
     simdata = SimData(extent, ruleset)
 
     # Test maprules components
@@ -82,7 +82,7 @@ applyrule!(data, ::TestManual, state, index) = 0
     ruleset = Ruleset(rule)
     mask = nothing
     # Test type stability
-    extent = Extent((_default_=init,), nothing, 1:1, nothing)
+    extent = Extent(; init=(_default_=init,), tspan=1:1)
     simdata = SimData(extent, ruleset)
     rkeys, rgrids = getgrids(_Read_(), rule, simdata)
     wkeys, wgrids = getgrids(_Write_(), rule, simdata)
@@ -106,7 +106,7 @@ applyrule!(data, ::TestManualWrite, state, index) = data[:_default_][index[1], 2
 
     rule = TestManualWrite()
     ruleset = Ruleset(rule)
-    extent = Extent((_default_=init,), nothing, 1:1, nothing)
+    extent = Extent(; init=(_default_=init,), tspan=1:1)
     simdata = SimData(extent, ruleset)
     resultdata = maprule!(simdata, rule)
     @test source(first(resultdata)) == final
@@ -127,7 +127,7 @@ applyrule(data, ::TestCellSquare, (state,), index) = state^2
     rule = Chain(TestCellTriple(), 
                  TestCellSquare())
     ruleset = Ruleset(rule)
-    extent = Extent((_default_=init,), nothing, 1:1, nothing)
+    extent = Extent(; init=(_default_=init,), tspan=1:1)
     simdata = SimData(extent, ruleset)
     resultdata = maprule!(simdata, ruleset.rules[1]);
     @test source(first(resultdata)) == final

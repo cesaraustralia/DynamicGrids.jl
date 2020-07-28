@@ -1,34 +1,35 @@
 
 """
-    Extent(init, mask, tspan, aux) 
-    Extent(; init, mask=nothing, tspan, aux=nothing, kwargs...) 
+    Extent(init, mask, aux, tspan, tstopped)
+    Extent(; init, mask=nothing, aux=nothing, tspan, kwargs...)
 
 Container for extensive variables: spatial and timeseries data.
 These are kept separate from rules to allow application
 of rules to alternate spatial and temporal contexts.
 
-Not usually constructed directly by users, but it can be passed to outputs
-instead of `init`, `mask`, `tspan` and `aux`.
+Extent is not usually constructed directly by users, but it can be passed
+to `Output` constructors instead of `init`, `mask`, `aux` and `tspan`.
 """
 mutable struct Extent{I,M,A}
     init::I
     mask::M
-    tspan::AbstractRange
     aux::A
+    tspan::AbstractRange
+    tstopped::Any
 end
-Extent(; init, mask=nothing, tspan, aux=nothing, kwargs...) = 
-    Extent(init, mask, tspan, aux) 
+Extent(init, mask, aux, tspan::AbstractRange) =
+    Extent(init, mask, aux, tspan, first(tspan))
+Extent(; init, mask=nothing, aux=nothing, tspan, kwargs...) =
+    Extent(init, mask, aux, tspan)
 
 init(e::Extent) = e.init
 mask(e::Extent) = e.mask
-tspan(e::Extent) = e.tspan
 aux(e::Extent) = e.aux
+tspan(e::Extent) = e.tspan
+tstopped(e::Extent) = e.tspan
 
 settspan!(e::Extent, tspan) = e.tspan = tspan
-setstarttime!(e::Extent, start) =
-    e.tspan = start:step(tspan(e)):last(tspan(e))
-setstoptime!(e::Extent, stop) =
-    e.tspan = first(tspan(e)):step(tspan(e)):stop
+settstopped!(e::Extent, tstopped) = e.tstopped = tstopped
 
 gridsize(extent::Extent) = gridsize(init(extent))
 gridsize(A::AbstractArray) = size(A)

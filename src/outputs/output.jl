@@ -56,8 +56,7 @@ fps(o::Output) = nothing
 
 setrunning!(o::Output, val) = o.running = val
 settspan!(o::Output, tspan) = settspan!(extent(o), tspan)
-setstarttime!(o::Output, start) = setstarttime!(extent(o), start)
-setstoptime!(o::Output, stop) = setstoptime!(extent(o), stop)
+settstopped!(o::Output, tstopped) = settstopped!(extent(o), tstopped)
 
 """
     isasync(o::Output)

@@ -49,7 +49,7 @@ end
 
 asnamedtuple(x::NamedTuple) = x
 asnamedtuple(x::AbstractArray) = (_default_=x,)
-asnamedtuple(e::Extent) = Extent(asnamedtuple(init(e)), mask(e), tspan(e), aux(e))
+asnamedtuple(e::Extent) = Extent(asnamedtuple(init(e)), mask(e), aux(e), tspan(e))
 
 zerogrids(initgrid::AbstractArray, nframes) = [zero(initgrid) for f in 1:nframes]
 zerogrids(initgrids::NamedTuple, nframes) =
