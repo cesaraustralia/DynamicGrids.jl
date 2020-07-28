@@ -113,16 +113,15 @@ resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
 
     # Calculate new timespan
     new_tspan = first(tspan(output)):step(tspan(output)):tstop
-    lastframe = lastindex(tspan(output))
-    stopframe = lastindex(new_tspan)
-    fspan = lastframe:stopframe
+    stoppedframe_ = stoppedframe(output)
+    fspan = stoppedframe_:lastindex(new_tspan)
     settspan!(output, new_tspan)
 
     # Use the last frame of the existing simulation as the init frame
-    if lastframe <= length(output)
-        init = output[lastframe]
+    if stoppedframe_ <= length(output)
+        init = output[stoppedframe_]
     else
-        init = first(output)
+        init = first(output) # This should never happen, could be an error instead
     end
 
     setfps!(output, fps)
@@ -164,7 +163,7 @@ simloop!(output::Output, simdata, fspan) = begin
         # Exit gracefully
         if !isrunning(output) || f == last(fspan)
             showframe(output, simdata, f, currenttime(simdata))
-            settstopped!(output, currenttime(simdata))
+            setstoppedframe!(output, f)
             finalise(output)
             break
         end

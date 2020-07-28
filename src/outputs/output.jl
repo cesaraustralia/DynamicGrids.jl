@@ -45,10 +45,8 @@ isrunning(o::Output) = o.running
 extent(o::Output) = o.extent
 init(o::Output) = init(extent(o))
 mask(o::Output) = mask(extent(o))
-tspan(o::Output) = tspan(extent(o))
 aux(o::Output) = aux(extent(o))
-starttime(o::Output) = first(tspan(o))
-stoptime(o::Output) = last(tspan(o))
+tspan(o::Output) = tspan(extent(o))
 Base.step(o::Output) = step(tspan(o))
 ruleset(o::Output) =
     throw(ArgumentError("No ruleset on the output. Pass one to `sim!` as the second argument"))
@@ -56,7 +54,9 @@ fps(o::Output) = nothing
 
 setrunning!(o::Output, val) = o.running = val
 settspan!(o::Output, tspan) = settspan!(extent(o), tspan)
-settstopped!(o::Output, tstopped) = settstopped!(extent(o), tstopped)
+setfps!(o::Output, x) = nothing
+settimestamp!(o::Output, f) = nothing
+setstoppedframe!(o::Output, f) = nothing
 
 """
     isasync(o::Output)

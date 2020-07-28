@@ -15,10 +15,7 @@ mutable struct Extent{I,M,A}
     mask::M
     aux::A
     tspan::AbstractRange
-    tstopped::Any
 end
-Extent(init, mask, aux, tspan::AbstractRange) =
-    Extent(init, mask, aux, tspan, first(tspan))
 Extent(; init, mask=nothing, aux=nothing, tspan, kwargs...) =
     Extent(init, mask, aux, tspan)
 
@@ -26,10 +23,8 @@ init(e::Extent) = e.init
 mask(e::Extent) = e.mask
 aux(e::Extent) = e.aux
 tspan(e::Extent) = e.tspan
-tstopped(e::Extent) = e.tspan
 
 settspan!(e::Extent, tspan) = e.tspan = tspan
-settstopped!(e::Extent, tstopped) = e.tstopped = tstopped
 
 gridsize(extent::Extent) = gridsize(init(extent))
 gridsize(A::AbstractArray) = size(A)
