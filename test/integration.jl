@@ -280,13 +280,15 @@ end
         opt=SparseOpt(),
     )
     tspan = Date(2010, 4):Month(1):Date(2010, 7)
-    output = REPLOutput(init_a; tspan=tspan, style=Braile(), fps=100, store=true)
+    output = REPLOutput(init_a; tspan=tspan, style=Braile(), fps=100, store=false)
+
     sim!(output, ruleset)
-    @test output[2][:_default_] == test6_7[:test2]
-    @test output[3][:_default_] == test6_7[:test3]
+    @test output[1][:_default_] == test6_7[:test4]
     @test DynamicGrids.tspan(output) == Date(2010, 4):Month(1):Date(2010, 7)
-    resume!(output, ruleset; tstop=Date(2010, 11))
-    @test DynamicGrids.tspan(output) == Date(2010, 4):Month(1):Date(2010, 11)
-    @test output[5][:_default_] == test6_7[:test5]
-    @test output[7][:_default_] == test6_7[:test7]
+
+    resume!(output, ruleset; tstop=Date(2010, 10))
+    @test DynamicGrids.tspan(output) == Date(2010, 4):Month(1):Date(2010, 10)
+    @test output[1][:_default_] == test6_7[:test7]
+
 end
+

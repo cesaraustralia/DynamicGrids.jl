@@ -7,25 +7,28 @@ const RulesetOrSimData = Union{AbstractRuleset,AbstractSimData}
 
 Config and variables for graphic outputs.
 """
-mutable struct GraphicConfig{FPS,TS,SF}
+mutable struct GraphicConfig{FPS,TS}
     fps::FPS
     timestamp::TS
-    stampframe::SF
+    stampframe::Int
+    stoppedframe::Int
     store::Bool
 end
 GraphicConfig(; fps=25.0, store=false, kwargs...) =
-    GraphicConfig(fps, 0.0, 1, store)
-
+    GraphicConfig(fps, 0.0, 1, 1, store)
 
 fps(gc::GraphicConfig) = gc.fps
 timestamp(gc::GraphicConfig) = gc.timestamp
 stampframe(gc::GraphicConfig) = gc.stampframe
+stoppedframe(gc::GraphicConfig) = gc.stoppedframe
 store(gc::GraphicConfig) = gc.store
 setfps!(gc::GraphicConfig, x) = gc.fps = x
 settimestamp!(o::GraphicConfig, f) = begin
     o.timestamp = time()
     o.stampframe = f
 end
+
+setstoppedframe!(gc::GraphicConfig, f) = gc.stoppedframe = f
 
 """
 Outputs that display the simulation frames live.
@@ -53,14 +56,13 @@ graphicconfig(o::GraphicOutput) = o.graphicconfig
 fps(o::GraphicOutput) = fps(graphicconfig(o))
 timestamp(o::GraphicOutput) = timestamp(graphicconfig(o))
 stampframe(o::GraphicOutput) = stampframe(graphicconfig(o))
+stoppedframe(o::GraphicOutput) = stoppedframe(graphicconfig(o))
 store(o::GraphicOutput) = store(graphicconfig(o))
 isstored(o::GraphicOutput) = store(o)
 
-setfps!(o::Output, x) = nothing
 setfps!(o::GraphicOutput, x) = setfps!(graphicconfig(o), x)
-
-settimestamp!(o::Output, f) = nothing
 settimestamp!(o::GraphicOutput, f) = settimestamp!(graphicconfig(o), f)
+setstoppedframe!(o::GraphicOutput, f) = setstoppedframe!(graphicconfig(o), f)
 
 # Output interface
 # Delay output to maintain the frame rate

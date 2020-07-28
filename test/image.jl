@@ -74,7 +74,7 @@ end
     @test frames(output)[1] == 5init
     @test isshowable(output, 1)
 
-    simdata = SimData(Extent(init, nothing, 1:10, nothing), Ruleset(Life()))
+    simdata = SimData(Extent(; init=init, tspan=1:10), Ruleset(Life()))
     @test_broken showframe(output, simdata, 1, 1) ==
         [ARGB32(1.0, 1.0, 1.0) ARGB32(1.0, 1.0, 1.0)
          ARGB32(0.0, 0.0, 0.0) ARGB32(1.0, 1.0, 1.0)]
@@ -97,7 +97,7 @@ end
     @test maxval(output) === 10.0
     @test processor(output) == ColorProcessor(zerocolor=(1.0, 0.0, 0.0))
     @test isstored(output) == true
-    simdata = SimData(Extent(init, nothing, 1:10, nothing), Ruleset(Life()))
+    simdata = SimData(Extent(; init=init, tspan=1:10), Ruleset(Life()))
 
     # Test level normalisation
     normed = normalise.(output[1][:a], minval(output), maxval(output))
@@ -191,7 +191,7 @@ end
     @test maxval(output) === (10, 20)
     @test processor(output) === proc
     @test isstored(output) == true
-    simdata = SimData(Extent(init, nothing, 1:10, nothing), Ruleset(Life()))
+    simdata = SimData(Extent(; init=init, tspan=1:10), Ruleset(Life()))
 
     # Test image is joined from :a, nothing, :b
     @test grid2image(output, Ruleset(), multiinit, 1) ==

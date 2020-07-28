@@ -45,12 +45,12 @@ sim!(output::Output, ruleset=ruleset(output);
         throw(ArgumentError("tspan step $(step(tspan)) must equal rule step $(step(ruleset))"))
 
     # Rebuild Extent to allow kwarg alterations
-    extent = Extent(asnamedtuple(init), mask, tspan, aux)
+    extent = Extent(; init=asnamedtuple(init), mask=mask, aux=aux, tspan=tspan)
     # Set up output
     initialise(output)
     isrunning(output) && error("A simulation is already running in this output")
     setrunning!(output, true) || error("Could not start the simulation with this output")
-    setstarttime!(output, first(tspan))
+    settspan!(output, tspan)
     # Create or update the combined data object for the simulation
     simdata = initdata!(simdata, extent, ruleset, nreplicates)
     # Delete grids output by the previous simulations
@@ -58,7 +58,7 @@ sim!(output::Output, ruleset=ruleset(output);
     # Set run speed for GraphicOutputs
     setfps!(output, fps)
     # Show the first grid
-    showframe(output, simdata, 1, tspan)
+    showframe(output, simdata, 1, first(tspan))
     # Let the init grid be displayed as long as a normal grid
     delay(output, 1)
     # Run the simulation over simdata and a unitrange
@@ -78,14 +78,14 @@ sim!(output::Output, rules::Rule...;
 end
 
 """
-    resume!(output::Output, ruleset::Ruleset;
-            tstop=stoptime(output),
+    resume!(output::GraphicOutput, ruleset::Ruleset;
+            tstop=last(tspan(output)),
             fps=fps(output),
             simdata=nothing,
             nreplicates=nothing)
 
 Restart the simulation from where you stopped last time. For arguments see [`sim!`](@ref).
-The keyword arg `stop` can be used to extend the length of the simulation.
+The keyword arg `tstop` can be used to extend the length of the simulation.
 
 ### Arguments
 - `output`: An [`Output`](@ref) to store grids or display them on the screen.
@@ -100,12 +100,11 @@ The keyword arg `stop` can be used to extend the length of the simulation.
 - `simdata`: a [`SimData`](@ref) object. Keeping it between simulations can improve performance
   when that is important
 """
-resume!(output::Output, ruleset::Ruleset=ruleset(output);
-        tstop=stoptime(output),
+resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
+        tstop=last(tspan(output)),
         fps=fps(output),
         simdata=nothing,
         nreplicates=nothing) = begin
-    # Initialise
     initialise(output)
     # Check status and arguments
     length(output) > 0 || error("There is no simulation to resume. Run `sim!` first")
@@ -113,20 +112,20 @@ resume!(output::Output, ruleset::Ruleset=ruleset(output);
     setrunning!(output, true) || error("Could not start the simulation with this output")
 
     # Calculate new timespan
-    lastframe = lastindex(tspan(output))
-    new_tspan = tspan(output)[1]:step(tspan(output)):tstop
-    stopframe = lastindex(new_tspan)
-    fspan = lastframe:stopframe
-    setstoptime!(output, tstop)
+    new_tspan = first(tspan(output)):step(tspan(output)):tstop
+    stoppedframe_ = stoppedframe(output)
+    fspan = stoppedframe_:lastindex(new_tspan)
+    settspan!(output, new_tspan)
+
     # Use the last frame of the existing simulation as the init frame
-    if lastframe <= length(output)
-        init = output[lastframe]
+    if stoppedframe_ <= length(output)
+        init = output[stoppedframe_]
     else
-        init = first(output)
+        init = output[1]
     end
 
     setfps!(output, fps)
-    extent = Extent(asnamedtuple(init), mask(output), new_tspan, aux(output))
+    extent = Extent(; init=asnamedtuple(init), mask=mask(output), aux=aux(output), tspan=new_tspan)
     simdata = initdata!(simdata, extent, ruleset, nreplicates)
     runsim!(output, simdata, fspan)
 end
@@ -164,7 +163,7 @@ simloop!(output::Output, simdata, fspan) = begin
         # Exit gracefully
         if !isrunning(output) || f == last(fspan)
             showframe(output, simdata, f, currenttime(simdata))
-            setstoptime!(output, currenttime(simdata))
+            setstoppedframe!(output, f)
             finalise(output)
             break
         end

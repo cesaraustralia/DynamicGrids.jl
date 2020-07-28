@@ -43,7 +43,7 @@ import FieldMetadata: @description, description,
 export sim!, resume!, replay, savegif, isinferred, method, methodtype 
 
 export rules, neighbors, inbounds, isinbounds, radius, gridsize, 
-       currenttime, currenttimestep, timestep, tspan
+       currenttime, currenttimestep, timestep
 
 export Rule, NeighborhoodRule, CellRule, ManualRule, ManualNeighborhoodRule
 
