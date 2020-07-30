@@ -44,7 +44,7 @@ abstract type ImageOutput{T} <: GraphicOutput{T} end
 (::Type{F})(o::T; frames=frames(o), extent=extent(o), graphicconfig=graphicconfig(o),
     imageconfig=imageconfig(o), kwargs...) where F <: ImageOutput where T <: Output = 
     F(; frames=frames, running=false, extent=extent, graphicconfig=graphicconfig, 
-      imageconfig=imagconfig, kwargs...)
+      imageconfig=imageconfig, kwargs...)
 
 # Generic ImageOutput constructor. Converts an init array to vector of arrays.
 (::Type{T})(init::Union{NamedTuple,AbstractMatrix}; 

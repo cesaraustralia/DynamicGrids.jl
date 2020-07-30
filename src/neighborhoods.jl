@@ -225,9 +225,7 @@ VonNeumann(radius=1, buffer=nothing) = begin
     Positional(coords, buffer)
 end
 
-"""
-Find the largest radius present in the passed in rules.
-"""
+# Find the largest radius present in the passed in rules.
 radius(set::Ruleset) = radius(rules(set))
 radius(rules::Tuple{Vararg{<:Rule}}) = begin
     allkeys = Tuple(union(map(keys, rules)...))
@@ -244,7 +242,6 @@ radius(rule::NeighborhoodRule, args...) = radius(neighborhood(rule))
 radius(rule::ManualNeighborhoodRule, args...) = radius(neighborhood(rule))
 radius(rule::Rule, args...) = 0
 
-
 # Build rules and neighborhoods for each buffer, so they
 # don't have to be constructed in the loop
 spreadbuffers(chain::Chain, init::AbstractArray) = begin
@@ -253,7 +250,7 @@ spreadbuffers(chain::Chain, init::AbstractArray) = begin
 end
 spreadbuffers(rule::Rule, init::AbstractArray) =
     spreadbuffers(rule, neighborhood(rule), buffer(neighborhood(rule)), init)
-spreadbuffers(rule::NeighborhoodRule, hood::Neighborhood, buffers::Nothing, init::AbstractArray) =
+spreadbuffers(rule::NeighborhoodRule, hood::Neighborhood, buffers, init::AbstractArray) =
     spreadbuffers(rule::NeighborhoodRule, hood::Neighborhood, allocbuffers(init, hood), init)
 spreadbuffers(rule::NeighborhoodRule, hood::Neighborhood, buffers::Tuple, init::AbstractArray) =
     buffers, map(b -> (@set rule.neighborhood.buffer = b), buffers)

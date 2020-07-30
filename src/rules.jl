@@ -112,7 +112,7 @@ A Neighborhood can also be used directly as an iterator..
 
 For neighborhood rules with multiple read grids, the first is the one
 used for the neighborhood, the others are passed in as additional state 
-for the central cell.
+for the cell.
 """
 abstract type NeighborhoodRule{R,W} <: Rule{R,W} end
 

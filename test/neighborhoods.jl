@@ -130,15 +130,13 @@ DynamicGrids.applyrule!(data, rule::TestManualNeighborhoodRule{R,Tuple{W1,}}, st
 end
 
 @testset "radius" begin
-    init = (a=[1. 2.], b=[10. 11.])
+    init = (a=[1.0 2.0], b=[10.0 11.0])
     ruleA = TestNeighborhoodRule{:a,:a}(Moore{3}())
     ruleB = TestManualNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}())
     ruleset = Ruleset(ruleA, ruleB)
     @test radius(ruleA) == 3
     @test radius(ruleB) == 2
-    @testset "ruleset returns max radii of all rule" begin
-        @test radius(ruleset) == (a=3, b=2)
-    end
+    @test radius(ruleset) == (a=3, b=2)
     @test radius(Ruleset()) == NamedTuple()
 
     output = ArrayOutput(init; tspan=1:3)

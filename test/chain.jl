@@ -1,7 +1,7 @@
 using DynamicGrids, Test, BenchmarkTools
 
 using DynamicGrids: SimData, radius, rules, readkeys, writekeys, 
-    applyrule, sumneighbors, neighborhood, update_chainstate, neighborhoodkey, Extent
+    applyrule, sumneighbors, neighborhood, neighborhoodkey, Extent
 
 @testset "CellRule chain" begin
 
@@ -48,7 +48,7 @@ using DynamicGrids: SimData, radius, rules, readkeys, writekeys,
     @test radius(ruleset) == (b=0, c=0, d=0, e=0, a=0)
 
     @test applyrule(data, chain, (b=1, c=1, d=1, a=1), (1, 1)) ==
-        (b=4, c=6, d=10, e=3, a=2)
+        (4, 6, 10, 3, 2)
 
     # @inferred applyrule(data, chain, (b=1, c=1, d=1, a=1), (1, 1))
 
@@ -87,6 +87,7 @@ using DynamicGrids: SimData, radius, rules, readkeys, writekeys,
     @test output[3][:e] == [6 0  0  
                             0 0 12]
 
+    @test isinferred(output, ruleset)
 end
 
 
@@ -133,10 +134,12 @@ end
     ruleset = Ruleset(chain; opt=NoOpt())
     noopt_output = ArrayOutput(init; tspan=1:3)
     @btime sim!($noopt_output, $ruleset)
+    @test isinferred(noopt_output, ruleset)
     
     ruleset = Ruleset(Chain(hoodrule, rule); opt=SparseOpt())
     sparseopt_output = ArrayOutput(init; tspan=1:3)
     @btime sim!($sparseopt_output, $ruleset; init=$init)
+    @test isinferred(sparseopt_output, ruleset)
 
     noopt_output[2][:a] == sparseopt_output[2][:a] ==
         [0 0 0 0 0
@@ -162,4 +165,5 @@ end
          4 5 9 5 4
          3 3 5 3 3
          2 3 4 3 2]
+
 end

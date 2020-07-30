@@ -27,5 +27,3 @@ tspan(e::Extent) = e.tspan
 settspan!(e::Extent, tspan) = e.tspan = tspan
 
 gridsize(extent::Extent) = gridsize(init(extent))
-gridsize(A::AbstractArray) = size(A)
-gridsize(nt::NamedTuple) = size(first(nt))

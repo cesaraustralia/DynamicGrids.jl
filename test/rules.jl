@@ -1,6 +1,6 @@
 using DynamicGrids, Setfield, FieldMetadata, Test
 import DynamicGrids: applyrule, applyrule!, maprule!, 
-       source, dest, currenttime, getgrids, combinegrids, ruleloop,
+       source, dest, currenttime, getgrids, combinegrids,
        SimData, WritableGridData, _Read_, _Write_,
        Rule, Extent, readkeys, writekeys
 
@@ -68,7 +68,7 @@ applyrule(data, ::TestRule, state, index) = 0
     newsimdata = @set simdata.grids = combinegrids(rkeys, rgrids, wkeys, wgrids)
     @test newsimdata.grids[1] isa WritableGridData
     # Test type stability
-    @inferred ruleloop(NoOpt(), rule, newsimdata, rkeys, rgrids, wkeys, wgrids, mask)
+    @inferred maprule!(newsimdata, NoOpt(), rule, rkeys, rgrids, wkeys, wgrids, mask)
     
     resultdata = maprule!(simdata, rule)
     @test source(resultdata[:_default_]) == final
@@ -88,7 +88,7 @@ applyrule!(data, ::TestManual, state, index) = 0
     wkeys, wgrids = getgrids(_Write_(), rule, simdata)
     newsimdata = @set simdata.grids = combinegrids(wkeys, wgrids, rkeys, rgrids)
 
-    @inferred ruleloop(NoOpt(), rule, newsimdata, rkeys, rgrids, wkeys, wgrids, mask)
+    @inferred maprule!(newsimdata, NoOpt(), rule, rkeys, rgrids, wkeys, wgrids, mask)
 
     resultdata = maprule!(simdata, rule)
     @test source(resultdata[:_default_]) == init

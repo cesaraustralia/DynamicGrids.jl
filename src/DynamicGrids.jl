@@ -40,7 +40,7 @@ import FieldMetadata: @description, description,
                       @default, default
 
 
-export sim!, resume!, replay, savegif, isinferred, method, methodtype 
+export sim!, resume!, replay, savegif, isinferred, method, methodtype, isinferred
 
 export rules, neighbors, inbounds, isinbounds, radius, gridsize, 
        currenttime, currenttimestep, timestep
