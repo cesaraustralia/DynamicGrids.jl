@@ -74,13 +74,6 @@ const FIELDDOCTABLE = FieldDocTable((:Description, :Default, :Bounds),
                                     (description, default, bounds);
                                     truncation=(100,40,100))
 
-# Documentation templates
-@template TYPES =
-    """
-    $(TYPEDEF)
-    $(DOCSTRING)
-    """
-
 include("rules.jl")
 include("rulesets.jl")
 include("extent.jl")
