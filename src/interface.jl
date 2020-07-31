@@ -104,7 +104,7 @@ function currentframe end
 """
     currenttime(simdata::SimdData)
 
-Retreive the current simulation time as an integer from a [`SimdData`](@ref) object.
+Retreive the current simulation time from a [`SimdData`](@ref) object.
 
 This will be in whatever type/units you specify in `tspan`.
 """

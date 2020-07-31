@@ -60,12 +60,21 @@ ConstructionBase.constructorof(::Type{T}) where T<:Rule{R,W} where {R,W} =
     T.name.wrapper{R,W}
 
 """
-A Rule that only writes and accesses a single cell: its return value is the new
-value of the cell(s). This limitation can be useful for performance optimisation,
+A Rule that only writes and uses a state from single cell of the read grids, 
+and has its return value written back to the same cell(s). 
+
+This limitation can be useful for performance optimisation,
 such as wrapping rules in [`Chain`](@ref) so that no writes occur between rules.
 
-Accessing `source(data)` and `dest(data)` arrays directly from CellRule
-is not guaranteed to have correct results, and should not be done.
+
+`CellRule` is applied with the method:
+
+```julia
+applyrule(data::SimData, rule::YourCellRule, state, I)
+```
+
+As the cell index is provided in `applyrule`, you can look up an [`aux`](@ref) array
+using `aux(data)[:auxname][I...]` to access cell-specific parameters for your rule.
 """
 abstract type CellRule{R,W} <: Rule{R,W} end
 
@@ -76,7 +85,7 @@ grid that they choose, instead of automatically updating every cell with their o
 `ManualRule` is applied with the method:
 
 ```julia
-applyrule!(data, rule, state, I)
+applyrule!(data::SimData, rule::YourManualRule, state, I)
 ```
 
 Note the `!` bang - this method alters the state of `data`.
@@ -96,23 +105,23 @@ A Rule that only accesses a neighborhood centered around the current cell.
 `NeighborhoodRule` is applied with the method:
 
 ```julia
-applyrule(data, rule, state, I)
+applyrule(data::SimData, rule::YourNeighborhoodRule, state, I)
 ```
 
-For each cell a neighborhood buffer will be populated containing the
-neighborhood cells, and passed to `applyrule` in the rule neighborhood.
+`NeighborhoodRule` must have a `neighborhood` field, that holds
+a [`Neighborhood`](@ref) object. `neighbors(rule)` returns an iterator 
+over the surrounding cell pattern defined by the `Neighborhood`.
+
+For each cell in the grids the neighborhood buffer will be updated
+for use in the `applyrule` method, managed to minimise array reads.
 
 This allows memory optimisations and the use of BLAS routines on the
-neighborhood buffer for [`Moore`](@ref). It also means
+neighborhood buffer for [`Moore`](@ref) neighborhoods. It also means
 that and no bounds checking is required in neighborhood code.
 
-`neighbors(hood)` returns an iterator over the buffer that is generic to
-any neigborhood type - Custom shapes as well as square radial neighborhoods.
-A Neighborhood can also be used directly as an iterator..
-
-For neighborhood rules with multiple read grids, the first is the one
-used for the neighborhood, the others are passed in as additional state 
-for the cell.
+For neighborhood rules with multiple read grids, the first is always
+the one used for the neighborhood, the others are passed in as additional 
+state for the cell. Any grids can be written to, but only for the current cell.
 """
 abstract type NeighborhoodRule{R,W} <: Rule{R,W} end
 
@@ -195,7 +204,7 @@ astuple(::Symbol, read) = (read,)
 
 A [`NeighborhoodRule`](@ref) that receives a neighbors object for the first 
 `read` grid and the passed in neighborhood, followed by the cell values for 
-the reqquired grids, as with [`Cell`](@ref).
+the required grids, as with [`Cell`](@ref).
 
 Returned value(s) are written to the `write`/`W` grid. 
 

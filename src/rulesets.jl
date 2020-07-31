@@ -35,8 +35,8 @@ orders of magnitude, as only used cells are run.
 This is complicated for optimising neighborhoods - they
 must run if they contain just one non-zero cell.
 
-This is best demonstrated with this gif, where the grey areas do not run except 
-where the neighborhood is fulliy inside or partially hangs over an area that is not grey.
+This is best demonstrated with this simulation, where the grey areas do not 
+run except where the neighborhood partially hangs over an area that is not grey.
 
 ![SparseOpt demonstration](https://raw.githubusercontent.com/cesaraustralia/DynamicGrids.jl/media/complexlife_spareseopt.gif)
 """

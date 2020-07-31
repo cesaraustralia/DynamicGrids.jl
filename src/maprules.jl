@@ -7,21 +7,29 @@ const GridOrGridTuple = Union{<:GridData,Tuple{Vararg{<:GridData}}}
 """
     maprule!(simdata::SimData, rule::Rule)
 
-Map a rule over the grids it uses, doining any setup
-and performance optimisation work required.
+Map a rule over the grids it reads from and updating the grids it writes to.
 
 This is broken into a setup method and an application method
 to introduce a function barrier, for type stability.
 """
 function maprule! end
 maprule!(simdata::SimData, rule::Rule) = begin
+
+    #= keys and grids are separated instead of in a NamedTuple as `rgrids` or `wgrids` 
+    may be a single grid, not a Tuple. But we still need to know what its key is.
+    The structure of rgrids and wgrids determines the values that are sent to the rule
+    are in a NamedTuple or single value, and wether a tuple of single return value
+    is expected. There may be a cleaner way of doing this. =#
+    
     rkeys, rgrids = getgrids(_Read_(), rule, simdata)
     wkeys, wgrids = getgrids(_Write_(), rule, simdata)
     # Copy the source to dest for grids we are writing to, if needed
     maybeupdatedest!(wgrids, rule)
     # Copy or zero out overflow where needed
     handleoverflow!(wgrids)
-    # Combine read and write grids to a temporary simdata object
+    # Combine read and write grids to a temporary simdata object.
+    # This means that grids not asked for by rules are not available,
+    # and grids not specified to write to are read-only.
     tempsimdata = @set simdata.grids = combinegrids(rkeys, rgrids, wkeys, wgrids)
     # Run the rule loop
     maprule!(tempsimdata, opt(simdata), rule, rkeys, rgrids, wkeys, wgrids, mask(simdata))
@@ -76,19 +84,16 @@ maprule!(simdata::SimData, opt::PerformanceOpt,
          rkeys, rgrids::GridOrGridTuple, wkeys, wgrids::GridOrGridTuple, mask) where {R,W} = begin
     griddata = simdata[neighborhoodkey(rule)]
     #= Blocks are cell smaller than the hood, because this works very nicely for
-    #looking at only 4 blocks at a time. Larger blocks mean each neighborhood is more
-    #likely to be active, smaller means handling more than 2 neighborhoods per block.
-    It would be good to test if this is the sweet spot for performance,
-    it probably isn't for game of life size grids. =#
+    looking at only 4 blocks at a time. Larger blocks mean each neighborhood is more
+    likely to be active, smaller means handling more than 2 neighborhoods per block.
+    It would be good to test if this is the sweet spot for performance =#
     r = radius(rule)
     blocksize = 2r
     hoodsize = 2r + 1
     nrows, ncols = gridsize(griddata)
     # We unwrap offset arrays and work with the underlying array
     src, dst = parent(source(griddata)), parent(dest(griddata))
-    # Get the preallocated neighborhood buffers
-    # Center of the buffer for both axes
-    # Build multiple rules for each neighborhood buffer
+    # Get the preallocated neighborhood buffers and build multiple rule copies for each 
     buffers, bufrules = spreadbuffers(rule, init(griddata))
     mapneighborhoodrule!(simdata, opt, rule, rkeys, rgrids, wkeys, wgrids,
              griddata, src, dst, buffers, bufrules, r, blocksize, hoodsize, nrows, ncols, mask)
