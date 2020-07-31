@@ -19,6 +19,10 @@ Moore{3}(allocbuffers(3, init))
 
 You can also change the length of the buffers tuple to
 experiment with cache performance.
+
+The main kinds of neighborhood are demonstrated here:
+
+![Neighborhoods](https://raw.githubusercontent.com/cesaraustralia/DynamicGrids.jl/media/Neighborhoods.png)
 """
 abstract type Neighborhood{R,B} end
 

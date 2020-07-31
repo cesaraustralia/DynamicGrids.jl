@@ -2,6 +2,8 @@
 struct _Read_ end
 struct _Write_ end
 
+const GridOrGridTuple = Union{<:GridData,Tuple{Vararg{<:GridData}}}
+
 """
     maprule!(simdata::SimData, rule::Rule)
 
@@ -48,9 +50,10 @@ maybecopystatus!(srcstatus::AbstractArray, deststatus::AbstractArray) =
 _to_readonly(data::Tuple) = map(ReadableGridData, data)
 _to_readonly(data::WritableGridData) = ReadableGridData(data)
 
-maprule!(simdata::SimData, opt::PerformanceOpt, rule::Rule, rkeys, rgrids, wkeys, wgrids, mask) =
+maprule!(simdata::SimData, opt::PerformanceOpt, rule::Rule, 
+         rkeys, rgrids::GridOrGridTuple, wkeys, wgrids::GridOrGridTuple, mask) =
     let rule=rule, simdata=simdata, rkeys=rkeys, rgrids=rgrids, wkeys=wkeys, wgrid=wgrids
-        optmap(opt, rgrids) do i, j
+        optmap(opt, rgrids, wgrids) do i, j
             ismasked(mask, i, j) && return
             readval = readgrids(rkeys, rgrids, i, j)
             writeval = applyrule(simdata, rule, readval, (i, j))
@@ -58,69 +61,19 @@ maprule!(simdata::SimData, opt::PerformanceOpt, rule::Rule, rkeys, rgrids, wkeys
             return
         end
     end
-maprule!(simdata::SimData, opt::PerformanceOpt, rule::ManualRule, rkeys, rgrids, wkeys, wgrids, mask) =
+maprule!(simdata::SimData, opt::PerformanceOpt, rule::ManualRule, 
+         rkeys, rgrids::GridOrGridTuple, wkeys, wgrids::GridOrGridTuple, mask) =
     let rule=rule, simdata=simdata, rkeys=rkeys, rgrids=rgrids
-        optmap(opt, rgrids) do i, j
+        optmap(opt, rgrids, wgrids) do i, j
             ismasked(mask, i, j) && return
             readval = readgrids(rkeys, rgrids, i, j)
             applyrule!(simdata, rule, readval, (i, j))
             return
         end
     end
-
-"""
-    optmap(f, data, ::SparseOpt)
-
-Maps rules over grids with sparse block optimisation. Inactive blocks do not run.
-This can lead to order of magnitude performance improvments in sparse
-simulations where large areas of the grid are filled with zeros.
-"""
-optmap(f, ::SparseOpt, data) = begin
-    nrows, ncols = gridsize(data)
-    r = radius(data)
-    # Only use SparseOpt for single-grid rules with grid radii > 0
-    if r isa Tuple || r == 0
-        optmap(f, NoOpt(), data)
-        return
-    end
-
-    blocksize = 2r
-    status = sourcestatus(data)
-
-    for bj in 1:size(status, 2) - 1, bi in 1:size(status, 1) - 1
-        @inbounds status[bi, bj] || continue
-        # Convert from padded block to init dimensions
-        istart = blocktoind(bi, blocksize) - r
-        jstart = blocktoind(bj, blocksize) - r
-        # Stop at the init row/column size, not the padding or block multiple
-        istop = min(istart + blocksize - 1, nrows)
-        jstop = min(jstart + blocksize - 1, ncols)
-        # Skip the padding
-        istart = max(istart, 1)
-        jstart = max(jstart, 1)
-
-        for j in jstart:jstop, i in istart:istop
-            f(i, j)
-        end
-    end
-    return
-end
-"""
-    optmap(f, data, ::NoOpt)
-
-Maps rule applicator over the grid with no optimisation
-"""
-optmap(f, ::NoOpt, data) = begin
-    nrows, ncols = gridsize(data)
-    for j in 1:ncols, i in 1:nrows
-        f(i, j)
-    end
-end
-
-
 maprule!(simdata::SimData, opt::PerformanceOpt,
          rule::Union{NeighborhoodRule,Chain{R,W,<:Tuple{<:NeighborhoodRule,Vararg}}},
-         rkeys, rgrids, wkeys, wgrids, mask) where {R,W} = begin
+         rkeys, rgrids::GridOrGridTuple, wkeys, wgrids::GridOrGridTuple, mask) where {R,W} = begin
     griddata = simdata[neighborhoodkey(rule)]
     #= Blocks are cell smaller than the hood, because this works very nicely for
     #looking at only 4 blocks at a time. Larger blocks mean each neighborhood is more
@@ -173,13 +126,7 @@ mapneighborhoodrule!(simdata::SimData, opt::NoOpt, rule, rkeys, rgrids, wkeys, w
                 I = i + b - 1, j
                 ismasked(mask, I...) && continue
                 # Run the rule using buffer b
-                readval = if rgrids isa Tuple
-                    # Get all vals from grids
-                    readgrids(keys2vals(readkeys(rule)), rgrids, I...)
-                else
-                    # Get single val from buffer center
-                    buffers[b][r + 1, r + 1]
-                end
+                readval = readgridsorbuffer(rgrids, buffers[b], rule, r, I...)
                 writeval = applyrule(simdata, bufrules[b], readval, I)
                 writegrids!(wgrids, writeval, I...)
             end
@@ -190,14 +137,13 @@ end
 mapneighborhoodrule!(simdata::SimData, opt::SparseOpt, rule, rkeys, rgrids, wkeys, wgrids,
          griddata, src, dst, buffers, bufrules, r, blocksize, hoodsize, nrows, ncols, mask
          ) where {R,W} = begin
-    # rgrids isa Tuple && length(rgrids) > 1 && error("`SparseOpt` can't handle rules with multiple read grids yet. Use `opt=NoOpt()`")
 
-    # Initialise status for the dest. Is this needed?
     srcstatus, dststatus = sourcestatus(griddata), deststatus(griddata)
+    # Initialise status for the dest. Is this needed?
     dststatus .= false
 
     # curstatus and newstatus track active status for 4 local blocks
-    newstatus = [false false; false false]
+    newstatus = localstatus(griddata)
     valtype = eltype(dst)
 
 
@@ -250,7 +196,7 @@ mapneighborhoodrule!(simdata::SimData, opt::SparseOpt, rule, rkeys, rgrids, wkey
             if !(bs11 | bs12 | bs21 | bs22)
                 # Skip this block
                 skippedlastblock = true
-                # Run the rest of the chain if it exists
+                # Run the rest of the chain if it exists and more than 1 grid is used
                 if rule isa Chain && length(rule) > 1 && length(rkeys) > 1
                     # Loop over the grid COLUMNS inside the block
                     for j in jstart:jstop
@@ -258,15 +204,9 @@ mapneighborhoodrule!(simdata::SimData, opt::SparseOpt, rule, rkeys, rgrids, wkey
                         for b in 1:rowsinblock
                             I = i + b - 1, j
                             ismasked(mask, I...) && continue
-                            read = readgrids(rkeys, rgrids, I...)
-                            write = applyrule(simdata, tail(rule), read, I)
-                            if wgrids isa Tuple
-                                map(wgrids, write) do d, w
-                                    @inbounds dest(d)[I...] = w
-                                end
-                            else
-                                @inbounds dest(wgrids)[I...] = write
-                            end
+                            readval = readgrids(rkeys, rgrids, I...)
+                            writeval = applyrule(simdata, tail(rule), readval, I)
+                            @inbounds writegrids!(wgrids, writeval, I...)
                         end
                     end
                 else
@@ -295,31 +235,27 @@ mapneighborhoodrule!(simdata::SimData, opt::SparseOpt, rule, rkeys, rgrids, wkey
 
             # Loop over the grid COLUMNS inside the block
             for j in jstart:jstop
-                # Which block column are we in, 1 or 2
-                curblockj = (j - jstart) ÷ r + 1
+                # Update buffers unless feshly populated
                 if freshbuffer
                     freshbuffer = false
                 else
                     update_buffers!(buffers, src, rowsinblock, hoodsize, r, i, j)
                 end
 
+                # Which block column are we in, 1 or 2
+                curblockj = (j - jstart) ÷ r + 1
+
                 # Loop over the grid ROWS inside the block
                 for b in 1:rowsinblock
                     I = i + b - 1, j
                     ismasked(mask, I...) && continue
                     # Which block row are we in, 1 or 2
-                    curblocki = (b - 1) ÷ r + 1
-                    readval = if rgrids isa Tuple
-                        # Get all vals from grids
-                        readgrids(keys2vals(readkeys(rule)), rgrids, I...)
-                    else
-                        # Get single val from buffer center
-                        @inbounds buffers[b][r + 1, r + 1]
-                    end
-                    @inbounds writeval = applyrule(simdata, bufrules[b], readval, I)
+                    readval = readgridsorbuffer(rgrids, buffers[b], rule, r, I...)
+                    writeval = applyrule(simdata, bufrules[b], readval, I)
                     @inbounds writegrids!(wgrids, writeval, I...)
                     # Update the status for the block
-                    @inbounds newstatus[curblocki, curblockj] |= get_cellstatus(wgrids, rule, writeval)
+                    curblocki = (b - 1) ÷ r + 1
+                    @inbounds newstatus[curblocki, curblockj] = true # |= get_cellstatus(wgrids, rule, writeval)
                 end
 
                 # Combine blocks with the previous rows / cols
@@ -338,6 +274,63 @@ mapneighborhoodrule!(simdata::SimData, opt::SparseOpt, rule, rkeys, rgrids, wkey
         end
     end
 end
+
+
+"""
+    optmap(f, ::SparseOpt, rdata::GridOrGridTuple, wdata::GridOrGridTuple)
+
+Maps rules over grids with sparse block optimisation. Inactive blocks do not run.
+This can lead to order of magnitude performance improvments in sparse
+simulations where large areas of the grid are filled with zeros.
+"""
+optmap(f, ::SparseOpt, rgrids::GridOrGridTuple, wgrids::GridOrGridTuple) = begin
+    nrows, ncols = gridsize(wgrids)
+    r = radius(rgrids)
+    # Only use SparseOpt for single-grid rules with grid radii > 0
+    if r isa Tuple || r == 0
+        optmap(f, NoOpt(), rgrids, wgrids)
+        return
+    end
+
+    blocksize = 2r
+    status = sourcestatus(rgrids)
+
+    for bj in 1:size(status, 2), bi in 1:size(status, 1)
+        @inbounds status[bi, bj] || continue
+        # Convert from padded block to init dimensions
+        istart = blocktoind(bi, blocksize) - r
+        jstart = blocktoind(bj, blocksize) - r
+        # Stop at the init row/column size, not the padding or block multiple
+        istop = min(istart + blocksize - 1, nrows)
+        jstop = min(jstart + blocksize - 1, ncols)
+        # Skip the padding
+        istart = max(istart, 1)
+        jstart = max(jstart, 1)
+
+        for j in jstart:jstop, i in istart:istop
+            f(i, j)
+        end
+    end
+    return
+end
+"""
+    optmap(f, ::NoOpt, rgrids::GridOrGridTuple, wgrids::GridOrGridTuple)
+
+Maps rule applicator over the grid with no optimisation
+"""
+optmap(f, ::NoOpt, rgrids::GridOrGridTuple, wgrids::GridOrGridTuple) = begin
+    nrows, ncols = gridsize(wgrids)
+    for j in 1:ncols, i in 1:nrows
+        f(i, j)
+    end
+end
+
+# Reduces array reads for single grids, when we can just use
+# the center of the neighborhood buffer as the cell state
+@inline readgridsorbuffer(rgrids::Tuple, buffer, rule, r, I...) =
+    readgrids(keys2vals(readkeys(rule)), rgrids, I...)
+@inline readgridsorbuffer(rgrids::ReadableGridData, buffer, rule, r, I...) =
+    buffer[r + 1, r + 1]
 
 update_buffers!(buffers, src, rowsinblock, hoodsize, r, i, j) = begin
     # Move the neighborhood buffers accross one column

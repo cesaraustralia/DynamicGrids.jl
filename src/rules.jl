@@ -73,7 +73,7 @@ abstract type CellRule{R,W} <: Rule{R,W} end
 `ManualRule` is the supertype for rules that manually write to whichever cells of the 
 grid that they choose, instead of automatically updating every cell with their output.
 
-`NeighborhoodRule` is applied with the method:
+`ManualRule` is applied with the method:
 
 ```julia
 applyrule!(data, rule, state, I)
@@ -236,7 +236,7 @@ Neighbors(f; read=:_default_, write=read, neighborhood=Moore(1)) =
 
 A [`ManualRule`](@ref) to manually write to the array where you need to. 
 `f` is passed an indexable `data` object, and the index of the current cell, 
-followed by the requirement grid values for the index.
+followed by the required grid values for the index.
 
 ## Example
 

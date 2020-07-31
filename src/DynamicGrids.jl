@@ -40,7 +40,7 @@ import FieldMetadata: @description, description,
                       @default, default
 
 
-export sim!, resume!, replay, savegif, isinferred, method, methodtype, isinferred
+export sim!, resume!, replay, savegif, isinferred, isinferred
 
 export rules, neighbors, inbounds, isinbounds, radius, gridsize, 
        currenttime, currenttimestep, timestep
@@ -74,6 +74,13 @@ const FIELDDOCTABLE = FieldDocTable((:Description, :Default, :Bounds),
                                     (description, default, bounds);
                                     truncation=(100,40,100))
 
+# Documentation templates
+@template TYPES =
+    """
+    $(TYPEDEF)
+    $(DOCSTRING)
+    """
+
 include("rules.jl")
 include("rulesets.jl")
 include("extent.jl")
@@ -88,6 +95,7 @@ include("outputs/repl.jl")
 include("outputs/gif.jl")
 include("interface.jl")
 include("framework.jl")
+include("precalc.jl")
 include("sequencerules.jl")
 include("maprules.jl")
 include("overflow.jl")

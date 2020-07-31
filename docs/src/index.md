@@ -33,9 +33,21 @@ Chain
 ```
 
 ```@docs
-applyrule
-applyrule!
+DynamicGrids.applyrule
+DynamicGrids.applyrule!
+DynamicGrids.precalcrules
 isinferred 
+```
+
+### Simulation data and methods for use in `applyrule`
+
+```@docs
+SimData
+DynamicGrids.radius
+DynamicGrids.aux
+DynamicGrids.timestep
+DynamicGrids.currenttimestep
+DynamicGrids.currenttime
 ```
 
 ## Neighborhoods
@@ -53,11 +65,13 @@ Positional
 LayeredPositional
 ```
 
+### Methods for use with Neighborhood objects
+
 ```@docs
-neighbors
-sumneighbors
-mapsetneighbor!
-setneighbor!
+DynamicGrids.neighbors
+DynamicGrids.sumneighbors
+DynamicGrids.mapsetneighbor!
+DynamicGrids.setneighbor!
 ```
 
 
@@ -72,6 +86,14 @@ GraphicOutput
 REPLOutput
 ImageOutput
 GifOutput
+```
+
+### Output methods
+
+```
+DynamicGrids.storeframe!
+DynamicGrids.showframe
+DynamicGrids.showimage
 ```
 
 ### Grid processors
@@ -121,13 +143,6 @@ NoOpt
 SparseOpt
 ```
 
-```@docs
-SimData
-timestep
-currenttimestep
-currenttime
-```
-
 ## Internal data handling
 
 [`SimData`](@ref) and [`GridData`](@ref) objects are used to 
@@ -141,8 +156,7 @@ DynamicGrids.ReadableGridData
 DynamicGrids.WritableGridData
 DynamicGrids.sequencerules!
 DynamicGrids.maprule!
-DynamicGrids.optmap(f, data, ::SparseOpt)
-DynamicGrids.optmap(f, data, ::NoOpt)
+DynamicGrids.optmap
 DynamicGrids.readgrids
 DynamicGrids.writegrids
 DynamicGrids.getgrids

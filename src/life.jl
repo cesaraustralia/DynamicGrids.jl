@@ -1,5 +1,5 @@
 """
-    Life(neighborhood, birth=3, sustain(2, 3))
+    Life(neighborhood, birth=3, sustain=(2, 3))
 
 Rule for game-of-life style cellular automata. This is a demonstration of 
 Cellular Automata more than a seriously optimised game of life rule.
@@ -46,8 +46,8 @@ sim!(output, Life(birth=(1,3,5,7), sustain=(1,3,5,7)))
 """
 @default @flattenable @bounds @description struct Life{R,W,N,B,S,L} <: NeighborhoodRule{R,W}
     neighborhood::N | Moore(1) | false | nothing | "Any Neighborhood"
-    b::B            | 3        | true  | (0, 8)  | "Array, Tuple or Iterable of integers to match neighbors when cell is empty"
-    s::S            | (2, 3)   | true  | (0, 8)  | "Array, Tuple or Iterable of integers to match neighbors cell is full"
+    birth::B        | 3        | true  | (0, 8)  | "Array, Tuple or Iterable of integers to match neighbors when cell is empty"
+    sustain::S      | (2, 3)   | true  | (0, 8)  | "Array, Tuple or Iterable of integers to match neighbors cell is full"
     lookup::L       | _        | false | _       | _
     Life{R,W,N,B,S,L}(neighborhood::N, birth::B, sustain::S, lookup::L) where {R,W,N,B,S,L} = begin
         lookup = Tuple(i in birth for i in 0:8), Tuple(i in sustain for i in 0:8)

@@ -1,21 +1,21 @@
 """
 Singleton types for choosing the grid overflow rule used in
-[`inbounds`](@ref). These determine what is done when a neighborhood
-or jump extends outside of the grid.
+[`inbounds`](@ref) and [`NeibourhoodRule`](@ref) buffers. 
+These determine what is done when a neighborhood or jump extends outside of the grid.
 """
 abstract type Overflow end
 
 """
     WrapOverflow()
 
-Wrap cords that overflow boundaries back to the opposite side
+Wrap cordinates that overflow boundaries back to the opposite side of the grid.
 """
 struct WrapOverflow <: Overflow end
 
 """
     RemoveOverflow()
 
-Remove coords that overflow boundaries
+Remove coordinates that overflow grid boundaries.
 """
 struct RemoveOverflow <: Overflow end
 
@@ -35,7 +35,8 @@ orders of magnitude, as only used cells are run.
 This is complicated for optimising neighborhoods - they
 must run if they contain just one non-zero cell.
 
-This is best demonstrated with this gif, where the grey areas do not run:
+This is best demonstrated with this gif, where the grey areas do not run except 
+where the neighborhood is fulliy inside or partially hangs over an area that is not grey.
 
 ![SparseOpt demonstration](https://raw.githubusercontent.com/cesaraustralia/DynamicGrids.jl/media/complexlife_spareseopt.gif)
 """
@@ -65,26 +66,31 @@ ruleset(rs::AbstractRuleset) = rs
 Base.step(rs::AbstractRuleset) = timestep(rs)
 
 """
-    Ruleset(rules...; overflow=RemoveOverflow(), opt=SparseOpt(), cellsize=1, timestep=nothing)
+    Ruleset(rules...; overflow=RemoveOverflow(), opt=NoOpt(), cellsize=1, timestep=nothing)
 
-A container for holding a sequence of `Rule`and simulaiton details like overflow handing 
-and optimisation.  Rules will be run in the order they are passed, ie. `Ruleset(rule1, rule2, rule3)`.
+A container for holding a sequence of `Rule`s and simulation 
+details like overflow handing and optimisation.  
+Rules will be run in the order they are passed, ie. `Ruleset(rule1, rule2, rule3)`.
 
 ## Keyword Arguments
-- `opt`: a [`PerformanceOpt`](@ref) to specificy optimisations like [`SparseOpt`](@ref).
-- `overflow`: what to do with overflow of grid edges. Options are `RemoveOverflow()` or `WrapOverflow()`.
-- `cellsize`: Size of cells.
-- `timestep`: fixed timestep where this is reuired for some rules. eg. `Month(1)` or `1u"s"`.
+- `opt`: a [`PerformanceOpt`](@ref) to specificy optimisations like 
+  [`SparseOpt`](@ref). Defaults to [`NoOpt`](@ref).
+- `overflow`: what to do with overflow of grid edges. 
+  Options are `RemoveOverflow()` or `WrapOverflow()`, defaulting to [`RemoveOverflow`](@ref).
+- `cellsize`: size of cells.
+- `timestep`: fixed timestep where this is reuired for some rules. 
+  eg. `Month(1)` or `1u"s"`.
 """
 @default_kw @flattenable mutable struct Ruleset{O<:Overflow,Op<:PerformanceOpt,C,T} <: AbstractRuleset
     # Rules are intentionally not type stable. This allows `precalc` and Interact.jl 
     # updates to change the rule type. Function barriers remove any performance overheads.
     rules::Tuple{Vararg{<:Rule}} | ()               | true
     overflow::O                  | RemoveOverflow() | false
-    opt::Op                      | SparseOpt()      | false
+    opt::Op                      | NoOpt()          | false
     cellsize::C                  | 1                | false
     timestep::T                  | nothing          | false
 end
 Ruleset(rules::Vararg{<:Rule}; kwargs...) = Ruleset(; rules=rules, kwargs...)
+Ruleset(rules::Tuple; kwargs...) = Ruleset(; rules=rules, kwargs...)
 
 rules(rs::Ruleset) = rs.rules

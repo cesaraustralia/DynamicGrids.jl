@@ -1,5 +1,5 @@
 """
-    Chain(args...)
+    Chain(rules...)
 
 `Chain`s allow chaining rules together to be completed in a single processing step,
 without intermediate reads or writes from grids. 
@@ -15,10 +15,11 @@ or [`NeighborhoodRule`](@ref) followed by [`CellRule`](@ref).
 struct Chain{R,W,T<:Union{Tuple{},Tuple{Union{<:NeighborhoodRule,<:CellRule},Vararg{<:CellRule}}}} <: Rule{R,W}
     rules::T
 end
-Chain(args...) = begin
-    rkeys = Tuple{union(map(k -> asiterable(readkeys(k)), args)...)...}
-    wkeys = Tuple{union(map(k -> asiterable(writekeys(k)), args)...)...}
-    Chain{rkeys,wkeys,typeof(args)}(args)
+Chain(rules...) = Chain(rules) 
+Chain(rules::Tuple) = begin
+    rkeys = Tuple{union(map(k -> asiterable(readkeys(k)), rules)...)...}
+    wkeys = Tuple{union(map(k -> asiterable(writekeys(k)), rules)...)...}
+    Chain{rkeys,wkeys,typeof(rules)}(rules)
 end
 
 rules(chain::Chain) = chain.rules

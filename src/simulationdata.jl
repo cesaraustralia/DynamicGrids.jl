@@ -148,13 +148,12 @@ end
 extent(d::SimData) = d.extent
 ruleset(d::SimData) = d.ruleset
 grids(d::SimData) = d.grids
-currentframe(d::SimData) = d.currentframe
 init(d::SimData) = init(extent(d))
 mask(d::SimData) = mask(first(d))
 aux(d::SimData) = aux(extent(d))
 tspan(d::SimData) = tspan(extent(d))
-starttime(d::SimData) = first(tspan(d))
 timestep(d::SimData) = step(tspan(d))
+currentframe(d::SimData) = d.currentframe
 currenttime(d::SimData) = tspan(d)[currentframe(d)]
 currenttime(d::Vector{<:SimData}) = currenttime(d[1])
 

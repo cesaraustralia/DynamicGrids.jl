@@ -1,15 +1,14 @@
 """
-    applyrule(rule::Rule, data, state, index, [buffer])
+    applyrule(data, rule::Rule, state, index)
 
 Updates cell values based on their current state and the 
 state of other cells as defined in the Rule.
 
 ### Arguments:
-- `rule` : [`Rule`](@ref)
 - `data` : [`SimData`](@ref)
+- `rule` : [`Rule`](@ref)
 - `state`: the value(s) of the current cell
 - `index`: a (row, column) tuple of Int for the current cell coordinates - `t`: the current time step
-- `buffer`: a neighborhood burrer array passed to [`NeighborhoodRule`].
 
 Returns the values) to be written to the current cell(s).
 """
@@ -17,7 +16,7 @@ function applyrule end
 
 
 """
-    applyrule!(rule::ManualRule, data, state, index)
+    applyrule!(data, rule::ManualRule, state, index)
 
 A rule that manually writes to the grid data array, 
 used in all rules inheriting from [`ManualRule`](@ref).
@@ -26,19 +25,6 @@ used in all rules inheriting from [`ManualRule`](@ref).
 see [`applyrule`](@ref)
 """
 function applyrule! end
-
-"""
-    precalcrules(rule, data)
-
-Run any precalculations needed to run a rule for a particular frame,
-returning new rule objects containing the updates.
-
-This is a functional approach, rebuilding rules recursively.
-`@set` from Setfield.jl can help updating immutable rules.
-
-The default action is to return the existing rule without change.
-"""
-function precalcrules end
 
 """
 Returns an iteraterable generator over all cells in the neighborhood.
@@ -74,12 +60,52 @@ Return the radius of a rule or ruleset if it has one, otherwise zero.
 """
 function radius end
 
+"""
+    aux(obj)
 
-# TODO: docuent SimData methods
-function starttime end
-function currenttime end
-function currentframe end
-function gridsize end
-function mask end
-function overflow end
+Retreive auxilary data `NamedTuple` from an [`Output`](@ref), 
+[`Extent`](@ref) or [`SimdData`](@ref) object.
+"""
+function aux end
+
+"""
+    tspan(obj)
+
+Retreive the timespan `AbstractRange` from an [`Output`](@ref), 
+[`Extent`](@ref) or [`SimdData`](@ref) object.
+"""
+function tspan end
+
+"""
+    timestep(obj)
+
+Retreive the timestep size from an [`Output`](@ref), 
+[`Extent`](@ref), [`Ruleset`](@ref) or [`SimdData`](@ref) object.
+"""
 function timestep end
+
+"""
+    currenttimestep(simdata::SimdData)
+
+Retreive the current timestep from a [`SimdData`](@ref) object.
+
+This may be different from the `timestep`. If the simulation is in `Month`, 
+`currenttimestep` will return `Seconds` for the length of the specific month.
+"""
+function currenttimestep end
+
+"""
+    currentframe(simdata::SimdData)
+
+Retreive the current simulation frame as an integer from a [`SimdData`](@ref) object.
+"""
+function currentframe end
+
+"""
+    currenttime(simdata::SimdData)
+
+Retreive the current simulation time as an integer from a [`SimdData`](@ref) object.
+
+This will be in whatever type/units you specify in `tspan`.
+"""
+function currenttime end
