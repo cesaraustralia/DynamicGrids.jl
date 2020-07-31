@@ -37,12 +37,12 @@ end
     end
 
     @testset "return type" begin
-        rule = Neighbors(Moore{1}(zeros(Bool, 3, 3))) do hood, x
+        rule = Neighbors{:a,:a}(Moore{1}(zeros(Bool, 3, 3))) do hood, x
             round(Int, x + sum(hood))
         end
-        output = ArrayOutput(rand(Int, 10, 10); tspan=1:10)
+        output = ArrayOutput((a=rand(Int, 10, 10),); tspan=1:10)
         @test isinferred(output, rule)
-        output = ArrayOutput(rand(Bool, 10, 10); tspan=1:10)
+        output = ArrayOutput((a=rand(Bool, 10, 10),); tspan=1:10)
         @test_throws ErrorException isinferred(output, rule)
     end
 
@@ -62,6 +62,4 @@ end
         output = ArrayOutput(zeros(Int, 10, 10); tspan=1:10)
         @test isinferred(output, Ruleset(rule))
     end
-
-    # TODO: implement/test for NamedTuple init
 end

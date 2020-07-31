@@ -7,7 +7,7 @@ Write the output array to a gif. You must pass a processor keyword argument for 
 Saving very large gifs may trigger a bug in Imagemagick.
 """
 savegif(filename::String, o::Output, ruleset=Ruleset(); 
-        minval=mival(o), maxval=maxval(o), processor=processor(o), kwargs...) = begin
+        minval=minval(o), maxval=maxval(o), processor=processor(o), kwargs...) = begin
     im_o = NoDisplayImageOutput(o; maxval=maxval, minval=minval, processor=processor)
     savegif(filename, im_o, ruleset; kwargs...) 
 end

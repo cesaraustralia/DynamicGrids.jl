@@ -4,6 +4,13 @@
 DynamicGrids
 ```
 
+## Running simulations
+
+```@docs
+sim!
+resume! 
+```
+
 ## Rules
 
 Rules define simulation behaviour. They hold data relevant to the simulation,
@@ -14,7 +21,6 @@ any number of grids.
 ```@docs
 Ruleset
 Rule
-Chain
 CellRule
 Cell
 NeighborhoodRule
@@ -23,11 +29,25 @@ Life
 ManualRule
 Manual
 ManualNeighborhoodRule
+Chain
 ```
 
 ```@docs
-applyrule
-applyrule!
+DynamicGrids.applyrule
+DynamicGrids.applyrule!
+DynamicGrids.precalcrules
+isinferred 
+```
+
+### Simulation data and methods for use in `applyrule`
+
+```@docs
+SimData
+DynamicGrids.radius
+DynamicGrids.aux
+DynamicGrids.timestep
+DynamicGrids.currenttimestep
+DynamicGrids.currenttime
 ```
 
 ## Neighborhoods
@@ -45,11 +65,13 @@ Positional
 LayeredPositional
 ```
 
+### Methods for use with Neighborhood objects
+
 ```@docs
-neighbors
-sumneighbors
-mapsetneighbor!
-setneighbor!
+DynamicGrids.neighbors
+DynamicGrids.sumneighbors
+DynamicGrids.mapsetneighbor!
+DynamicGrids.setneighbor!
 ```
 
 
@@ -64,6 +86,14 @@ GraphicOutput
 REPLOutput
 ImageOutput
 GifOutput
+```
+
+### Output methods
+
+```
+DynamicGrids.storeframe!
+DynamicGrids.showframe
+DynamicGrids.showimage
 ```
 
 ### Grid processors
@@ -113,22 +143,23 @@ NoOpt
 SparseOpt
 ```
 
-
 ## Internal data handling
 
-Simdata and Griddata objects are used to manage the simulation
-and provide rules with any data they need.
+[`SimData`](@ref) and [`GridData`](@ref) objects are used to 
+manage the simulation and provide rules with any data they need.
+
+These methods and objects are all subject to change.
 
 ```@docs
-SimData
-GridData
-ReadableGridData
-WritableGridData
-```
-
-# Methods
-
-```@autodocs
-Modules = [DynamicGrids]
-Order   = [:function]
+DynamicGrids.GridData
+DynamicGrids.ReadableGridData
+DynamicGrids.WritableGridData
+DynamicGrids.sequencerules!
+DynamicGrids.maprule!
+DynamicGrids.optmap
+DynamicGrids.readgrids
+DynamicGrids.writegrids
+DynamicGrids.getgrids
+DynamicGrids.combinegrids
+DynamicGrids.replacegrids
 ```

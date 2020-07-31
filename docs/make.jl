@@ -1,6 +1,5 @@
 using Documenter, DynamicGrids
-using DynamicGrids: applyrule, applyrule!, setneighbor!, mapsetneighbor!, neighbors, sumneighbors,
-      AbstractSimData, SimData, GridData, ReadableGridData, WritableGridData
+using DynamicGrids: AbstractSimData, SimData, GridData, ReadableGridData, WritableGridData
 
 makedocs(
     modules = [DynamicGrids],

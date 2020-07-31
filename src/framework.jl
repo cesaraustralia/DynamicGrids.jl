@@ -70,15 +70,13 @@ end
 
 Shorthand for running a rule without defining a `Ruleset`.
 """
-sim!(output::Output, rules::Rule...;
-     tspan=tspan(output),
-     kwargs...) = begin
+sim!(output::Output, rules::Rule...; tspan=tspan(output), kwargs...) = begin
     ruleset = Ruleset(rules...; timestep=step(tspan), kwargs...)
     sim!(output::Output, ruleset; tspan=tspan, kwargs...)
 end
 
 """
-    resume!(output::GraphicOutput, ruleset::Ruleset;
+    resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
             tstop=last(tspan(output)),
             fps=fps(output),
             simdata=nothing,
@@ -100,11 +98,11 @@ The keyword arg `tstop` can be used to extend the length of the simulation.
 - `simdata`: a [`SimData`](@ref) object. Keeping it between simulations can improve performance
   when that is important
 """
-resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
+function resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
         tstop=last(tspan(output)),
         fps=fps(output),
         simdata=nothing,
-        nreplicates=nothing) = begin
+        nreplicates=nothing)
     initialise(output)
     # Check status and arguments
     length(output) > 0 || error("There is no simulation to resume. Run `sim!` first")
@@ -131,18 +129,21 @@ resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
 end
 
 # run the simulation either directly or asynchronously.
-runsim!(output, args...) =
+function runsim!(output, args...)
     if isasync(output)
         @async simloop!(output, args...)
     else
         simloop!(output, args...)
     end
+end
 
-#= Loop over the selected timespan, running the ruleset and displaying the output
+"""
+Loop over the selected timespan, running the ruleset and displaying the output
 Operations on outputs and rulesets are allways mutable and in-place.
 Operations on rules and simdata objects are functional as they are used in inner loops
-where immutability improves performance. =#
-simloop!(output::Output, simdata, fspan) = begin
+where immutability improves performance.
+"""
+function simloop!(output::Output, simdata, fspan)
     # Set the frame timestamp for fps calculation
     settimestamp!(output, first(fspan))
     # Initialise types etc
@@ -170,20 +171,4 @@ simloop!(output::Output, simdata, fspan) = begin
     end
     setrunning!(output, false)
     output
-end
-
-# We have to keep the original rulset as it may be modified elsewhere
-# like in an Interact.jl interface. `Ruleset` is mutable.
-precalcrules!(simdata::Vector{<:SimData}) = precalcrules!.(simdata)
-precalcrules!(simdata::SimData) = begin
-    simdata.ruleset.rules = precalcrules(rules(simdata), simdata)
-    simdata
-end
-precalcrules(rule, simdata) = rule
-precalcrules(rules::Tuple, simdata) =
-    (precalcrules(rules[1], simdata), precalcrules(tail(rules), simdata)...)
-precalcrules(rules::Tuple{}, simdata) = ()
-precalcrules(chain::Chain{R,W}, simdata) where {R,W} = begin
-    ch = precalcrules(rules(chain), simdata)
-    Chain{R,W,typeof(ch)}(ch)
 end

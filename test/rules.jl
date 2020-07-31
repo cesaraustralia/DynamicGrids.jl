@@ -1,6 +1,6 @@
 using DynamicGrids, Setfield, FieldMetadata, Test
 import DynamicGrids: applyrule, applyrule!, maprule!, 
-       source, dest, currenttime, getgrids, combinegrids, ruleloop,
+       source, dest, currenttime, getgrids, combinegrids,
        SimData, WritableGridData, _Read_, _Write_,
        Rule, Extent, readkeys, writekeys
 
@@ -20,18 +20,21 @@ DynamicGrids.applyrule(data, ::AddOneRule, state, args...) = state + 1
     mask = Bool[0 1 0
                 0 1 1
                 1 1 0]
-    rules = Ruleset(AddOneRule{:_default_,:_default_}())
-    output = ArrayOutput(init; tspan=1:3, mask=mask)
-    sim!(output, rules)
-    @test output[1] == [0.0 4.0 0.0
-                        0.0 5.0 8.0
-                        3.0 6.0 0.0]
-    @test output[2] == [0.0 5.0 0.0
-                        0.0 6.0 9.0
-                        4.0 7.0 0.0]
-    @test output[3] == [0.0 6.0 0.0
-                        0.0 7.0 10.0
-                        5.0 8.0 0.0]
+    ruleset1 = Ruleset(AddOneRule{:_default_,:_default_}(); opt=NoOpt())
+    ruleset2 = Ruleset(AddOneRule{:_default_,:_default_}(); opt=SparseOpt())
+    output1 = ArrayOutput(init; tspan=1:3, mask=mask)
+    output2 = ArrayOutput(init; tspan=1:3, mask=mask)
+    sim!(output1, ruleset1)
+    sim!(output2, ruleset2)
+    @test output1[1] == output2[1] == [0.0 4.0 0.0
+                                       0.0 5.0 8.0
+                                       3.0 6.0 0.0]
+    @test output1[2] == output2[2] == [0.0 5.0 0.0
+                                       0.0 6.0 9.0
+                                       4.0 7.0 0.0]
+    @test output1[3] == output2[3] == [0.0 6.0 0.0
+                                       0.0 7.0 10.0
+                                       5.0 8.0 0.0]
 end
 
 
@@ -48,30 +51,35 @@ applyrule(data, ::TestRule, state, index) = 0
              0 0 0 0]
 
     rule = TestRule{:a,:a}()
-    ruleset = Ruleset(rule)
+    ruleset1 = Ruleset(rule; opt=NoOpt())
+    ruleset2 = Ruleset(rule; opt=SparseOpt())
     mask = nothing
 
-    @test DynamicGrids.overflow(ruleset) === RemoveOverflow()
-    @test DynamicGrids.opt(ruleset) === SparseOpt()
-    @test DynamicGrids.cellsize(ruleset) === 1
-    @test DynamicGrids.timestep(ruleset) === nothing
-    @test DynamicGrids.ruleset(ruleset) === ruleset
+    @test DynamicGrids.overflow(ruleset1) === RemoveOverflow()
+    @test DynamicGrids.opt(ruleset1) === NoOpt()
+    @test DynamicGrids.opt(ruleset2) === SparseOpt()
+    @test DynamicGrids.cellsize(ruleset1) === 1
+    @test DynamicGrids.timestep(ruleset1) === nothing
+    @test DynamicGrids.ruleset(ruleset1) === ruleset1
 
     extent = Extent(; init=(_default_=init,), tspan=1:1)
-    simdata = SimData(extent, ruleset)
+    simdata1 = SimData(extent, ruleset1)
+    simdata2 = SimData(extent, ruleset2)
 
     # Test maprules components
-    rkeys, rgrids = getgrids(_Read_(), rule, simdata)
-    wkeys, wgrids = getgrids(_Write_(), rule, simdata)
+    rkeys, rgrids = getgrids(_Read_(), rule, simdata1)
+    wkeys, wgrids = getgrids(_Write_(), rule, simdata1)
     @test rkeys == Val{:_default_}()
     @test wkeys == Val{:_default_}()
-    newsimdata = @set simdata.grids = combinegrids(rkeys, rgrids, wkeys, wgrids)
+    newsimdata = @set simdata1.grids = combinegrids(rkeys, rgrids, wkeys, wgrids)
     @test newsimdata.grids[1] isa WritableGridData
     # Test type stability
-    @inferred ruleloop(NoOpt(), rule, newsimdata, rkeys, rgrids, wkeys, wgrids, mask)
+    @inferred maprule!(newsimdata, NoOpt(), rule, rkeys, rgrids, wkeys, wgrids, mask)
     
-    resultdata = maprule!(simdata, rule)
-    @test source(resultdata[:_default_]) == final
+    resultdata1 = maprule!(simdata1, rule)
+    resultdata2 = maprule!(simdata2, rule)
+    @test source(resultdata1[:_default_]) == final
+    @test source(resultdata2[:_default_]) == final
 end
 
 struct TestManual{R,W} <: ManualRule{R,W} end
@@ -79,19 +87,24 @@ applyrule!(data, ::TestManual, state, index) = 0
 
 @testset "A partial rule that returns zero does nothing" begin
     rule = TestManual()
-    ruleset = Ruleset(rule)
+    ruleset1 = Ruleset(rule; opt=NoOpt())
+    ruleset2 = Ruleset(rule; opt=SparseOpt())
     mask = nothing
     # Test type stability
     extent = Extent(; init=(_default_=init,), tspan=1:1)
-    simdata = SimData(extent, ruleset)
-    rkeys, rgrids = getgrids(_Read_(), rule, simdata)
-    wkeys, wgrids = getgrids(_Write_(), rule, simdata)
-    newsimdata = @set simdata.grids = combinegrids(wkeys, wgrids, rkeys, rgrids)
+    simdata1 = SimData(extent, ruleset1)
+    simdata2 = SimData(extent, ruleset2)
+    rkeys, rgrids = getgrids(_Read_(), rule, simdata1)
+    wkeys, wgrids = getgrids(_Write_(), rule, simdata1)
+    newsimdata = @set simdata1.grids = combinegrids(wkeys, wgrids, rkeys, rgrids)
 
-    @inferred ruleloop(NoOpt(), rule, newsimdata, rkeys, rgrids, wkeys, wgrids, mask)
+    @inferred maprule!(newsimdata, NoOpt(), rule, rkeys, rgrids, wkeys, wgrids, mask)
+    @inferred maprule!(newsimdata, SparseOpt(), rule, rkeys, rgrids, wkeys, wgrids, mask)
 
-    resultdata = maprule!(simdata, rule)
-    @test source(resultdata[:_default_]) == init
+    resultdata1 = maprule!(simdata1, rule)
+    resultdata2 = maprule!(simdata2, rule)
+    @test source(resultdata1[:_default_]) == init
+    @test source(resultdata2[:_default_]) == init
 end
 
 struct TestManualWrite{R,W} <: ManualRule{R,W} end
@@ -105,11 +118,15 @@ applyrule!(data, ::TestManualWrite, state, index) = data[:_default_][index[1], 2
              0 0 1 0]
 
     rule = TestManualWrite()
-    ruleset = Ruleset(rule)
+    ruleset1 = Ruleset(rule; opt=NoOpt())
+    ruleset2 = Ruleset(rule; opt=SparseOpt())
     extent = Extent(; init=(_default_=init,), tspan=1:1)
-    simdata = SimData(extent, ruleset)
-    resultdata = maprule!(simdata, rule)
-    @test source(first(resultdata)) == final
+    simdata1 = SimData(extent, ruleset1)
+    simdata2 = SimData(extent, ruleset2)
+    resultdata1 = maprule!(simdata1, rule)
+    resultdata2 = maprule!(simdata2, rule)
+    @test source(first(resultdata1)) == final
+    @test source(first(resultdata2)) == final
 end
 
 struct TestCellTriple{R,W} <: CellRule{R,W} end
@@ -126,11 +143,15 @@ applyrule(data, ::TestCellSquare, (state,), index) = state^2
              144 225 324 441]
     rule = Chain(TestCellTriple(), 
                  TestCellSquare())
-    ruleset = Ruleset(rule)
+    ruleset1 = Ruleset(rule; opt=NoOpt())
+    ruleset2 = Ruleset(rule; opt=SparseOpt())
     extent = Extent(; init=(_default_=init,), tspan=1:1)
-    simdata = SimData(extent, ruleset)
-    resultdata = maprule!(simdata, ruleset.rules[1]);
-    @test source(first(resultdata)) == final
+    simdata1 = SimData(extent, ruleset1)
+    simdata2 = SimData(extent, ruleset2)
+    resultdata1 = maprule!(simdata1, rule);
+    resultdata2 = maprule!(simdata2, rule);
+    @test source(first(resultdata1)) == final
+    @test source(first(resultdata2)) == final
 end
 
 
@@ -199,37 +220,46 @@ end
 
 @testset "Multi-grid rules work" begin
     init = (prey=[10. 10.], predator=[1. 0.])
-    ruleset = Ruleset(DoubleY{Tuple{:predator,:prey},:prey}(), predation)
-    output = ArrayOutput(init; tspan=1:3)
-    sim!(output, ruleset; init=init)
-    @test output[2] == (prey=[18. 20.], predator=[2. 0.])
-    @test output[3] == (prey=[32. 40.], predator=[4. 0.])
+    ruleset1 = Ruleset(DoubleY{Tuple{:predator,:prey},:prey}(), predation; opt=NoOpt())
+    ruleset2 = Ruleset(DoubleY{Tuple{:predator,:prey},:prey}(), predation; opt=SparseOpt())
+    output1 = ArrayOutput(init; tspan=1:3)
+    output2 = ArrayOutput(init; tspan=1:3)
+    sim!(output1, ruleset1)
+    sim!(output2, ruleset2)
+    @test output1[2] == (prey=[18. 20.], predator=[2. 0.])
+    @test output2[2] == (prey=[18. 20.], predator=[2. 0.])
+    @test output1[3] == (prey=[32. 40.], predator=[4. 0.])
+    @test output2[3] == (prey=[32. 40.], predator=[4. 0.])
 end
 
 @testset "Multi-grid rules work" begin
     init = (prey=[10. 10.], predator=[0. 0.])
-    ruleset = Ruleset(HalfX{:prey,Tuple{:prey,:predator}}())
-    output = ArrayOutput(init; tspan=1:3)
-    sim!(output, ruleset)
-    @test output[2] == (prey=[10. 10.], predator=[5. 5.])
-    @test output[3] == (prey=[10. 10.], predator=[5. 5.])
+    ruleset1 = Ruleset(HalfX{:prey,Tuple{:prey,:predator}}(); opt=NoOpt())
+    ruleset2 = Ruleset(HalfX{:prey,Tuple{:prey,:predator}}(); opt=SparseOpt())
+    output1 = ArrayOutput(init; tspan=1:3)
+    output2 = ArrayOutput(init; tspan=1:3)
+    sim!(output1, ruleset1)
+    sim!(output2, ruleset2)
+    @test output1[2] == (prey=[10. 10.], predator=[5. 5.])
+    @test output2[2] == (prey=[10. 10.], predator=[5. 5.])
+    @test output1[3] == (prey=[10. 10.], predator=[5. 5.])
+    @test output2[3] == (prey=[10. 10.], predator=[5. 5.])
 end
 
 @testset "life with generic constructors" begin
     @test Life(Moore(1), (1, 1), (5, 5)) ==
-          Life(; neighborhood=Moore(1), b=(1, 1), s=(5, 5))
+          Life(; neighborhood=Moore(1), birth=(1, 1), sustain=(5, 5))
     @test Life{:a,:b}(Moore(1), (1, 1), (5, 5)) ==
-          Life(; read=:a, write=:b, neighborhood=Moore(1), b=(1, 1), s=(5, 5));
+          Life(; read=:a, write=:b, neighborhood=Moore(1), birth=(1, 1), sustain=(5, 5));
     @test Life(read=:a, write=:b) == Life{:a,:b}()
     @test Life() == Life(; read=:_default_)
 end
 
 @testset "generic ConstructionBase compatability" begin
-    life = Life{:x,:y}(; neighborhood=Moore(2), b=(1, 1), s=(2, 2))
-    @set! life.b = (5, 6)
-
-    @test life.b == (5, 6)
-    @test life.s == (2, 2)
+    life = Life{:x,:y}(; neighborhood=Moore(2), birth=(1, 1), sustain=(2, 2))
+    @set! life.birth = (5, 6)
+    @test life.birth == (5, 6)
+    @test life.sustain == (2, 2)
     @test readkeys(life) == :x
     @test writekeys(life) == :y
     @test DynamicGrids.neighborhood(life) == Moore(2)

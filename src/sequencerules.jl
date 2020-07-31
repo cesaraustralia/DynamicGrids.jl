@@ -1,6 +1,16 @@
-#= Threaded replicate simulations. If `nreplicates` is set the data object
-will be a vector of replicate data, so we loop over it with threads.
-TODO: use new threading method =#
+"""
+    sequencerules!(simdata::AbstractSimData) 
+
+Sequence rules over the [`SimData`](@ref) object, 
+calling [`maprule!`](@ref) for each individual `Rule`.
+
+If a Vector of `SimData` is used replicates will be run
+with `Threads.@threads`.
+
+TODO: use the new threading method.
+"""
+sequencerules!(simdata::AbstractSimData) = 
+    sequencerules!(simdata, rules(simdata))
 sequencerules!(data::AbstractVector{T}) where T<:AbstractSimData = begin
     newdata = copy(data)
     Threads.@threads for i in 1:length(data)
@@ -8,11 +18,6 @@ sequencerules!(data::AbstractVector{T}) where T<:AbstractSimData = begin
     end
     newdata
 end
-#= Iterate over all rules recursively, updating the simdata object at each step.
-Returns the simdata object with source and dest arrays ready for the next rule 
-in the sequence, or the next timestep. =#
-sequencerules!(simdata::AbstractSimData) = 
-    sequencerules!(simdata, rules(simdata))
 sequencerules!(simdata::AbstractSimData, rules::Tuple) = begin
     # Run the first rules
     simdata = maprule!(simdata, rules[1])

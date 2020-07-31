@@ -4,6 +4,10 @@ Simulation data specific to a singule grid.
 """
 abstract type GridData{T,N,I} <: AbstractArray{T,N} end
 
+(::Type{T})(d::GridData) where T <: GridData =
+    T(init(d), mask(d), radius(d), overflow(d), source(d), dest(d),
+      sourcestatus(d), deststatus(d), localstatus(d))
+
 # Common fields for GridData and WritableGridData, which are
 # identical except for their indexing methods
 @mix struct GridDataMixin{T,N,I<:AbstractArray{T,N},M,R,O,S,St,LSt}
@@ -20,10 +24,6 @@ end
 
 GridDataOrReps = Union{GridData, Vector{<:GridData}}
 
-(::Type{T})(d::GridData) where T <: GridData =
-    T(init(d), mask(d), radius(d), overflow(d), source(d), dest(d),
-      sourcestatus(d), deststatus(d), localstatus(d))
-
 # Array interface
 Base.size(d::GridData) = size(source(d))
 Base.axes(d::GridData) = axes(source(d))
@@ -35,6 +35,7 @@ Base.lastindex(d::GridData) = lastindex(source(d))
 init(d::GridData) = d.init
 mask(d::GridData) = d.mask
 radius(d::GridData) = d.radius
+radius(d::Tuple{<:GridData,Vararg}) = map(radius, d)
 overflow(d::GridData) = d.overflow
 source(d::GridData) = d.source
 dest(d::GridData) = d.dest
@@ -42,9 +43,15 @@ sourcestatus(d::GridData) = d.sourcestatus
 deststatus(d::GridData) = d.deststatus
 localstatus(d::GridData) = d.localstatus
 gridsize(d::GridData) = size(init(d))
+gridsize(A::AbstractArray) = size(A)
+gridsize(nt::NamedTuple) = gridsize(first(nt))
+gridsize(t::Tuple) = gridsize(first(t))
 
 
 """
+    ReadableGridData(griddata::GridData)
+    ReadableGridData(init::AbstractArray, mask, radius, overflow)
+
 Simulation data and storage passed to rules for each timestep.
 """
 @GridDataMixin struct ReadableGridData{} <: GridData{T,N,I} end
@@ -75,12 +82,15 @@ ReadableGridData(init::AbstractArray, mask, radius, overflow) = begin
 end
 
 Base.parent(d::ReadableGridData) = parent(source(d))
-Base.@propagate_inbounds Base.getindex(d::ReadableGridData, I...) = getindex(source(d), I...)
+# Base.@propagate_inbounds
+Base.getindex(d::ReadableGridData, I...) = getindex(source(d), I...)
 
 """
-WriteableGridData is passed to rules `<: ManualRule`, and can be written to directly as
-an array. This handles updates to block optimisations and writing to the correct
-source/dest array.
+    ReadableGridData(griddata::GridData)
+
+Passed to rules `<: ManualRule`, and can be written to directly as
+an array. This handles updates to SparseOpt() and writing to 
+the correct source/dest array.
 """
 @GridDataMixin struct WritableGridData{} <: GridData{T,N,I} end
 
@@ -101,13 +111,15 @@ Base.@propagate_inbounds Base.getindex(d::WritableGridData, I...) =
 abstract type AbstractSimData end
 
 """
-Simulation data hold all intermediate arrays, timesteps
-and frame numbers for the current frame of the siulation.
+    SimData(extent::Extent, ruleset::Ruleset)
 
-A simdata object is accessable in `applyrule` as the second parameter.
+Simulation dataset to hold all intermediate arrays, timesteps
+and frame numbers for the current frame of the simulation.
 
-Multiple grids can be indexed into using their key. Single grids
-can be indexed as if SimData is regular array.
+A simdata object is accessable in [`applyrule`](@ref) as the first parameter.
+
+Multiple grids can be indexed into using their key. In single grid
+simulations `SimData` can be indexed directly as if it is a `Matrix`.
 """
 struct SimData{G<:NamedTuple,E,Ru,F} <: AbstractSimData
     grids::G
@@ -136,13 +148,12 @@ end
 extent(d::SimData) = d.extent
 ruleset(d::SimData) = d.ruleset
 grids(d::SimData) = d.grids
-currentframe(d::SimData) = d.currentframe
 init(d::SimData) = init(extent(d))
 mask(d::SimData) = mask(first(d))
 aux(d::SimData) = aux(extent(d))
 tspan(d::SimData) = tspan(extent(d))
-starttime(d::SimData) = first(tspan(d))
 timestep(d::SimData) = step(tspan(d))
+currentframe(d::SimData) = d.currentframe
 currenttime(d::SimData) = tspan(d)[currentframe(d)]
 currenttime(d::Vector{<:SimData}) = currenttime(d[1])
 

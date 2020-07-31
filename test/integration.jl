@@ -132,8 +132,16 @@ test5_6 = (
                     overflow=WrapOverflow(),
                     opt=SparseOpt(),
                 )
+                noopt_ruleset = Ruleset(;
+                    rules=(Life(),),
+                    timestep=Day(2),
+                    overflow=WrapOverflow(),
+                    opt=NoOpt(),
+                )
                 sparse_output = ArrayOutput(test[:init]; tspan=Date(2001, 1, 1):Day(2):Date(2001, 1, 14))
+                noopt_output = ArrayOutput(test[:init], tspan=Date(2001, 1, 1):Day(2):Date(2001, 1, 14))
                 sim!(sparse_output, sparse_ruleset)
+                sim!(noopt_output, noopt_ruleset)
 
                 @testset "SparseOpt results match glider behaviour" begin
                     @test sparse_output[2] == test[:test2]
@@ -142,16 +150,6 @@ test5_6 = (
                     @test sparse_output[5] == test[:test5]
                     @test sparse_output[7] == test[:test7]
                 end
-
-                noopt_ruleset = Ruleset(;
-                    rules=(Life(),),
-                    timestep=Day(2),
-                    overflow=WrapOverflow(),
-                    opt=NoOpt(),
-                )
-                noopt_output = ArrayOutput(test[:init], tspan=Date(2001, 1, 1):Day(2):Date(2001, 1, 14))
-                sim!(noopt_output, noopt_ruleset)
-
                 @testset "NoOpt results match glider behaviour" begin
                     @test noopt_output[2] == test[:test2]
                     @test noopt_output[3] == test[:test3]
@@ -159,6 +157,7 @@ test5_6 = (
                     @test noopt_output[5] == test[:test5]
                     @test noopt_output[7] == test[:test7]
                 end
+
                 cyclej!(test)
             end
             cyclei!(test)

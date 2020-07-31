@@ -40,7 +40,7 @@ import FieldMetadata: @description, description,
                       @default, default
 
 
-export sim!, resume!, replay, savegif, isinferred, method, methodtype 
+export sim!, resume!, replay, savegif, isinferred, isinferred
 
 export rules, neighbors, inbounds, isinbounds, radius, gridsize, 
        currenttime, currenttimestep, timestep
@@ -95,6 +95,7 @@ include("outputs/repl.jl")
 include("outputs/gif.jl")
 include("interface.jl")
 include("framework.jl")
+include("precalc.jl")
 include("sequencerules.jl")
 include("maprules.jl")
 include("overflow.jl")
