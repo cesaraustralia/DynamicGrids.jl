@@ -1,14 +1,12 @@
 
 """
-Neighborhoods define how surrounding cells are related to the current cell.
-The `neighbors` function returns the sum of surrounding cells, as defined
-by the neighborhood.
+Neighborhoods define the pattern of surrounding cells in the "neighborhood" 
+of the current cell. The `neighbors` function returns the surrounding 
+cells as an iterable.
 
-Neighborhoods are iterable, so
+The main kinds of neighborhood are demonstrated below:
 
-for n in hood
-    if n > 3
-end
+![Neighborhoods](https://raw.githubusercontent.com/cesaraustralia/DynamicGrids.jl/media/Neighborhoods.png)
 
 If the allocation of neighborhood buffers during the simulation is costly
 (it usually isn't) you can use `allocbuffers` or preallocate them:
@@ -19,10 +17,6 @@ Moore{3}(allocbuffers(3, init))
 
 You can also change the length of the buffers tuple to
 experiment with cache performance.
-
-The main kinds of neighborhood are demonstrated here:
-
-![Neighborhoods](https://raw.githubusercontent.com/cesaraustralia/DynamicGrids.jl/media/Neighborhoods.png)
 """
 abstract type Neighborhood{R,B} end
 
@@ -41,8 +35,7 @@ Base.copyto!(dest::Neighborhood, dof, source::Neighborhood, sof, N) =
 
 
 """
-A Moore-style neighborhood where a square are with a center radius `(D - 1) / 2`
-where D is the diameter.
+Moore-style square neighborhoods
 """
 abstract type AbstractRadialNeighborhood{R,B} <: Neighborhood{R,B} end
 
@@ -60,9 +53,8 @@ end
 """
     Moore(radius::Int=1)
 
-Radial neighborhoods calculate the surrounding neighborhood
-from the radius around the central cell. The central cell
-is omitted.
+Moore neighborhoods define the neighborhood as all cells within a horizontal or 
+vertical distance of the central cell. The central cell is omitted.
 
 The `buffer` argument may be required for performance
 optimisation, see [`Neighborhood`](@ref) for details.
@@ -106,10 +98,10 @@ Base.length(hood::Moore{R}) where R = (2R + 1)^2 - 1
 end
 
 """
-Positional neighborhoods are tuples of custom coordinates (also tuples) 
-specified in relation to the central point of the current cell. They can 
-be any arbitrary shape or size, but should be listed in column-major order 
-for performance.
+Neighborhoods are tuples or vectors of custom coordinates tuples
+that are specified in relation to the central point of the current cell. 
+They can be any arbitrary shape or size, but should be listed in column-major 
+order for performance.
 """
 abstract type AbstractPositional{R,B} <: Neighborhood{R,B} end
 
@@ -121,12 +113,13 @@ const CustomCoords = Union{AbstractArray{<:CustomCoord},Tuple{Vararg{<:CustomCoo
     Positional(coords::Tuple{Tuple{Vararg{Int}}}, [buffer=nothing])
     Positional{R}(coords::Tuple, buffer)
 
-Allows arbitrary neighborhood shapes by specifying each coord, which are simply
-`Tuple`s of `Int` distance (positive and negative) from the central point.
+Neighborhoods that can take arbitrary shapes by specifying each coordinate, 
+as `Tuple{Int,Int}` of the row/column distance (positive and negative) 
+from the central point.
 
 The neighborhood radius is calculated from the most distance coordinate.
 For simplicity the buffer read from the main grid is a square with sides
-`2R + 1` around the central point, and is not shrunk or offset to match the
+`2r + 1` around the central point, and is not shrunk or offset to match the
 coordinates if they are not symmetrical.
 
 The `buffer` argument may be required for performance
