@@ -6,8 +6,8 @@
 [![codecov.io](http://codecov.io/github/cesaraustralia/DynamicGrids.jl/coverage.svg?branch=master)](http://codecov.io/github/cesaraustralia/DynamicGrids.jl?branch=master)
 
 DynamicGrids is a generalised framework for building high-performance grid-based
-spatial simulations, including cellular automata, but also allowing arbitrary
-behaviours such as long distance jumps and interactions between multiple grids.
+spatial simulations, including cellular automata, but also allowing a wider
+range of behaviours like random jumps and interactions between multiple grids.
 It is extended by [Dispersal.jl](https://github.com/cesaraustralia/Dispersal.jl)
 for modelling organism dispersal processes.
 
@@ -40,8 +40,9 @@ how a simulation works: *grids*, *rules*, and *outputs*.
 
 ## Grids
 
-Simulation grids may be any single `AbstractArray` or a `NamedTuple` of `AbstractArray`. 
-Grids are updated by `Rules` for every cell, at every timestep.
+Simulation grids may be any single `AbstractArray` or a `NamedTuple` of multiple
+`AbstractArray`. Grids are updated by `Rules` that are run for every cell, at
+every timestep.
 
 The `init` grid/s contain whatever initialisation data is required to start
 a simulation: the array type, size and element type, as well as providing the
@@ -51,16 +52,17 @@ initial conditions:
 init = rand(Float32, 100, 100)
 ```
 
-An `init` grid can be attached to a `Ruleset`: 
+An `init` grid can be attached to an `Output`: 
 
 ```
-ruleset = Ruleset(Life(); init=init)
+output = ArrayOutput(init; tspan=1:100)
 ```
 
-or passed into a simulation, where it will take preference over the `Ruleset` init:
+or passed into a simulation, where it will take preference over the `init`
+attached to the `Output`, but must be the same type and size:
 
 ```
-sim!(output, rulset; init=init)
+sim!(output, ruleset; init=init)
 ```
 
 For multiple grids, `init` is a `NamedTuple` of equal-sized arrays
@@ -71,10 +73,9 @@ init = (predator=rand(100, 100), prey=(rand(100, 100))
 ```
 
 Handling and passing of the correct grids to a `Rule` is automated by
-DynamicGrids.jl. `Rule`s specify which grids they require in what order
-using the first two (`R` and `W`) type parameters, or `read` and `write`
-keyword arguments. 
-
+DynamicGrids.jl. `Rule`s specify which grids they require in what order using
+the first two (`R` and `W`) type parameters, or `read` and `write` keyword
+arguments. 
 
 Dimensional or spatial `init` grids from
 [DimensionalData.jl](https://github.com/rafaqz/DimensionalData.jl) of
@@ -88,11 +89,11 @@ files and observation points can be easily added.
 
 Rules hold the parameters for running a simulation, and are applied in
 `applyrule` method that is called for each of the active cells in the grid.
-Rules come in a number of flavours (outlined in the 
-[docs](https://cesaraustralia.github.io/DynamicGrids.jl/stable/#Rules-1)), which allow
-assumptions to be made about running them that can greatly improve performance.
-Rules can be collected in a `Ruleset`, with some additional arguments to
-control the simulation:
+Rules come in a number of flavours (outlined in the
+[docs](https://cesaraustralia.github.io/DynamicGrids.jl/stable/#Rules-1)), which
+allow assumptions to be made about running them that can greatly improve
+performance. Rules can be collected in a `Ruleset`, with some additional
+arguments to control the simulation:
 
 ```
 ruleset = Ruleset(Life(2, 3); opt=SparseOpt())
@@ -106,19 +107,16 @@ types of each rule:
 ruleset = Ruleset(rule1, rule2; timestep=Day(1), opt=SparseOpt())
 ```
 
-For better performance (often ~2x or more), models included in a `Chain` object will be
-combined into a single model, using only one array read and write. This
-optimisation is limited to `CellRule`, or a `NeighborhoodRule`
-followed by `CellRule`. If the `@inline` compiler macro is used on all
-`applyrule` methods, all rules in a `Chain` will be compiled together into a single, 
-efficient function call.
+For better performance (often ~2x or more), models included in a `Chain` object
+will be combined into a single model, using only one array read and write. This
+optimisation is limited to `CellRule`, or a `NeighborhoodRule` followed by
+`CellRule`. If the `@inline` compiler macro is used on all `applyrule` methods,
+all rules in a `Chain` will be compiled together into a single, efficient
+function call.
 
 ```julia
 ruleset = Ruleset(rule1, Chain(rule2, rule3, rule4))
 ```
-
-A `Ruleset` can hold rules that act on multiple grids. These may either run side
-by side independently (say for live comparative analysis), or may interact.
 
 
 ## Output 
@@ -152,10 +150,9 @@ apps, with live interactive control over parameters.
 simple graphical output for Gtk. These packages are kept separate to avoid
 dependencies when being used in non-graphical simulations. 
 
-Outputs are also easy to write, and high performance or applications may benefit
-from writing a custom output to reduce memory use, such as running a loss
-function on the fly instead of storing the whole grid. Performance of DynamicGrids.jl
-is dominated by cache interactions, and reducing memory use has significant
+Outputs are also easy to write, and high performance applications may benefit
+from writing a custom output to reduce memory use. Performance of
+DynamicGrids.jl is dominated by cache interactions, so reducing memory use has
 positive effects.
 
 ## Example
