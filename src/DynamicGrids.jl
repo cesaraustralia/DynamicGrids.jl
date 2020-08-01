@@ -4,7 +4,8 @@ module DynamicGrids
     path = joinpath(dirname(@__DIR__), "README.md")
     include_dependency(path)
     # Use [`XX`](@ref) in the docs but not the readme
-    text = replace(read(path, String), r"`(\w+\w)`" => s"[`\1`](@ref)")
+    match = r"`((?>[\w-]+)(?<!AbstractArray|NamedTuple|init|read|write|R|W))`"
+    text = replace(read(path, String), match => s"[`\1`](@ref)")
     # Run examples
     replace(text, "```julia" => "```@example")
 end DynamicGrids
@@ -90,6 +91,8 @@ include("neighborhoods.jl")
 include("outputs/output.jl")
 include("outputs/graphic.jl")
 include("outputs/image.jl")
+include("outputs/textconfig.jl")
+include("outputs/processors.jl")
 include("outputs/array.jl")
 include("outputs/repl.jl")
 include("outputs/gif.jl")

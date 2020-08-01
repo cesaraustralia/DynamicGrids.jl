@@ -1,14 +1,14 @@
 """
-    inbounds(x, max, overflow)
+    inbounds(xs::Tuple, data)
 
-Check grid boundaries for a single coordinate and max value or a tuple
-of coorinates and max values.
+Check grid boundaries for a coordinate before writing in [`ManualRule`](@ref).
 
 Returns a tuple containing the coordinate(s) followed by a boolean `true`
 if the cell is in bounds, `false` if not.
 
 Overflow of type [`RemoveOverflow`](@ref) returns the coordinate and `false` to skip
 coordinates that overflow outside of the grid.
+
 [`WrapOverflow`](@ref) returns a tuple with the current position or it's
 wrapped equivalent, and `true` as it is allways in-bounds.
 """
@@ -32,6 +32,13 @@ end
         x, true
     end
 
+"""
+    isinbounds(xs::Tuple, data)
+
+Check that a coordinate is within the grid, usually in [`ManualRule`](@ref).
+
+Unlike [`inbounds`](@ref), [`Overflow`](@ref) status is ignored.
+"""
 @inline isinbounds(x::Tuple, data::Union{SimData,GridData}) = 
     isinbounds(x::Tuple, gridsize(data))
 @inline isinbounds(xs::Tuple, maxs::Tuple) = all(isinbounds.(xs, maxs))

@@ -1,6 +1,6 @@
 
 """
-    sim!(output, [ruleset=ruleset(output)];
+    sim!(output, [ruleset::Ruleset=ruleset(output)];
          init=init(output),
          mask=mask(output),
          tstpan=tspan(output),
@@ -9,7 +9,7 @@
          simdata=nothing,
          nreplicates=nothing)
 
-Runs the whole simulation, passing the destination aray to
+Runs the simulation, passing the destination aray to
 the passed in output for each time-step.
 
 ### Arguments
@@ -66,9 +66,9 @@ sim!(output::Output, ruleset=ruleset(output);
 end
 
 """
-    sim!(output, rules...; kwargs...)
+    sim!(output, rules::Rule...; kwargs...)
 
-Shorthand for running a rule without defining a `Ruleset`.
+Run a simulation passing in rules without defining a `Ruleset`.
 """
 sim!(output::Output, rules::Rule...; tspan=tspan(output), kwargs...) = begin
     ruleset = Ruleset(rules...; timestep=step(tspan), kwargs...)
@@ -128,20 +128,33 @@ function resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
     runsim!(output, simdata, fspan)
 end
 
-# run the simulation either directly or asynchronously.
-function runsim!(output, args...)
+"""
+    runsim!(output::Output, args...)
+
+Simulation runner. Runs a simulation synchonously or asynchonously
+depending on the return value of `isasync(output)` - which may be a 
+fixed trait or a field value depending on the output type.
+
+This allows interfaces with interactive components to update during
+the simulations.
+"""
+runsim!(output, simdata, fspan) = 
     if isasync(output)
-        @async simloop!(output, args...)
+        @async simloop!(output, simdata, fspan)
     else
-        simloop!(output, args...)
+        simloop!(output, simdata, fspan)
     end
-end
 
 """
-Loop over the selected timespan, running the ruleset and displaying the output
+    simloop!(output::Output, simdata::SimData, fspan::UnitRange)
+
+Loop over the frames in `fspan`, running the ruleset and displaying the output.
+
 Operations on outputs and rulesets are allways mutable and in-place.
-Operations on rules and simdata objects are functional as they are used in inner loops
-where immutability improves performance.
+
+Operations on [`Rule`](@ref)s and [`SimData`](@ref) objects are in a 
+functional style, as they are used in inner loops where immutability improves 
+performance.
 """
 function simloop!(output::Output, simdata, fspan)
     # Set the frame timestamp for fps calculation

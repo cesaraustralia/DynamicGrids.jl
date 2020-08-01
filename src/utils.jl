@@ -1,6 +1,13 @@
 
 """
-Check if a cell is masked, using the passed-in mask grid.
+    ismasked(data, I...)
+
+Check if a cell is masked, using the `mask` array.
+
+Used used internally during simulations to skip masked cells.
+
+If `mask` was not passed to the `Output` constructor or `sim!` 
+it defaults to `nothing` and `false` is always returned.
 """
 ismasked(data::AbstractSimData, I...) = ismasked(mask(data), I...)
 ismasked(data::GridData, I...) = ismasked(mask(data), I...)
@@ -19,14 +26,12 @@ unwrap(::Type{Val{X}}) where X = X
 
 """
     isinferred(output::Output, ruleset::Ruleset)
+    isinferred(output::Output, rules::Rule...)
 
-Test if a custom rule return type is inferred and correct.
+Test if a custom rule is inferred and the return type is correct when 
+`applyrule` or `applyrule!` is run.
+
 Type-stability can give orders of magnitude improvements in performance.
-
-If there is no `init` array or `NamedTuple` in the ruleset
-it must be passed in as a keyword argument.
-
-Passing `starttime` is optional, in case the time type has some effect on the rule.
 """
 isinferred(output::Output, rules::Rule...) =
     isinferred(output, Ruleset(rules...))

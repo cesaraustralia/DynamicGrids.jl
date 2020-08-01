@@ -41,7 +41,7 @@ how a simulation works: *grids*, *rules*, and *outputs*.
 ## Grids
 
 Simulation grids may be any single `AbstractArray` or a `NamedTuple` of multiple
-`AbstractArray`. Grids are updated by `Rules` that are run for every cell, at
+`AbstractArray`. Grids are updated by `Rule`s that are run for every cell, at
 every timestep.
 
 The `init` grid/s contain whatever initialisation data is required to start
@@ -58,7 +58,7 @@ An `init` grid can be attached to an `Output`:
 output = ArrayOutput(init; tspan=1:100)
 ```
 
-or passed into a simulation, where it will take preference over the `init`
+or passed in to `sim!`, where it will take preference over the `init`
 attached to the `Output`, but must be the same type and size:
 
 ```

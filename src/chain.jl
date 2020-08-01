@@ -1,5 +1,6 @@
 """
     Chain(rules...)
+    Chain(rules::Tuple)
 
 `Chain`s allow chaining rules together to be completed in a single processing step,
 without intermediate reads or writes from grids. 
@@ -38,24 +39,13 @@ Base.length(chain::Chain) = length(rules(chain))
 Base.firstindex(chain::Chain) = firstindex(rules(chain))
 Base.lastindex(chain::Chain) = lastindex(rules(chain))
 
-"""
-    applyrule(data, rules::Chain, state, (i, j))
-
-Chained rules. 
-
-If a [`Chain`](@ref) of rules is passed to `applyrule`, run them
-sequentially for each cell. This can have much beter performance as no writes
-occur between rules, and they are essentially compiled together into compound
-rules. This gives correct results only for [`CellRule`](@ref), or for a single
-[`NeighborhoodRule`](@ref) followed by [`CellRule`](@ref).
-"""
 @generated applyrule(data::SimData, chain::Chain{R,W,T}, state, index) where {R,W,T} = begin
     expr = Expr(:block)
     for i in 1:length(T.parameters)
         rule_expr = quote
             rule = chain[$i]
             # Get the state needed by this rule
-            read = readstate(rule, state)
+            read = filter_readstate(rule, state)
             # Run the rule
             write = applyrule(data, rule, read, index)
             # Create new state with the result and state from other rules
@@ -63,12 +53,16 @@ rules. This gives correct results only for [`CellRule`](@ref), or for a single
         end
         push!(expr.args, rule_expr)
     end
-    push!(expr.args, :(writestate(chain, state)))
+    push!(expr.args, :(filter_writestate(chain, state)))
     expr
 end
 
-# Get state as a NamedTuple or single value
-@generated readstate(::Rule{R,W}, state::NamedTuple) where {R<:Tuple,W} = begin 
+"""
+    filter_readstate(rule, state::NamedTuple)
+
+Get the state to pass to the specific rule as a `NamedTuple` or single value
+"""
+@generated filter_readstate(::Rule{R,W}, state::NamedTuple) where {R<:Tuple,W} = begin 
     expr = Expr(:tuple)
     keys = Tuple(R.parameters)
     for k in keys
@@ -76,10 +70,14 @@ end
     end
     :(NamedTuple{$keys,typeof($expr)}($expr))
 end
-@inline readstate(::Rule{R,W}, state::NamedTuple) where {R,W} = state[R]
+@inline filter_readstate(::Rule{R,W}, state::NamedTuple) where {R,W} = state[R]
 
-# Get the state to write for the chain
-@generated writestate(::Rule{R,W}, state::NamedTuple) where {R<:Tuple,W} = begin 
+"""
+    filter_writestate(rule, state::NamedTuple)
+
+Get the state to write for the specific rule
+"""
+@generated filter_writestate(::Rule{R,W}, state::NamedTuple) where {R<:Tuple,W} = begin 
     expr = Expr(:tuple)
     keys = Tuple(W.parameters)
     for k in keys
@@ -87,10 +85,15 @@ end
     end
     expr
 end
-@inline writestate(rule::Rule{R,W}, state::NamedTuple) where {R,W} = state[W]
+@inline filter_writestate(rule::Rule{R,W}, state::NamedTuple) where {R,W} = state[W]
 
-# Merge new state with previous state 
-# Returning a new NamedTuple with all keys having the most recent state
+"""
+    update_chainstate(rule::Rule, state::NamedTuple, writestate)
+
+Merge new state with previous state.
+
+Returns a new `NamedTuple` with all keys having the most recent state
+"""
 @generated function update_chainstate(rule::Rule{R,W}, state::NamedTuple{K,V}, writestate
                                      ) where {R,W,K,V}
     expr = Expr(:tuple)

@@ -32,6 +32,8 @@ ManualNeighborhoodRule
 Chain
 ```
 
+### Rule methods and helpers
+
 ```@docs
 DynamicGrids.applyrule
 DynamicGrids.applyrule!
@@ -39,15 +41,19 @@ DynamicGrids.precalcrules
 isinferred 
 ```
 
-### Simulation data and methods for use in `applyrule`
+### Data objects and methods for use in `applyrule`
 
 ```@docs
 SimData
-DynamicGrids.radius
 DynamicGrids.aux
+DynamicGrids.tspan
 DynamicGrids.timestep
 DynamicGrids.currenttimestep
 DynamicGrids.currenttime
+DynamicGrids.currentframe
+DynamicGrids.frameindex
+DynamicGrids.inbounds
+DynamicGrids.isinbounds
 ```
 
 ## Neighborhoods
@@ -65,13 +71,15 @@ Positional
 LayeredPositional
 ```
 
-### Methods for use with Neighborhood objects
+### Methods for use with neighborhood rules and neighborhoods
 
 ```@docs
+DynamicGrids.radius
 DynamicGrids.neighbors
 DynamicGrids.sumneighbors
 DynamicGrids.mapsetneighbor!
 DynamicGrids.setneighbor!
+DynamicGrids.allocbuffers
 ```
 
 
@@ -89,12 +97,6 @@ GifOutput
 ```
 
 ### Output methods
-
-```
-DynamicGrids.storeframe!
-DynamicGrids.showframe
-DynamicGrids.showimage
-```
 
 ### Grid processors
 
@@ -117,12 +119,27 @@ TextConfig
 savegif
 ```
 
-### Internal components for outputs
+### Internal components and methods for outputs
+
+These are used for defining your own outputs and `GridProcessors`, 
+not for general scripting.
 
 ```@docs
 DynamicGrids.Extent
 DynamicGrids.GraphicConfig
 DynamicGrids.ImageConfig
+DynamicGrids.storeframe!
+DynamicGrids.showframe
+DynamicGrids.showimage
+DynamicGrids.isasync
+DynamicGrids.isshowable
+DynamicGrids.isstored
+DynamicGrids.initialise
+DynamicGrids.finalise
+DynamicGrids.grid2image
+DynamicGrids.rendertext!
+DynamicGrids.rendertime!
+DynamicGrids.rendername!
 ```
 
 ## Ruleset config
@@ -148,18 +165,24 @@ SparseOpt
 [`SimData`](@ref) and [`GridData`](@ref) objects are used to 
 manage the simulation and provide rules with any data they need.
 
-These methods and objects are all subject to change.
+These methods and objects are all subject to change until version 1.0.
 
 ```@docs
 DynamicGrids.GridData
 DynamicGrids.ReadableGridData
 DynamicGrids.WritableGridData
+DynamicGrids.runsim!
+DynamicGrids.simloop!
 DynamicGrids.sequencerules!
 DynamicGrids.maprule!
 DynamicGrids.optmap
 DynamicGrids.readgrids
 DynamicGrids.writegrids
 DynamicGrids.getgrids
+DynamicGrids.ismasked
 DynamicGrids.combinegrids
 DynamicGrids.replacegrids
+DynamicGrids.filter_readstate
+DynamicGrids.filter_writestate
+DynamicGrids.update_chainstate
 ```

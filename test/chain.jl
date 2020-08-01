@@ -91,7 +91,7 @@ using DynamicGrids: SimData, radius, rules, readkeys, writekeys,
 end
 
 
-@testset "NeighbourhoodRule, CellRule chain" begin
+@testset "NeighborhoodRule, CellRule chain" begin
 
     hoodrule = Neighbors(read=:a) do neighborhodhood, cell
         sum(neighborhodhood)

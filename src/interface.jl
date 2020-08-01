@@ -1,8 +1,10 @@
 """
     applyrule(data, rule::Rule, state, index)
 
-Updates cell values based on their current state and the 
-state of other cells as defined in the Rule.
+Apply a rule to the cell state and return values to write to the grid/s.
+
+This is called in `maprule!` methods during the simulation, 
+not by the user. Custom `Rule` implementations must define this method.
 
 ### Arguments:
 - `data` : [`SimData`](@ref)
@@ -18,8 +20,11 @@ function applyrule end
 """
     applyrule!(data, rule::ManualRule, state, index)
 
-A rule that manually writes to the grid data array, 
-used in all rules inheriting from [`ManualRule`](@ref).
+Apply a rule to the cell state and manually write to the grid data array. 
+Used in all rules inheriting from [`ManualRule`](@ref).
+
+This is called in internal `maprule!` methods during the simulation, 
+not by the user. Custom `ManualRule` implementations must define this method.
 
 ### Arguments:
 see [`applyrule`](@ref)
@@ -27,29 +32,37 @@ see [`applyrule`](@ref)
 function applyrule! end
 
 """
+    neighbors(x::Union{Neighborhood,NeighborhoodRule}})
+
 Returns an iteraterable generator over all cells in the neighborhood.
+
+Custom `Neighborhood`s must define this method.
 """
 function neighbors end
 
 """
-sumneighbors(hood::Neighborhood, buffer, state)
+    sumneighbors(hood::Neighborhood, state)
 
 Sums all cells in the neighborhood. This is identical to running 
-`sum(neighbors(hood, buffer))` but it can be more efficient than as
+`sum(neighbors(hood))` but it can be more efficient than as
 it may use matrix algra libraries for `sum`, instead of regular sum over 
 an iterator.
 """
 function sumneighbors end
 
 """
-    mapsetneighbor!(data, hood, rule, state, index)
+    mapsetneighbor!(data, neighborhood, rule, state, index)
 
 Run `setneighbor!` over all cells in the neighborhood and sums its return values. 
+
+This is used only in [`ManualNeighborhoodRule`](@ref).
 """
 function mapsetneighbor! end
 
 """
-Set value of a cell in the neighborhood. Called in `mapsetneighbor`.
+    setneighbor!(data, neighborhood, rule, state, hood_index, dest_index)
+
+Set value of a cell in the neighborhood. Called in `mapsetneighbor!`.
 """
 function setneighbor! end
 
@@ -64,15 +77,15 @@ function radius end
     aux(obj)
 
 Retreive auxilary data `NamedTuple` from an [`Output`](@ref), 
-[`Extent`](@ref) or [`SimdData`](@ref) object.
+[`Extent`](@ref) or [`SimData`](@ref) object.
 """
 function aux end
 
 """
     tspan(obj)
 
-Retreive the timespan `AbstractRange` from an [`Output`](@ref), 
-[`Extent`](@ref) or [`SimdData`](@ref) object.
+Retreive the time-span `AbstractRange` from an [`Output`](@ref), 
+[`Extent`](@ref) or [`SimData`](@ref) object.
 """
 function tspan end
 
@@ -80,14 +93,14 @@ function tspan end
     timestep(obj)
 
 Retreive the timestep size from an [`Output`](@ref), 
-[`Extent`](@ref), [`Ruleset`](@ref) or [`SimdData`](@ref) object.
+[`Extent`](@ref), [`Ruleset`](@ref) or [`SimData`](@ref) object.
 """
 function timestep end
 
 """
-    currenttimestep(simdata::SimdData)
+    currenttimestep(simdata::SimData)
 
-Retreive the current timestep from a [`SimdData`](@ref) object.
+Retreive the current timestep from a [`SimData`](@ref) object.
 
 This may be different from the `timestep`. If the simulation is in `Month`, 
 `currenttimestep` will return `Seconds` for the length of the specific month.
@@ -95,16 +108,16 @@ This may be different from the `timestep`. If the simulation is in `Month`,
 function currenttimestep end
 
 """
-    currentframe(simdata::SimdData)
+    currentframe(simdata::SimData)
 
-Retreive the current simulation frame as an integer from a [`SimdData`](@ref) object.
+Retreive the current simulation frame as an integer from a [`SimData`](@ref) object.
 """
 function currentframe end
 
 """
-    currenttime(simdata::SimdData)
+    currenttime(simdata::SimData)
 
-Retreive the current simulation time from a [`SimdData`](@ref) object.
+Retreive the current simulation time from a [`SimData`](@ref) object.
 
 This will be in whatever type/units you specify in `tspan`.
 """

@@ -40,7 +40,7 @@ Moore-style square neighborhoods
 abstract type AbstractRadialNeighborhood{R,B} <: Neighborhood{R,B} end
 
 """
-    neighbors(hood::AbstractRadialNeighborhood, buffer)
+    neighbors(hood::AbstractRadialNeighborhoodbuffer)
 
 Returns a generator of the cell neighbors, skipping the central cell.
 """
@@ -150,8 +150,7 @@ absmaxcoord(neighborhood::Positional) = absmaxcoord(coords(neighborhood))
 """
     neighbors(hood::Positional)
 
-Returns an iterator over the `Positional` neighborhood 
-cells around the current index.
+Returns an iterator over the `Positional` neighborhood cells around the current index.
 """
 neighbors(hood::Positional) =
     (buffer(hood)[(coord .+ radius(hood) .+ 1)...] for coord in coords(hood))
@@ -194,7 +193,7 @@ end
     neighbors(hood::Positional)
 
 Returns a tuple of iterators over each `Positional` neighborhood 
-layer for the cells around the current index.
+layer, for the cells around the current index.
 """
 @inline neighbors(hood::LayeredPositional) =
     map(l -> neighbors(l), hood.layers)

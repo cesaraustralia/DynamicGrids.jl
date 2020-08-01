@@ -161,7 +161,8 @@ Especially convenient with `do` notation.
 
 ## Example
 
-Set the cells of grid `:c` to the sum of `:a` and `:b`.
+Set the cells of grid `:c` to the sum of `:a` and `:b`:
+
 ```julia
 simplerule = Cell() do a, b
     a + b

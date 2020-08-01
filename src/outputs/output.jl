@@ -27,6 +27,7 @@ Base.@propagate_inbounds Base.getindex(o::Output, i::Union{Int,AbstractVector,Co
 Base.@propagate_inbounds Base.setindex!(o::Output, x, i::Union{Int,AbstractVector,Colon}) =
     setindex!(frames(o), x, i)
 Base.push!(o::Output, x) = push!(frames(o), x)
+Base.step(o::Output) = step(tspan(o))
 
 DimensionalData.DimensionalArray(o::Output{<:NamedTuple}; key=first(keys(o[1]))) = 
     cat(map(f -> f[key], frames(o)...); dims=timedim(o))
@@ -47,7 +48,8 @@ init(o::Output) = init(extent(o))
 mask(o::Output) = mask(extent(o))
 aux(o::Output) = aux(extent(o))
 tspan(o::Output) = tspan(extent(o))
-Base.step(o::Output) = step(tspan(o))
+timestep(o::Output) = step(tspan(o))
+
 ruleset(o::Output) =
     throw(ArgumentError("No ruleset on the output. Pass one to `sim!` as the second argument"))
 fps(o::Output) = nothing
@@ -66,7 +68,7 @@ Check if the output should run asynchonously.
 isasync(o::Output) = false
 
 """
-    isasync(o::Output)
+    isastored(o::Output)
 
 Check if the output is storing each frame, or just the the current one.
 """
@@ -85,6 +87,7 @@ isshowable(o::Output, f) = false
 Initialise the output display, if it has one.
 """
 initialise(o::Output) = nothing
+
 """
     finalise(o::Output)
 
@@ -99,19 +102,29 @@ finalise(o::Output) = nothing
 but other outputs just do nothing and continue.
 """
 delay(o::Output, f) = nothing
+
 """
-    showframe(o::Output, args...)
+    showframe(o::Output, , data::RulesetOrSimData, f, t)
 
 Show the grid(s) in the output, if it can do that.
 """
 showframe(o::Output, args...) = nothing
 
-# Grid strorage and updating
+"""
+    frameindex(o::Output, data::RulesetOrSimData)
+
+Get the index of the current frame in the output.
+
+Every frame has an index of 1 if the simulation isn't stored
+"""
 frameindex(o::Output, data::AbstractSimData) = frameindex(o, currentframe(data))
-# Every frame is frame 1 if the simulation isn't stored
 frameindex(o::Output, f::Int) = isstored(o) ? f : oneunit(f)
 
+"""
+    storeframe!(o::Output, data::AbstractSimData)
 
+Store the current simulaiton frame in the output.
+"""
 storeframe!(output::Output, data::AbstractSimData) = begin
     f = frameindex(output, data)
     checkbounds(output, f)
@@ -131,7 +144,6 @@ _storeloop(outgrid, grid) =
     for j in axes(outgrid, 2), i in axes(outgrid, 1) 
         @inbounds outgrid[i, j] = grid[i, j]
     end
-
 # Replicated frames
 storeframe!(output::Output{<:AbstractArray}, data::AbstractVector{<:AbstractSimData}) = begin
     f = frameindex(output, data[1])
@@ -177,10 +189,5 @@ initgrids!(grids::NamedTuple, o::Output, init::NamedTuple) = begin
     for key in keys(init)
         @inbounds grids[key] .= init[key]
     end
-    # for f = (firstindex(o) + 1):lastindex(o)
-    #     for key in keys(init)
-    #         fill!(o[f][key], zero(eltype(init[key])))
-    #     end
-    # end
     o
 end

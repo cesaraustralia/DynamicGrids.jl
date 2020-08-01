@@ -1,6 +1,6 @@
 """
 Singleton types for choosing the grid overflow rule used in
-[`inbounds`](@ref) and [`NeibourhoodRule`](@ref) buffers. 
+[`inbounds`](@ref) and [`NeighborhoodRule`](@ref) buffers. 
 These determine what is done when a neighborhood or jump extends outside of the grid.
 """
 abstract type Overflow end
