@@ -166,7 +166,7 @@ using DynamicGrids, DynamicGridsGtk, ColorSchemes, Colors
 const DEAD, ALIVE, BURNING = 1, 2, 3
 
 rule = let prob_combustion=0.0001, prob_regrowth=0.01
-    Neighbors(RadialNeighborhood(1)) do neighborhood, cell
+    Neighbors(Moore(1)) do neighborhood, cell
         if cell == ALIVE
             if BURNING in neighborhood
                 BURNING
