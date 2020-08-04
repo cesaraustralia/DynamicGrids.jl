@@ -33,6 +33,7 @@ Test if a custom rule is inferred and the return type is correct when
 
 Type-stability can give orders of magnitude improvements in performance.
 """
+isinferred(output::Output, rules::Tuple) = isinferred(output, rules...)
 isinferred(output::Output, rules::Rule...) =
     isinferred(output, Ruleset(rules...))
 isinferred(output::Output, ruleset::Ruleset) = begin

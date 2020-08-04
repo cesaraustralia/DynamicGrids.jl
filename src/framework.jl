@@ -70,6 +70,7 @@ end
 
 Run a simulation passing in rules without defining a `Ruleset`.
 """
+sim!(output::Output, rules::Tuple; kwargs...) = sim!(output::Output, rules...; kwargs...)
 sim!(output::Output, rules::Rule...; tspan=tspan(output), kwargs...) = begin
     ruleset = Ruleset(rules...; timestep=step(tspan), kwargs...)
     sim!(output::Output, ruleset; tspan=tspan, kwargs...)

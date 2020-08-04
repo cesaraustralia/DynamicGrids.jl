@@ -72,7 +72,7 @@ isshowable(o::GraphicOutput, f) = true # TODO working max fps. o.timestamp + (t 
 
 storeframe!(o::GraphicOutput, data::AbstractSimData) = begin
     f = frameindex(o, data)
-    if isstored(o)
+    if f > length(o)
         _pushgrid!(eltype(o), o)
     end
     storeframe!(eltype(o), o, data, f)

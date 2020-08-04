@@ -194,9 +194,9 @@ Cell(f; read=:_default_, write=read) = Cell{read,write}(f)
 
 const Map = Cell
 
-astuple(rule::Rule, read) = astuple(readkeys(rule), read)
-astuple(::Tuple, read) = read
-astuple(::Symbol, read) = (read,)
+astuple(rule::Rule, state) = astuple(readkeys(rule), state)
+astuple(::Tuple, state) = state
+astuple(::Symbol, state) = (state,)
 
 """
     Neighbors(f, neighborhood)

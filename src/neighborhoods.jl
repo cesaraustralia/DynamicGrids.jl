@@ -1,7 +1,7 @@
 
 """
-Neighborhoods define the pattern of surrounding cells in the "neighborhood" 
-of the current cell. The `neighbors` function returns the surrounding 
+Neighborhoods define the pattern of surrounding cells in the "neighborhood"
+of the current cell. The `neighbors` function returns the surrounding
 cells as an iterable.
 
 The main kinds of neighborhood are demonstrated below:
@@ -53,7 +53,7 @@ end
 """
     Moore(radius::Int=1)
 
-Moore neighborhoods define the neighborhood as all cells within a horizontal or 
+Moore neighborhoods define the neighborhood as all cells within a horizontal or
 vertical distance of the central cell. The central cell is omitted.
 
 The `buffer` argument may be required for performance
@@ -65,9 +65,9 @@ end
 # Buffer is updated later during the simulation.
 # but can be passed in now to avoid the allocation.
 # This might be bad design. SimData could instead hold a list of
-# ruledata for the rule that holds this buffer, with 
+# ruledata for the rule that holds this buffer, with
 # the neighborhood. So you can do neighbors(data)
-Moore(radius::Int=1, buffer=nothing) = 
+Moore(radius::Int=1, buffer=nothing) =
     Moore{radius}(buffer)
 Moore{R}(buffer=nothing) where R =
     Moore{R,typeof(buffer)}(buffer)
@@ -99,8 +99,8 @@ end
 
 """
 Neighborhoods are tuples or vectors of custom coordinates tuples
-that are specified in relation to the central point of the current cell. 
-They can be any arbitrary shape or size, but should be listed in column-major 
+that are specified in relation to the central point of the current cell.
+They can be any arbitrary shape or size, but should be listed in column-major
 order for performance.
 """
 abstract type AbstractPositional{R,B} <: Neighborhood{R,B} end
@@ -113,8 +113,8 @@ const CustomCoords = Union{AbstractArray{<:CustomCoord},Tuple{Vararg{<:CustomCoo
     Positional(coords::Tuple{Tuple{Vararg{Int}}}, [buffer=nothing])
     Positional{R}(coords::Tuple, buffer)
 
-Neighborhoods that can take arbitrary shapes by specifying each coordinate, 
-as `Tuple{Int,Int}` of the row/column distance (positive and negative) 
+Neighborhoods that can take arbitrary shapes by specifying each coordinate,
+as `Tuple{Int,Int}` of the row/column distance (positive and negative)
 from the central point.
 
 The neighborhood radius is calculated from the most distance coordinate.
@@ -192,7 +192,7 @@ end
 """
     neighbors(hood::Positional)
 
-Returns a tuple of iterators over each `Positional` neighborhood 
+Returns a tuple of iterators over each `Positional` neighborhood
 layer, for the cells around the current index.
 """
 @inline neighbors(hood::LayeredPositional) =
@@ -206,7 +206,7 @@ layer, for the cells around the current index.
 """
     VonNeumann(radius=1)
 
-A convenience wrapper to build Von-Neumann neighborhoods as 
+A convenience wrapper to build Von-Neumann neighborhoods as
 a [`Positional`](@ref) neighborhood.
 """
 VonNeumann(radius=1, buffer=nothing) = begin
@@ -240,9 +240,9 @@ radius(rule::Rule, args...) = 0
 
 # Build rules and neighborhoods for each buffer, so they
 # don't have to be constructed in the loop
-spreadbuffers(chain::Chain, init::AbstractArray) = begin
+spreadbuffers(chain::Chain{R,W}, init::AbstractArray) where {R,W} = begin
     buffers, bufrules = spreadbuffers(rules(chain)[1], init)
-    buffers, map(r -> Chain(r, tail(rules(chain))...), bufrules)
+    buffers, map(r -> Chain{R,W}((r, tail(rules(chain))...)), bufrules)
 end
 spreadbuffers(rule::Rule, init::AbstractArray) =
     spreadbuffers(rule, neighborhood(rule), buffer(neighborhood(rule)), init)
@@ -255,14 +255,14 @@ spreadbuffers(rule::NeighborhoodRule, hood::Neighborhood, buffers::Tuple, init::
     allocbuffers(init::AbstractArray, hood::Neighborhood)
     allocbuffers(init::AbstractArray, radius::Int)
 
-Allocate buffers for the Neighborhood. The `init` array should 
+Allocate buffers for the Neighborhood. The `init` array should
 be of the same type as the grid the neighborhood runs on.
 """
-allocbuffers(init::AbstractArray, hood::Neighborhood) = allocbuffers(init, radius(hood))
-allocbuffers(init::AbstractArray, r::Int) = Tuple(allocbuffer(init, r) for i in 1:2r)
+@inline allocbuffers(init::AbstractArray, hood::Neighborhood{R}) where R = allocbuffers(init, R)
+@inline allocbuffers(init::AbstractArray, r::Int) = ntuple(i -> allocbuffer(init, r), 2r)
 
-allocbuffer(init::AbstractArray, hood::Neighborhood) = allocbuffer(init, radius(hood))
-allocbuffer(init::AbstractArray, r::Int) = zeros(eltype(init), 2r+1, 2r+1)
+@inline allocbuffer(init::AbstractArray, hood::Neighborhood{R}) where R = allocbuffer(init, R)
+@inline allocbuffer(init::AbstractArray, r::Int) = zeros(eltype(init), 2r+1, 2r+1)
 
 """
     hoodsize(radius)

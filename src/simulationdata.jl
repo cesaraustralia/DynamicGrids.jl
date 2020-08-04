@@ -65,6 +65,7 @@ ReadableGridData(init::AbstractArray, mask, radius, overflow) = begin
         hoodsize = 2r + 1
         blocksize = 2r
         source = addpadding(init, r)
+        dest = addpadding(init, r)
         nblocs = indtoblock.(size(source), blocksize)
         sourcestatus = zeros(Bool, nblocs)
         deststatus = deepcopy(sourcestatus)
@@ -72,24 +73,24 @@ ReadableGridData(init::AbstractArray, mask, radius, overflow) = begin
         localstatus = zeros(Bool, 2, 2)
     else
         source = deepcopy(init)
+        dest = deepcopy(init)
         sourcestatus = deststatus = true
         localstatus = nothing
     end
-    dest = deepcopy(source)
 
     ReadableGridData(init, mask, radius, overflow, source, dest,
                      sourcestatus, deststatus, localstatus)
 end
 
 Base.parent(d::ReadableGridData) = parent(source(d))
-# Base.@propagate_inbounds
-Base.getindex(d::ReadableGridData, I...) = getindex(source(d), I...)
+Base.@propagate_inbounds Base.getindex(d::ReadableGridData, I...) = getindex(source(d), I...)
+
 
 """
     ReadableGridData(griddata::GridData)
 
 Passed to rules `<: ManualRule`, and can be written to directly as
-an array. This handles updates to SparseOpt() and writing to 
+an array. This handles updates to SparseOpt() and writing to
 the correct source/dest array.
 """
 @GridDataMixin struct WritableGridData{} <: GridData{T,N,I} end
@@ -103,7 +104,7 @@ Base.@propagate_inbounds Base.setindex!(d::WritableGridData, x, I...) = begin
 end
 
 Base.parent(d::WritableGridData) = parent(dest(d))
-Base.@propagate_inbounds Base.getindex(d::WritableGridData, I...) = 
+Base.@propagate_inbounds Base.getindex(d::WritableGridData, I...) =
     getindex(dest(d), I...)
 
 
@@ -127,11 +128,12 @@ struct SimData{G<:NamedTuple,E,Ru,F} <: AbstractSimData
     ruleset::Ru
     currentframe::F
 end
-SimData(extent, ruleset::Ruleset) = begin
-    extent = asnamedtuple(extent)
+# Convert grids in extent to NamedTuple
+SimData(extent, ruleset::Ruleset) =
+    SimData(asnamedtuple(extent), ruleset::Ruleset)
+SimData(extent::Extent{<:NamedTuple{Keys}}, ruleset::Ruleset) where Keys = begin
     # Calculate the neighborhood radus (and grid padding) for each grid
-    keys_ = keys(init(extent))
-    radii = NamedTuple{keys_}(get(radius(ruleset), key, 0) for key in keys_)
+    radii = NamedTuple{Keys}(get(radius(ruleset), key, 0) for key in Keys)
     # Construct the SimData for each grid
     griddata = map(init(extent), radii) do in, ra
         ReadableGridData(in, mask(extent), ra, overflow(ruleset))
@@ -139,7 +141,7 @@ SimData(extent, ruleset::Ruleset) = begin
     SimData(griddata, extent, ruleset)
 end
 SimData(griddata::NamedTuple, extent, ruleset::Ruleset) = begin
-    currentframe = 1; 
+    currentframe = 1;
     SimData(griddata, extent, ruleset, currentframe)
 end
 
@@ -158,14 +160,14 @@ currenttime(d::SimData) = tspan(d)[currentframe(d)]
 currenttime(d::Vector{<:SimData}) = currenttime(d[1])
 
 # Getters forwarded to data
-Base.getindex(d::SimData, i::Symbol) = 
+Base.getindex(d::SimData, i::Symbol) =
     getindex(grids(d), i)
 # For resolving method ambiguity
-Base.getindex(d::SimData{<:NamedTuple{(:_default_,)}}, i::Symbol) = 
+Base.getindex(d::SimData{<:NamedTuple{(:_default_,)}}, i::Symbol) =
     getindex(grids(d), i)
-Base.getindex(d::SimData{<:NamedTuple{(:_default_,)}}, I...) = 
+Base.getindex(d::SimData{<:NamedTuple{(:_default_,)}}, I...) =
     getindex(first(grids(d)), I...)
-Base.setindex!(d::SimData{<:NamedTuple{(:_default_,)}}, x, I...) = 
+Base.setindex!(d::SimData{<:NamedTuple{(:_default_,)}}, x, I...) =
     setindex!(first(grids(d)), x, I...)
 Base.keys(d::SimData) = keys(grids(d))
 Base.values(d::SimData) = values(grids(d))
