@@ -16,6 +16,17 @@ mutable struct Extent{I,M,A}
     aux::A
     tspan::AbstractRange
 end
+Extent(init::I, mask::M, aux::A, tspan::T) where {I,M,A,T} = begin
+    # Check grid sizes match
+    gridsize = if init isa NamedTuple
+        size_ = size(first(init_))
+        all(map(i -> size(i) == size_, init)) || throw(ArgumentError("`init` grid sizes do not match"))
+    else
+        size_ = size(init_)
+    end
+    (mask !== nothing) && (size(mask) != size_) && throw(ArgumentError("`mask` size do not match `init`"))
+    Extent{I,M,A,T}(init, mask, aux, tspan)
+end
 Extent(; init, mask=nothing, aux=nothing, tspan, kwargs...) =
     Extent(init, mask, aux, tspan)
 
