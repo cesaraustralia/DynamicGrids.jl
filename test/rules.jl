@@ -1,8 +1,7 @@
 using DynamicGrids, Setfield, FieldMetadata, Test
 import DynamicGrids: applyrule, applyrule!, maprule!, 
-       source, dest, currenttime, getgrids, combinegrids,
-       SimData, WritableGridData, _Read_, _Write_,
-       Rule, Extent, readkeys, writekeys
+       source, dest, currenttime, getreadgrids, getwritegrids, combinegrids,
+       SimData, WritableGridData, Rule, Extent, readkeys, writekeys
 
 init  = [0 1 1 0
          0 1 1 0
@@ -62,15 +61,15 @@ applyrule(data, ::TestRule, state, index) = 0
     @test DynamicGrids.timestep(ruleset1) === nothing
     @test DynamicGrids.ruleset(ruleset1) === ruleset1
 
-    extent = Extent(; init=(_default_=init,), tspan=1:1)
+    extent = Extent(; init=(a=init,), tspan=1:1)
     simdata1 = SimData(extent, ruleset1)
     simdata2 = SimData(extent, ruleset2)
 
     # Test maprules components
-    rkeys, rgrids = getgrids(_Read_(), rule, simdata1)
-    wkeys, wgrids = getgrids(_Write_(), rule, simdata1)
-    @test rkeys == Val{:_default_}()
-    @test wkeys == Val{:_default_}()
+    rkeys, rgrids = getreadgrids(rule, simdata1)
+    wkeys, wgrids = getwritegrids(rule, simdata1)
+    @test rkeys == Val{:a}()
+    @test wkeys == Val{:a}()
     newsimdata = @set simdata1.grids = combinegrids(rkeys, rgrids, wkeys, wgrids)
     @test newsimdata.grids[1] isa WritableGridData
     # Test type stability
@@ -78,8 +77,8 @@ applyrule(data, ::TestRule, state, index) = 0
     
     resultdata1 = maprule!(simdata1, rule)
     resultdata2 = maprule!(simdata2, rule)
-    @test source(resultdata1[:_default_]) == final
-    @test source(resultdata2[:_default_]) == final
+    @test source(resultdata1[:a]) == final
+    @test source(resultdata2[:a]) == final
 end
 
 struct TestManual{R,W} <: ManualRule{R,W} end
@@ -94,8 +93,8 @@ applyrule!(data, ::TestManual, state, index) = 0
     extent = Extent(; init=(_default_=init,), tspan=1:1)
     simdata1 = SimData(extent, ruleset1)
     simdata2 = SimData(extent, ruleset2)
-    rkeys, rgrids = getgrids(_Read_(), rule, simdata1)
-    wkeys, wgrids = getgrids(_Write_(), rule, simdata1)
+    rkeys, rgrids = getreadgrids(rule, simdata1)
+    wkeys, wgrids = getwritegrids(rule, simdata1)
     newsimdata = @set simdata1.grids = combinegrids(wkeys, wgrids, rkeys, rgrids)
 
     @inferred maprule!(newsimdata, NoOpt(), rule, rkeys, rgrids, wkeys, wgrids, mask)

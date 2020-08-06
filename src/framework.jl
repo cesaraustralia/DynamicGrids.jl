@@ -70,6 +70,7 @@ end
 
 Run a simulation passing in rules without defining a `Ruleset`.
 """
+sim!(output::Output, rules::Tuple; kwargs...) = sim!(output::Output, rules...; kwargs...)
 sim!(output::Output, rules::Rule...; tspan=tspan(output), kwargs...) = begin
     ruleset = Ruleset(rules...; timestep=step(tspan), kwargs...)
     sim!(output::Output, ruleset; tspan=tspan, kwargs...)
@@ -105,7 +106,6 @@ function resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
         nreplicates=nothing)
     initialise(output)
     # Check status and arguments
-    length(output) > 0 || error("There is no simulation to resume. Run `sim!` first")
     isrunning(output) && error("A simulation is already running in this output")
     setrunning!(output, true) || error("Could not start the simulation with this output")
 

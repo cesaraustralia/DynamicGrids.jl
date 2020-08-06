@@ -45,8 +45,9 @@ tspan_ = DateTime(2001):Day(1):DateTime(2001, 2)
     @test parent(wgrida) === parent(dest(grida)) === parent(dest(wgrida))
 
     @test sourcestatus(grida) == deststatus(grida) == 
-        [0 1 0
-         0 1 0]
+        [0 1 0 0
+         0 1 0 0
+         0 0 0 0]
 
     @test parent(source(gridb)) == parent(dest(gridb)) == 
         [2 2 2

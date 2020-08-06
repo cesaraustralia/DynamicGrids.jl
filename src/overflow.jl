@@ -97,12 +97,14 @@ handleoverflow!(griddata::GridData, ::WrapOverflow) = begin
 end
 
 function wrapstatus!(status)
-    status[end, :] .|= status[1, :]
-    status[:, end] .|= status[:, 1]
-    status[end-1, :] .|= status[1, :] .|= status[2, :]
-    status[:, end-1] .|= status[:, 1] .|= status[:, 2]
-    status[1, :] .|= status[end-1, :] .|= status[end, :]
-    status[:, 1] .|= status[:, end-1] .|= status[:, end]
-    status[end-1, :] .= true
+    # This could be further optimised.
+    status[end-1, :] .|= status[1, :]
+    status[:, end-1] .|= status[:, 1]
+    #status[end-2, :] .|= status[1, :] .|= status[2, :]
+    status[end-2, :] .= true
+    status[:, end-2] .|= status[:, 1] .|= status[:, 2]
+    #status[1, :] .|= status[end-2, :] .|= status[end-1, :]
     status[1, :] .= true
+    status[:, 1] .|= status[:, end-2] .|= status[:, end-1]
+    status .= true
 end

@@ -29,9 +29,9 @@ Base.@propagate_inbounds Base.setindex!(o::Output, x, i::Union{Int,AbstractVecto
 Base.push!(o::Output, x) = push!(frames(o), x)
 Base.step(o::Output) = step(tspan(o))
 
-DimensionalData.DimensionalArray(o::Output{<:NamedTuple}; key=first(keys(o[1]))) = 
+DimensionalData.DimensionalArray(o::Output{<:NamedTuple}; key=first(keys(o[1]))) =
     cat(map(f -> f[key], frames(o)...); dims=timedim(o))
-DimensionalData.DimensionalArray(o::Output{<:DimensionalArray}) = 
+DimensionalData.DimensionalArray(o::Output{<:DimensionalArray}) =
     cat(frames(o)...; dims=timedim(o))
 DimensionalData.dims(o::Output) = begin
     ts = tspan(o)
@@ -141,7 +141,7 @@ storeframe!(::Type{<:AbstractArray}, output::Output, simdata::AbstractSimData, f
     _storeloop(outgrid, first(grids(simdata)))
 end
 _storeloop(outgrid, grid) =
-    for j in axes(outgrid, 2), i in axes(outgrid, 1) 
+    for j in axes(outgrid, 2), i in axes(outgrid, 1)
         @inbounds outgrid[i, j] = grid[i, j]
     end
 # Replicated frames
