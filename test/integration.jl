@@ -229,7 +229,6 @@ end
 
     @testset "Results match glider behaviour" begin
         output = ArrayOutput((a=init,); tspan=(Date(2001, 1, 1):Day(2):Date(2001, 1, 14)))
-
         @testset "NoOpt" begin
             sim!(output, rule; overflow=RemoveOverflow(), opt=NoOpt())
             @test output[2][:a] == test2_rem
@@ -238,7 +237,6 @@ end
             @test output[5][:a] == test5_rem
             @test output[7][:a] == test7_rem
         end
-
         @testset "SparseOpt" begin
             sim!(output, rule; overflow=RemoveOverflow(), opt=SparseOpt())
             @test output[2][:a] == test2_rem
@@ -247,7 +245,6 @@ end
             @test output[5][:a] == test5_rem
             @test output[7][:a] == test7_rem
         end
-
     end
 
 end

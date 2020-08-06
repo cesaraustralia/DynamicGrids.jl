@@ -45,7 +45,9 @@ localstatus(d::GridData) = d.localstatus
 gridsize(d::GridData) = size(init(d))
 gridsize(A::AbstractArray) = size(A)
 gridsize(nt::NamedTuple) = gridsize(first(nt))
+gridsize(nt::NamedTuple{(),Tuple{}}) = 0, 0
 gridsize(t::Tuple) = gridsize(first(t))
+gridsize(t::Tuple{}) = 0, 0
 
 
 """
@@ -66,9 +68,9 @@ ReadableGridData(init::AbstractArray, mask, radius, overflow) = begin
         blocksize = 2r
         source = addpadding(init, r)
         dest = addpadding(init, r)
-        nblocs = indtoblock.(size(source), blocksize)
+        nblocs = indtoblock.(size(source), blocksize) .+ 1
         sourcestatus = zeros(Bool, nblocs)
-        deststatus = deepcopy(sourcestatus)
+        deststatus = zeros(Bool, nblocs)
         updatestatus!(source, sourcestatus, deststatus, r)
         localstatus = zeros(Bool, 2, 2)
     else

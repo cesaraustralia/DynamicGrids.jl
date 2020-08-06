@@ -57,11 +57,12 @@ struct NoOpt <: PerformanceOpt end
 abstract type AbstractRuleset end
 
 # Getters
+ruleset(rs::AbstractRuleset) = rs
+rules(rs::AbstractRuleset) = rs.rules
 overflow(rs::AbstractRuleset) = rs.overflow
 opt(rs::AbstractRuleset) = rs.opt
 cellsize(rs::AbstractRuleset) = rs.cellsize
 timestep(rs::AbstractRuleset) = rs.timestep
-ruleset(rs::AbstractRuleset) = rs
 
 Base.step(rs::AbstractRuleset) = timestep(rs)
 
@@ -92,5 +93,4 @@ Rules will be run in the order they are passed, ie. `Ruleset(rule1, rule2, rule3
 end
 Ruleset(rules::Vararg{<:Rule}; kwargs...) = Ruleset(; rules=rules, kwargs...)
 Ruleset(rules::Tuple; kwargs...) = Ruleset(; rules=rules, kwargs...)
-
-rules(rs::Ruleset) = rs.rules
+Ruleset(rs::Ruleset) = Ruleset(rules(rs), overflow(rs), opt(rs), cellsize(rs), timestep(rs))

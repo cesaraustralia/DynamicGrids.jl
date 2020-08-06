@@ -6,7 +6,7 @@ Check if a cell is masked, using the `mask` array.
 
 Used used internally during simulations to skip masked cells.
 
-If `mask` was not passed to the `Output` constructor or `sim!` 
+If `mask` was not passed to the `Output` constructor or `sim!`
 it defaults to `nothing` and `false` is always returned.
 """
 ismasked(data::AbstractSimData, I...) = ismasked(mask(data), I...)
@@ -28,7 +28,7 @@ unwrap(::Type{Val{X}}) where X = X
     isinferred(output::Output, ruleset::Ruleset)
     isinferred(output::Output, rules::Rule...)
 
-Test if a custom rule is inferred and the return type is correct when 
+Test if a custom rule is inferred and the return type is correct when
 `applyrule` or `applyrule!` is run.
 
 Type-stability can give orders of magnitude improvements in performance.
@@ -53,8 +53,8 @@ isinferred(simdata::SimData, rule::Union{NeighborhoodRule,Chain{<:Any,<:Any,<:Tu
     _isinferred(simdata, rule)
 end
 isinferred(simdata::SimData, rule::ManualRule) = begin
-    rkeys, rgrids = getgrids(_Read_(), rule, simdata)
-    wkeys, wgrids = getgrids(_Write_(), rule, simdata)
+    rkeys, rgrids = getreadgrids(rule, simdata)
+    wkeys, wgrids = getwritegrids(rule, simdata)
     simdata = @set simdata.grids = combinegrids(rkeys, rgrids, wkeys, wgrids)
     readval = readgrids(rkeys, rgrids, 1, 1)
     @inferred applyrule!(simdata, rule, readval, (1, 1))
@@ -62,8 +62,8 @@ isinferred(simdata::SimData, rule::ManualRule) = begin
 end
 
 function _isinferred(simdata, rule)
-    rkeys, rgrids = getgrids(_Read_(), rule, simdata)
-    wkeys, wgrids = getgrids(_Write_(), rule, simdata)
+    rkeys, rgrids = getreadgrids(rule, simdata)
+    wkeys, wgrids = getwritegrids(rule, simdata)
     simdata = @set simdata.grids = combinegrids(rkeys, rgrids, wkeys, wgrids)
     readval = readgrids(rkeys, rgrids, 1, 1)
     ex_writeval = Tuple(example_writeval(wgrids))

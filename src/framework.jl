@@ -106,7 +106,6 @@ function resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
         nreplicates=nothing)
     initialise(output)
     # Check status and arguments
-    length(output) > 0 || error("There is no simulation to resume. Run `sim!` first")
     isrunning(output) && error("A simulation is already running in this output")
     setrunning!(output, true) || error("Could not start the simulation with this output")
 
