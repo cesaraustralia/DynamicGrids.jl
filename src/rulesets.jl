@@ -94,3 +94,6 @@ end
 Ruleset(rules::Vararg{<:Rule}; kwargs...) = Ruleset(; rules=rules, kwargs...)
 Ruleset(rules::Tuple; kwargs...) = Ruleset(; rules=rules, kwargs...)
 Ruleset(rs::Ruleset) = Ruleset(rules(rs), overflow(rs), opt(rs), cellsize(rs), timestep(rs))
+
+Base.copy(rs::Ruleset) = 
+    Ruleset(rules(rs), overflow(rs), opt(rs), cellsize(rs), timestep(rs)) 
