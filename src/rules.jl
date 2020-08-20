@@ -192,8 +192,6 @@ Cell(f; read=:_default_, write=read) = Cell{read,write}(f)
         rule.f(astuple(rule, state)...)
     end
 
-const Map = Cell
-
 astuple(rule::Rule, state) = astuple(readkeys(rule), state)
 astuple(::Tuple, state) = state
 astuple(::Symbol, state) = (state,)
