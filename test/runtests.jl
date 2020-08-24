@@ -1,4 +1,11 @@
-using SafeTestsets
+
+using DimensionalData, Aqua, SafeTestsets
+
+if VERSION >= v"1.5.0"
+    Aqua.test_all(DimensionalData)
+    Aqua.test_project_extras(DimensionalData)
+    Aqua.test_stale_deps(DimensionalData)
+end
 
 @time @safetestset "chain" begin include("chain.jl") end
 @time @safetestset "rules" begin include("rules.jl") end

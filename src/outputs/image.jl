@@ -86,8 +86,8 @@ maxval(o::Output) = maxval(imageconfig(o))
 
 
 # Allow construcing a frame with the ruleset passed in instead of SimData
-showframe(frame, o::ImageOutput, data::RulesetOrSimData, f, t) =
-    showimage(grid2image(o, data, frame, t), o, data, f, t)
+showframe(frame, o::ImageOutput, data::SimData, f, t) =
+    showimage(grid2image(o, data, frame, f, t), o, data, f, t)
 
 """
     showimage(image::AbstractArray{AGRB32,2}, output::ImageOutput, f, t)

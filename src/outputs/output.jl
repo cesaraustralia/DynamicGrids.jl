@@ -104,14 +104,14 @@ but other outputs just do nothing and continue.
 delay(o::Output, f) = nothing
 
 """
-    showframe(o::Output, , data::RulesetOrSimData, f, t)
+    showframe(o::Output, , data::SimData, f, t)
 
 Show the grid(s) in the output, if it can do that.
 """
 showframe(o::Output, args...) = nothing
 
 """
-    frameindex(o::Output, data::RulesetOrSimData)
+    frameindex(o::Output, data::SimData)
 
 Get the index of the current frame in the output.
 

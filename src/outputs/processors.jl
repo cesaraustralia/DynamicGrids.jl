@@ -4,7 +4,7 @@
 Default colorscheme. Better performance than using a Colorschemes.jl
 scheme as there is array access or interpolation.
 
-`min` and `max` are values between `0.0` and `1.0` that 
+`min` and `max` are values between `0.0` and `1.0` that
 define the range of greys used.
 """
 struct Greyscale{M1,M2}
@@ -32,16 +32,16 @@ abstract type GridProcessor end
 textconfig(::GridProcessor) = nothing
 
 """
-    grid2image(o::ImageOutput, data::Union{Ruleset,SimData}, grids, t)
-    grid2image(p::GridProcessor, o::ImageOutput, data::Union{Ruleset,SimData}, grids, t)
+    grid2image(o::ImageOutput, data::SimData, grids, f, t)
+    grid2image(p::GridProcessor, o::ImageOutput, data::SimData, grids, f, t)
 
 Convert a grid or `NamedRuple` of grids to an `RGB` image, using a [`GridProcessor`](@ref).
 But it they can be distpatched on together when required for custom outputs.
 """
 function grid2image end
 
-grid2image(o::ImageOutput, data::RulesetOrSimData, frame, t) =
-    grid2image(processor(o), o, data, frame, t)
+grid2image(o::ImageOutput, data::SimData, grids, f, t) =
+    grid2image(processor(o), o, data, grids, f, t)
 
 """
 Grid processors that convert one grid into an image array.
@@ -54,11 +54,11 @@ abstract type SingleGridProcessor <: GridProcessor end
 allocimage(grid::AbstractArray) = allocimage(size(grid))
 allocimage(size::Tuple) = fill(ARGB32(0.0, 0.0, 0.0, 1.0), size)
 
-grid2image(p::SingleGridProcessor, o::ImageOutput, data::RulesetOrSimData, grids::NamedTuple, t) =
+grid2image(p::SingleGridProcessor, o::ImageOutput, data::SimData, grids::NamedTuple, f, t) =
     grid2image(p, o, data, first(grids), t, string(first(keys(grids))))
-grid2image(p::SingleGridProcessor, o::Output, data::RulesetOrSimData, grid::AbstractArray, t, name=nothing) =
+grid2image(p::SingleGridProcessor, o::Output, data::SimData, grid::AbstractArray, f, t, name=nothing) =
     grid2image(p, mask(o), minval(o), maxval(o), data, grid, t, name)
-grid2image(p::SingleGridProcessor, mask, minval, maxval, data::RulesetOrSimData, grid::AbstractArray, t, name=nothing) = begin
+grid2image(p::SingleGridProcessor, mask, minval, maxval, data::SimData, grid::AbstractArray, f, t, name=nothing) = begin
     img = allocimage(grid)
     for j in 1:size(img, 2), i in 1:size(img, 1)
         @inbounds val = grid[i, j]
@@ -81,7 +81,7 @@ abstract type MultiGridProcessor <: GridProcessor end
 Converts output grids to a colorsheme.
 
 ## Arguments / Keyword Arguments
-- `scheme`: a ColorSchemes.jl colorscheme, [`Greyscale`](@ref) or object that defines 
+- `scheme`: a ColorSchemes.jl colorscheme, [`Greyscale`](@ref) or object that defines
   `Base.get(obj, val)` and returns a `Color` or a value that can be converted to `Color`
   using `ARGB32(val)`.
 - `zerocolor`: a `Color` to use when values are zero, or `nothing` to ignore.
@@ -106,7 +106,7 @@ textconfig(processor::ColorProcessor) = processor.textconfig
 Base.show(io::IO, m::MIME"image/svg+xml", p::ColorProcessor) =
     show(io, m, scheme(p))
 
-@inline cell2rgb(p::ColorProcessor, mask, minval, maxval, data::RulesetOrSimData, val, I) =
+@inline cell2rgb(p::ColorProcessor, mask, minval, maxval, data::SimData, val, I) =
     if !(maskcolor(p) isa Nothing) && ismasked(mask, I...)
         rgb(maskcolor(p))
     else
@@ -121,12 +121,12 @@ Base.show(io::IO, m::MIME"image/svg+xml", p::ColorProcessor) =
 """
     SparseOptInspector()
 
-A [`GridProcessor`](@ref) that checks [`SparseOpt`](@ref) visually. 
-Cells that do not run show in gray. Errors show in red, but if they do there's a bug. 
+A [`GridProcessor`](@ref) that checks [`SparseOpt`](@ref) visually.
+Cells that do not run show in gray. Errors show in red, but if they do there's a bug.
 """
 struct SparseOptInspector <: SingleGridProcessor end
 
-@inline cell2rgb(p::SparseOptInspector, mask, minval, maxval, data::RulesetOrSimData, val, I) = begin
+@inline cell2rgb(p::SparseOptInspector, mask, minval, maxval, data::SimData, val, I) = begin
     r = radius(first(grids(data)))
     blocksize = 2r
     blockindex = indtoblock.((I[1] + r,  I[2] + r), blocksize)
@@ -178,7 +178,7 @@ colors(processor::ThreeColorProcessor) = processor.colors
 zerocolor(processor::ThreeColorProcessor) = processor.zerocolor
 maskcolor(processor::ThreeColorProcessor) = processor.maskcolor
 
-grid2image(p::ThreeColorProcessor, o::ImageOutput, data::RulesetOrSimData, grids::NamedTuple, t) = begin
+grid2image(p::ThreeColorProcessor, o::ImageOutput, data::SimData, grids::NamedTuple, f, t) = begin
     img = allocimage(first(grids))
     ncols, ngrids, nmin, nmax = map(length, (colors(p), grids, minval(o), maxval(o)))
     if !(ngrids == ncols == nmin == nmax)
@@ -208,7 +208,7 @@ end
     LayoutProcessor(layout::Array, processors::Matrix, textconfig::TextConfig)
 
 LayoutProcessor allows displaying multiple grids in a block layout,
-by specifying a layout matrix and a list of [`SingleGridProcessor`](@ref) 
+by specifying a layout matrix and a list of [`SingleGridProcessor`](@ref)
 to be run for each.
 
 ## Arguments
@@ -239,8 +239,8 @@ processors(p::LayoutProcessor) = p.processors
 textconfig(p::LayoutProcessor) = p.textconfig
 
 
-grid2image(p::LayoutProcessor, o::ImageOutput, data::RulesetOrSimData, grids::NamedTuple, t
-          ) = begin
+grid2image(p::LayoutProcessor, o::ImageOutput, data::SimData,
+           grids::NamedTuple, f, t) = begin
     ngrids, nmin, nmax = map(length, (grids, minval(o), maxval(o)))
     if !(ngrids == nmin == nmax)
         ArgumentError(
@@ -265,15 +265,16 @@ grid2image(p::LayoutProcessor, o::ImageOutput, data::RulesetOrSimData, grids::Na
         end
         # Run processor for section
         key = keys(grids)[n]
-        _sectionloop(processors(p)[n], img, mask(o), minval(o)[n], maxval(o)[n], data, grids[n], key, i, j)
+        _sectionloop(processors(p)[n], img, mask(o), minval(o)[n], maxval(o)[n],
+                     data, grids[n], key, f, i, j)
     end
     rendertime!(img, textconfig(p), t)
     img
 end
 
-_sectionloop(processor::SingleGridProcessor, img, mask, minval, maxval, data, grid, key, i, j) = begin
-    # We pass an empty string for time as we don't want to print it multiple times.
-    section = grid2image(processor, mask, minval, maxval, data, grid, nothing, string(key))
+_sectionloop(processor::SingleGridProcessor, img, mask, minval, maxval, data, grid, key, f, i, j) = begin
+    # We pass `nothing` for time as we don't want to print it multiple times.
+    section = grid2image(processor, mask, minval, maxval, data, grid, f, nothing, string(key))
     @assert eltype(section) == eltype(img)
     sze = size(section)
     # Copy section into image

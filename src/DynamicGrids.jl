@@ -48,7 +48,7 @@ export rules, neighbors, inbounds, isinbounds, radius, gridsize,
 
 export Rule, NeighborhoodRule, CellRule, ManualRule, ManualNeighborhoodRule
 
-export Chain, Cell, Neighbors, Manual, Map, Life
+export Chain, Cell, Neighbors, Manual, Life
 
 export AbstractRuleset, Ruleset
 
