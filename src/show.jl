@@ -28,12 +28,6 @@ show(io::IO, rule::T) where T<:Rule{R,W} where {R,W} = begin
     end
 end
 
-show(io::IO, rule::T) where T <: Map{R,W} where {R,W} = begin
-    indent = get(io, :indent, "")
-    printstyled(io, indent, Base.nameof(typeof(rule)),
-                "{", sprint(show, R), ",", sprint(show, W), "}"; color=:red)
-end
-
 Base.show(io::IO, chain::Chain{R,W}) where {R,W} = begin
     indent = get(io, :indent, "")
     printstyled(io, indent, string("Chain{", sprint(show, R), ",", sprint(show, W), "} :"); color=:green)
