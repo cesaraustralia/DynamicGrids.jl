@@ -2,7 +2,7 @@ using DynamicGrids, Dates, Test, Colors, ColorSchemes, FieldDefaults
 using FreeTypeAbstraction
 using DynamicGrids: grid2image, processor, minval, maxval, normalise, SimData, NoDisplayImageOutput,
     isstored, isasync, initialise, finalise, delay, fps, settimestamp!, timestamp,
-    tspan, setfps!, frames, isshowable, Red, Green, Blue, showframe, rgb, scale, Extent
+    tspan, setfps!, frames, isshowable, Red, Green, Blue, showframe, rgb, scale, Extent, extent
 using ColorSchemes: leonardo
 
 @testset "rgb" begin
@@ -39,7 +39,7 @@ l05 = ARGB32(get(leonardo, 0.5))
 l08 = ARGB32(get(leonardo, 0.8))
 l1 = ARGB32(get(leonardo, 1))
 
-global images = []
+images = []
 
 DynamicGrids.showimage(image, o::NoDisplayImageOutput, f, t) = begin
     push!(images, image)
@@ -74,7 +74,8 @@ end
     @test frames(output)[1] == 5init
     @test isshowable(output, 1)
 
-    simdata = SimData(Extent(; init=init, tspan=1:10), Ruleset(Life()))
+    output = NoDisplayImageOutput(init; tspan=1:10, maxval=40.0)
+    simdata = SimData(extent(output), Ruleset(Life()))
     @test_broken showframe(output, simdata, 1, 1) ==
         [ARGB32(1.0, 1.0, 1.0) ARGB32(1.0, 1.0, 1.0)
          ARGB32(0.0, 0.0, 0.0) ARGB32(1.0, 1.0, 1.0)]
@@ -91,13 +92,13 @@ end
 
 @testset "ColorProcessor" begin
     proc = ColorProcessor(zerocolor=(1.0, 0.0, 0.0))
-    output = NoDisplayImageOutput((a=init,); tspan=1:1, processor=proc, minval=0.0, maxval=10.0, store=true)
+    output = NoDisplayImageOutput((a=init,); tspan=1:10, processor=proc, minval=0.0, maxval=10.0, store=true)
     maxval(output.imageconfig)
     @test minval(output) === 0.0
     @test maxval(output) === 10.0
     @test processor(output) == ColorProcessor(zerocolor=(1.0, 0.0, 0.0))
     @test isstored(output) == true
-    simdata = SimData(Extent(; init=init, tspan=1:10), Ruleset(Life()))
+    simdata = SimData(extent(output), Ruleset(Life()))
 
     # Test level normalisation
     normed = normalise.(output[1][:a], minval(output), maxval(output))
@@ -105,24 +106,25 @@ end
                      0.0 0.5]
 
     # Test greyscale Image conversion
-    @test grid2image(processor(output), output, simdata, (a=init,), 1) ==
+    @test grid2image(processor(output), output, simdata, (a=init,), 1, 1) ==
         [ARGB32(0.8, 0.8, 0.8) ARGB32(1.0, 1.0, 1.0)
          ARGB32(1.0, 0.0, 0.0) ARGB32(0.5, 0.5, 0.5)]
 
     proc = ColorProcessor(;scheme=leonardo)
-    @test grid2image(proc, output, simdata, init, 1) == [l08 l1
-                                                         l0 l05]
+    @test grid2image(proc, output, simdata, init, 1, 1) == [l08 l1
+                                                            l0 l05]
     z0 = ARGB32(1, 0, 0)
     proc = ColorProcessor(scheme=leonardo, zerocolor=z0)
-    @test grid2image(proc, output, simdata, init, 1) == [l08 l1
-                                                         z0 l05]
+    @test grid2image(proc, output, simdata, init, 1, 1) == [l08 l1
+                                                            z0 l05]
 
     @testset "text captions" begin
-        font = "arial"
         pixelsize = 20
         timepos = 2pixelsize, pixelsize
         textinit = zeros(200, 200)
+        font = "arial"
         face = findfont(font)
+        # Swap fonts on linux
         if face === nothing
             font = "cantarell"
             face = findfont(font)
@@ -131,9 +133,10 @@ end
         renderstring!(refimg, string(DateTime(2001)), face, pixelsize, timepos...;
                       fcolor=ARGB32(1.0, 1.0, 1.0, 1.0), bcolor=ARGB32(0.0, 0.0, 0.0, 1.0))
         textconfig=TextConfig(; font=font, timepixels=pixelsize, namepixels=pixelsize)
+
         proc = ColorProcessor(zerocolor=ARGB32(1.0, 0.0, 0.0, 1.0), textconfig=textconfig)
         output = NoDisplayImageOutput((t=textinit,); tspan=1:1, processor=proc, store=true)
-        img = grid2image(proc, output, simdata, textinit, DateTime(2001))
+        img = grid2image(proc, output, simdata, textinit, 1, DateTime(2001), nothing);
         @test img == refimg
     end
     
@@ -191,10 +194,10 @@ end
     @test maxval(output) === (10, 20)
     @test processor(output) === proc
     @test isstored(output) == true
-    simdata = SimData(Extent(; init=init, tspan=1:10), Ruleset(Life()))
+    simdata = SimData(extent(output), Ruleset(Life()))
 
     # Test image is joined from :a, nothing, :b
-    @test grid2image(output, Ruleset(), multiinit, 1) ==
+    @test grid2image(output, simdata, multiinit, 1, 1) ==
         [ARGB32(0.8, 0.8, 0.8) ARGB32(1.0, 1.0, 1.0)
          ARGB32(1.0, 0.0, 0.0) ARGB32(0.5, 0.5, 0.5)
          ARGB32(0.0, 0.0, 0.0) ARGB32(0.0, 0.0, 0.0)
@@ -203,10 +206,10 @@ end
          z0                   l05                 ]
 
     @testset "text captions" begin
-        font = "arial"
         timepixels = 20
         timepos = 2timepixels, timepixels
         textinit = (a=zeros(200, 200), b=zeros(200, 200))
+        font = "arial"
         face = findfont(font)
         if face === nothing
             font = "cantarell"
@@ -230,7 +233,7 @@ end
         output = NoDisplayImageOutput((t=textinit,); tspan=1:10, processor=proc, store=true, 
                                  minval=(0, 0), maxval=(1, 1))
 
-        img = grid2image(output, simdata, textinit, DateTime(2001));
+        img = grid2image(output, simdata, textinit, 1, DateTime(2001));
         @test img == refimg
     end
 end
@@ -250,8 +253,8 @@ end
     @test minval(output) === (4, 0, 5, 0)
     @test maxval(output) === (6, 1, 10, 1)
     @test processor(output) === proc
-
     # Test image is combined from red and green overlays
-    @test grid2image(processor(output), output, Ruleset(), multiinit, 1) ==
+    simdata = SimData(extent(output), Ruleset(Life()))
+    @test grid2image(processor(output), output, simdata, multiinit, 1, 1) ==
         [ARGB32(0.1, 0.5, 0.0) ARGB32(0.2, 0.5, 0.0) ARGB32(0.0, 0.0, 1.0) ARGB32(0.9, 0.9, 0.9) ARGB32(0.8, 0.8, 0.8)]
 end

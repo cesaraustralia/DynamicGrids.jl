@@ -40,6 +40,7 @@ Render time `name` and `t` as text onto the image, following config settings.
 rendertext!(img, config::TextConfig, name, t) = begin
     rendername!(img, config::TextConfig, name)
     rendertime!(img, config::TextConfig, t)
+    img
 end
 rendertext!(img, config::Nothing, name, t) = nothing
 
@@ -48,21 +49,25 @@ rendertext!(img, config::Nothing, name, t) = nothing
 
 Render `name` as text on the image following config settings.
 """
-rendername!(img, config::TextConfig, name) =
+rendername!(img, config::TextConfig, name) = begin
     renderstring!(img, name, config.face, config.namepixels, config.namepos...;
                   fcolor=config.fcolor, bcolor=config.bcolor)
-rendername!(img, config::TextConfig, name::Nothing) = nothing
-rendername!(img, config::Nothing, name) = nothing
-rendername!(img, config::Nothing, name::Nothing) = nothing
+    img
+end
+rendername!(img, config::TextConfig, name::Nothing) = img
+rendername!(img, config::Nothing, name) = img
+rendername!(img, config::Nothing, name::Nothing) = img
 
 """
     rendertime!(img, config::TextConfig, t)
 
 Render time `t` as text on the image following config settings.
 """
-rendertime!(img, config::TextConfig, t) =
+rendertime!(img, config::TextConfig, t) = begin
     renderstring!(img, string(t), config.face, config.timepixels, config.timepos...;
                   fcolor=config.fcolor, bcolor=config.bcolor)
-rendertime!(img, config::Nothing, t) = nothing
-rendertime!(img, config::TextConfig, t::Nothing) = nothing
-rendertime!(img, config::Nothing, t::Nothing) = nothing
+    img
+end
+rendertime!(img, config::Nothing, t) = img
+rendertime!(img, config::TextConfig, t::Nothing) = img
+rendertime!(img, config::Nothing, t::Nothing) = img

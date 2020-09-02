@@ -57,7 +57,7 @@ allocimage(size::Tuple) = fill(ARGB32(0.0, 0.0, 0.0, 1.0), size)
 grid2image(p::SingleGridProcessor, o::ImageOutput, data::SimData, grids::NamedTuple, f, t) =
     grid2image(p, o, data, first(grids), t, string(first(keys(grids))))
 grid2image(p::SingleGridProcessor, o::Output, data::SimData, grid::AbstractArray, f, t, name=nothing) =
-    grid2image(p, mask(o), minval(o), maxval(o), data, grid, t, name)
+    grid2image(p, mask(o), minval(o), maxval(o), data, grid, f, t, name)
 grid2image(p::SingleGridProcessor, mask, minval, maxval, data::SimData, grid::AbstractArray, f, t, name=nothing) = begin
     img = allocimage(grid)
     for j in 1:size(img, 2), i in 1:size(img, 1)
@@ -66,7 +66,7 @@ grid2image(p::SingleGridProcessor, mask, minval, maxval, data::SimData, grid::Ab
         @inbounds img[i, j] = pixel
     end
     rendertext!(img, textconfig(p), name, t)
-    img
+    return img
 end
 
 

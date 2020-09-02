@@ -13,8 +13,12 @@ savegif(filename::String, o::Output, ruleset=Ruleset();
 end
 savegif(filename::String, o::ImageOutput, ruleset=Ruleset();
         processor=processor(o), fps=fps(o), kwargs...) = begin
-    images = map(frames(o), collect(firstindex(o):lastindex(o))) do frame, t
-        grid2image(processor, o, ruleset, frame, t)
+    ext = extent(o)
+    simdata = SimData(ext, ruleset)
+    println(tspan(ext))
+    images = map(frames(o), collect(firstindex(o):lastindex(o))) do frame, f
+        t = tspan(ext)[f]
+        grid2image(processor, o, simdata, frame, f, t)
     end
     array = cat(images..., dims=3)
     FileIO.save(filename, array; fps=fps, kwargs...)
@@ -27,13 +31,13 @@ end
 
 Output that stores the simulation as images and saves a Gif file on completion.
 """
-mutable struct GifOutput{T,F<:AbstractVector{T},E,GC,IC,I,N} <: ImageOutput{T}
+mutable struct GifOutput{T,F<:AbstractVector{T},E,GC,IC,G,N} <: ImageOutput{T}
     frames::F
     running::Bool 
     extent::E
     graphicconfig::GC
     imageconfig::IC
-    image::I
+    gif::G
     filename::N
 end
 GifOutput(; frames, running, extent, graphicconfig, imageconfig, filename, kwargs...) =
@@ -52,5 +56,5 @@ savegif(o::GifOutput) = savegif(filename(o), o)
 savegif(filename::String, o::GifOutput, ruleset=nothing, fps=fps(o);
         processor=nothing, kwargs...) = begin
     !(processor isa Nothing) && @warn "Cannot set the processor on savegif for GifOutput. Run the sim again"
-    FileIO.save(filename, o.image; fps=fps, kwargs...)
+    FileIO.save(filename, gif(o); fps=fps, kwargs...)
 end
