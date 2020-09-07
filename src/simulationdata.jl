@@ -1,6 +1,6 @@
 
 """
-Simulation data specific to a singule grid.
+Simulation data specific to a single grid.
 """
 abstract type GridData{T,N,I} <: AbstractArray{T,N} end
 
