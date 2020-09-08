@@ -76,7 +76,7 @@ function radius end
 """
     aux(obj)
 
-Retreive auxilary data `NamedTuple` from an [`Output`](@ref), 
+Retrieve auxilary data `NamedTuple` from an [`Output`](@ref), 
 [`Extent`](@ref) or [`SimData`](@ref) object.
 """
 function aux end
@@ -84,7 +84,7 @@ function aux end
 """
     tspan(obj)
 
-Retreive the time-span `AbstractRange` from an [`Output`](@ref), 
+Retrieve the time-span `AbstractRange` from an [`Output`](@ref), 
 [`Extent`](@ref) or [`SimData`](@ref) object.
 """
 function tspan end
@@ -92,7 +92,7 @@ function tspan end
 """
     timestep(obj)
 
-Retreive the timestep size from an [`Output`](@ref), 
+Retrieve the timestep size from an [`Output`](@ref), 
 [`Extent`](@ref), [`Ruleset`](@ref) or [`SimData`](@ref) object.
 """
 function timestep end
@@ -100,7 +100,7 @@ function timestep end
 """
     currenttimestep(simdata::SimData)
 
-Retreive the current timestep from a [`SimData`](@ref) object.
+Retrieve the current timestep from a [`SimData`](@ref) object.
 
 This may be different from the `timestep`. If the simulation is in `Month`, 
 `currenttimestep` will return `Seconds` for the length of the specific month.
@@ -110,14 +110,14 @@ function currenttimestep end
 """
     currentframe(simdata::SimData)
 
-Retreive the current simulation frame as an integer from a [`SimData`](@ref) object.
+Retrieve the current simulation frame as an integer from a [`SimData`](@ref) object.
 """
 function currentframe end
 
 """
     currenttime(simdata::SimData)
 
-Retreive the current simulation time from a [`SimData`](@ref) object.
+Retrieve the current simulation time from a [`SimData`](@ref) object.
 
 This will be in whatever type/units you specify in `tspan`.
 """
