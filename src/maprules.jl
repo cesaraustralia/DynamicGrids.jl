@@ -147,7 +147,7 @@ mapneighborhoodrule!(simdata::SimData, griddata, opt::SparseOpt, rule, rkeys, rg
 
     #= Run the rule row by row. When we move along a row by one cell, we access only
     a single new column of data with the height of 2 blocks, and move the existing
-    data in the neighborhood buffers array accross by one column. This saves on reads
+    data in the neighborhood buffers array across by one column. This saves on reads
     from the main array, and focusses reads and writes in the small buffer array that
     should be in fast local memory. =#
 
@@ -395,7 +395,7 @@ end
 """
     getredgrids(context, rule::Rule, simdata::AbstractSimData)
 
-Retreives `GridData` from a `SimData` object to match the requirements of a `Rule`.
+Retrieves `GridData` from a `SimData` object to match the requirements of a `Rule`.
 
 Returns a `Tuple` holding the key or `Tuple` of keys, and grid or `Tuple` of grids.
 """
