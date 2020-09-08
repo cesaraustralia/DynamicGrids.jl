@@ -14,7 +14,7 @@ the passed in output for each time-step.
 
 ### Arguments
 - `output`: An [`Output`](@ref) to store grids or display them on the screen.
-- `ruleset`: A [`Ruleset`](@ref) containing one ore more [`Rule`](@ref)s. If the output
+- `ruleset`: A [`Ruleset`](@ref) containing one or more [`Rule`](@ref)s. If the output
   has a `Ruleset` attached, it will be used.
 
 ### Keyword Arguments
