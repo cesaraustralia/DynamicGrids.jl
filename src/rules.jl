@@ -255,7 +255,7 @@ rule = let x = 10
     end
 end
 ```
-The `let` block greatly imroves performance.
+The `let` block greatly improves performance.
 """
 @flattenable @description struct Manual{R,W,F} <: ManualRule{R,W}
     # Field | Flatten | Description
