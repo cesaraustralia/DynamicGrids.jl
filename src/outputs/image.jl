@@ -31,7 +31,7 @@ See [`GifOutput`](@ref) for an example.
 
 Although the majority of the code is maintained here to enable sharing
 and reuse, most `ImageOutput`s are not provided in DynamicGrids.jl to avoid
-heavey dependencies on graphics libraries. See
+heavy dependencies on graphics libraries. See
 [DynamicGridsGtk.jl](https://github.com/cesaraustralia/DynamicGridsGtk.jl)
 and [DynamicGridsInteract.jl](https://github.com/cesaraustralia/DynamicGridsInteract.jl)
 for implementations.
@@ -85,7 +85,7 @@ minval(o::Output) = minval(imageconfig(o))
 maxval(o::Output) = maxval(imageconfig(o))
 
 
-# Allow construcing a frame with the ruleset passed in instead of SimData
+# Allow constructing a frame with the ruleset passed in instead of SimData
 showframe(frame, o::ImageOutput, data::SimData, f, t) =
     showimage(grid2image(o, data, frame, f, t), o, data, f, t)
 
