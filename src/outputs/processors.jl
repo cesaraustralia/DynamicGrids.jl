@@ -36,7 +36,7 @@ textconfig(::GridProcessor) = nothing
     grid2image(p::GridProcessor, o::ImageOutput, data::SimData, grids, f, t)
 
 Convert a grid or `NamedRuple` of grids to an `RGB` image, using a [`GridProcessor`](@ref).
-But it they can be distpatched on together when required for custom outputs.
+But it they can be dispatched on together when required for custom outputs.
 """
 function grid2image end
 
