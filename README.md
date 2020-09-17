@@ -88,7 +88,7 @@ files and observation points can be easily added.
 ### Non-Number Grids
 
 Grids containing custom and non-`Number` types are possible, with some caveats.
-They must define `Base.zero` for their type, and should be a bitstype for performance. 
+They must define `Base.zero` for their element type, and should be a bitstype for performance. 
 Tuple does not define `zero`. `Array` is not a bitstype, and does not define `zero`. 
 `SArray` from StaticArrays.jl is both, and can be used as the contents of a grid. 
 Custom structs that defne `zero` should also work. 
