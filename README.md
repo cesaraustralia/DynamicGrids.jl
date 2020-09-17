@@ -42,8 +42,8 @@ how a simulation works: *grids*, *rules*, and *outputs*.
 ## Grids
 
 Simulation grids may be any single `AbstractArray` or a `NamedTuple` of multiple
-`AbstractArray`. Grids are updated by `Rule`s that are run for every cell, at
-every timestep. They can contain any type that defines `Base.zero`.
+`AbstractArray`. Usually grids contain values of `Number`, but other types are possible.
+Grids are updated by `Rule`s that are run for every cell, at every timestep. 
 
 The `init` grid/s contain whatever initialisation data is required to start
 a simulation: the array type, size and element type, as well as providing the
@@ -84,6 +84,8 @@ Dimensional or spatial `init` grids from
 model to return output with explicit dimensions. This will plot correctly as a
 map using [Plots.jl](https://github.com/JuliaPlots/Plots.jl), to which shape
 files and observation points can be easily added.
+
+### Non-Number Grids
 
 Grids containing custom and non-`Number` types are possible, with some caveats.
 They must define `Base.zero` for their type, and should be a bitstype for performance. 
