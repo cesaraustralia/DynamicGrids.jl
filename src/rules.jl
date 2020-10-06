@@ -25,7 +25,7 @@ the initial `R`, `W` etc fields.
     T{:_default_,:_default_,map(typeof, args)...}(args...)
 # R,W but no kwargs
 (::Type{T})(args...) where T<:Rule{R,W} where {R,W} =
-    T{typeof.(args)...}(args...)
+    T{map(typeof, args)...}(args...)
 # No R,W but kwargs
 (::Type{T})(; read=:_default_, write=:_default_, kwargs...) where T<:Rule =
     T{read,write}(; kwargs...)

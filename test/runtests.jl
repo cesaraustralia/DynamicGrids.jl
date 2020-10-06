@@ -14,6 +14,7 @@ end
 @time @safetestset "utils" begin include("utils.jl") end
 @time @safetestset "outputs" begin include("outputs.jl") end
 @time @safetestset "integration" begin include("integration.jl") end
+@time @safetestset "object grids" begin include("objectgrids.jl") end
 @time @safetestset "show" begin include("show.jl") end
 # ImageMagick breaks in windows travis for some reason
 if !Sys.iswindows() 
