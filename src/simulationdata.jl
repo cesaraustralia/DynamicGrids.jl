@@ -213,10 +213,9 @@ addpadding(init::AbstractArray{T,N}, r) where {T,N} = begin
     sze = size(init)
     paddedsize = sze .+ 2r
     paddedindices = -r + 1:sze[1] + r, -r + 1:sze[2] + r
-    sourceparent = similar(init, paddedsize...)
+    sourceparent = fill!(similar(init, paddedsize), zero(T))
     source = OffsetArray(sourceparent, paddedindices...)
-    source .= zero(eltype(source))
-    # Copy the init array to he middle section of the source array
+    # Copy the init array to the middle section of the source array
     for j in 1:size(init, 2), i in 1:size(init, 1)
         @inbounds source[i, j] = init[i, j]
     end

@@ -73,10 +73,11 @@ Moore{R}(buffer=nothing) where R =
     Moore{R,typeof(buffer)}(buffer)
 
 # Neighborhood specific `sum` for performance:w
-Base.sum(hood::Moore, cell=_centerval(hood)) =
-    sum(buffer(hood)) - cell
+Base.sum(hood::Moore) = _sum(hood, _centerval(hood))
 
 _centerval(hood) = buffer(hood)[radius(hood) + 1, radius(hood) + 1]
+
+_sum(hood::Neighborhood, cell) = sum(buffer(hood)) - cell
 
 Base.length(hood::Moore{R}) where R = (2R + 1)^2 - 1
 
