@@ -3,11 +3,8 @@ module DynamicGrids
 @doc let
     path = joinpath(dirname(@__DIR__), "README.md")
     include_dependency(path)
-    # Use [`XX`](@ref) in the docs but not the readme
-    match = r"`((?>[\w-]+)(?<!AbstractArray|NamedTuple|init|read|write|R|W))`"
-    text = replace(read(path, String), match => s"[`\1`](@ref)")
     # Run examples
-    replace(text, "```julia" => "```@example")
+    replace(read(path, String), "```julia" => "```@example")
 end DynamicGrids
 
 

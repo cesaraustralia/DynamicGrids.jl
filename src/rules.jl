@@ -21,21 +21,30 @@ the initial `R`, `W` etc fields.
 =#
 
 # No R,W params and no kwargs
-(::Type{T})(args...) where T<:Rule =
+function (::Type{T})(args...) where T<:Rule
+    _checkfields(T, args)
     T{:_default_,:_default_,map(typeof, args)...}(args...)
+end
 # R,W but no kwargs
-(::Type{T})(args...) where T<:Rule{R,W} where {R,W} =
+function (::Type{T})(args...) where T<:Rule{R,W} where {R,W}
+    _checkfields(T, args)
     T{map(typeof, args)...}(args...)
+end
 # No R,W but kwargs
 (::Type{T})(; read=:_default_, write=:_default_, kwargs...) where T<:Rule =
     T{read,write}(; kwargs...)
 # R,W and kwargs passed through to FieldDefaults.jl.
 # This means @default should be used for rule defaults, never @default_kw
 # or this will be overwritten, but also not work as it wont handle R,W.
-(::Type{T})(; kwargs...) where T<:Rule{R,W} where {R,W} = begin
+function (::Type{T})(; kwargs...) where T<:Rule{R,W} where {R,W}
     args = FieldDefaults.insert_kwargs(kwargs, T)
     T{map(typeof, args)...}(args...)
 end
+
+# Check number of args passed in as we don't get a normal method error with the 
+# splatted args in the default constructors.
+_checkfields(T, args) = length(fieldnames(T)) == length(args) || 
+    throw(ArgumentError("$T has $(length(fieldnames(T))) fields: $(fieldnames(T)), you have used $(length(args))"))
 
 @generated Base.keys(rule::Rule{R,W}) where {R,W} =
     Expr(:tuple, QuoteNode.(union(asiterable(W), asiterable(R)))...)
@@ -186,6 +195,10 @@ end
     f::F    | false    | "Function to apply to the read values"
 end
 Cell(f; read=:_default_, write=read) = Cell{read,write}(f)
+Cell(; kwargs...) = _nofunctionerror(Cell)
+
+@noinline _nofunctionerror(T) = 
+    throw(ArgumentError("No function passed to $T. did you mean to use a `do` block?"))
 
 @inline applyrule(data, rule::Cell, state, I) =
     let (rule, read) = (rule, state)
@@ -232,6 +245,7 @@ The `let` block may improve performance.
 end
 Neighbors(f; read=:_default_, write=read, neighborhood=Moore(1)) = 
     Neighbors{read,write}(f, neighborhood)
+Neighbors(; kwargs...) = _nofunctionerror(Neighbors)
 
 @inline applyrule(data, rule::Neighbors, read, I) =
     let hood=neighborhood(rule), rule=rule, read=astuple(rule, read)
@@ -262,6 +276,7 @@ The `let` block greatly improves performance.
     f::F    | false   | "Function to apply to the data, index and read values"
 end
 Manual(f; read=:_default_, write=read) = Manual{read,write}(f)
+Manual(; kwargs...) = _nofunctionerror(Manual)
 
 @inline applyrule!(data, rule::Manual, read, I) =
     let data=data, I=I, rule=rule, read=astuple(rule, read)
