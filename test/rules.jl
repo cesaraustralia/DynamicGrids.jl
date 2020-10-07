@@ -9,6 +9,31 @@ init  = [0 1 1 0
          0 1 1 0
          0 1 1 0]
 
+@testset "Generic rule constructors" begin
+   rule1 = Cell{:a,:b}(identity)
+   @test rule1.f == identity
+   rule2 = Cell(identity, read=:a, write=:b)
+   @test rule1 == rule2
+   @test_throws ArgumentError Cell()
+   @test_throws ArgumentError Cell(identity, identity)
+   @test_throws MethodError Cell{:a, :b}(identity, read=:x, write=:y)
+   rule1 = Neighbors{:a,:b}(identity, Moore(1))
+   @test rule1.f == identity
+   rule2 = Neighbors(identity, read=:a, write=:b, neighborhood=Moore(1))
+   # Moore(1) is the default value
+   rule3 = Neighbors(identity, read=:a, write=:b)
+   @test rule1 == rule2 == rule3
+   @test_throws ArgumentError Neighbors()
+   @test_throws ArgumentError Neighbors(identity, identity, identity)
+   rule1 = Manual{:a,:b}(identity)
+   @test rule1.f == identity
+   rule2 = Manual(identity, read=:a, write=:b)
+   @test rule1 == rule2
+   @test_throws ArgumentError Manual()
+   @test_throws ArgumentError Manual(identity, identity)
+end
+
+
 struct AddOneRule{R,W} <: Rule{R,W} end
 DynamicGrids.applyrule(data, ::AddOneRule, state, args...) = state + 1
 

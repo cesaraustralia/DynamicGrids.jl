@@ -80,6 +80,7 @@ DynamicGrids.sumneighbors
 DynamicGrids.mapsetneighbor!
 DynamicGrids.setneighbor!
 DynamicGrids.allocbuffers
+DynamicGrids.hoodsize
 ```
 
 
@@ -135,11 +136,14 @@ DynamicGrids.isasync
 DynamicGrids.isshowable
 DynamicGrids.isstored
 DynamicGrids.initialise
+DynamicGrids.delay
 DynamicGrids.finalise
 DynamicGrids.grid2image
 DynamicGrids.rendertext!
 DynamicGrids.rendertime!
 DynamicGrids.rendername!
+DynamicGrids.normalise
+DynamicGrids.rgb
 ```
 
 ## Ruleset config
@@ -178,8 +182,8 @@ DynamicGrids.maprule!
 DynamicGrids.optmap
 DynamicGrids.readgrids
 DynamicGrids.writegrids
-DynamicGrids.getgrids
 DynamicGrids.ismasked
+DynamicGrids.getreadgrids
 DynamicGrids.combinegrids
 DynamicGrids.replacegrids
 DynamicGrids.filter_readstate
