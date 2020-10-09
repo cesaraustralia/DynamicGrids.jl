@@ -1,13 +1,17 @@
 
-using DimensionalData, Aqua, SafeTestsets
+using DynamicGrids, Documenter, Aqua, SafeTestsets
 
 if VERSION >= v"1.5.0"
-    Aqua.test_ambiguities([DimensionalData, Base, Core])
-    Aqua.test_unbound_args(DimensionalData)
-    Aqua.test_undefined_exports(DimensionalData)
-    Aqua.test_deps_compat(DimensionalData) 
-    Aqua.test_project_extras(DimensionalData)
-    Aqua.test_stale_deps(DimensionalData)
+    # Amibiguities are not owned by DynamicGrids
+    # Aqua.test_ambiguities([DynamicGrids, Base, Core])
+    Aqua.test_unbound_args(DynamicGrids)
+    Aqua.test_undefined_exports(DynamicGrids)
+    Aqua.test_project_extras(DynamicGrids)
+    Aqua.test_stale_deps(DynamicGrids)
+    Aqua.test_deps_compat(DynamicGrids)
+    Aqua.test_project_toml_formatting(DynamicGrids)
+    Aqua.test_project_extras(DynamicGrids)
+    Aqua.test_stale_deps(DynamicGrids)
 end
 
 @time @safetestset "chain" begin include("chain.jl") end
@@ -17,7 +21,6 @@ end
 @time @safetestset "utils" begin include("utils.jl") end
 @time @safetestset "outputs" begin include("outputs.jl") end
 @time @safetestset "integration" begin include("integration.jl") end
-@time @safetestset "object grids" begin include("objectgrids.jl") end
 @time @safetestset "show" begin include("show.jl") end
 # ImageMagick breaks in windows travis for some reason
 if !Sys.iswindows() 
