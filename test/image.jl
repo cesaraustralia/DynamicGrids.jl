@@ -81,6 +81,7 @@ end
          ARGB32(0.0, 0.0, 0.0) ARGB32(1.0, 1.0, 1.0)]
     savegif("test.gif", output)
     @test isfile("test.gif")
+    rm("test.gif")
 
     arrayoutput = ArrayOutput([0 0]; tspan=1:2)
     @test minval(arrayoutput) == nothing

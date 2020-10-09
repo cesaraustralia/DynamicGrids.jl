@@ -76,8 +76,8 @@ maprule!(simdata::SimData, opt::PerformanceOpt, rule::ManualRule,
         end
     end
 maprule!(simdata::SimData, opt::PerformanceOpt,
-         rule::Union{NeighborhoodRule,Chain{R,W,Rules}}, rkeys, rgrids, wkeys, wgrids, mask
-         ) where {R,W,Rules<:Tuple{<:NeighborhoodRule,Vararg}} = begin
+         rule::Union{NeighborhoodRule,Chain{<:Any,<:Any,<:Tuple{<:NeighborhoodRule,Vararg}}}, 
+         rkeys, rgrids, wkeys, wgrids, mask) = begin
     griddata = simdata[neighborhoodkey(rule)]
     src, dst = parent(source(griddata)), parent(dest(griddata))
     buffers, bufrules = spreadbuffers(rule, init(griddata))
@@ -100,7 +100,7 @@ end
 # Neighorhood buffer optimisation without `SparseOpt`
 mapneighborhoodrule!(simdata::SimData, griddata, opt::NoOpt, rule, rkeys, rgrids, wkeys, wgrids,
          src, dst, buffers, bufrules, r, blocksize, hoodsize, nrows, ncols, nblockrows, nblockcols, mask
-         ) where {R,W} = begin
+         ) = begin
     # Loop down a block COLUMN
     for bi = 1:nblockrows
         rowsinblock = min(blocksize, nrows - blocksize * (bi - 1))
@@ -138,7 +138,7 @@ end
 # Neighorhood buffer optimisation combined with `SparseOpt`
 mapneighborhoodrule!(simdata::SimData, griddata, opt::SparseOpt, rule, rkeys, rgrids, wkeys, wgrids,
          src, dst, buffers, bufrules, r, blocksize, hoodsize, nrows, ncols, nblockrows, nblockcols, mask
-         ) where {R,W} = begin
+         ) = begin
 
     srcstatus, dststatus = sourcestatus(griddata), deststatus(griddata)
     # Zero out dest and dest status
