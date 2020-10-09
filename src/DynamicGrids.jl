@@ -38,7 +38,7 @@ import FieldMetadata: @description, description,
                       @default, default
 
 
-export sim!, resume!, replay, savegif, isinferred, isinferred
+export sim!, resume!, savegif, isinferred, isinferred
 
 export rules, neighbors, inbounds, isinbounds, radius, gridsize, 
        currenttime, currenttimestep, timestep
