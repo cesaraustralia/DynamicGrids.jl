@@ -1,5 +1,5 @@
 
-using DynamicGrids, Documenter, Aqua, SafeTestsets
+using DynamicGrids, Aqua, SafeTestsets
 
 if VERSION >= v"1.5.0"
     # Amibiguities are not owned by DynamicGrids
