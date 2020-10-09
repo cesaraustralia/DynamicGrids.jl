@@ -10,7 +10,7 @@ struct Block <: CharStyle end
 struct Braile <: CharStyle end
 
 """
-    REPLOutput(init; tspan, fps=25.0, store=false, color=:white, cutoff=0.5 style=Block())
+    REPLOutput(init; tspan, fps=25.0, store=false, color=:white, cutoff=0.5, style=Block())
 
 An output that is displayed directly in the REPL. It can either store or discard
 simulation frames.

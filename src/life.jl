@@ -10,36 +10,40 @@ in the s array.
 
 ## Examples (gleaned from CellularAutomata.jl)
 
-```@example
-# Life. 
+```jldoctest; output=false
 using DynamicGrids, Distributions
+# Use `Binomial` to tweak the density random true values
 init = Bool.(rand(Binomial(1, 0.5), 70, 70))
-output = REPLOutput(init; tspan=(1, 1000), fps=10, color=:red)
+output = REPLOutput(init; tspan=1:100, fps=25, color=:red)
 
 # Morley
-sim!(output, Ruleset(Life(birth=[3,6,8], sustain=[2,4,5]))
+sim!(output, Ruleset(Life(birth=[3, 6, 8], sustain=[2, 4, 5])))
 
 # 2x2
-sim!(output, Ruleset(Life(birth=[3,6], sustain=[1,2,5])))
+sim!(output, Ruleset(Life(birth=[3, 6], sustain=[1, 2, 5])))
 
 # Dimoeba
-init = rand(0:1, 400, 300)
+init = rand(Bool, 400, 300)
 init[:, 100:200] .= 0
-output = REPLOutput{:braile}(init; fps=25, color=:blue)
-sim!(output, Life(birth=(3,5,6,7,8), sustain=(5,6,7,8))))
+output = REPLOutput(init; tspan=1:100, fps=25, color=:blue, style=Braile())
+sim!(output,  Life(birth=(3, 5, 6, 7, 8),  sustain=(5, 6, 7, 8)))
 
 ## No death
-sim!(output, Life(birth=[3], sustain=[0,1,2,3,4,5,6,7,8]))
+sim!(output,  Life(birth=(3, ),  sustain=(0, 1, 2, 3, 4, 5, 6, 7, 8)))
 
 ## 34 life
-sim!(output, Life(birth=[3,4], sustain=[3,4]))
+sim!(output, Life(birth=(3, 4), sustain=(3, 4)))
 
 # Replicator
-init = fill(1, 300,300)
-init[:, 100:200] .= 0
+init = fill(true, 300,300)
+init[:, 100:200] .= false
 init[10, :] .= 0
-output = REPLOutput(init; tspan=(1, 1000), fps=60, color=:yellow)
-sim!(output, Life(birth=(1,3,5,7), sustain=(1,3,5,7)))
+output = REPLOutput(init; tspan=1:100, fps=25, color=:yellow)
+sim!(output,  Life(birth=(1, 3, 5, 7),  sustain=(1, 3, 5, 7)))
+nothing
+
+# output
+
 ```
 
 ![REPL Life](https://raw.githubusercontent.com/cesaraustralia/DynamicGrids.jl/media/life.gif)
