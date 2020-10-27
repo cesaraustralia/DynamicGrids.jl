@@ -10,7 +10,7 @@ not by the user. Custom `Rule` implementations must define this method.
 - `data` : [`SimData`](@ref)
 - `rule` : [`Rule`](@ref)
 - `state`: the value(s) of the current cell
-- `index`: a (row, column) tuple of Int for the current cell coordinates - `t`: the current time step
+- `index`: a (row, column) tuple of Int for the current cell coordinates
 
 Returns the values) to be written to the current cell(s).
 """
