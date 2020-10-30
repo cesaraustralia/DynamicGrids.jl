@@ -126,8 +126,9 @@ coordinates if they are not symmetrical.
 The `buffer` argument may be required for performance
 optimisation, see [`Neighborhood`] for more details.
 """
-@description @flattenable struct Positional{R,C<:CustomCoords,B} <: AbstractPositional{R,B}
-    coords::C | false | "A tuple of tuples of Int, containing 2-D coordinates relative to the central point"
+struct Positional{R,C<:CustomCoords,B} <: AbstractPositional{R,B}
+    "A tuple of tuples of Int, containing 2-D coordinates relative to the central point"
+    coords::C
     buffer::B
 end
 
@@ -175,9 +176,10 @@ Sets of [`Positional`](@ref) neighborhoods that can have separate rules for each
 `neighbors` for `LayeredPositional` returns a tuple of iterators
 for each neighborhood layer.
 """
-@description struct LayeredPositional{R,L,B} <: AbstractPositional{R,B}
-    layers::L | "A tuple of custom neighborhoods"
-    buffer::B | _
+struct LayeredPositional{R,L,B} <: AbstractPositional{R,B}
+    "A tuple of custom neighborhoods"
+    layers::L
+    buffer::B
 end
 LayeredPositional(layers::Positional...) =
     LayeredPositional(layers)

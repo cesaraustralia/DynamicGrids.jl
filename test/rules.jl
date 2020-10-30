@@ -1,4 +1,4 @@
-using DynamicGrids, Setfield, FieldMetadata, Test
+using DynamicGrids, ModelParameters, Setfield, Test
 import DynamicGrids: applyrule, applyrule!, maprule!, 
        source, dest, currenttime, getreadgrids, getwritegrids, combinegrids,
        SimData, WritableGridData, Rule, Extent, readkeys, writekeys
@@ -272,11 +272,20 @@ end
 
 @testset "life with generic constructors" begin
     @test Life(Moore(1), (1, 1), (5, 5)) ==
-          Life(; neighborhood=Moore(1), birth=(1, 1), sustain=(5, 5))
-    @test Life{:a,:b}(Moore(1), (1, 1), (5, 5)) ==
-          Life(; read=:a, write=:b, neighborhood=Moore(1), birth=(1, 1), sustain=(5, 5));
-    @test Life(read=:a, write=:b) == Life{:a,:b}()
-    @test Life() == Life(; read=:_default_)
+        Life(; neighborhood=Moore(1), birth=(1, 1), sustain=(5, 5))
+    @test Life{:a,:b}(Moore(1), (7, 1), (5, 3)) ==
+          Life{:a,:b}(neighborhood=Moore(1), birth=(7, 1), sustain=(5, 3))
+    # Defaults
+    @test Life() == Life(
+        Moore(1), 
+        Param(3, bounds=(0, 8)),
+        (Param(2, bounds=(0, 8)), Param(3, bounds=(0, 8)))
+    )
+    @test Life{:a,:b}() == Life{:a,:b}(
+         Moore(1), 
+         Param(3, bounds=(0, 8)),
+         (Param(2, bounds=(0, 8)), Param(3, bounds=(0, 8)))
+    )
 end
 
 @testset "generic ConstructionBase compatability" begin

@@ -12,32 +12,20 @@ abstract type Rule{R,W} end
 
 
 #=
-Default constructors for all rules.
+Default constructors for all Rules.
 Sets both the read and write grids to `:_default`.
 
-This strategy relies on a one-to-one relationship
-between all fields and their type parameters, besides
-the initial `R`, `W` etc fields.
+This strategy relies on a one-to-one relationship between fields 
+and type parameters, besides the initial `R` and `W` params.
 =#
 
-# No R,W params and no kwargs
-function (::Type{T})(args...) where T<:Rule
-    _checkfields(T, args)
-    T{:_default_,:_default_,map(typeof, args)...}(args...)
+# No {R,W} with args or kw
+function (::Type{T})(args...; kw...) where T<:Rule
+    T{:_default_,:_default_}(args...; kw...)
 end
-# R,W but no kwargs
+# {R,W} with args
 function (::Type{T})(args...) where T<:Rule{R,W} where {R,W}
     _checkfields(T, args)
-    T{map(typeof, args)...}(args...)
-end
-# No R,W but kwargs
-(::Type{T})(; read=:_default_, write=:_default_, kwargs...) where T<:Rule =
-    T{read,write}(; kwargs...)
-# R,W and kwargs passed through to FieldDefaults.jl.
-# This means @default should be used for rule defaults, never @default_kw
-# or this will be overwritten, but also not work as it wont handle R,W.
-function (::Type{T})(; kwargs...) where T<:Rule{R,W} where {R,W}
-    args = FieldDefaults.insert_kwargs(kwargs, T)
     T{map(typeof, args)...}(args...)
 end
 
@@ -83,7 +71,7 @@ applyrule(data::SimData, rule::YourCellRule, state, I)
 ```
 
 As the cell index is provided in `applyrule`, you can look up an [`aux`](@ref) array
-using `aux(data)[:auxname][I...]` to access cell-specific parameters for your rule.
+using `aux(data, Val{:auxname}())[I...]` to access cell-specific parameters for your rule.
 """
 abstract type CellRule{R,W} <: Rule{R,W} end
 
@@ -190,11 +178,10 @@ rule = let y = y
 end
 ```
 """
-@flattenable @description struct Cell{R,W,F} <: CellRule{R,W}
-    # Field | Flatten | Description
-    f::F    | false    | "Function to apply to the read values"
+struct Cell{R,W,F} <: CellRule{R,W}
+    "Function to apply to the read values"
+    f::F
 end
-Cell(f; read=:_default_, write=read) = Cell{read,write}(f)
 Cell(; kwargs...) = _nofunctionerror(Cell)
 
 @noinline _nofunctionerror(T) = 
@@ -238,13 +225,12 @@ end
 
 The `let` block may improve performance.
 """
-@flattenable @description struct Neighbors{R,W,F,N} <: NeighborhoodRule{R,W}
-    # Field         | Flatten | Description
-    f::F            | false   | "Function to apply to the neighborhood and read values"
-    neighborhood::N | true    | ""
+struct Neighbors{R,W,F,N} <: NeighborhoodRule{R,W}
+    "Function to apply to the neighborhood and read values"
+    f::F
+    "Defines the neighborhood of cells around the central cell"
+    neighborhood::N
 end
-Neighbors(f; read=:_default_, write=read, neighborhood=Moore(1)) = 
-    Neighbors{read,write}(f, neighborhood)
 Neighbors(; kwargs...) = _nofunctionerror(Neighbors)
 
 @inline applyrule(data, rule::Neighbors, read, I) =
@@ -271,11 +257,10 @@ end
 ```
 The `let` block greatly improves performance.
 """
-@flattenable @description struct Manual{R,W,F} <: ManualRule{R,W}
-    # Field | Flatten | Description
-    f::F    | false   | "Function to apply to the data, index and read values"
+struct Manual{R,W,F} <: ManualRule{R,W}
+    "Function to apply to the data, index and read values"
+    f::F
 end
-Manual(f; read=:_default_, write=read) = Manual{read,write}(f)
 Manual(; kwargs...) = _nofunctionerror(Manual)
 
 @inline applyrule!(data, rule::Manual, read, I) =

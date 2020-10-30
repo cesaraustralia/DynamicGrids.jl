@@ -1,7 +1,7 @@
 """
     Life(neighborhood, birth=3, sustain=(2, 3))
 
-Rule for game-of-life style cellular automata. This is a demonstration of 
+Rule for game-of-life style cellular automata. This is a demonstration of
 Cellular Automata more than a seriously optimised game of life rule.
 
 Cells becomes active if it is empty and the number of neightbors is a number in
@@ -48,20 +48,27 @@ nothing
 
 ![REPL Life](https://raw.githubusercontent.com/cesaraustralia/DynamicGrids.jl/media/life.gif)
 """
-@default @flattenable @bounds @description struct Life{R,W,N,B,S,L} <: NeighborhoodRule{R,W}
-    neighborhood::N | Moore(1) | false | nothing | "Any Neighborhood"
-    birth::B        | 3        | true  | (0, 8)  | "Array, Tuple or Iterable of integers to match neighbors when cell is empty"
-    sustain::S      | (2, 3)   | true  | (0, 8)  | "Array, Tuple or Iterable of integers to match neighbors cell is full"
-    lookup::L       | _        | false | _       | _
+struct Life{R,W,N,B,S,L} <: NeighborhoodRule{R,W}
+    "A Neighborhood, usually Moore(1)"
+    neighborhood::N
+    "Int, Array, Tuple or Iterable of values that match sum(neighbors) when cell is empty"
+    birth::B 
+    "Int, Array, Tuple or Iterable of values that match sum(neighbors) when cell is full"
+    sustain::S
+    lookup::L
+
     Life{R,W,N,B,S,L}(neighborhood::N, birth::B, sustain::S, lookup::L) where {R,W,N,B,S,L} = begin
         lookup = Tuple(i in birth for i in 0:8), Tuple(i in sustain for i in 0:8)
         new{R,W,N,B,S,typeof(lookup)}(neighborhood, birth, sustain, lookup)
     end
 end
-Life(neighborhood, birth, sustain) = 
-    Life(neighborhood, birth, sustain, nothing) 
-Life{R,W}(neighborhood, birth, sustain) where {R,W} = 
-    Life{R,W}(neighborhood, birth, sustain, nothing) 
+Life{R,W}(neighborhood, birth, sustain) where {R,W} =
+    Life{R,W}(neighborhood, birth, sustain, nothing)
+Life{R,W}(; neighborhood=Moore(1),
+          birth=Param(3, bounds=(0, 8)),
+          sustain=(Param(2, bounds=(0, 8)), Param(3, bounds=(0, 8))),
+         ) where {R,W} =
+    Life{R,W}(neighborhood, birth, sustain, nothing)
 
 
 """

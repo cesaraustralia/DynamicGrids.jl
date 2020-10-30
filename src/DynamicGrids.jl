@@ -13,12 +13,9 @@ using Colors,
       Crayons,
       DimensionalData,
       DocStringExtensions,
-      FieldDefaults,
-      FieldMetadata,
-      FieldDocTables,
+      ModelParameters,
       FreeTypeAbstraction,
       FileIO,
-      Mixers,
       OffsetArrays,
       REPL,
       Setfield,
@@ -32,15 +29,9 @@ using Base: tail
 import Base: show, getindex, setindex!, lastindex, size, length, push!, append!,
              broadcast, broadcast!, similar, eltype, iterate
 
-import FieldMetadata: @description, description, 
-                      @bounds, bounds,
-                      @flattenable, flattenable,
-                      @default, default
-
-
 export sim!, resume!, savegif, isinferred, isinferred
 
-export rules, neighbors, inbounds, isinbounds, radius, gridsize, 
+export rules, neighbors, inbounds, isinbounds, radius, gridsize,
        currenttime, currenttimestep, timestep
 
 export Rule, NeighborhoodRule, CellRule, ManualRule, ManualNeighborhoodRule
@@ -66,11 +57,6 @@ export TextConfig
 export Greyscale, Grayscale
 
 export CharStyle, Block, Braile
-
-
-const FIELDDOCTABLE = FieldDocTable((:Description, :Default, :Bounds),
-                                    (description, default, bounds);
-                                    truncation=(100,40,100))
 
 # Documentation templates
 @template TYPES =

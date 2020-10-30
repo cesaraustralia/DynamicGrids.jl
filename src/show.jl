@@ -9,7 +9,9 @@ show(io::IO, ruleset::Ruleset) = begin
         fn == :rules && continue
         println(io, fn, " = ", repr(getfield(ruleset, fn)))
     end
+    ModelParameters.paramtable(io, ruleset)
 end
+# end
 
 show(io::IO, rule::T) where T<:Rule{R,W} where {R,W} = begin
     indent = get(io, :indent, "")

@@ -1,4 +1,4 @@
-using DynamicGrids, Dates, Test, Colors, ColorSchemes, FieldDefaults
+using DynamicGrids, Dates, Test, Colors, ColorSchemes
 using FreeTypeAbstraction
 using DynamicGrids: grid2image, processor, minval, maxval, normalise, SimData, NoDisplayImageOutput,
     isstored, isasync, initialise, finalise, delay, fps, settimestamp!, timestamp,
@@ -31,8 +31,6 @@ end
     @test scale(1.2, nothing, nothing) == 1.2
 end
 
-init = [8.0 10.0;
-        0.0  5.0]
 
 l0 = ARGB32(get(leonardo, 0))
 l05 = ARGB32(get(leonardo, 0.5))
@@ -47,6 +45,8 @@ DynamicGrids.showimage(image, o::NoDisplayImageOutput, f, t) = begin
 end
 
 @testset "basic ImageOutput" begin
+    init = [8.0 10.0;
+            0.0  5.0]
     output = NoDisplayImageOutput(init; tspan=1:1, maxval=40.0)
 
     @test parent(output) == [init]
@@ -92,6 +92,8 @@ end
 
 
 @testset "ColorProcessor" begin
+    init = [8.0 10.0;
+            0.0  5.0]
     proc = ColorProcessor(zerocolor=(1.0, 0.0, 0.0))
     output = NoDisplayImageOutput((a=init,); tspan=1:10, processor=proc, minval=0.0, maxval=10.0, store=true)
     maxval(output.imageconfig)
@@ -154,7 +156,6 @@ end
             ]
     ruleset = Ruleset(;
         rules=(Life(),),
-            init=init,
         timestep=Day(1),
         overflow=WrapOverflow(),
         opt=SparseOpt(),
@@ -185,6 +186,8 @@ end
 end
 
 @testset "LayoutProcessor" begin
+    init = [8.0 10.0;
+            0.0  5.0]
     z0 = ARGB32(1, 0, 0)
     grey = ColorProcessor(zerocolor=z0)
     leo = ColorProcessor(scheme=leonardo, zerocolor=z0)

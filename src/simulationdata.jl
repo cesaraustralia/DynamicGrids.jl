@@ -8,20 +8,6 @@ abstract type GridData{T,N,I} <: AbstractArray{T,N} end
     T(init(d), mask(d), radius(d), overflow(d), source(d), dest(d),
       sourcestatus(d), deststatus(d), localstatus(d))
 
-# Common fields for GridData and WritableGridData, which are
-# identical except for their indexing methods
-@mix struct GridDataMixin{T,N,I<:AbstractArray{T,N},M,R,O,S,St,LSt}
-    init::I
-    mask::M
-    radius::R
-    overflow::O
-    source::S
-    dest::S
-    sourcestatus::St
-    deststatus::St
-    localstatus::LSt
-end
-
 GridDataOrReps = Union{GridData, Vector{<:GridData}}
 
 # Array interface
@@ -56,7 +42,18 @@ gridsize(t::Tuple{}) = 0, 0
 
 Simulation data and storage passed to rules for each timestep.
 """
-@GridDataMixin struct ReadableGridData{} <: GridData{T,N,I} end
+struct ReadableGridData{T,N,I<:AbstractArray{T,N},M,R,O,S,St,LSt} <: GridData{T,N,I}
+    init::I
+    mask::M
+    radius::R
+    overflow::O
+    source::S
+    dest::S
+    sourcestatus::St
+    deststatus::St
+    localstatus::LSt
+end
+
 
 # Generate simulation data to match a ruleset and init array.
 ReadableGridData(init::AbstractArray, mask, radius, overflow) = begin
@@ -95,7 +92,17 @@ Passed to rules `<: ManualRule`, and can be written to directly as
 an array. This handles updates to SparseOpt() and writing to
 the correct source/dest array.
 """
-@GridDataMixin struct WritableGridData{} <: GridData{T,N,I} end
+struct WritableGridData{T,N,I<:AbstractArray{T,N},M,R,O,S,St,LSt} <: GridData{T,N,I}
+    init::I
+    mask::M
+    radius::R
+    overflow::O
+    source::S
+    dest::S
+    sourcestatus::St
+    deststatus::St
+    localstatus::LSt
+end
 
 Base.@propagate_inbounds Base.setindex!(d::WritableGridData, x, I...) = begin
     r = radius(d)
@@ -154,7 +161,7 @@ ruleset(d::SimData) = d.ruleset
 grids(d::SimData) = d.grids
 init(d::SimData) = init(extent(d))
 mask(d::SimData) = mask(first(d))
-aux(d::SimData) = aux(extent(d))
+aux(d::SimData, args...) = aux(extent(d), args...)
 tspan(d::SimData) = tspan(extent(d))
 timestep(d::SimData) = step(tspan(d))
 currentframe(d::SimData) = d.currentframe
