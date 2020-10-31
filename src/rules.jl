@@ -10,14 +10,11 @@ Rules are applied to the grid using the [`applyrule`](@ref) method.
 """
 abstract type Rule{R,W} end
 
-
-#=
-Default constructors for all Rules.
+#= Default constructors for all Rules.
 Sets both the read and write grids to `:_default`.
 
 This strategy relies on a one-to-one relationship between fields 
-and type parameters, besides the initial `R` and `W` params.
-=#
+and type parameters, besides the initial `R` and `W` params.  =#
 
 # No {R,W} with args or kw
 function (::Type{T})(args...; kw...) where T<:Rule
@@ -29,21 +26,30 @@ function (::Type{T})(args...) where T<:Rule{R,W} where {R,W}
     T{map(typeof, args)...}(args...)
 end
 
-# Check number of args passed in as we don't get a normal method error with the 
-# splatted args in the default constructors.
-_checkfields(T, args) = length(fieldnames(T)) == length(args) || 
-    throw(ArgumentError("$T has $(length(fieldnames(T))) fields: $(fieldnames(T)), you have used $(length(args))"))
+# Check number of args passed in as we don't get a normal method 
+# error because of the splatted args in the default constructor.
+function _checkfields(::Type{T}, args) where T 
+    length(fieldnames(T)) == length(args) || _fielderror(T, args)
+end
 
-@generated Base.keys(rule::Rule{R,W}) where {R,W} =
+@noinline function _fielderror(T, args)
+    throw(ArgumentError("$T has $(length(fieldnames(T))) fields: $(fieldnames(T)), you have used $(length(args))"))
+end
+
+
+@generated function Base.keys(rule::Rule{R,W}) where {R,W}
     Expr(:tuple, QuoteNode.(union(asiterable(W), asiterable(R)))...)
+end
 
 @inline writekeys(::Rule{R,W}) where {R,W} = W
-@generated writekeys(::Rule{R,W}) where {R,W<:Tuple} =
+@generated function writekeys(::Rule{R,W}) where {R,W<:Tuple}
     Expr(:tuple, QuoteNode.(W.parameters)...)
+end
 
 @inline readkeys(::Rule{R,W}) where {R,W} = R
-@generated readkeys(::Rule{R,W}) where {R<:Tuple,W} =
+@generated function readkeys(::Rule{R,W}) where {R<:Tuple,W}
     Expr(:tuple, QuoteNode.(R.parameters)...)
+end
 
 keys2vals(keys::Tuple) = map(Val, keys)
 keys2vals(key::Symbol) = Val(key)
@@ -53,8 +59,9 @@ asiterable(x::Type{<:Tuple}) = x.parameters
 asiterable(x::Tuple) = x
 
 # Define the constructor for generic rule reconstruction in Flatten.jl and Setfield.jl
-ConstructionBase.constructorof(::Type{T}) where T<:Rule{R,W} where {R,W} =
+function ConstructionBase.constructorof(::Type{T}) where T<:Rule{R,W} where {R,W}
     T.name.wrapper{R,W}
+end
 
 """
 A Rule that only writes and uses a state from single cell of the read grids, 
@@ -182,15 +189,16 @@ struct Cell{R,W,F} <: CellRule{R,W}
     "Function to apply to the read values"
     f::F
 end
-Cell(; kwargs...) = _nofunctionerror(Cell)
+Cell{R,W}(; kwargs...) where {R,W} = _nofunctionerror(Cell)
 
 @noinline _nofunctionerror(T) = 
     throw(ArgumentError("No function passed to $T. did you mean to use a `do` block?"))
 
-@inline applyrule(data, rule::Cell, state, I) =
+@inline function applyrule(data, rule::Cell, state, I)
     let (rule, read) = (rule, state)
         rule.f(astuple(rule, state)...)
     end
+end
 
 astuple(rule::Rule, state) = astuple(readkeys(rule), state)
 astuple(::Tuple, state) = state
@@ -231,12 +239,15 @@ struct Neighbors{R,W,F,N} <: NeighborhoodRule{R,W}
     "Defines the neighborhood of cells around the central cell"
     neighborhood::N
 end
-Neighbors(; kwargs...) = _nofunctionerror(Neighbors)
+Neighbors{R,W}(; kwargs...) where {R,W} = _nofunctionerror(Neighbors)
+Neighbors{R,W}(f; neighborhood=Moore(1)) where {R,W} = 
+    Neighbors{R,W}(f, neighborhood)
 
-@inline applyrule(data, rule::Neighbors, read, I) =
+@inline function applyrule(data, rule::Neighbors, read, I)
     let hood=neighborhood(rule), rule=rule, read=astuple(rule, read)
         rule.f(hood, read...)
     end
+end
 
 """
     Manual(f; read=:_default_, write=read) 
@@ -261,12 +272,13 @@ struct Manual{R,W,F} <: ManualRule{R,W}
     "Function to apply to the data, index and read values"
     f::F
 end
-Manual(; kwargs...) = _nofunctionerror(Manual)
+Manual{R,W}(; kwargs...) where {R,W} = _nofunctionerror(Manual)
 
-@inline applyrule!(data, rule::Manual, read, I) =
+@inline function applyrule!(data, rule::Manual, read, I)
     let data=data, I=I, rule=rule, read=astuple(rule, read)
         rule.f(data, I, read...)
     end
+end
 
 """
     method(rule)
