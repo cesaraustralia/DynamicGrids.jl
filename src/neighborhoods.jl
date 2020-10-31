@@ -44,10 +44,10 @@ abstract type AbstractRadialNeighborhood{R,B} <: Neighborhood{R,B} end
 
 Returns a generator of the cell neighbors, skipping the central cell.
 """
-neighbors(hood::AbstractRadialNeighborhood) = begin
+function neighbors(hood::AbstractRadialNeighborhood)
     hoodlen = hoodsize(hood)^2
     centerpoint = hoodlen ÷ 2 + 1
-    (buffer(hood)[i] for i in 1:hoodlen if i != centerpoint)
+    return (buffer(hood)[i] for i in 1:hoodlen if i != centerpoint)
 end
 
 """
@@ -67,10 +67,8 @@ end
 # This might be bad design. SimData could instead hold a list of
 # ruledata for the rule that holds this buffer, with
 # the neighborhood. So you can do neighbors(data)
-Moore(radius::Int=1, buffer=nothing) =
-    Moore{radius}(buffer)
-Moore{R}(buffer=nothing) where R =
-    Moore{R,typeof(buffer)}(buffer)
+Moore(radius::Int=1, buffer=nothing) = Moore{radius}(buffer)
+Moore{R}(buffer=nothing) where R = Moore{R,typeof(buffer)}(buffer)
 
 # Neighborhood specific `sum` for performance:w
 Base.sum(hood::Moore) = _sum(hood, _centerval(hood))
@@ -81,7 +79,9 @@ _sum(hood::Neighborhood, cell) = sum(buffer(hood)) - cell
 
 Base.length(hood::Moore{R}) where R = (2R + 1)^2 - 1
 
-@inline mapsetneighbor!(data::WritableGridData, hood::AbstractRadialNeighborhood, rule, state, index) = begin
+@inline function mapsetneighbor!(
+    data::WritableGridData, hood::AbstractRadialNeighborhood, rule, state, index
+)
     r = radius(hood)
     sum = zero(state)
     # Loop over dispersal kernel grid dimensions
@@ -95,7 +95,7 @@ Base.length(hood::Moore{R}) where R = (2R + 1)^2 - 1
             sum += setneighbor!(data, hood, rule, state, hood_index, dest_index)
         end
     end
-    sum
+    return sum
 end
 
 """
@@ -157,7 +157,9 @@ Returns an iterator over the `Positional` neighborhood cells around the current 
 neighbors(hood::Positional) =
     (buffer(hood)[(coord .+ radius(hood) .+ 1)...] for coord in coords(hood))
 
-@inline mapsetneighbor!(data::WritableGridData, hood::Positional, rule, state, index) = begin
+@inline function mapsetneighbor!(
+    data::WritableGridData, hood::Positional, rule, state, index
+)
     r = radius(hood); sum = zero(state)
     # Loop over dispersal kernel grid dimensions
     for coord in coords(hood)
@@ -165,7 +167,7 @@ neighbors(hood::Positional) =
         dest_index = index .+ coord
         sum += setneighbor!(data, hood, rule, state, hood_index, dest_index)
     end
-    sum
+    return sum
 end
 
 """
@@ -198,8 +200,7 @@ end
 Returns a tuple of iterators over each `Positional` neighborhood
 layer, for the cells around the current index.
 """
-@inline neighbors(hood::LayeredPositional) =
-    map(l -> neighbors(l), hood.layers)
+@inline neighbors(hood::LayeredPositional) = map(l -> neighbors(l), hood.layers)
 
 @inline Base.sum(hood::LayeredPositional) = map(sum, neighbors(hood))
 
@@ -212,7 +213,7 @@ layer, for the cells around the current index.
 A convenience wrapper to build Von-Neumann neighborhoods as
 a [`Positional`](@ref) neighborhood.
 """
-VonNeumann(radius=1, buffer=nothing) = begin
+function VonNeumann(radius=1, buffer=nothing)
     coords = Tuple{Int,Int}[]
     rng = -radius:radius
     for j in rng, i in rng
@@ -221,12 +222,12 @@ VonNeumann(radius=1, buffer=nothing) = begin
             push!(coords, (i, j))
         end
     end
-    Positional(coords, buffer)
+    return Positional(coords, buffer)
 end
 
 # Find the largest radius present in the passed in rules.
 radius(set::Ruleset) = radius(rules(set))
-radius(rules::Tuple{Vararg{<:Rule}}) = begin
+function radius(rules::Tuple{Vararg{<:Rule}})
     allkeys = Tuple(union(map(keys, rules)...))
     maxradii = Tuple(radius(rules, key) for key in allkeys)
     return NamedTuple{allkeys}(maxradii)
@@ -243,14 +244,14 @@ radius(rule::Rule, args...) = 0
 
 # Build rules and neighborhoods for each buffer, so they
 # don't have to be constructed in the loop
-spreadbuffers(chain::Chain{R,W}, init::AbstractArray) where {R,W} = begin
+function spreadbuffers(chain::Chain{R,W}, init::AbstractArray) where {R,W}
     buffers, bufrules = spreadbuffers(rules(chain)[1], init)
-    buffers, map(r -> Chain{R,W}((r, tail(rules(chain))...)), bufrules)
+    return buffers, map(r -> Chain{R,W}((r, tail(rules(chain))...)), bufrules)
 end
 spreadbuffers(rule::Rule, init::AbstractArray) =
     spreadbuffers(rule, neighborhood(rule), buffer(neighborhood(rule)), init)
 spreadbuffers(rule::NeighborhoodRule, hood::Neighborhood, buffers, init::AbstractArray) =
-    spreadbuffers(rule::NeighborhoodRule, hood::Neighborhood, allocbuffers(init, hood), init)
+    spreadbuffers(rule, hood, allocbuffers(init, hood), init)
 spreadbuffers(rule::NeighborhoodRule, hood::Neighborhood, buffers::Tuple, init::AbstractArray) =
     buffers, map(b -> (@set rule.neighborhood.buffer = b), buffers)
 

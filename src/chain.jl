@@ -29,9 +29,9 @@ radius(chain::Chain) = radius(chain[1])
 neighborhoodkey(chain::Chain) = neighborhoodkey(chain[1])
 neighborhood(chain::Chain) = neighborhood(chain[1])
 
-Base.tail(chain::Chain{R,W}) where {R,W} = begin
-    ch = tail(rules(chain))
-    Chain{R,W,typeof(ch)}(ch)
+function Base.tail(chain::Chain{R,W}) where {R,W}
+    chaintail = tail(rules(chain))
+    Chain{R,W,typeof(chaintail)}(chaintail)
 end
 Base.getindex(chain::Chain, i) = getindex(rules(chain), i)
 Base.iterate(chain::Chain) = iterate(rules(chain))
@@ -39,7 +39,7 @@ Base.length(chain::Chain) = length(rules(chain))
 Base.firstindex(chain::Chain) = firstindex(rules(chain))
 Base.lastindex(chain::Chain) = lastindex(rules(chain))
 
-@generated applyrule(data::SimData, chain::Chain{R,W,T}, state, index) where {R,W,T} = begin
+@generated function applyrule(data::SimData, chain::Chain{R,W,T}, state, index) where {R,W,T}
     expr = Expr(:block)
     for i in 1:length(T.parameters)
         rule_expr = quote
@@ -62,7 +62,7 @@ end
 
 Get the state to pass to the specific rule as a `NamedTuple` or single value
 """
-@generated filter_readstate(::Rule{R,W}, state::NamedTuple) where {R<:Tuple,W} = begin 
+@generated function filter_readstate(::Rule{R,W}, state::NamedTuple) where {R<:Tuple,W}
     expr = Expr(:tuple)
     keys = Tuple(R.parameters)
     for k in keys
@@ -77,7 +77,7 @@ end
 
 Get the state to write for the specific rule
 """
-@generated filter_writestate(::Rule{R,W}, state::NamedTuple) where {R<:Tuple,W} = begin 
+@generated function filter_writestate(::Rule{R,W}, state::NamedTuple) where {R<:Tuple,W}
     expr = Expr(:tuple)
     keys = Tuple(W.parameters)
     for k in keys

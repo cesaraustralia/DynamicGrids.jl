@@ -5,15 +5,15 @@ using DynamicGrids: SimData, radius, rules, readkeys, writekeys,
 
 @testset "CellRule chain" begin
 
-    rule1 = Cell(read=:a, write=:b) do a
+    rule1 = Cell{:a,:b}() do a
         2a
     end
 
-    rule2 = Cell(read=Tuple{:b,:d}, write=:c) do b, d
+    rule2 = Cell{Tuple{:b,:d},:c}() do b, d
         b + d
     end
 
-    rule3 = Cell(read=Tuple{:a,:c,:d}, write=Tuple{:d,:e}) do a, c, d
+    rule3 = Cell{Tuple{:a,:c,:d},Tuple{:d,:e}}() do a, c, d
         a + c + d, 3a
     end
 
@@ -93,7 +93,7 @@ end
 
 @testset "NeighborhoodRule, CellRule chain" begin
 
-    hoodrule = Neighbors(read=:a) do neighborhodhood, cell
+    hoodrule = Neighbors{:a,:a}() do neighborhodhood, cell
         sum(neighborhodhood)
     end
 

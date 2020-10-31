@@ -1,5 +1,5 @@
 
-show(io::IO, ruleset::Ruleset) = begin
+function Base.show(io::IO, ruleset::Ruleset)
     printstyled(io, Base.nameof(typeof(ruleset)), " =\n"; color=:blue)
     println(io, "rules:")
     for rule in rules(ruleset)
@@ -11,9 +11,8 @@ show(io::IO, ruleset::Ruleset) = begin
     end
     ModelParameters.paramtable(io, ruleset)
 end
-# end
 
-show(io::IO, rule::T) where T<:Rule{R,W} where {R,W} = begin
+function Base.show(io::IO, rule::T) where T<:Rule{R,W} where {R,W}
     indent = get(io, :indent, "")
     printstyled(io, indent, Base.nameof(typeof(rule)), 
                 "{", sprint(show, R), ",", sprint(show, W), "}"; color=:red)
@@ -30,7 +29,7 @@ show(io::IO, rule::T) where T<:Rule{R,W} where {R,W} = begin
     end
 end
 
-Base.show(io::IO, chain::Chain{R,W}) where {R,W} = begin
+function Base.show(io::IO, chain::Chain{R,W}) where {R,W}
     indent = get(io, :indent, "")
     printstyled(io, indent, string("Chain{", sprint(show, R), ",", sprint(show, W), "} :"); color=:green)
     for rule in rules(chain)

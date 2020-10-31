@@ -53,8 +53,6 @@ struct ReadableGridData{T,N,I<:AbstractArray{T,N},M,R,O,S,St,LSt} <: GridData{T,
     deststatus::St
     localstatus::LSt
 end
-
-
 # Generate simulation data to match a ruleset and init array.
 ReadableGridData(init::AbstractArray, mask, radius, overflow) = begin
     r = radius
@@ -82,7 +80,10 @@ ReadableGridData(init::AbstractArray, mask, radius, overflow) = begin
 end
 
 Base.parent(d::ReadableGridData) = parent(source(d))
-Base.@propagate_inbounds Base.getindex(d::ReadableGridData, I...) = getindex(source(d), I...)
+
+@propagate_inbounds function Base.getindex(d::ReadableGridData, I...)
+    getindex(source(d), I...)
+end
 
 
 """
@@ -104,17 +105,18 @@ struct WritableGridData{T,N,I<:AbstractArray{T,N},M,R,O,S,St,LSt} <: GridData{T,
     localstatus::LSt
 end
 
-Base.@propagate_inbounds Base.setindex!(d::WritableGridData, x, I...) = begin
-    r = radius(d)
+Base.parent(d::WritableGridData) = parent(dest(d))
+@propagate_inbounds function Base.setindex!(d::WritableGridData, x, I...)
+    @boundscheck checkbounds(dest(d), I...)
     @inbounds dest(d)[I...] = x
+    r = radius(d)
     if deststatus(d) isa AbstractArray
         @inbounds deststatus(d)[indtoblock.(I .+ r, 2r)...] = true
     end
 end
-
-Base.parent(d::WritableGridData) = parent(dest(d))
-Base.@propagate_inbounds Base.getindex(d::WritableGridData, I...) =
+@propagate_inbounds function Base.getindex(d::WritableGridData, I...)
     getindex(dest(d), I...)
+end
 
 
 
@@ -128,8 +130,41 @@ and frame numbers for the current frame of the simulation.
 
 A simdata object is accessable in [`applyrule`](@ref) as the first parameter.
 
-Multiple grids can be indexed into using their key. In single grid
-simulations `SimData` can be indexed directly as if it is a `Matrix`.
+Multiple grids can be indexed into using their key if you need to read
+from arbitrary locations: 
+
+```julia
+funciton applyrule(data::SimData, rule::SomeRule{Tuple{A,B}},W}, (a, b), cellindex) where {A,B,W}
+    grid_a = data[A]
+    grid_b = data[B]
+    ...
+```
+
+In single grid simulations `SimData` can be indexed directly as if it is a `Matrix`.
+
+## Methods
+
+- `currentframe(data::SimData)`: get the current frame number, an `Int`
+- `currenttime(data::SimData)`: the current frame time, which `isa eltype(tspan)`
+- `aux(d::SimData, args...)`: get the `aux` data `NamedTuple`, or `Nothing`.
+  adding a `Symbol` or `Val{:symbol}` argument will get a field of aux.
+- `tspan(d::SimData)`: get the simulation time span, an `AbstractRange`.
+- `timestep(d::SimData)`: get the simulaiton time step.
+- `radius(data::SimData)` : returns the `Int` radius used on the grid, 
+  which is also the amount of border padding.
+- `overflow(data::SimData)` : returns the [`Overflow`](@ref) - `RemoveOverflow` or `WrapOverflow`.
+
+These are available, but you probably shouldn't use them and thier behaviour
+is not guaranteed in furture versions. They will mean rule to be useful only 
+in specific contexts.
+
+- `extent(d::SimData)` : get the simulation [`Extent`](@ref) object.
+- `init(data::SimData)` : get the simulation init `AbstractArray`/`NamedTuple`
+- `mask(data::SimData)` : get the simulation mask `AbstractArray`
+- `ruleset(d::SimData)` : get the simulation [`Ruleset`](@ref).
+- `source(data::SimData)` : get the `source` grid that is being read from.
+- `dest(data::SimData)` : get the `dest` grid that is being written to.
+
 """
 struct SimData{G<:NamedTuple,E,Ru,F} <: AbstractSimData
     grids::G
@@ -154,7 +189,6 @@ SimData(griddata::NamedTuple, extent, ruleset::Ruleset) = begin
     SimData(griddata, extent, ruleset, currentframe)
 end
 
-
 # Getters
 extent(d::SimData) = d.extent
 ruleset(d::SimData) = d.ruleset
@@ -169,15 +203,18 @@ currenttime(d::SimData) = tspan(d)[currentframe(d)]
 currenttime(d::Vector{<:SimData}) = currenttime(d[1])
 
 # Getters forwarded to data
-Base.getindex(d::SimData, i::Symbol) =
-    getindex(grids(d), i)
-# For resolving method ambiguity
-Base.getindex(d::SimData{<:NamedTuple{(:_default_,)}}, i::Symbol) =
-    getindex(grids(d), i)
-Base.getindex(d::SimData{<:NamedTuple{(:_default_,)}}, I...) =
+Base.getindex(d::SimData, i::Symbol) = getindex(grids(d), i)
+# For the single :_default_ grid allow indexing directly
+function Base.getindex(d::SimData{<:NamedTuple{(:_default_,)}}, I...)
     getindex(first(grids(d)), I...)
-Base.setindex!(d::SimData{<:NamedTuple{(:_default_,)}}, x, I...) =
+end
+# For resolving method ambiguity
+function Base.getindex(d::SimData{<:NamedTuple{(:_default_,)}}, i::Symbol)
+    getindex(grids(d), i)
+end
+function Base.setindex!(d::SimData{<:NamedTuple{(:_default_,)}}, x, I...)
     setindex!(first(grids(d)), x, I...)
+end
 Base.keys(d::SimData) = keys(grids(d))
 Base.values(d::SimData) = values(grids(d))
 Base.first(d::SimData) = first(grids(d))
@@ -194,7 +231,7 @@ currenttimestep(d::SimData) = currenttime(d) + timestep(d) - currenttime(d)
 
 # Swap source and dest arrays. Allways returns regular SimData.
 swapsource(d::Tuple) = map(swapsource, d)
-swapsource(grid::GridData) = begin
+function swapsource(grid::GridData)
     src = grid.source
     dst = grid.dest
     @set! grid.dest = src
@@ -202,13 +239,11 @@ swapsource(grid::GridData) = begin
     srcstatus = grid.sourcestatus
     dststatus = grid.deststatus
     @set! grid.deststatus = srcstatus
-    @set grid.sourcestatus = dststatus
+    return @set grid.sourcestatus = dststatus
 end
 
 # Uptate timestamp
-updatetime(simdata::SimData, f::Integer) = begin
-    @set! simdata.currentframe = f
-end
+updatetime(simdata::SimData, f::Integer) = @set! simdata.currentframe = f
 updatetime(simdata::AbstractVector{<:SimData}, f) = updatetime.(simdata, f)
 
 #=
@@ -216,7 +251,7 @@ Find the maximum radius required by all rules
 Add padding around the original init array, offset into the negative
 So that the first real cell is still 1, 1
 =#
-addpadding(init::AbstractArray{T,N}, r) where {T,N} = begin
+function addpadding(init::AbstractArray{T,N}, r) where {T,N}
     sze = size(init)
     paddedsize = sze .+ 2r
     paddedindices = -r + 1:sze[1] + r, -r + 1:sze[2] + r
@@ -226,17 +261,17 @@ addpadding(init::AbstractArray{T,N}, r) where {T,N} = begin
     for j in 1:size(init, 2), i in 1:size(init, 1)
         @inbounds source[i, j] = init[i, j]
     end
-    source
+    return source
 end
 
 #=
 Initialise the block status array.
 This tracks whether anything has to be done in an area of the main array.
 =#
-updatestatus!(grid::GridData) =
+function updatestatus!(grid::GridData)
     updatestatus!(parent(source(grid)), sourcestatus(grid), deststatus(grid), radius(grid))
-updatestatus!(source, sourcestatus::Bool, deststatus::Bool, radius) = nothing
-updatestatus!(source, sourcestatus, deststatus, radius) = begin
+end
+function updatestatus!(source, sourcestatus, deststatus, radius)
     blocksize = 2radius
     source = parent(source)
     for i in CartesianIndices(source)
@@ -247,19 +282,28 @@ updatestatus!(source, sourcestatus, deststatus, radius) = begin
             @inbounds deststatus[bi...] = true
         end
     end
+    return nothing
 end
+updatestatus!(source, sourcestatus::Bool, deststatus::Bool, radius) = nothing
 
 # When replicates are an Integer, construct a vector of SimData
-initdata!(::Nothing, extent, ruleset::Ruleset, nreplicates::Integer) =
+function initdata!(::Nothing, extent, ruleset::Ruleset, nreplicates::Integer)
     [SimData(extent, ruleset) for r in 1:nreplicates]
+end
 # When simdata is a Vector, the existing SimData arrays are re-initialised
-initdata!(simdata::AbstractVector{<:AbstractSimData}, extent, ruleset, nreplicates::Integer) =
+function initdata!(
+    simdata::AbstractVector{<:AbstractSimData}, extent, ruleset, nreplicates::Integer
+)
     map(d -> initdata!(d, extent, ruleset, nothing), simdata)
+end
 # When no simdata is passed in, create new SimData
-initdata!(::Nothing, extent, ruleset::Ruleset, nreplicates::Nothing) =
+function initdata!(::Nothing, extent, ruleset::Ruleset, nreplicates::Nothing)
     SimData(extent, ruleset)
+end
 # Initialise a SimData object with a new `Extent` and `Ruleset`.
-initdata!(simdata::AbstractSimData, extent::Extent, ruleset::Ruleset, nreplicates::Nothing) = begin
+function initdata!(
+    simdata::AbstractSimData, extent::Extent, ruleset::Ruleset, nreplicates::Nothing
+)
     map(values(simdata), values(init(extent))) do grid, init
         for j in 1:gridsize(grid)[2], i in 1:gridsize(grid)[1]
             @inbounds source(grid)[i, j] = dest(grid)[i, j] = init[i, j]

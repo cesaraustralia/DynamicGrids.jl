@@ -24,7 +24,7 @@ using Colors,
 
 const DG = DynamicGrids
 
-using Base: tail
+using Base: tail, @propagate_inbounds
 
 import Base: show, getindex, setindex!, lastindex, size, length, push!, append!,
              broadcast, broadcast!, similar, eltype, iterate

@@ -76,5 +76,6 @@ Life{R,W}(; neighborhood=Moore(1),
 
 Applies game of life rule to current cell, returning `Bool`.
 """
-applyrule(data::SimData, rule::Life, state, I) =
+function applyrule(data::SimData, rule::Life, state, I)
     rule.lookup[state + 1][sum(neighbors(rule)) + 1]
+end

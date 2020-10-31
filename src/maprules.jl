@@ -9,8 +9,7 @@ Map a rule over the grids it reads from and updating the grids it writes to.
 This is broken into a setup method and an application method
 to introduce a function barrier, for type stability.
 """
-function maprule! end
-maprule!(simdata::SimData, rule::Rule) = begin
+function maprule!(simdata::SimData, rule::Rule)
     #= keys and grids are separated instead of in a NamedTuple as `rgrids` or `wgrids`
     may be a single grid, not a Tuple. But we still need to know what its key is.
     The structure of rgrids and wgrids determines the values that are sent to the rule
@@ -37,36 +36,36 @@ maprule!(simdata::SimData, rule::Rule) = begin
     replacegrids(simdata, wkeys, readonly_wgrids)
 end
 
-maybeupdatedest!(ds::Tuple, rule) =
-    map(d -> maybeupdatedest!(d, rule), ds)
+maybeupdatedest!(ds::Tuple, rule) = map(d -> maybeupdatedest!(d, rule), ds)
 maybeupdatedest!(d::WritableGridData, rule::Rule) = nothing
-maybeupdatedest!(d::WritableGridData, rule::ManualRule) = begin
+function maybeupdatedest!(d::WritableGridData, rule::ManualRule)
     @inbounds copyto!(parent(dest(d)), parent(source(d)))
 end
 
 maybecopystatus!(grid::Tuple{Vararg{<:GridData}}) = map(maybecopystatus!, grid)
-maybecopystatus!(grid::GridData) =
-    maybecopystatus!(sourcestatus(grid), deststatus(grid))
+maybecopystatus!(grid::GridData) = maybecopystatus!(sourcestatus(grid), deststatus(grid))
 maybecopystatus!(srcstatus, deststatus) = nothing
-maybecopystatus!(srcstatus::AbstractArray, deststatus::AbstractArray) =
+function maybecopystatus!(srcstatus::AbstractArray, deststatus::AbstractArray)
     @inbounds return srcstatus .= deststatus
+end
 
 _to_readonly(data::Tuple) = map(ReadableGridData, data)
 _to_readonly(data::WritableGridData) = ReadableGridData(data)
 
-maprule!(simdata::SimData, opt::PerformanceOpt, rule::Rule,
-         rkeys, rgrids, wkeys, wgrids, mask) =
+function maprule!(simdata::SimData, opt::PerformanceOpt, rule::Rule,
+                  rkeys, rgrids, wkeys, wgrids, mask)
     let rule=rule, simdata=simdata, rkeys=rkeys, rgrids=rgrids, wkeys=wkeys, wgrid=wgrids
         optmap(opt, rgrids, wgrids) do i, j
-            ismasked(mask, i, j) && return
+            ismasked(mask, i, j) && return nothing
             readval = readgrids(rkeys, rgrids, i, j)
             writeval = applyrule(simdata, rule, readval, (i, j))
             writegrids!(wgrids, writeval, i, j)
-            return
+            return nothing
         end
     end
-maprule!(simdata::SimData, opt::PerformanceOpt, rule::ManualRule,
-         rkeys, rgrids, wkeys, wgrids, mask) =
+end
+function maprule!(simdata::SimData, opt::PerformanceOpt, rule::ManualRule,
+                  rkeys, rgrids, wkeys, wgrids, mask)
     let rule=rule, simdata=simdata, rkeys=rkeys, rgrids=rgrids
         optmap(opt, rgrids, wgrids) do i, j
             ismasked(mask, i, j) && return
@@ -75,9 +74,12 @@ maprule!(simdata::SimData, opt::PerformanceOpt, rule::ManualRule,
             return
         end
     end
-maprule!(simdata::SimData, opt::PerformanceOpt,
-         rule::Union{NeighborhoodRule,Chain{<:Any,<:Any,<:Tuple{<:NeighborhoodRule,Vararg}}}, 
-         rkeys, rgrids, wkeys, wgrids, mask) = begin
+end
+function maprule!(
+    simdata::SimData, opt::PerformanceOpt,
+    rule::Union{NeighborhoodRule,Chain{<:Any,<:Any,<:Tuple{<:NeighborhoodRule,Vararg}}}, 
+    rkeys, rgrids, wkeys, wgrids, mask
+)
     griddata = simdata[neighborhoodkey(rule)]
     src, dst = parent(source(griddata)), parent(dest(griddata))
     buffers, bufrules = spreadbuffers(rule, init(griddata))
@@ -93,14 +95,21 @@ maprule!(simdata::SimData, opt::PerformanceOpt,
     nblockrows, nblockcols = indtoblock.((nrows, ncols), blocksize)
     # We unwrap offset arrays and work with the underlying array
     # Get the preallocated neighborhood buffers and build multiple rule copies for each
-    mapneighborhoodrule!(simdata, griddata, opt, rule, rkeys, rgrids, wkeys, wgrids,
-             src, dst, buffers, bufrules, r, blocksize, hoodsize, nrows, ncols, nblockrows, nblockcols, mask)
+    mapneighborhoodrule!(
+        simdata, griddata, opt, rule, rkeys, rgrids, wkeys, wgrids,
+        src, dst, buffers, bufrules, r, blocksize, hoodsize, nrows, 
+        ncols, nblockrows, nblockcols, mask
+    )
 end
 
 # Neighorhood buffer optimisation without `SparseOpt`
-mapneighborhoodrule!(simdata::SimData, griddata, opt::NoOpt, rule, rkeys, rgrids, wkeys, wgrids,
-         src, dst, buffers, bufrules, r, blocksize, hoodsize, nrows, ncols, nblockrows, nblockcols, mask
-         ) = begin
+# This is too many arguments but it's for type 
+# stability boundaries with maprule.
+function mapneighborhoodrule!(
+    simdata::SimData, griddata, opt::NoOpt, rule, rkeys, rgrids, wkeys, wgrids,
+    src, dst, buffers, bufrules, r, blocksize, hoodsize, nrows, 
+    ncols, nblockrows, nblockcols, mask
+)
     # Loop down a block COLUMN
     for bi = 1:nblockrows
         rowsinblock = min(blocksize, nrows - blocksize * (bi - 1))
@@ -133,13 +142,13 @@ mapneighborhoodrule!(simdata::SimData, griddata, opt::NoOpt, rule, rkeys, rgrids
             end
         end
     end
-    return
+    return nothing
 end
 # Neighorhood buffer optimisation combined with `SparseOpt`
-mapneighborhoodrule!(simdata::SimData, griddata, opt::SparseOpt, rule, rkeys, rgrids, wkeys, wgrids,
-         src, dst, buffers, bufrules, r, blocksize, hoodsize, nrows, ncols, nblockrows, nblockcols, mask
-         ) = begin
-
+function mapneighborhoodrule!(
+    simdata::SimData, griddata, opt::SparseOpt, rule, rkeys, rgrids, wkeys, wgrids,
+    src, dst, buffers, bufrules, r, blocksize, hoodsize, nrows, ncols, nblockrows, nblockcols, mask
+)
     srcstatus, dststatus = sourcestatus(griddata), deststatus(griddata)
     # Zero out dest and dest status
     fill!(dst, zero(eltype(dst)))
@@ -259,7 +268,7 @@ mapneighborhoodrule!(simdata::SimData, griddata, opt::SparseOpt, rule, rkeys, rg
             end
         end
     end
-    return
+    return nothing
 end
 
 
@@ -270,7 +279,7 @@ Maps rules over grids with sparse block optimisation. Inactive blocks do not run
 This can lead to order of magnitude performance improvments in sparse
 simulations where large areas of the grid are filled with zeros.
 """
-optmap(f, ::SparseOpt, rgrids::GridOrGridTuple, wgrids::GridOrGridTuple) = begin
+function optmap(f, ::SparseOpt, rgrids::GridOrGridTuple, wgrids::GridOrGridTuple)
     nrows, ncols = gridsize(wgrids)
     r = radius(rgrids)
     # Only use SparseOpt for single-grid rules with grid radii > 0
@@ -298,14 +307,14 @@ optmap(f, ::SparseOpt, rgrids::GridOrGridTuple, wgrids::GridOrGridTuple) = begin
             f(i, j)
         end
     end
-    return
+    return nothing
 end
 """
     optmap(f, ::NoOpt, rgrids::GridOrGridTuple, wgrids::GridOrGridTuple)
 
 Maps rule applicator over the grid with no optimisation
 """
-optmap(f, ::NoOpt, rgrids::GridOrGridTuple, wgrids::GridOrGridTuple) = begin
+function optmap(f, ::NoOpt, rgrids::GridOrGridTuple, wgrids::GridOrGridTuple)
     nrows, ncols = gridsize(wgrids)
     for j in 1:ncols, i in 1:nrows
         f(i, j)
@@ -319,7 +328,7 @@ end
 @inline readgridsorbuffer(rgrids::ReadableGridData, buffer, rule, r, I...) =
     buffer[r + 1, r + 1]
 
-update_buffers!(buffers, src, rowsinblock, hoodsize, r, i, j) = begin
+function update_buffers!(buffers, src, rowsinblock, hoodsize, r, i, j)
     # Move the neighborhood buffers accross one column
     for b in 1:rowsinblock
         @inbounds buf = buffers[b]
@@ -333,14 +342,16 @@ update_buffers!(buffers, src, rowsinblock, hoodsize, r, i, j) = begin
             @inbounds buf[x, hoodsize] = src[i + b + x - 2, j + 2r]
         end
     end
+    return nothing
 end
 
-get_cellstatus(wgrids::Tuple, rule, writeval) = begin
+function get_cellstatus(wgrids::Tuple, rule, writeval)
     val = writeval[1]
     val != zero(val)
 end
-get_cellstatus(wgrids::WritableGridData, rule, writeval) =
+function get_cellstatus(wgrids::WritableGridData, rule, writeval)
     writeval != zero(typeof(writeval))
+end
 
 
 
@@ -364,7 +375,7 @@ function readgrids end
         NamedTuple{keys,typeof(vals)}(vals)
     end
 end
-readgrids(rkeys::Val, rgrids::ReadableGridData, I...) = begin
+function readgrids(rkeys::Val, rgrids::ReadableGridData, I...)
     @inbounds rgrids[I...]
 end
 
@@ -378,7 +389,7 @@ so has to be very fast.
 Returns a single value or NamedTuple of values.
 """
 function writegrids end
-@generated writegrids!(wdata::Tuple, vals::Union{Tuple,NamedTuple}, I...) = begin
+@generated function writegrids!(wdata::Tuple, vals::Union{Tuple,NamedTuple}, I...)
     expr = Expr(:block)
     for i in 1:length(wdata.parameters)
         push!(expr.args, :(@inbounds dest(wdata[$i])[I...] = vals[$i]))
@@ -386,9 +397,9 @@ function writegrids end
     push!(expr.args, :(nothing))
     expr
 end
-writegrids!(wdata::GridData{T}, val::T, I...) where T = begin
+function writegrids!(wdata::GridData{T}, val::T, I...) where T
     @inbounds dest(wdata)[I...] = val
-    nothing
+    return nothing
 end
 
 
@@ -399,20 +410,24 @@ Retrieves `GridData` from a `SimData` object to match the requirements of a `Rul
 
 Returns a `Tuple` holding the key or `Tuple` of keys, and grid or `Tuple` of grids.
 """
-@generated getreadgrids(::Rule{R,W}, simdata::AbstractSimData) where {R<:Tuple,W} =
+@generated function getreadgrids(::Rule{R,W}, simdata::AbstractSimData) where {R<:Tuple,W}
     Expr(:tuple,
         Expr(:tuple, (:(Val{$(QuoteNode(key))}()) for key in R.parameters)...),
         Expr(:tuple, (:(simdata[$(QuoteNode(key))]) for key in R.parameters)...),
     )
-@generated getreadgrids(::Rule{R,W}, simdata::AbstractSimData) where {R,W} =
+end
+@generated function getreadgrids(::Rule{R,W}, simdata::AbstractSimData) where {R,W}
     :((Val{$(QuoteNode(R))}(), simdata[$(QuoteNode(R))]))
-@generated getwritegrids(::Rule{R,W}, simdata::AbstractSimData) where {R,W<:Tuple} =
+end
+@generated function getwritegrids(::Rule{R,W}, simdata::AbstractSimData) where {R,W<:Tuple}
     Expr(:tuple,
         Expr(:tuple, (:(Val{$(QuoteNode(key))}()) for key in W.parameters)...),
         Expr(:tuple, (:(WritableGridData(simdata[$(QuoteNode(key))])) for key in W.parameters)...),
     )
-@generated getwritegrids(::Rule{R,W}, simdata::AbstractSimData) where {R,W}  =
+end
+@generated function getwritegrids(::Rule{R,W}, simdata::AbstractSimData) where {R,W}
     :((Val{$(QuoteNode(W))}(), WritableGridData(simdata[$(QuoteNode(W))])))
+end
 
 """
     combinegrids(rkey, rgrids, wkey, wgrids)
@@ -420,18 +435,20 @@ Returns a `Tuple` holding the key or `Tuple` of keys, and grid or `Tuple` of gri
 Combine grids into a new NamedTuple of grids depending
 on the read and write keys required by a rule.
 """
-function combinegrids end
-
-@inline combinegrids(simdata::SimData, rkeys, rgrids, wkeys, wgrids) =
+@inline function combinegrids(simdata::SimData, rkeys, rgrids, wkeys, wgrids)
     @set simdata.grids = combinegrids(rkeys, rgrids, wkeys, wgrids)
-@inline combinegrids(rkey, rgrids, wkey, wgrids) =
+end
+@inline function combinegrids(rkey, rgrids, wkey, wgrids)
     combinegrids((rkey,), (rgrids,), (wkey,), (wgrids,))
-@inline combinegrids(rkey, rgrids, wkeys::Tuple, wgrids::Tuple) =
+end
+@inline function combinegrids(rkey, rgrids, wkeys::Tuple, wgrids::Tuple)
     combinegrids((rkey,), (rgrids,), wkeys, wgrids)
-@inline combinegrids(rkeys::Tuple, rgrids::Tuple, wkey, wgrids) =
+end
+@inline function combinegrids(rkeys::Tuple, rgrids::Tuple, wkey, wgrids)
     combinegrids(rkeys, rgrids, (wkey,), (wgrids,))
-@generated combinegrids(rkeys::Tuple{Vararg{<:Val}}, rgrids::Tuple,
-                       wkeys::Tuple{Vararg{<:Val}}, wgrids::Tuple) = begin
+end
+@generated function combinegrids(rkeys::Tuple{Vararg{<:Val}}, rgrids::Tuple,
+                       wkeys::Tuple{Vararg{<:Val}}, wgrids::Tuple)
     rkeys = _vals2syms(rkeys)
     wkeys = _vals2syms(wkeys)
     keysexp = Expr(:tuple, QuoteNode.(wkeys)...)
@@ -444,7 +461,7 @@ function combinegrids end
         end
     end
 
-    quote
+    return quote
         keys = $keysexp
         vals = $dataexp
         NamedTuple{keys,typeof(vals)}(vals)
@@ -456,10 +473,10 @@ end
 
 Replace grids in a NamedTuple with new grids where required.
 """
-function replacegrids end
-replacegrids(simdata::AbstractSimData, newkeys, newgrids) =
+function replacegrids(simdata::AbstractSimData, newkeys, newgrids)
     @set simdata.grids = replacegrids(grids(simdata), newkeys, newgrids)
-@generated replacegrids(allgrids::NamedTuple, newkeys::Tuple, newgrids::Tuple) = begin
+end
+@generated function replacegrids(allgrids::NamedTuple, newkeys::Tuple, newgrids::Tuple)
     newkeys = map(unwrap, newkeys.parameters)
     allkeys = allgrids.parameters[1]
     expr = Expr(:tuple)
@@ -471,12 +488,13 @@ replacegrids(simdata::AbstractSimData, newkeys, newgrids) =
             push!(expr.args, :(allgrids.$key))
         end
     end
-    quote
+
+    return quote
         vals = $expr
         NamedTuple{$allkeys,typeof(vals)}(vals)
     end
 end
-@generated replacegrids(allgrids::NamedTuple, newkey::Val, newgrid::GridData) = begin
+@generated function replacegrids(allgrids::NamedTuple, newkey::Val, newgrid::GridData)
     newkey = unwrap(newkey)
     allkeys = allgrids.parameters[1]
     expr = Expr(:tuple)
@@ -487,7 +505,8 @@ end
             push!(expr.args, :(allgrids.$key))
         end
     end
-    quote
+
+    return quote
         vals = $expr
         NamedTuple{$allkeys,typeof(vals)}(vals)
     end
