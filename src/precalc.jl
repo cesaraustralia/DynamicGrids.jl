@@ -1,9 +1,12 @@
 # We have to keep the original rulset pointer as it may be modified 
 # elsewhere like in an Interact.jl interface. `Ruleset` is mutable,
 # and rules has an abstract field type.
-precalcrules!(simdata::Vector{<:SimData}) = precalcrules!.(simdata)
+precalcrules!(simdata::Vector{<:SimData}) = map(precalcrules!, simdata)
 function precalcrules!(simdata::SimData)
-    simdata.ruleset.rules = _precalcrules(ModelParameters.simplify(rules(simdata)), simdata)
+    ModelParameters.setparent!(
+        precalculated_ruleset(simdata),
+        _precalcrules(ModelParameters.stripparams(rules(simdata)), simdata)
+    )
     return simdata
 end
 

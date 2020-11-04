@@ -24,7 +24,7 @@ function applyrule end
 Apply a rule to the cell state and manually write to the grid data array.
 Used in all rules inheriting from [`ManualRule`](@ref).
 
-This is called in internal `maprule!` methods during the simulation, not by 
+This is called in internal `maprule!` methods during the simulation, not by
 the user. Custom [`ManualRule`](@ref) implementations must define this method.
 
 Only grids specified with the `W` type parameter will be writable from `data`.
@@ -91,11 +91,104 @@ Set value of a cell in the neighborhood. Called in `mapsetneighbor!`.
 function setneighbor! end
 
 """
+    add!(data::WritableGridData, x, I...)
+    add!(A::AbstractArray, x, I...)
+
+Add the value `x` to a grid cell.
+
+## Example useage
+
+```julia
+function applyrule!(data::SimData, rule::MyManualRule{A,B}, state, cellindex) where {A,B}
+
+    dest, is_inbounds = inbounds(jump .+ cellindex, gridsize(data))
+
+    # Update spotted cell if it's on the grid
+    is_inbounds && add!(data[W], state, dest...)
+end
+```
+"""
+function add! end
+
+"""
+    sub!(data::WritableGridData, x, I...)
+    sub!(A::AbstractArray, x, I...)
+
+Subtract the value `x` from a grid cell. See `add!` for example usage.
+"""
+function sub! end
+
+"""
+    and!(data::WritableGridData, x, I...)
+    and!(A::AbstractArray, x, I...)
+
+Set the grid cell `c` to `c & x`. See `add!` for example usage.
+"""
+function and! end
+
+"""
+    or!(data::WritableGridData, x, I...)
+    or!(A::AbstractArray, x, I...)
+
+Set the grid cell `c` to `c | x`. See `add!` for example usage.
+"""
+function or! end
+
+"""
+    xor!(data::WritableGridData, x, I...)
+    xor!(A::AbstractArray, x, I...)
+
+Set the grid cell `c` to `xor(c, x)`. See `add!` for example usage.
+"""
+function xor! end
+
+"""
+    inbounds(xs::Tuple, data::SimData) => Tuple{NTuple{2,Int},Bool}
+
+Check grid boundaries for a coordinate before writing in [`ManualRule`](@ref).
+
+Returns a `Tuple` containing a coordinates `Tuple` and a `Bool` - `true`
+if the cell is in bounds, `false` if not.
+
+Overflow of type [`RemoveOverflow`](@ref) returns the coordinate and `false` to skip
+coordinates that overflow outside of the grid.
+
+[`WrapOverflow`](@ref) returns a tuple with the current position or it's
+wrapped equivalent, and `true` as it is allways in-bounds.
+"""
+function inbounds end
+
+"""
+    isinbounds(xs::Tuple, data)
+
+Check that a coordinate is within the grid, usually in [`ManualRule`](@ref).
+
+Unlike [`inbounds`](@ref), [`Overflow`](@ref) status is ignored.
+"""
+function isinbounds end
+
+"""
     radius(rule, [key]) => Int
 
 Return the radius of a rule or ruleset if it has one, otherwise zero.
 """
 function radius end
+
+"""
+    init(obj) => Union{AbstractArray,NamedTUple}
+
+Retrieve the mask from an [`Output`](@ref),
+[`Extent`](@ref) or [`SimData`](@ref) object.
+"""
+function init end
+
+"""
+    mask(obj) => AbstractArray
+
+Retrieve the mask from an [`Output`](@ref),
+[`Extent`](@ref) or [`SimData`](@ref) object.
+"""
+function mask end
 
 """
     aux(obj, [key])

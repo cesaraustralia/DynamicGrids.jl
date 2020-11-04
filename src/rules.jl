@@ -1,12 +1,56 @@
 
 """
-A rule contains all the information required to run a rule in a
-simulation, given an initial array. Rules can be chained together sequentially.
+A `Rule` object contains the information required to apply some
+logical rule to every cell of every timestep of a simulation. 
 
-By default the output of the rule for a Rule is automatically written to the current
-cell in the grid.
+Rules can be chained together sequentially into [`Ruleset`](@ref)s.
 
-Rules are applied to the grid using the [`applyrule`](@ref) method.
+Rules are applied to the grid using the [`applyrule`](@ref) method:
+
+```julia
+@inline applyrule(data::SimData, rule::YourRule, state, cellindex) =  
+```
+
+Where cellindex is a `Tuple` of `Int`, and `state` is a single value, or a `NamedTuple` 
+if multiple grids are requested. The `NamedTuple` keys will match the 
+keys in `R`, which is a type like `Tuple{:key1,:key1}` - note the names are user
+specified, and should never be fixed by a Rule - they can be retrieved from the type
+here as `A` and `B` :
+
+```julia
+applyrule(data::SimData, rule::YourCellRule{Tuple{R1,R2},Tuple{W1,W2}}, state, cellindex) where {R1,R2,W1,W2}
+```
+
+By default the output is written to the current cell in the specified `W` write grid/s. 
+`Rule`s writing to multiple grids, simply return a `Tuple` in the order specified by
+the `W` type params.
+
+## Precalculation
+
+[`precalcrule`](@ref) can be used to precalculate any fields that depend on the 
+timestep. Otherwise everything should be precalculated apon construction. 
+
+Retreive required information from [`SimData`](@ref) such as [`currenttime`](@ref)
+or [`currentframe`](@ref). The return value is the updated rule.
+
+```julia
+precalcrule(rule::YourCellRule, data::SimData)
+```
+
+## Rule Performance
+
+Rules may run many millions of times during a simulation. They need to be fast.
+
+Some basic guidlines for writing rules are:
+- Never allocate memory in a `Rule` if you can help it.
+- Type stability is essential. [`isinferred`](@ref) is useful to check 
+  if your rule is type-stable.
+- Using the `@inline` macro on `applyrule` can help force inlining your
+  code into the simulation.
+- Reading and writing from multiple grids is expensive due to additional load
+  on fast cahce memory. Try to limit the number of grids you use.
+
+
 """
 abstract type Rule{R,W} end
 
@@ -64,21 +108,35 @@ function ConstructionBase.constructorof(::Type{T}) where T<:Rule{R,W} where {R,W
 end
 
 """
-A Rule that only writes and uses a state from single cell of the read grids, 
+A `Rule` that only writes and uses a state from single cell of the read grids, 
 and has its return value written back to the same cell(s). 
 
 This limitation can be useful for performance optimisation,
 such as wrapping rules in [`Chain`](@ref) so that no writes occur between rules.
 
 
-`CellRule` is applied with the method:
+`CellRule` is defined with :
 
 ```julia
-applyrule(data::SimData, rule::YourCellRule, state, I)
+struct YourCellRule{R,W} <: CellRule{R,W} end
 ```
 
-As the cell index is provided in `applyrule`, you can look up an [`aux`](@ref) array
-using `aux(data, Val{:auxname}())[I...]` to access cell-specific parameters for your rule.
+And applied as:
+
+```julia
+function applyrule(data::SimData, rule::YourCellRule{R,W}, state, cellindex) where {R,W}
+    state * 2
+end
+```
+
+As the `cellindex` is provided in `applyrule`, you can look up an [`aux`](@ref) array
+using `aux(data, Val{:auxname}())[cellindex...]` to access cell-specific variables for 
+your rule.
+
+It's good to add a struct field to hold the `Val{:auxname}()` object instead of
+using names directly, so that users can set the aux name themselves to suit the
+scripting context.
+
 """
 abstract type CellRule{R,W} <: Rule{R,W} end
 
@@ -86,21 +144,35 @@ abstract type CellRule{R,W} <: Rule{R,W} end
 `ManualRule` is the supertype for rules that manually write to whichever cells of the 
 grid that they choose, instead of automatically updating every cell with their output.
 
-`ManualRule` is applied with the method:
+`ManualRule` is applied with a method like:
 
 ```julia
-applyrule!(data::SimData, rule::YourManualRule, state, I)
+function applyrule!(data::SimData, rule::YourManualRule{R,W}, state, cellindex) where {R,W}
+     inc = 1
+     add!(data[W], inc, cellindex...)
+     return nothing
+end
 ```
 
-Note the `!` bang - this method alters the state of `data`.
+Note the `!` bang - this method alters the state of `data`. We also use the type
+parameter `W` (write) to index into the `data` object. You could also just use 
+`first(dat)` when there is only one `W` write grid.
 
-Updates to the destination grids data are performed manually by
-`data[:key][I...] += x`, or `data[I...] += x` if no grid names are used. 
+To update the grid, you can use: [`add!`](@ref), [`sub!`](@ref) for `Number`,
+and [`and!`](@ref), [`or!`](@ref) for `Bool`. These methods safely combined 
+writes from all grid cells - directly using `setindex!` would cause bugs.
 
-Direct assignments with `=` will produce bugs, as the same grid cell may 
-also be written to elsewhere.
+It there are multiple write grids, you will need to get the grid keys from 
+type parameters, here `W1` and `W2`: 
 
-Updating the block status of [`SparseOpt`](@ref) is handled automatically on write.
+```julia
+function applyrule(data, rule::YourManRule{R,Tuple{W1,W2}}, state, cellindex) where {R,W1,W2}
+     inc = 1
+     add!(data[W1], inc, cellindex...)
+     add!(data[W2], 2inc, cellindex...)
+     return nothing
+end
+```
 """
 abstract type ManualRule{R,W} <: Rule{R,W} end
 
@@ -257,12 +329,16 @@ A [`ManualRule`](@ref) to manually write to the array where you need to.
 `f` is passed an indexable `data` object, and the index of the current cell, 
 followed by the required grid values for the index.
 
+To update the grid, you can use: [`add!`](@ref), [`sub!`](@ref) for `Number`,
+and [`and!`](@ref), [`or!`](@ref) for `Bool`. These methods safely combined 
+writes from all grid cells - directly using `setindex!` would cause bugs.
+
 ## Example
 
 ```julia
 rule = let x = 10
     Manual{Tuple{:a,:b},:b}() do data, I, a, b
-        data[:b][I...] = a + b^x
+        add!(data[:b], a^x, I...)
     end
 end
 ```

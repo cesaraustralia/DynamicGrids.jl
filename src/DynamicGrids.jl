@@ -13,14 +13,16 @@ using Colors,
       Crayons,
       DimensionalData,
       DocStringExtensions,
-      ModelParameters,
       FreeTypeAbstraction,
       FileIO,
       OffsetArrays,
       REPL,
+      Reexport,
       Setfield,
       Test,
       UnicodeGraphics
+
+@reexport using ModelParameters
 
 const DG = DynamicGrids
 
@@ -33,6 +35,8 @@ export sim!, resume!, savegif, isinferred, isinferred
 
 export rules, neighbors, inbounds, isinbounds, radius, gridsize,
        currenttime, currenttimestep, timestep
+
+export add!, sub!, and!, or!, xor!
 
 export Rule, NeighborhoodRule, CellRule, ManualRule, ManualNeighborhoodRule
 

@@ -369,7 +369,7 @@ function readgrids end
     for i in 1:length(rgrids.parameters)
         push!(expr.args, :(@inbounds rgrids[$i][I...]))
     end
-    quote
+    return quote
         keys = map(unwrap, rkeys)
         vals = $expr
         NamedTuple{keys,typeof(vals)}(vals)
@@ -395,7 +395,7 @@ function writegrids end
         push!(expr.args, :(@inbounds dest(wdata[$i])[I...] = vals[$i]))
     end
     push!(expr.args, :(nothing))
-    expr
+    return expr
 end
 function writegrids!(wdata::GridData{T}, val::T, I...) where T
     @inbounds dest(wdata)[I...] = val

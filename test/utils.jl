@@ -49,17 +49,18 @@ end
     @testset "let blocks" begin
         a = 0.7
         rule = Manual() do data, index, x
-            data[index...] = round(Int, x + a)
+            add!(first(data), round(Int, a + x), index...)
         end
         output = ArrayOutput(zeros(Int, 10, 10); tspan=1:10)
         @test_throws ErrorException isinferred(output, Ruleset(rule))
         a = 0.7
         rule = let a = a
             Manual() do data, index, x
-                data[index...] = round(Int, x + a)
+                add!(first(data), round(Int, a), index...)
             end
         end
         output = ArrayOutput(zeros(Int, 10, 10); tspan=1:10)
         @test isinferred(output, Ruleset(rule))
     end
+
 end

@@ -44,8 +44,8 @@ abstract type AbstractRadialNeighborhood{R,B} <: Neighborhood{R,B} end
 
 Returns a generator of the cell neighbors, skipping the central cell.
 """
-function neighbors(hood::AbstractRadialNeighborhood)
-    hoodlen = hoodsize(hood)^2
+function neighbors(hood::AbstractRadialNeighborhood{R}) where R
+    hoodlen = hoodsize(R)^2
     centerpoint = hoodlen ÷ 2 + 1
     return (buffer(hood)[i] for i in 1:hoodlen if i != centerpoint)
 end

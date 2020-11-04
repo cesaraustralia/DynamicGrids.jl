@@ -9,7 +9,7 @@ function Base.show(io::IO, ruleset::Ruleset)
         fn == :rules && continue
         println(io, fn, " = ", repr(getfield(ruleset, fn)))
     end
-    ModelParameters.paramtable(io, ruleset)
+    ModelParameters.printparams(io, ruleset)
 end
 
 function Base.show(io::IO, rule::T) where T<:Rule{R,W} where {R,W}

@@ -53,22 +53,22 @@ that it does.
 """
 struct NoOpt <: PerformanceOpt end
 
-
 abstract type AbstractRuleset <: AbstractModel end
 
 # Getters
 ruleset(rs::AbstractRuleset) = rs
-rules(rs::AbstractRuleset) = getfield(rs, :rules)
-overflow(rs::AbstractRuleset) = getfield(rs, :overflow)
-opt(rs::AbstractRuleset) = getfield(rs, :opt)
-cellsize(rs::AbstractRuleset) = getfield(rs, :cellsize)
-timestep(rs::AbstractRuleset) = getfield(rs, :timestep)
+rules(rs::AbstractRuleset) = rs.rules
+overflow(rs::AbstractRuleset) = rs.overflow
+opt(rs::AbstractRuleset) = rs.opt
+cellsize(rs::AbstractRuleset) = rs.cellsize
+timestep(rs::AbstractRuleset) = rs.timestep
 
 Base.step(rs::AbstractRuleset) = timestep(rs)
 
 # ModelParameters interface
 Base.parent(rs::AbstractRuleset) = rules(rs)
 ModelParameters.setparent!(rs::AbstractRuleset, rules) = rs.rules = rules
+ModelParameters.setparent(rs::AbstractRuleset, rules) = @set rs.rules = rules
 
 """
     Ruleset(rules...; overflow=RemoveOverflow(), opt=NoOpt(), cellsize=1, timestep=nothing)

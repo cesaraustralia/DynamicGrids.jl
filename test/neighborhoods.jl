@@ -105,9 +105,11 @@ DynamicGrids.applyrule(data, rule::TestNeighborhoodRule, state, index) =
 struct TestManualNeighborhoodRule{R,W,N} <: ManualNeighborhoodRule{R,W}
     neighborhood::N
 end
-DynamicGrids.applyrule!(data, rule::TestManualNeighborhoodRule{R,Tuple{W1,}}, state, index
-                       ) where {R,W1} =
-    data[W1][index...] = state[1]
+function DynamicGrids.applyrule!(
+    data, rule::TestManualNeighborhoodRule{R,Tuple{W1,}}, state, index
+) where {R,W1} 
+    add!(data[W1], state[1], index...)
+end
 
 
 
@@ -144,10 +146,11 @@ end
     # TODO make sure 2 radii can coexist
 end
 
-DynamicGrids.setneighbor!(data, hood, rule::TestManualNeighborhoodRule,
-             state, hood_index, dest_index) = begin
-    data[dest_index...] += state
-    state
+function DynamicGrids.setneighbor!(
+    data, hood, rule::TestManualNeighborhoodRule, state, hood_index, dest_index
+)
+    add!(data, state, dest_index...)
+    return state
 end
 
 @testset "mapsetneighbor!" begin

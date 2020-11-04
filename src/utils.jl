@@ -37,13 +37,14 @@ function isinferred(output::Output, ruleset::Ruleset)
     ext = extent(output)
     ext = @set ext.init = asnamedtuple(init(output))
     simdata = SimData(ext, ruleset)
-    map(rules(ruleset)) do rule
+    precalcrules!(simdata)
+    map(precalculated_rules(simdata)) do rule
         isinferred(simdata, rule)
     end
     return true
 end
 isinferred(simdata::SimData, rule::Rule) = _isinferred(simdata, rule)
-function isinferred( simdata::SimData, 
+function isinferred(simdata::SimData, 
     rule::Union{NeighborhoodRule,Chain{<:Any,<:Any,<:Tuple{<:NeighborhoodRule,Vararg}}}
 )
     griddata = simdata[neighborhoodkey(rule)]

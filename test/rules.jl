@@ -131,14 +131,19 @@ applyrule!(data, ::TestManual, state, index) = 0
 end
 
 struct TestManualWrite{R,W} <: ManualRule{R,W} end
-applyrule!(data, ::TestManualWrite, state, index) = data[:_default_][index[1], 2] = 0
+applyrule!(data, ::TestManualWrite{R,W}, state, index) where {R,W} = add!(data[W], 1, index[1], 2)
 
 @testset "A partial rule that writes to dest affects output" begin
-    final = [0 0 1 0;
-             0 0 1 0;
-             0 0 1 0;
-             0 0 1 0;
-             0 0 1 0]
+    init  = [0 1 1 0
+             0 1 1 0
+             0 1 1 0
+             0 1 1 0
+             0 1 1 0]
+    final = [0 5 1 0;
+             0 5 1 0;
+             0 5 1 0;
+             0 5 1 0;
+             0 5 1 0]
 
     rule = TestManualWrite()
     ruleset1 = Ruleset(rule; opt=NoOpt())

@@ -54,7 +54,7 @@ struct ReadableGridData{T,N,I<:AbstractArray{T,N},M,R,O,S,St,LSt} <: GridData{T,
     localstatus::LSt
 end
 # Generate simulation data to match a ruleset and init array.
-ReadableGridData(init::AbstractArray, mask, radius, overflow) = begin
+function ReadableGridData(init::AbstractArray, mask, radius, overflow)
     r = radius
     # We add one extra row and column of status blocks so
     # we dont have to worry about special casing the last block
@@ -105,17 +105,29 @@ struct WritableGridData{T,N,I<:AbstractArray{T,N},M,R,O,S,St,LSt} <: GridData{T,
     localstatus::LSt
 end
 
-Base.parent(d::WritableGridData) = parent(dest(d))
-@propagate_inbounds function Base.setindex!(d::WritableGridData, x, I...)
-    @boundscheck checkbounds(dest(d), I...)
-    @inbounds dest(d)[I...] = x
-    r = radius(d)
-    if deststatus(d) isa AbstractArray
-        @inbounds deststatus(d)[indtoblock.(I .+ r, 2r)...] = true
+# Methods for writing to a WritableGridData grid from ManualRule. These are (approximately)
+# associative and commutative so that write order does not affect the result.
+for (f, op) in ((:add!, :+), (:sub!, :-), (:and!, :&), (:or!, :|), (:xor!, :xor))
+    @eval begin
+        @propagate_inbounds function ($f)(d::WritableGridData, x, I...)
+            @boundscheck checkbounds(dest(d), I...)
+            @inbounds _setdeststatus!(d, true, I...)
+            @inbounds ($f)(dest(d), x, I...)
+        end
+        @propagate_inbounds ($f)(A::AbstractArray, x, I...) = A[I...] = ($op)(A[I...], x)
     end
 end
+
+@propagate_inbounds function _setdeststatus!(d::WritableGridData, x::Bool, I...)
+    if deststatus(d) isa AbstractArray
+        r = radius(d)
+        @inbounds deststatus(d)[indtoblock.(I .+ r, 2r)...] = x
+    end
+end
+
+Base.parent(d::WritableGridData) = parent(dest(d))
 @propagate_inbounds function Base.getindex(d::WritableGridData, I...)
-    getindex(dest(d), I...)
+    getindex(source(d), I...)
 end
 
 
@@ -131,7 +143,7 @@ and frame numbers for the current frame of the simulation.
 A simdata object is accessable in [`applyrule`](@ref) as the first parameter.
 
 Multiple grids can be indexed into using their key if you need to read
-from arbitrary locations: 
+from arbitrary locations:
 
 ```julia
 funciton applyrule(data::SimData, rule::SomeRule{Tuple{A,B}},W}, (a, b), cellindex) where {A,B,W}
@@ -150,12 +162,12 @@ In single grid simulations `SimData` can be indexed directly as if it is a `Matr
   adding a `Symbol` or `Val{:symbol}` argument will get a field of aux.
 - `tspan(d::SimData)`: get the simulation time span, an `AbstractRange`.
 - `timestep(d::SimData)`: get the simulaiton time step.
-- `radius(data::SimData)` : returns the `Int` radius used on the grid, 
+- `radius(data::SimData)` : returns the `Int` radius used on the grid,
   which is also the amount of border padding.
 - `overflow(data::SimData)` : returns the [`Overflow`](@ref) - `RemoveOverflow` or `WrapOverflow`.
 
 These are available, but you probably shouldn't use them and thier behaviour
-is not guaranteed in furture versions. They will mean rule to be useful only 
+is not guaranteed in furture versions. They will mean rule to be useful only
 in specific contexts.
 
 - `extent(d::SimData)` : get the simulation [`Extent`](@ref) object.
@@ -166,10 +178,11 @@ in specific contexts.
 - `dest(data::SimData)` : get the `dest` grid that is being written to.
 
 """
-struct SimData{G<:NamedTuple,E,Ru,F} <: AbstractSimData
+struct SimData{G<:NamedTuple,E,R,PR,F} <: AbstractSimData
     grids::G
     extent::E
-    ruleset::Ru
+    ruleset::R
+    precalculated_ruleset::PR
     currentframe::F
 end
 # Convert grids in extent to NamedTuple
@@ -186,12 +199,13 @@ SimData(extent::Extent{<:NamedTuple{Keys}}, ruleset::Ruleset) where Keys = begin
 end
 SimData(griddata::NamedTuple, extent, ruleset::Ruleset) = begin
     currentframe = 1;
-    SimData(griddata, extent, ruleset, currentframe)
+    SimData(griddata, extent, ruleset, ruleset, currentframe)
 end
 
 # Getters
 extent(d::SimData) = d.extent
 ruleset(d::SimData) = d.ruleset
+precalculated_ruleset(d::SimData) = d.precalculated_ruleset
 grids(d::SimData) = d.grids
 init(d::SimData) = init(extent(d))
 mask(d::SimData) = mask(first(d))
@@ -201,29 +215,23 @@ timestep(d::SimData) = step(tspan(d))
 currentframe(d::SimData) = d.currentframe
 currenttime(d::SimData) = tspan(d)[currentframe(d)]
 currenttime(d::Vector{<:SimData}) = currenttime(d[1])
+@inline add(d::SimData, x, I...) = add(firs(d), x, I...)
+
 
 # Getters forwarded to data
 Base.getindex(d::SimData, i::Symbol) = getindex(grids(d), i)
-# For the single :_default_ grid allow indexing directly
-function Base.getindex(d::SimData{<:NamedTuple{(:_default_,)}}, I...)
-    getindex(first(grids(d)), I...)
-end
-# For resolving method ambiguity
-function Base.getindex(d::SimData{<:NamedTuple{(:_default_,)}}, i::Symbol)
-    getindex(grids(d), i)
-end
-function Base.setindex!(d::SimData{<:NamedTuple{(:_default_,)}}, x, I...)
-    setindex!(first(grids(d)), x, I...)
-end
+
 Base.keys(d::SimData) = keys(grids(d))
 Base.values(d::SimData) = values(grids(d))
 Base.first(d::SimData) = first(grids(d))
 Base.last(d::SimData) = last(grids(d))
 
 gridsize(d::SimData) = gridsize(first(d))
-rules(d::SimData) = rules(ruleset(d))
 overflow(d::SimData) = overflow(ruleset(d))
+rules(d::SimData) = rules(ruleset(d))
+precalculated_rules(d::SimData) = rules(precalculated_ruleset(d))
 opt(d::SimData) = opt(ruleset(d))
+cellsize(d::SimData) = cellsize(ruleset(d))
 
 # Get the actual current timestep, e.g. seconds instead of variable periods like Month
 currenttimestep(d::SimData) = currenttime(d) + timestep(d) - currenttime(d)
