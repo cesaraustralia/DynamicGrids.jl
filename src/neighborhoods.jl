@@ -25,6 +25,7 @@ ConstructionBase.constructorof(::Type{<:T}) where T <: Neighborhood{R} where R =
 
 radius(hood::Neighborhood{R}) where R = R
 buffer(hood::Neighborhood) = hood.buffer
+@inline positions(hood::Neighborhood, I) = (I .+ o for o in offsets(hood))
 
 Base.eltype(hood::Neighborhood) = eltype(buffer(hood))
 Base.iterate(hood::Neighborhood, args...) = iterate(neighbors(hood), args...)
@@ -37,18 +38,7 @@ Base.copyto!(dest::Neighborhood, dof, source::Neighborhood, sof, N) =
 """
 Moore-style square neighborhoods
 """
-abstract type AbstractRadialNeighborhood{R,B} <: Neighborhood{R,B} end
-
-"""
-    neighbors(hood::AbstractRadialNeighborhoodbuffer)
-
-Returns a generator of the cell neighbors, skipping the central cell.
-"""
-function neighbors(hood::AbstractRadialNeighborhood{R}) where R
-    hoodlen = hoodsize(R)^2
-    centerpoint = hoodlen ÷ 2 + 1
-    return (buffer(hood)[i] for i in 1:hoodlen if i != centerpoint)
-end
+abstract type RadialNeighborhood{R,B} <: Neighborhood{R,B} end
 
 """
     Moore(radius::Int=1)
@@ -59,7 +49,7 @@ vertical distance of the central cell. The central cell is omitted.
 The `buffer` argument may be required for performance
 optimisation, see [`Neighborhood`](@ref) for details.
 """
-struct Moore{R,B} <: AbstractRadialNeighborhood{R,B}
+struct Moore{R,B} <: RadialNeighborhood{R,B}
     buffer::B
 end
 # Buffer is updated later during the simulation.
@@ -70,17 +60,51 @@ end
 Moore(radius::Int=1, buffer=nothing) = Moore{radius}(buffer)
 Moore{R}(buffer=nothing) where R = Moore{R,typeof(buffer)}(buffer)
 
+@inline function neighbors(hood::Moore{R}) where R
+    hoodlen = hoodsize(R)^2
+    centerpoint = hoodlen ÷ 2 + 1
+    return (buffer(hood)[i] for i in 1:hoodlen if i != centerpoint)
+end
+
+@inline function offsets(hood::Moore{R}) where R
+    ((i, j) for j in -R:R, i in -R:R if i != (0, 0))
+end
+
+@inline function setneighbors!(data, hood, I, x)
+    for P in positions(hood, I)
+        data[P...] = x
+    end
+end
+
+Base.length(hood::Moore{R}) where R = (2R + 1)^2 - 1
 # Neighborhood specific `sum` for performance:w
 Base.sum(hood::Moore) = _sum(hood, _centerval(hood))
 
 _centerval(hood) = buffer(hood)[radius(hood) + 1, radius(hood) + 1]
-
 _sum(hood::Neighborhood, cell) = sum(buffer(hood)) - cell
 
-Base.length(hood::Moore{R}) where R = (2R + 1)^2 - 1
 
 @inline function mapsetneighbor!(
-    data::WritableGridData, hood::AbstractRadialNeighborhood, rule, state, index
+    data::WritableGridData, hood::Neighborhood, rule, state, index
+)
+    r = radius(hood)
+    sum = zero(state)
+    # Loop over dispersal kernel grid dimensions
+    for x = one(r):2r + one(r)
+        xdest = x + index[2] - r - one(r)
+        for y = one(r):2r + one(r)
+            x == (r + one(r)) && y == (r + one(r)) && continue
+            ydest = y + index[1] - r - one(r)
+            hood_index = (y, x)
+            dest_index = (ydest, xdest)
+            sum += setneighbor!(data, hood, rule, state, hood_index, dest_index)
+        end
+    end
+    return sum
+end
+
+@inline function mapsetneighbor!(
+    f, data::WritableGridData, hood, state, index
 )
     r = radius(hood)
     sum = zero(state)
@@ -157,6 +181,8 @@ Returns an iterator over the `Positional` neighborhood cells around the current 
 neighbors(hood::Positional) =
     (buffer(hood)[(coord .+ radius(hood) .+ 1)...] for coord in coords(hood))
 
+offsets(hood::Positional) = coords(hood)
+
 @inline function mapsetneighbor!(
     data::WritableGridData, hood::Positional, rule, state, index
 )
@@ -222,7 +248,7 @@ function VonNeumann(radius=1, buffer=nothing)
             push!(coords, (i, j))
         end
     end
-    return Positional(coords, buffer)
+    return Positional(Tuple(coords), buffer)
 end
 
 # Find the largest radius present in the passed in rules.
