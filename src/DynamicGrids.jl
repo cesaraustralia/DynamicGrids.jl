@@ -33,14 +33,15 @@ import Base: show, getindex, setindex!, lastindex, size, length, push!, append!,
 
 export sim!, resume!, savegif, isinferred, isinferred
 
-export rules, neighbors, inbounds, isinbounds, radius, gridsize,
-       currenttime, currenttimestep, timestep
+export rules, neighbors, offsets, positions, radius, inbounds, isinbounds 
+
+export gridsize, currenttime, currenttimestep, timestep
 
 export add!, sub!, and!, or!, xor!
 
-export Rule, NeighborhoodRule, CellRule, ManualRule, ManualNeighborhoodRule
+export Rule, NeighborhoodRule, CellRule, ManualRule, ManualNeighborhoodRule, GridRule
 
-export Chain, Cell, Neighbors, Manual, Life
+export Cell, Neighbors, SetNeighbors, Manual, Chain, Life
 
 export AbstractRuleset, Ruleset
 

@@ -4,9 +4,10 @@ Simulation data specific to a single grid.
 """
 abstract type GridData{T,N,I} <: AbstractArray{T,N} end
 
-(::Type{T})(d::GridData) where T <: GridData =
-    T(init(d), mask(d), radius(d), overflow(d), source(d), dest(d),
+function (::Type{T})(d::GridData) where T <: GridData
+    T(init(d), mask(d), radius(d), opt(d), overflow(d), source(d), dest(d),
       sourcestatus(d), deststatus(d), localstatus(d))
+end
 
 GridDataOrReps = Union{GridData, Vector{<:GridData}}
 
@@ -22,6 +23,7 @@ init(d::GridData) = d.init
 mask(d::GridData) = d.mask
 radius(d::GridData) = d.radius
 radius(d::Tuple{<:GridData,Vararg}) = map(radius, d)
+opt(d::GridData) = d.opt
 overflow(d::GridData) = d.overflow
 source(d::GridData) = d.source
 dest(d::GridData) = d.dest
@@ -42,11 +44,12 @@ gridsize(t::Tuple{}) = 0, 0
 
 Simulation data and storage passed to rules for each timestep.
 """
-struct ReadableGridData{T,N,I<:AbstractArray{T,N},M,R,O,S,St,LSt} <: GridData{T,N,I}
+struct ReadableGridData{T,N,I<:AbstractArray{T,N},M,R,Op,Ov,S,St,LSt} <: GridData{T,N,I}
     init::I
     mask::M
     radius::R
-    overflow::O
+    opt::Op
+    overflow::Ov
     source::S
     dest::S
     sourcestatus::St
@@ -54,7 +57,7 @@ struct ReadableGridData{T,N,I<:AbstractArray{T,N},M,R,O,S,St,LSt} <: GridData{T,
     localstatus::LSt
 end
 # Generate simulation data to match a ruleset and init array.
-function ReadableGridData(init::AbstractArray, mask, radius, overflow)
+function ReadableGridData(init::AbstractArray, mask, radius, opt, overflow)
     r = radius
     # We add one extra row and column of status blocks so
     # we dont have to worry about special casing the last block
@@ -75,7 +78,7 @@ function ReadableGridData(init::AbstractArray, mask, radius, overflow)
         localstatus = nothing
     end
 
-    ReadableGridData(init, mask, radius, overflow, source, dest,
+    ReadableGridData(init, mask, radius, opt, overflow, source, dest,
                      sourcestatus, deststatus, localstatus)
 end
 
@@ -93,16 +96,23 @@ Passed to rules `<: ManualRule`, and can be written to directly as
 an array. This handles updates to SparseOpt() and writing to
 the correct source/dest array.
 """
-struct WritableGridData{T,N,I<:AbstractArray{T,N},M,R,O,S,St,LSt} <: GridData{T,N,I}
+struct WritableGridData{T,N,I<:AbstractArray{T,N},M,R,Op,Ov,S,St,LSt} <: GridData{T,N,I}
     init::I
     mask::M
     radius::R
-    overflow::O
+    opt::Op
+    overflow::Ov
     source::S
     dest::S
     sourcestatus::St
     deststatus::St
     localstatus::LSt
+end
+
+Base.@propagate_inbounds Base.setindex!(d::WritableGridData, x, I...) = begin
+    r = radius(d)
+    _setdeststatus!(d, x, I)
+    dest(d)[I...] = x
 end
 
 # Methods for writing to a WritableGridData grid from ManualRule. These are (approximately)
@@ -111,19 +121,20 @@ for (f, op) in ((:add!, :+), (:sub!, :-), (:and!, :&), (:or!, :|), (:xor!, :xor)
     @eval begin
         @propagate_inbounds function ($f)(d::WritableGridData, x, I...)
             @boundscheck checkbounds(dest(d), I...)
-            @inbounds _setdeststatus!(d, true, I...)
+            @inbounds _setdeststatus!(d, x, I)
             @inbounds ($f)(dest(d), x, I...)
         end
         @propagate_inbounds ($f)(A::AbstractArray, x, I...) = A[I...] = ($op)(A[I...], x)
     end
 end
 
-@propagate_inbounds function _setdeststatus!(d::WritableGridData, x::Bool, I...)
-    if deststatus(d) isa AbstractArray
-        r = radius(d)
-        @inbounds deststatus(d)[indtoblock.(I .+ r, 2r)...] = x
-    end
+_setdeststatus!(d::WritableGridData, x, I) = _setdeststatus!(d::WritableGridData, opt(d), x, I) 
+function _setdeststatus!(d::WritableGridData, opt::SparseOpt, x, I)
+    r = radius(d)
+    blockindex = indtoblock.(I .+ r, 2r)
+    @inbounds deststatus(d)[blockindex...] = !(opt.f(x))
 end
+_setdeststatus!(d::WritableGridData, opt, x, I) = nothing
 
 Base.parent(d::WritableGridData) = parent(dest(d))
 @propagate_inbounds function Base.getindex(d::WritableGridData, I...)
@@ -167,7 +178,7 @@ In single grid simulations `SimData` can be indexed directly as if it is a `Matr
 - `overflow(data::SimData)` : returns the [`Overflow`](@ref) - `RemoveOverflow` or `WrapOverflow`.
 
 These are available, but you probably shouldn't use them and thier behaviour
-is not guaranteed in furture versions. They will mean rule to be useful only
+is not guaranteed in furture versions. They will mean rule is useful only
 in specific contexts.
 
 - `extent(d::SimData)` : get the simulation [`Extent`](@ref) object.
@@ -193,7 +204,7 @@ SimData(extent::Extent{<:NamedTuple{Keys}}, ruleset::Ruleset) where Keys = begin
     radii = NamedTuple{Keys}(get(radius(ruleset), key, 0) for key in Keys)
     # Construct the SimData for each grid
     griddata = map(init(extent), radii) do in, ra
-        ReadableGridData(in, mask(extent), ra, overflow(ruleset))
+        ReadableGridData(in, mask(extent), ra, opt(ruleset), overflow(ruleset))
     end
     SimData(griddata, extent, ruleset)
 end
@@ -221,16 +232,17 @@ currenttime(d::Vector{<:SimData}) = currenttime(d[1])
 # Getters forwarded to data
 Base.getindex(d::SimData, i::Symbol) = getindex(grids(d), i)
 
+@propagate_inbounds Base.setindex!(d::SimData, x, I...) = setindex!(first(grids(d)), x, I...)
 Base.keys(d::SimData) = keys(grids(d))
 Base.values(d::SimData) = values(grids(d))
 Base.first(d::SimData) = first(grids(d))
 Base.last(d::SimData) = last(grids(d))
 
 gridsize(d::SimData) = gridsize(first(d))
+opt(d::SimData) = opt(ruleset(d))
 overflow(d::SimData) = overflow(ruleset(d))
 rules(d::SimData) = rules(ruleset(d))
 precalculated_rules(d::SimData) = rules(precalculated_ruleset(d))
-opt(d::SimData) = opt(ruleset(d))
 cellsize(d::SimData) = cellsize(ruleset(d))
 
 # Get the actual current timestep, e.g. seconds instead of variable periods like Month

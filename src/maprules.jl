@@ -1,4 +1,4 @@
-# Internal traits for sharing methods
+# Internal traits for sharing methodsbst
 const GridOrGridTuple = Union{<:GridData,Tuple{Vararg{<:GridData}}}
 
 """
@@ -93,21 +93,19 @@ function maprule!(
     blocksize = 2r
     hoodsize = 2r + 1
     nblockrows, nblockcols = indtoblock.((nrows, ncols), blocksize)
-    # We unwrap offset arrays and work with the underlying array
-    # Get the preallocated neighborhood buffers and build multiple rule copies for each
     mapneighborhoodrule!(
         simdata, griddata, opt, rule, rkeys, rgrids, wkeys, wgrids,
-        src, dst, buffers, bufrules, r, blocksize, hoodsize, nrows, 
+        src, dst, buffers, bufrules, r, blocksize, hoodsize, nrows,
         ncols, nblockrows, nblockcols, mask
     )
+    return nothing
 end
 
 # Neighorhood buffer optimisation without `SparseOpt`
-# This is too many arguments but it's for type 
-# stability boundaries with maprule.
+# This is too many arguments
 function mapneighborhoodrule!(
     simdata::SimData, griddata, opt::NoOpt, rule, rkeys, rgrids, wkeys, wgrids,
-    src, dst, buffers, bufrules, r, blocksize, hoodsize, nrows, 
+    src, dst, buffers, bufrules, r, blocksize, hoodsize, nrows,
     ncols, nblockrows, nblockcols, mask
 )
     # Loop down a block COLUMN
@@ -250,7 +248,7 @@ function mapneighborhoodrule!(
                     # Write to the grid
                     writegrids!(wgrids, writeval, I...)
                     # Update the status for the current block
-                    cs = get_cellstatus(wgrids, rule, writeval)
+                    cs = get_cellstatus(opt, wgrids, rule, writeval)
                     curblocki = r == 1 ? b : (b - 1) ÷ r + 1
                     if curblocki == 1
                         curblockj == 1 ? (newbs11 |= cs) : (newbs12 |= cs)
@@ -345,12 +343,11 @@ function update_buffers!(buffers, src, rowsinblock, hoodsize, r, i, j)
     return nothing
 end
 
-function get_cellstatus(wgrids::Tuple, rule, writeval)
-    val = writeval[1]
-    val != zero(val)
+function get_cellstatus(opt::SparseOpt, wgrids::Tuple, rule, writeval)
+    !(opt.f(writeval[1]))
 end
-function get_cellstatus(wgrids::WritableGridData, rule, writeval)
-    writeval != zero(typeof(writeval))
+function get_cellstatus(opt::SparseOpt, wgrids::WritableGridData, rule, writeval)
+    !(opt.f(writeval))
 end
 
 
