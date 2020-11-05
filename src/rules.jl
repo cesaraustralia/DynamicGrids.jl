@@ -107,6 +107,10 @@ function ConstructionBase.constructorof(::Type{T}) where T<:Rule{R,W} where {R,W
     T.name.wrapper{R,W}
 end
 
+
+
+
+
 """
 A `Rule` that only writes and uses a state from single cell of the read grids, 
 and has its return value written back to the same cell(s). 
@@ -224,6 +228,39 @@ neighbors(rule::ManualNeighborhoodRule) = neighbors(neighborhood(rule))
 neighborhood(rule::ManualNeighborhoodRule) = rule.neighborhood
 neighborhoodkey(rule::ManualNeighborhoodRule{R,W}) where {R,W} = R
 neighborhoodkey(rule::ManualNeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
+
+
+"""
+A `Rule` applies to whole grids. This is used for operations that don't benefit from
+having neighborhood buffering or looping over the grid handled for them, or any specific 
+optimisations. Best suited to simple functions like `rand`(write)` or using convolutions 
+from other packages like DSP.jl. They may also be useful for doing other custom things that 
+don't fit into the DynamicGrids.jl framework during the simulation.
+
+Grid rules specify the grids they want and are sequenced just like any other grid.
+
+```julia
+struct YourGridRule{R,W} <: GridRule{R,W} end
+```
+
+And applied as:
+
+```julia
+function applyrule!(write, data::SimData, rule::YourGridRule{R,W}, read) where {R,W}
+    rand!(grids[W])
+end
+```
+
+As the `cellindex` is provided in `applyrule`, you can look up an [`aux`](@ref) array
+using `aux(data, Val{:auxname}())[cellindex...]` to access cell-specific variables for 
+your rule.
+
+It's good to add a struct field to hold the `Val{:auxname}()` object instead of
+using names directly, so that users can set the aux name themselves to suit the
+scripting context.
+
+"""
+abstract type GridRule{R,W} <: Rule{R,W} end
 
 
 """
