@@ -262,10 +262,59 @@ scripting context.
 """
 abstract type GridRule{R,W} <: Rule{R,W} end
 
+"""
+    Grid{R,W}(f)
+    Grid(f; read, write)
+
+A [`CellRule`](@ref) that applies a function `f` to the
+`read` grid cells and returns the `write` cells.
+
+Especially convenient with `do` notation.
+
+## Example
+
+Set the cells of grid `:c` to the sum of `:a` and `:b`:
+
+```julia
+simplerule = Cell() do a, b
+    a + b
+end
+```
+
+If you need to use multiple grids (a and b), use the `read`
+and `write` arguments. If you want to use external variables,
+wrap the whole thing in a `let` block, for performance.
+
+```julia
+rule = let y = y
+    rule = Cell(read=(a, b), write=b) do a, b
+        a + b * y 
+    end
+end
+```
+"""
+struct Grid{R,W,F} <: GridRule{R,W}
+    "Function to apply to the read values"
+    f::F
+end
+Grid{R,W}(; kwargs...) where {R,W} = _nofunctionerror(Grid)
+
+@noinline _nofunctionerror(T) = 
+    throw(ArgumentError("No function passed to $T. did you mean to use a `do` block?"))
+
+@inline function applyrule!(write, data, rule::Grid, read)
+    let rule=rule, write = write, read=read
+        rule.f(
+            map(dest, astuple(writekeys(rule), write))..., 
+            map(source, astuple(readkeys(rule), read))...
+        )
+    end
+end
+
 
 """
+    Cell(f)
     Cell{R,W}(f)
-    Cell(f; read, write)
 
 A [`CellRule`](@ref) that applies a function `f` to the
 `read` grid cells and returns the `write` cells.
@@ -304,7 +353,7 @@ Cell{R,W}(; kwargs...) where {R,W} = _nofunctionerror(Cell)
     throw(ArgumentError("No function passed to $T. did you mean to use a `do` block?"))
 
 @inline function applyrule(data, rule::Cell, state, I)
-    let (rule, read) = (rule, state)
+    let rule=rule, state=state
         rule.f(astuple(rule, state)...)
     end
 end
@@ -314,9 +363,8 @@ astuple(::Tuple, state) = state
 astuple(::Symbol, state) = (state,)
 
 """
-    Neighbors(f, neighborhood)
-    Neighbors{R,W}(f, neighborhood)
-    Neighbors(f; read=:_default_, write=read, neighborhood=Moore()) 
+    Neighbors(f, neighborhood=Moor(1))
+    Neighbors{R,W}(f, neighborhood=Moore()) 
 
 A [`NeighborhoodRule`](@ref) that receives a neighbors object for the first 
 `read` grid and the passed in neighborhood, followed by the cell values for 
@@ -359,7 +407,7 @@ Neighbors{R,W}(f; neighborhood=Moore(1)) where {R,W} =
 end
 
 """
-    Manual(f; read=:_default_, write=read) 
+    Manual(f)
     Manual{R,W}(f)
 
 A [`ManualRule`](@ref) to manually write to the array where you need to. 
@@ -395,8 +443,8 @@ end
 
 
 """
-    SetNeighbors(f; read=:_default_, write=read) 
-    SetNeighbors{R,W}(f)
+    SetNeighbors(f, neighborhood=Moor(1)) 
+    SetNeighbors{R,W}(f, neighborhood=Moor(1))
 
 A [`ManualRule`](@ref) to manually write to the array where you need to. 
 `f` is passed an indexable `data` object, and the index of the current cell, 
