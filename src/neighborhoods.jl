@@ -26,6 +26,11 @@ ConstructionBase.constructorof(::Type{<:T}) where T <: Neighborhood{R} where R =
 radius(hood::Neighborhood{R}) where R = R
 buffer(hood::Neighborhood) = hood.buffer
 @inline positions(hood::Neighborhood, I) = (I .+ o for o in offsets(hood))
+@inline function setneighbors!(data, hood, I, x)
+    for P in positions(hood, I)
+        data[P...] = x
+    end
+end
 
 Base.eltype(hood::Neighborhood) = eltype(buffer(hood))
 Base.iterate(hood::Neighborhood, args...) = iterate(neighbors(hood), args...)
@@ -65,23 +70,46 @@ Moore{R}(buffer=nothing) where R = Moore{R,typeof(buffer)}(buffer)
     centerpoint = hoodlen ÷ 2 + 1
     return (buffer(hood)[i] for i in 1:hoodlen if i != centerpoint)
 end
-
 @inline function offsets(hood::Moore{R}) where R
     ((i, j) for j in -R:R, i in -R:R if i != (0, 0))
-end
-
-@inline function setneighbors!(data, hood, I, x)
-    for P in positions(hood, I)
-        data[P...] = x
-    end
 end
 
 Base.length(hood::Moore{R}) where R = (2R + 1)^2 - 1
 # Neighborhood specific `sum` for performance:w
 Base.sum(hood::Moore) = _sum(hood, _centerval(hood))
 
-_centerval(hood) = buffer(hood)[radius(hood) + 1, radius(hood) + 1]
+_centerval(hood::Neighborhood{R}) where R = buffer(hood)[R + 1, R + 1]
 _sum(hood::Neighborhood, cell) = sum(buffer(hood)) - cell
+
+
+"""
+Abstract supertype for kernel neighborhoods.
+
+These inlude the central cell.
+"""
+abstract type AbstractKernel{R,K,B} <: RadialNeighborhood{R,B} end
+
+"""
+    Kernel{R}(kernel, buffer=nothing)
+
+"""
+struct Kernel{R,K,B} <: RadialNeighborhood{R,B}
+    "Kernal matrix"
+    kernel::K
+    "Neighborhood buffer"
+    buffer::B
+end
+Kernel{R}(kernel, buffer=nothing) where R = 
+    Kernel{R,typeof(kernel),typeof(buffer)}(kernel, buffer)
+
+Base.dot(hood::Kernel) = kernel(hood) ∘ buffer(hood)
+kernel(hood::Kernel) = hood.kernel
+# The central cell is included
+neighbors(hood::Kernel) = buffer(hood)
+@inline offsets(hood::Kernel{R}) where R = ((i, j) for j in -R:R, i in -R:R)
+
+Base.length(hood::Moore{R}) where R = (2R + 1)^2
+Base.sum(hood::Moore) = sum(hood, buffer(hood))
 
 
 @inline function mapsetneighbor!(
@@ -250,6 +278,7 @@ function VonNeumann(radius=1, buffer=nothing)
     end
     return Positional(Tuple(coords), buffer)
 end
+
 
 # Find the largest radius present in the passed in rules.
 radius(set::Ruleset) = radius(rules(set))
