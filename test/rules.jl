@@ -1,5 +1,5 @@
 using DynamicGrids, ModelParameters, Setfield, Test
-import DynamicGrids: applyrule, applyrule!, maprule!, 
+import DynamicGrids: applyrule, applyrule!, maprule!, extent,
        source, dest, currenttime, getreadgrids, getwritegrids, combinegrids,
        SimData, WritableGridData, Rule, Extent, readkeys, writekeys
 
@@ -22,8 +22,20 @@ init  = [0 1 1 0
    rule1 = Neighbors(identity, Moore(1))
    @test rule1.f == identity
    rule2 = Neighbors(identity; neighborhood=Moore(1))
-   @test rule1 == rule2
    @test typeof(rule1)  == Neighbors{:_default_,:_default_,typeof(identity),Moore{1,Nothing}}
+   @test rule1 == rule2
+   @test_throws ArgumentError Neighbors()
+   @test_throws ArgumentError Neighbors(identity, identity, identity)
+   rule1 = SetNeighbors{:a,:b}(identity, Moore(1))
+   @test rule1.f == identity
+   rule2 = SetNeighbors{:a,:b}(identity; neighborhood=Moore(1))
+   @test rule1 == rule2
+   @test typeof(rule1)  == SetNeighbors{:a,:b,typeof(identity),Moore{1,Nothing}}
+   rule1 = SetNeighbors(identity, Moore(1))
+   @test rule1.f == identity
+   rule2 = SetNeighbors(identity; neighborhood=Moore(1))
+   @test typeof(rule1)  == SetNeighbors{:_default_,:_default_,typeof(identity),Moore{1,Nothing}}
+   @test rule1 == rule2
    @test_throws ArgumentError Neighbors()
    @test_throws ArgumentError Neighbors(identity, identity, identity)
    rule1 = Manual{:a,:b}(identity)
@@ -31,6 +43,82 @@ init  = [0 1 1 0
    @test_throws ArgumentError Manual()
    @test_throws ArgumentError Manual(identity, identity)
 end
+
+
+@testset "Cell" begin
+    rule = Cell(x -> 2x)
+    @test applyrule(nothing, rule, 1, (0, 0)) == 2
+end
+
+@testset "Neighbors" begin
+    buf = [1 0 0; 0 0 1; 0 0 1]
+    rule = Neighbors(VonNeumann(1, buf)) do hood, state
+        sum(hood)
+    end
+    @test applyrule(nothing, rule, 0, (3, 3)) == 1
+    rule = Neighbors(Moore(1, buf)) do hood, state
+        sum(hood)
+    end
+    @test applyrule(nothing, rule, 0, (3, 3)) == 3
+end
+
+@testset "Convolution" begin
+    k = [1 0 1; 0 0 0; 1 0 1]
+    buf = [1 0 0; 0 0 1; 0 0 1]
+    ruleonv = Convolution(Kernel(k, buf))
+    @test applyrule(nothing, ruleonv, 0, (3, 3)) == 2
+end
+
+@testset "SetNeighbors" begin
+    init  = [0 1 0 0
+             0 0 0 0
+             0 0 0 0
+             0 1 0 0
+             0 0 1 0]
+    rule = SetNeighbors(VonNeumann(1)) do data, hood, I, state
+        if state > 0
+            for pos in positions(hood, I)
+                add!(first(data), 1, pos...) 
+            end
+        end
+    end
+    output = ArrayOutput(init; tspan=1:2)
+    data = SimData(extent(output), Ruleset(rule)) 
+    # Cant use applyrule! without a lot of work on SimData
+    # so just trun the whole thing
+    sim!(output, rule)
+    @test output[2] == [1 1 1 0
+                        0 1 0 0
+                        0 1 0 0
+                        1 1 2 0
+                        0 2 1 1]
+end
+
+@testset "Manual" begin
+    init  = [0 1 0 0
+             0 0 0 0
+             0 0 0 0
+             0 1 0 0
+             0 0 1 0]
+    rule = Manual() do data, I, state
+        if state > 0
+            pos = I[1] - 2, I[2]
+            isinbounds(pos, data) && add!(first(data), 1, pos...)
+        end
+    end
+
+    output = ArrayOutput(init; tspan=1:2)
+    data = SimData(extent(output), Ruleset(rule)) 
+    # Cant use applyrule! without a lot of work on SimData
+    # so just trun the whole thing
+    sim!(output, rule)
+    @test output[2] == [0 1 0 0
+                        0 1 0 0
+                        0 0 1 0
+                        0 1 0 0
+                        0 0 1 0]
+end
+
 
 
 struct AddOneRule{R,W} <: Rule{R,W} end
@@ -148,9 +236,9 @@ applyrule!(data, ::TestManualWrite{R,W}, state, index) where {R,W} = add!(data[W
     rule = TestManualWrite()
     ruleset1 = Ruleset(rule; opt=NoOpt())
     ruleset2 = Ruleset(rule; opt=SparseOpt())
-    extent = Extent(; init=(_default_=init,), tspan=1:1)
-    simdata1 = SimData(extent, ruleset1)
-    simdata2 = SimData(extent, ruleset2)
+    ext = Extent(; init=(_default_=init,), tspan=1:1)
+    simdata1 = SimData(ext, ruleset1)
+    simdata2 = SimData(ext, ruleset2)
     resultdata1 = maprule!(simdata1, rule)
     resultdata2 = maprule!(simdata2, rule)
     @test source(first(resultdata1)) == final
@@ -173,9 +261,9 @@ applyrule(data, ::TestCellSquare, (state,), index) = state^2
                  TestCellSquare())
     ruleset1 = Ruleset(rule; opt=NoOpt())
     ruleset2 = Ruleset(rule; opt=SparseOpt())
-    extent = Extent(; init=(_default_=init,), tspan=1:1)
-    simdata1 = SimData(extent, ruleset1)
-    simdata2 = SimData(extent, ruleset2)
+    ext = Extent(; init=(_default_=init,), tspan=1:1)
+    simdata1 = SimData(ext, ruleset1)
+    simdata2 = SimData(ext, ruleset2)
     resultdata1 = maprule!(simdata1, rule);
     resultdata2 = maprule!(simdata2, rule);
     @test source(first(resultdata1)) == final

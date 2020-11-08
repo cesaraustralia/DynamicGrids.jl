@@ -207,6 +207,8 @@ abstract type NeighborhoodRule{R,W} <: Rule{R,W} end
 
 neighbors(rule::NeighborhoodRule) = neighbors(neighborhood(rule))
 neighborhood(rule::NeighborhoodRule) = rule.neighborhood
+offsets(rule::NeighborhoodRule) = offsets(neighborhood(rule))
+positions(rule::NeighborhoodRule, args...) = positions(neighborhood(rule), args...)
 neighborhoodkey(rule::NeighborhoodRule{R,W}) where {R,W} = R
 # The first argument is for the neighborhood grid
 neighborhoodkey(rule::NeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
@@ -458,7 +460,7 @@ writes from all grid cells - directly using `setindex!` would cause bugs.
 
 ```julia
 rule = let x = 10
-    SetNeighbors{Tuple{:a,:b},:b}() do data, I, a, b
+    SetNeighbors{Tuple{:a,:b},:b}() do data, hood, I, a, b
         add!(data[:b], a^x, I...)
     end
 end
@@ -471,14 +473,49 @@ struct SetNeighbors{R,W,F,N} <: ManualNeighborhoodRule{R,W}
     "The neighborhood of cells around the central cell"
     neighborhood::N
 end
-SetNeighbors{R,W}(; kwargs...) where {R,W} = _nofunctionerror(Manual)
+SetNeighbors{R,W}(; kwargs...) where {R,W} = _nofunctionerror(SetNeighbors)
 SetNeighbors{R,W}(f; neighborhood=Moore(1)) where {R,W} = 
-    Neighbors{R,W}(f, neighborhood)
+    SetNeighbors{R,W}(f, neighborhood)
 
 @inline function applyrule!(data, rule::SetNeighbors, read, I)
     let data=data, hood=neighborhood(rule), I=I, rule=rule, read=astuple(rule, read)
         rule.f(data, hood, I, read...)
     end
+end
+
+
+"""
+    Convolution(f, neighborhood=Moor(1)) 
+    Convolution{R,W}(f, neighborhood=Moor(1))
+
+A [`ManualRule`](@ref) to manually write to the array where you need to. 
+`f` is passed an indexable `data` object, and the index of the current cell, 
+followed by the required grid values for the index.
+
+To update the grid, you can use: [`add!`](@ref), [`sub!`](@ref) for `Number`,
+and [`and!`](@ref), [`or!`](@ref) for `Bool`. These methods safely combined 
+writes from all grid cells - directly using `setindex!` would cause bugs.
+
+## Example
+
+```julia
+rule = let x = 10
+    Convolution{Tuple{:a,:b},:b}() do data, I, a, b
+        add!(data[:b], a^x, I...)
+    end
+end
+```
+The `let` block greatly improves performance.
+"""
+struct Convolution{R,W,N} <: ManualNeighborhoodRule{R,W}
+    "The neighborhood of cells around the central cell"
+    neighborhood::N
+end
+Convolution{R,W}(; neighborhood) where {R,W} = Convolution{R,W}(neighborhood)
+
+@inline function applyrule(data, rule::Convolution, read, I)
+    kernel = neighborhood(rule)
+    LinearAlgebra.dot(kernel)
 end
 
 """

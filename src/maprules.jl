@@ -277,7 +277,7 @@ Maps rules over grids with sparse block optimisation. Inactive blocks do not run
 This can lead to order of magnitude performance improvments in sparse
 simulations where large areas of the grid are filled with zeros.
 """
-function optmap(f, ::SparseOpt, rgrids::GridOrGridTuple, wgrids::GridOrGridTuple)
+optmap(f, ::SparseOpt, rgrids::GridOrGridTuple, wgrids::GridOrGridTuple) = begin
     nrows, ncols = gridsize(wgrids)
     r = radius(rgrids)
     # Only use SparseOpt for single-grid rules with grid radii > 0

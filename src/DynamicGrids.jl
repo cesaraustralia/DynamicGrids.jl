@@ -15,6 +15,7 @@ using Colors,
       DocStringExtensions,
       FreeTypeAbstraction,
       FileIO,
+      LinearAlgebra,
       OffsetArrays,
       REPL,
       Reexport,
@@ -41,11 +42,11 @@ export add!, sub!, and!, or!, xor!
 
 export Rule, NeighborhoodRule, CellRule, ManualRule, ManualNeighborhoodRule, GridRule
 
-export Cell, Neighbors, SetNeighbors, Manual, Chain, Life
+export Cell, Neighbors, SetNeighbors, Convolution, Manual, Chain, Life
 
 export AbstractRuleset, Ruleset
 
-export Neighborhood, AbstractRadialNeighborhood, Moore,
+export Neighborhood, RadialNeighborhood, Kernel, Moore,
        AbstractPositional, Positional, VonNeumann, LayeredPositional
 
 export PerformanceOpt, NoOpt, SparseOpt

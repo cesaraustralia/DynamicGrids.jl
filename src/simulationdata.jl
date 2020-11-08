@@ -131,8 +131,11 @@ end
 _setdeststatus!(d::WritableGridData, x, I) = _setdeststatus!(d::WritableGridData, opt(d), x, I) 
 function _setdeststatus!(d::WritableGridData, opt::SparseOpt, x, I)
     r = radius(d)
-    blockindex = indtoblock.(I .+ r, 2r)
-    @inbounds deststatus(d)[blockindex...] = !(opt.f(x))
+    if r > 0
+        blockindex = indtoblock.(I .+ r, 2r)
+        @inbounds deststatus(d)[blockindex...] = !(opt.f(x))
+    end
+    return nothing
 end
 _setdeststatus!(d::WritableGridData, opt, x, I) = nothing
 
@@ -336,7 +339,7 @@ function initdata!(
 end
 
 # Convert regular index to block index
-indtoblock(x, blocksize) = (x - 1) ÷ blocksize + 1
+indtoblock(x::Int, blocksize::Int) = (x - 1) ÷ blocksize + 1
 
 # Convert block index to regular index
 blocktoind(x, blocksize) = (x - 1) * blocksize + 1

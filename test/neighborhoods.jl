@@ -1,7 +1,7 @@
 using DynamicGrids, Setfield, Test
 import DynamicGrids: neighbors, sumneighbors, SimData, Extent, radius, neighbors,
        mapsetneighbor!, neighborhood, WritableGridData, dest, hoodsize, neighborhoodkey,
-       allocbuffer, allocbuffers, buffer, coords
+       allocbuffer, allocbuffers, buffer, offsets
 
 @testset "allocbuffers" begin
     @test allocbuffer(Bool[1 0], 1) == Bool[0 0 0
@@ -36,10 +36,11 @@ end
     @test eltype(moore) == Int
     @test neighbors(moore) isa Base.Generator
     @test collect(neighbors(moore)) == [0, 1, 0, 0, 1, 0, 1, 1]
-    @test sum(neighbors(moore)) == 4
-
+    @test sum(moore) == sum(neighbors(moore)) == 4
+    @test Tuple(offsets(moore)) == ((-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 0), 
+                                    (0, 1), (1, -1), (1, 0), (1, 1))
     vonneumann = VonNeumann(1, init[1:3, 1:3])
-    @test coords(vonneumann) == [(0, -1), (-1, 0), (1, 0), (0, 1)]
+    @test offsets(vonneumann) == ((0, -1), (-1, 0), (1, 0), (0, 1))
     @test buffer(vonneumann) == init[1:3, 1:3]
     @test hoodsize(vonneumann) == 3
     @test vonneumann[2, 1] == 1
@@ -49,10 +50,10 @@ end
     @test collect(neighbors(vonneumann)) == [1, 0, 1, 1]
     @test sum(neighbors(vonneumann)) == 3
     vonneumann2 = VonNeumann(2)
-    @test coords(vonneumann2) == 
-        [(0, -2), (-1, -1), (0, -1), (1, -1), 
+    @test offsets(vonneumann2) == 
+       ((0, -2), (-1, -1), (0, -1), (1, -1), 
          (-2 , 0), (-1, 0), (1, 0), (2, 0), 
-         (-1, 1), (0, 1), (1, 1), (0, 2)]
+         (-1, 1), (0, 1), (1, 1), (0, 2))
 
     buf = [0 0 0
            0 1 0
@@ -89,7 +90,7 @@ end
     @test sum(custom1) == 2
     @test sum(custom2) == 0
     @test sum(layered) == (1, 2)
-
+    @test offsets(layered) == (((-1, 1), (-2, 2)), ((1, 2), (2, 2)))
     @testset "neighbors works on rule" begin
         rule = Life(;neighborhood=Moore{1}([0 1 1; 0 0 0; 1 1 1]))
         @test sum(neighbors(rule)) == 5
@@ -129,6 +130,8 @@ end
     @test neighborhood(ruleB) == Moore{2}()
     @test neighborhoodkey(ruleA) == :a
     @test neighborhoodkey(ruleB) == :b
+    @test Tuple(offsets(ruleB)) === ((-2, -2), (-2, -1), (-2, 0), (-2, 1), (-2, 2), (-1, -2), (-1, -1), (-1, 0), (-1, 1), (-1, 2), (0, -2), (0, -1), (0, 0), (0, 1), (0, 2), (1, -2), (1, -1), (1, 0), (1, 1), (1, 2), (2, -2), (2, -1), (2, 0), (2, 1), (2, 2))
+    @test Tuple(positions(ruleB, (10, 10))) == ((8, 8), (8, 9), (8, 10), (8, 11), (8, 12), (9, 8), (9, 9), (9, 10), (9, 11), (9, 12), (10, 8), (10, 9), (10, 10), (10, 11), (10, 12), (11, 8), (11, 9), (11, 10), (11, 11), (11, 12), (12, 8), (12, 9), (12, 10), (12, 11), (12, 12))
 end
 
 @testset "radius" begin
@@ -153,7 +156,7 @@ function DynamicGrids.setneighbor!(
     return state
 end
 
-@testset "mapsetneighbor!" begin
+@testset "mapsetneighbor! (decpreciated)" begin
     init = [0 1 2 3 4 5
             0 1 2 3 4 5
             0 1 2 3 4 5
@@ -215,10 +218,10 @@ end
          0 1 2 3 4 5]
 end
 
-@testset "construction" begin
+@testset "Positional" begin
     hood = Positional(((-1, -1), (1, 1)))
-    @set! hood.coords = ((-5, -5), (5, 5))
-    @test hood.coords == ((-5, -5), (5, 5))
+    @set! hood.offsets = ((-5, -5), (5, 5))
+    @test offsets(hood) == hood.offsets == ((-5, -5), (5, 5))
 
     hood = LayeredPositional(
         (Positional(((-1, -1), (1, 1))), Positional(((-2, -2), (2, 2)))),

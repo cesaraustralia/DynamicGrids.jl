@@ -26,11 +26,6 @@ ConstructionBase.constructorof(::Type{<:T}) where T <: Neighborhood{R} where R =
 radius(hood::Neighborhood{R}) where R = R
 buffer(hood::Neighborhood) = hood.buffer
 @inline positions(hood::Neighborhood, I) = (I .+ o for o in offsets(hood))
-@inline function setneighbors!(data, hood, I, x)
-    for P in positions(hood, I)
-        data[P...] = x
-    end
-end
 
 Base.eltype(hood::Neighborhood) = eltype(buffer(hood))
 Base.iterate(hood::Neighborhood, args...) = iterate(neighbors(hood), args...)
@@ -87,13 +82,13 @@ Abstract supertype for kernel neighborhoods.
 
 These inlude the central cell.
 """
-abstract type AbstractKernel{R,K,B} <: RadialNeighborhood{R,B} end
+abstract type AbstractKernel{R,B} <: RadialNeighborhood{R,B} end
 
 """
     Kernel{R}(kernel, buffer=nothing)
 
 """
-struct Kernel{R,K,B} <: RadialNeighborhood{R,B}
+struct Kernel{R,K,B} <: AbstractKernel{R,B}
     "Kernal matrix"
     kernel::K
     "Neighborhood buffer"
@@ -101,15 +96,16 @@ struct Kernel{R,K,B} <: RadialNeighborhood{R,B}
 end
 Kernel{R}(kernel, buffer=nothing) where R = 
     Kernel{R,typeof(kernel),typeof(buffer)}(kernel, buffer)
+Kernel(kernel, buffer=nothing) = Kernel{(size(kernel, 1) - 1) ÷ 2}(kernel, buffer)
 
-Base.dot(hood::Kernel) = kernel(hood) ∘ buffer(hood)
+LinearAlgebra.dot(hood::Kernel) = kernel(hood) ⋅ buffer(hood)
 kernel(hood::Kernel) = hood.kernel
 # The central cell is included
 neighbors(hood::Kernel) = buffer(hood)
 @inline offsets(hood::Kernel{R}) where R = ((i, j) for j in -R:R, i in -R:R)
 
-Base.length(hood::Moore{R}) where R = (2R + 1)^2
-Base.sum(hood::Moore) = sum(hood, buffer(hood))
+Base.length(hood::Kernel{R}) where R = (2R + 1)^2
+Base.sum(hood::Kernel) = sum(buffer(hood))
 
 
 @inline function mapsetneighbor!(
@@ -163,8 +159,8 @@ const CustomCoords = Union{AbstractArray{<:CustomCoord},Tuple{Vararg{<:CustomCoo
 
 """
     Positional(coord::Tuple{Vararg{Int}}...)
-    Positional(coords::Tuple{Tuple{Vararg{Int}}}, [buffer=nothing])
-    Positional{R}(coords::Tuple, buffer)
+    Positional(offsets::Tuple{Tuple{Vararg{Int}}}, [buffer=nothing])
+    Positional{R}(offsets::Tuple, buffer)
 
 Neighborhoods that can take arbitrary shapes by specifying each coordinate,
 as `Tuple{Int,Int}` of the row/column distance (positive and negative)
@@ -180,26 +176,26 @@ optimisation, see [`Neighborhood`] for more details.
 """
 struct Positional{R,C<:CustomCoords,B} <: AbstractPositional{R,B}
     "A tuple of tuples of Int, containing 2-D coordinates relative to the central point"
-    coords::C
+    offsets::C
     buffer::B
 end
 
 Positional(args::CustomCoord...) = Positional(args)
-Positional(coords::CustomCoords, buffer=nothing) =
-    Positional{absmaxcoord(coords)}(coords, buffer)
-Positional{R}(coords::CustomCoords, buffer=nothing) where R =
-    Positional{R,typeof(coords),typeof(buffer)}(coords, buffer)
+Positional(offsets::CustomCoords, buffer=nothing) =
+    Positional{absmaxcoord(offsets)}(offsets, buffer)
+Positional{R}(offsets::CustomCoords, buffer=nothing) where R =
+    Positional{R,typeof(offsets),typeof(buffer)}(offsets, buffer)
 
 ConstructionBase.constructorof(::Type{Positional{R,C,B}}) where {R,C,B} =
     Positional{R}
 
-coords(hood::Positional) = hood.coords
+offsets(hood::Positional) = hood.offsets
 
-Base.length(hood::Positional) = length(coords(hood))
+Base.length(hood::Positional) = length(offsets(hood))
 
-# Calculate the maximum absolute value in the coords to use as the radius
-absmaxcoord(coords::Union{AbstractArray,Tuple}) = maximum(map(x -> maximum(map(abs, x)), coords))
-absmaxcoord(neighborhood::Positional) = absmaxcoord(coords(neighborhood))
+# Calculate the maximum absolute value in the offsets to use as the radius
+absmaxcoord(offsets::Union{AbstractArray,Tuple}) = maximum(map(x -> maximum(map(abs, x)), offsets))
+absmaxcoord(neighborhood::Positional) = absmaxcoord(offsets(neighborhood))
 
 """
     neighbors(hood::Positional)
@@ -207,18 +203,18 @@ absmaxcoord(neighborhood::Positional) = absmaxcoord(coords(neighborhood))
 Returns an iterator over the `Positional` neighborhood cells around the current index.
 """
 neighbors(hood::Positional) =
-    (buffer(hood)[(coord .+ radius(hood) .+ 1)...] for coord in coords(hood))
+    (buffer(hood)[(coord .+ radius(hood) .+ 1)...] for coord in offsets(hood))
 
-offsets(hood::Positional) = coords(hood)
+offsets(hood::Positional) = hood.offsets
 
 @inline function mapsetneighbor!(
     data::WritableGridData, hood::Positional, rule, state, index
 )
     r = radius(hood); sum = zero(state)
     # Loop over dispersal kernel grid dimensions
-    for coord in coords(hood)
-        hood_index = coord .+ r
-        dest_index = index .+ coord
+    for offset in offsets(hood)
+        hood_index = offset .+ r
+        dest_index = index .+ offset
         sum += setneighbor!(data, hood, rule, state, hood_index, dest_index)
     end
     return sum
@@ -255,6 +251,8 @@ Returns a tuple of iterators over each `Positional` neighborhood
 layer, for the cells around the current index.
 """
 @inline neighbors(hood::LayeredPositional) = map(l -> neighbors(l), hood.layers)
+@inline offsets(hood::LayeredPositional) = map(l -> offsets(l), hood.layers)
+@inline positions(hood::LayeredPositional, args...) = map(l -> positions(l, args...), hood.layers)
 
 @inline Base.sum(hood::LayeredPositional) = map(sum, neighbors(hood))
 
@@ -268,15 +266,15 @@ A convenience wrapper to build Von-Neumann neighborhoods as
 a [`Positional`](@ref) neighborhood.
 """
 function VonNeumann(radius=1, buffer=nothing)
-    coords = Tuple{Int,Int}[]
+    offsets = Tuple{Int,Int}[]
     rng = -radius:radius
     for j in rng, i in rng
         distance = abs(i) + abs(j)
         if distance <= radius && distance > 0
-            push!(coords, (i, j))
+            push!(offsets, (i, j))
         end
     end
-    return Positional(Tuple(coords), buffer)
+    return Positional(Tuple(offsets), buffer)
 end
 
 
