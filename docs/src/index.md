@@ -25,10 +25,14 @@ CellRule
 Cell
 NeighborhoodRule
 Neighbors
+Convolution
 Life
 ManualRule
 Manual
 ManualNeighborhoodRule
+SetNeighbors
+GridRule
+Grid
 Chain
 ```
 
@@ -37,7 +41,7 @@ Chain
 ```@docs
 DynamicGrids.applyrule
 DynamicGrids.applyrule!
-DynamicGrids.precalcrules
+DynamicGrids.precalcrule
 isinferred 
 ```
 
@@ -45,7 +49,9 @@ isinferred
 
 ```@docs
 SimData
+DynamicGrids.init
 DynamicGrids.aux
+DynamicGrids.mask
 DynamicGrids.tspan
 DynamicGrids.timestep
 DynamicGrids.currenttimestep
@@ -63,7 +69,9 @@ and how they are combined to update the value of the current cell.
 
 ```@docs
 Neighborhood
-AbstractRadialNeighborhood
+RadialNeighborhood
+AbstractKernel
+Kernel
 Moore
 VonNeumann
 AbstractPositional
@@ -76,11 +84,23 @@ LayeredPositional
 ```@docs
 DynamicGrids.radius
 DynamicGrids.neighbors
+DynamicGrids.positions
+DynamicGrids.offsets
 DynamicGrids.sumneighbors
 DynamicGrids.mapsetneighbor!
 DynamicGrids.setneighbor!
 DynamicGrids.allocbuffers
 DynamicGrids.hoodsize
+```
+
+## Manual Rules
+
+```@docs
+add!
+sub!
+and!
+or!
+xor!
 ```
 
 

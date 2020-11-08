@@ -1,89 +1,127 @@
 
 """
-A rule contains all the information required to run a rule in a
-simulation, given an initial array. Rules can be chained together sequentially.
+A `Rule` object contains the information required to apply some
+logical rule to every cell of every timestep of a simulation. 
 
-By default the output of the rule for a Rule is automatically written to the current
-cell in the grid.
+Rules can be chained together sequentially into [`Ruleset`](@ref)s.
 
-Rules are applied to the grid using the [`applyrule`](@ref) method.
+Rules are applied to the grid using the [`applyrule`](@ref) method:
+
+```julia
+@inline applyrule(data::SimData, rule::YourRule, state, cellindex) =  
+```
+
+Where cellindex is a `Tuple` of `Int`, and `state` is a single value, or a `NamedTuple` 
+if multiple grids are requested. The `NamedTuple` keys will match the 
+keys in `R`, which is a type like `Tuple{:key1,:key1}` - note the names are user
+specified, and should never be fixed by a Rule - they can be retrieved from the type
+here as `A` and `B` :
+
+```julia
+applyrule(data::SimData, rule::YourCellRule{Tuple{R1,R2},Tuple{W1,W2}}, state, cellindex) where {R1,R2,W1,W2}
+```
+
+By default the output is written to the current cell in the specified `W` write grid/s. 
+`Rule`s writing to multiple grids, simply return a `Tuple` in the order specified by
+the `W` type params.
+
+## Precalculation
+
+[`precalcrule`](@ref) can be used to precalculate any fields that depend on the 
+timestep. Otherwise everything should be precalculated apon construction. 
+
+Retreive required information from [`SimData`](@ref) such as [`currenttime`](@ref)
+or [`currentframe`](@ref). The return value is the updated rule.
+
+```julia
+precalcrule(rule::YourCellRule, data::SimData)
+```
+
+## Rule Performance
+
+Rules may run many millions of times during a simulation. They need to be fast.
+
+Some basic guidlines for writing rules are:
+- Never allocate memory in a `Rule` if you can help it.
+- Type stability is essential. [`isinferred`](@ref) is useful to check 
+  if your rule is type-stable.
+- Using the `@inline` macro on `applyrule` can help force inlining your
+  code into the simulation.
+- Reading and writing from multiple grids is expensive due to additional load
+  on fast cahce memory. Try to limit the number of grids you use.
+
+
 """
 abstract type Rule{R,W} end
 
-
-#=
-Default constructors for all rules.
+#= Default constructors for all Rules.
 Sets both the read and write grids to `:_default`.
 
-This strategy relies on a one-to-one relationship
-between all fields and their type parameters, besides
-the initial `R`, `W` etc fields.
-=#
+This strategy relies on a one-to-one relationship between fields 
+and type parameters, besides the initial `R` and `W` params.  =#
 
-# No R,W params and no kwargs
-function (::Type{T})(args...) where T<:Rule
-    _checkfields(T, args)
-    T{:_default_,:_default_,map(typeof, args)...}(args...)
+# No {R,W} with args or kw
+function (::Type{T})(args...; kw...) where T<:Rule
+    T{:_default_,:_default_}(args...; kw...)
 end
-# R,W but no kwargs
+# {R,W} with args
 function (::Type{T})(args...) where T<:Rule{R,W} where {R,W}
     _checkfields(T, args)
     T{map(typeof, args)...}(args...)
 end
-# No R,W but kwargs
-(::Type{T})(; read=:_default_, write=:_default_, kwargs...) where T<:Rule =
-    T{read,write}(; kwargs...)
-# R,W and kwargs passed through to FieldDefaults.jl.
-# This means @default should be used for rule defaults, never @default_kw
-# or this will be overwritten, but also not work as it wont handle R,W.
-function (::Type{T})(; kwargs...) where T<:Rule{R,W} where {R,W}
-    args = FieldDefaults.insert_kwargs(kwargs, T)
-    T{map(typeof, args)...}(args...)
+
+
+@generated function Base.keys(rule::Rule{R,W}) where {R,W}
+    Expr(:tuple, QuoteNode.(union(asiterable(W), asiterable(R)))...)
 end
 
-# Check number of args passed in as we don't get a normal method error with the 
-# splatted args in the default constructors.
-_checkfields(T, args) = length(fieldnames(T)) == length(args) || 
-    throw(ArgumentError("$T has $(length(fieldnames(T))) fields: $(fieldnames(T)), you have used $(length(args))"))
-
-@generated Base.keys(rule::Rule{R,W}) where {R,W} =
-    Expr(:tuple, QuoteNode.(union(asiterable(W), asiterable(R)))...)
-
 @inline writekeys(::Rule{R,W}) where {R,W} = W
-@generated writekeys(::Rule{R,W}) where {R,W<:Tuple} =
+@generated function writekeys(::Rule{R,W}) where {R,W<:Tuple}
     Expr(:tuple, QuoteNode.(W.parameters)...)
+end
 
 @inline readkeys(::Rule{R,W}) where {R,W} = R
-@generated readkeys(::Rule{R,W}) where {R<:Tuple,W} =
+@generated function readkeys(::Rule{R,W}) where {R<:Tuple,W}
     Expr(:tuple, QuoteNode.(R.parameters)...)
-
-keys2vals(keys::Tuple) = map(Val, keys)
-keys2vals(key::Symbol) = Val(key)
-
-asiterable(x::Symbol) = (x,)
-asiterable(x::Type{<:Tuple}) = x.parameters
-asiterable(x::Tuple) = x
+end
 
 # Define the constructor for generic rule reconstruction in Flatten.jl and Setfield.jl
-ConstructionBase.constructorof(::Type{T}) where T<:Rule{R,W} where {R,W} =
+function ConstructionBase.constructorof(::Type{T}) where T<:Rule{R,W} where {R,W}
     T.name.wrapper{R,W}
+end
+
+
 
 """
-A Rule that only writes and uses a state from single cell of the read grids, 
+A `Rule` that only writes and uses a state from single cell of the read grids, 
 and has its return value written back to the same cell(s). 
 
 This limitation can be useful for performance optimisation,
 such as wrapping rules in [`Chain`](@ref) so that no writes occur between rules.
 
 
-`CellRule` is applied with the method:
+`CellRule` is defined with :
 
 ```julia
-applyrule(data::SimData, rule::YourCellRule, state, I)
+struct YourCellRule{R,W} <: CellRule{R,W} end
 ```
 
-As the cell index is provided in `applyrule`, you can look up an [`aux`](@ref) array
-using `aux(data)[:auxname][I...]` to access cell-specific parameters for your rule.
+And applied as:
+
+```julia
+function applyrule(data::SimData, rule::YourCellRule{R,W}, state, cellindex) where {R,W}
+    state * 2
+end
+```
+
+As the `cellindex` is provided in `applyrule`, you can look up an [`aux`](@ref) array
+using `aux(data, Val{:auxname}())[cellindex...]` to access cell-specific variables for 
+your rule.
+
+It's good to add a struct field to hold the `Val{:auxname}()` object instead of
+using names directly, so that users can set the aux name themselves to suit the
+scripting context.
+
 """
 abstract type CellRule{R,W} <: Rule{R,W} end
 
@@ -91,21 +129,35 @@ abstract type CellRule{R,W} <: Rule{R,W} end
 `ManualRule` is the supertype for rules that manually write to whichever cells of the 
 grid that they choose, instead of automatically updating every cell with their output.
 
-`ManualRule` is applied with the method:
+`ManualRule` is applied with a method like:
 
 ```julia
-applyrule!(data::SimData, rule::YourManualRule, state, I)
+function applyrule!(data::SimData, rule::YourManualRule{R,W}, state, cellindex) where {R,W}
+     inc = 1
+     add!(data[W], inc, cellindex...)
+     return nothing
+end
 ```
 
-Note the `!` bang - this method alters the state of `data`.
+Note the `!` bang - this method alters the state of `data`. We also use the type
+parameter `W` (write) to index into the `data` object. You could also just use 
+`first(dat)` when there is only one `W` write grid.
 
-Updates to the destination grids data are performed manually by
-`data[:key][I...] += x`, or `data[I...] += x` if no grid names are used. 
+To update the grid, you can use: [`add!`](@ref), [`sub!`](@ref) for `Number`,
+and [`and!`](@ref), [`or!`](@ref) for `Bool`. These methods safely combined 
+writes from all grid cells - directly using `setindex!` would cause bugs.
 
-Direct assignments with `=` will produce bugs, as the same grid cell may 
-also be written to elsewhere.
+It there are multiple write grids, you will need to get the grid keys from 
+type parameters, here `W1` and `W2`: 
 
-Updating the block status of [`SparseOpt`](@ref) is handled automatically on write.
+```julia
+function applyrule(data, rule::YourManRule{R,Tuple{W1,W2}}, state, cellindex) where {R,W1,W2}
+     inc = 1
+     add!(data[W1], inc, cellindex...)
+     add!(data[W2], 2inc, cellindex...)
+     return nothing
+end
+```
 """
 abstract type ManualRule{R,W} <: Rule{R,W} end
 
@@ -136,6 +188,8 @@ abstract type NeighborhoodRule{R,W} <: Rule{R,W} end
 
 neighbors(rule::NeighborhoodRule) = neighbors(neighborhood(rule))
 neighborhood(rule::NeighborhoodRule) = rule.neighborhood
+offsets(rule::NeighborhoodRule) = offsets(neighborhood(rule))
+positions(rule::NeighborhoodRule, args...) = positions(neighborhood(rule), args...)
 neighborhoodkey(rule::NeighborhoodRule{R,W}) where {R,W} = R
 # The first argument is for the neighborhood grid
 neighborhoodkey(rule::NeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
@@ -155,13 +209,67 @@ abstract type ManualNeighborhoodRule{R,W} <: ManualRule{R,W} end
 
 neighbors(rule::ManualNeighborhoodRule) = neighbors(neighborhood(rule))
 neighborhood(rule::ManualNeighborhoodRule) = rule.neighborhood
+offsets(rule::ManualNeighborhoodRule) = offsets(neighborhood(rule))
+positions(rule::ManualNeighborhoodRule, args...) = positions(neighborhood(rule), args...)
 neighborhoodkey(rule::ManualNeighborhoodRule{R,W}) where {R,W} = R
 neighborhoodkey(rule::ManualNeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
 
 
 """
+A `Rule` applies to whole grids. This is used for operations that don't benefit from
+having neighborhood buffering or looping over the grid handled for them, or any specific 
+optimisations. Best suited to simple functions like `rand`(write)` or using convolutions 
+from other packages like DSP.jl. They may also be useful for doing other custom things that 
+don't fit into the DynamicGrids.jl framework during the simulation.
+
+Grid rules specify the grids they want and are sequenced just like any other grid.
+
+```julia
+struct YourGridRule{R,W} <: GridRule{R,W} end
+```
+
+And applied as:
+
+```julia
+function applyrule!(data::SimData, rule::YourGridRule{R,W}) where {R,W}
+    rand!(data[W])
+end
+```
+"""
+abstract type GridRule{R,W} <: Rule{R,W} end
+
+"""
+    Grid{R,W}(f)
+
+Apply a function `f` to fill whole grid/s.
+
+```jldoctest
+rule = Grid{:a,:b}() do a, b
+    b .= a
+end
+```
+
+Never use assignment broadcast `.*=`, the write grids are not guarantieed to 
+have the same values as the same-named read grids R. Always copy from a read 
+grid to a write grid manually.
+"""
+struct Grid{R,W,F} <: GridRule{R,W}
+    "Function to apply to the read values"
+    f::F
+end
+Grid{R,W}(; kwargs...) where {R,W} = _nofunctionerror(Grid)
+
+@inline function applyrule!(data, rule::Grid{R,W}) where {R,W}
+    rule.f(
+        map(r -> source(getindex(data, r)), asiterable(R))...,
+        map(w -> source(getindex(data, w)), asiterable(W))...,
+    )
+end
+
+
+"""
+    Cell(f)
     Cell{R,W}(f)
-    Cell(f; read, write)
 
 A [`CellRule`](@ref) that applies a function `f` to the
 `read` grid cells and returns the `write` cells.
@@ -184,35 +292,27 @@ wrap the whole thing in a `let` block, for performance.
 
 ```julia
 rule = let y = y
-    rule = Cell(read=(a, b), write=b) do a, b
+    rule = Cell{Tuple{:a,:b},:b}() do a, b
         a + b * y 
     end
 end
 ```
 """
-@flattenable @description struct Cell{R,W,F} <: CellRule{R,W}
-    # Field | Flatten | Description
-    f::F    | false    | "Function to apply to the read values"
+struct Cell{R,W,F} <: CellRule{R,W}
+    "Function to apply to the read values"
+    f::F
 end
-Cell(f; read=:_default_, write=read) = Cell{read,write}(f)
-Cell(; kwargs...) = _nofunctionerror(Cell)
+Cell{R,W}(; kwargs...) where {R,W} = _nofunctionerror(Cell)
 
-@noinline _nofunctionerror(T) = 
-    throw(ArgumentError("No function passed to $T. did you mean to use a `do` block?"))
-
-@inline applyrule(data, rule::Cell, state, I) =
-    let (rule, read) = (rule, state)
+@inline function applyrule(data, rule::Cell, state, I)
+    let rule=rule, state=state
         rule.f(astuple(rule, state)...)
     end
-
-astuple(rule::Rule, state) = astuple(readkeys(rule), state)
-astuple(::Tuple, state) = state
-astuple(::Symbol, state) = (state,)
+end
 
 """
-    Neighbors(f, neighborhood)
-    Neighbors{R,W}(f, neighborhood)
-    Neighbors(f; read=:_default_, write=read, neighborhood=Moore()) 
+    Neighbors(f, neighborhood=Moor(1))
+    Neighbors{R,W}(f, neighborhood=Moore()) 
 
 A [`NeighborhoodRule`](@ref) that receives a neighbors object for the first 
 `read` grid and the passed in neighborhood, followed by the cell values for 
@@ -238,50 +338,131 @@ end
 
 The `let` block may improve performance.
 """
-@flattenable @description struct Neighbors{R,W,F,N} <: NeighborhoodRule{R,W}
-    # Field         | Flatten | Description
-    f::F            | false   | "Function to apply to the neighborhood and read values"
-    neighborhood::N | true    | ""
+struct Neighbors{R,W,F,N} <: NeighborhoodRule{R,W}
+    "Function to apply to the neighborhood and read values"
+    f::F
+    "Defines the neighborhood of cells around the central cell"
+    neighborhood::N
 end
-Neighbors(f; read=:_default_, write=read, neighborhood=Moore(1)) = 
-    Neighbors{read,write}(f, neighborhood)
-Neighbors(; kwargs...) = _nofunctionerror(Neighbors)
+Neighbors{R,W}(; kwargs...) where {R,W} = _nofunctionerror(Neighbors)
+Neighbors{R,W}(f; neighborhood=Moore(1)) where {R,W} = 
+    Neighbors{R,W}(f, neighborhood)
 
-@inline applyrule(data, rule::Neighbors, read, I) =
+@inline function applyrule(data, rule::Neighbors, read, I)
     let hood=neighborhood(rule), rule=rule, read=astuple(rule, read)
         rule.f(hood, read...)
     end
+end
 
 """
-    Manual(f; read=:_default_, write=read) 
+    Manual(f)
     Manual{R,W}(f)
 
 A [`ManualRule`](@ref) to manually write to the array where you need to. 
 `f` is passed an indexable `data` object, and the index of the current cell, 
 followed by the required grid values for the index.
 
+To update the grid, you can use: [`add!`](@ref), [`sub!`](@ref) for `Number`,
+and [`and!`](@ref), [`or!`](@ref) for `Bool`. These methods safely combined 
+writes from all grid cells - directly using `setindex!` would cause bugs.
+
 ## Example
 
 ```julia
 rule = let x = 10
     Manual{Tuple{:a,:b},:b}() do data, I, a, b
-        data[:b][I...] = a + b^x
+        add!(data[:b], a^x, I...)
     end
 end
 ```
 The `let` block greatly improves performance.
 """
-@flattenable @description struct Manual{R,W,F} <: ManualRule{R,W}
-    # Field | Flatten | Description
-    f::F    | false   | "Function to apply to the data, index and read values"
+struct Manual{R,W,F} <: ManualRule{R,W}
+    "Function to apply to the data, index and read values"
+    f::F
 end
-Manual(f; read=:_default_, write=read) = Manual{read,write}(f)
-Manual(; kwargs...) = _nofunctionerror(Manual)
+Manual{R,W}(; kwargs...) where {R,W} = _nofunctionerror(Manual)
 
-@inline applyrule!(data, rule::Manual, read, I) =
+@inline function applyrule!(data, rule::Manual, read, I)
     let data=data, I=I, rule=rule, read=astuple(rule, read)
         rule.f(data, I, read...)
     end
+end
+
+
+"""
+    SetNeighbors(f, neighborhood=Moor(1)) 
+    SetNeighbors{R,W}(f, neighborhood=Moor(1))
+
+A [`ManualRule`](@ref) to manually write to the array where you need to. 
+`f` is passed an indexable `data` object, and the index of the current cell, 
+followed by the required grid values for the index.
+
+To update the grid, you can use: [`add!`](@ref), [`sub!`](@ref) for `Number`,
+and [`and!`](@ref), [`or!`](@ref) for `Bool`. These methods safely combined 
+writes from all grid cells - directly using `setindex!` would cause bugs.
+
+## Example
+
+```julia
+rule = let x = 10
+    SetNeighbors{Tuple{:a,:b},:b}() do data, hood, I, a, b
+        add!(data[:b], a^x, I...)
+    end
+end
+```
+The `let` block greatly improves performance.
+"""
+struct SetNeighbors{R,W,F,N} <: ManualNeighborhoodRule{R,W}
+    "Function to apply to the data, index and read values"
+    f::F
+    "The neighborhood of cells around the central cell"
+    neighborhood::N
+end
+SetNeighbors{R,W}(; kwargs...) where {R,W} = _nofunctionerror(SetNeighbors)
+SetNeighbors{R,W}(f; neighborhood=Moore(1)) where {R,W} = 
+    SetNeighbors{R,W}(f, neighborhood)
+
+@inline function applyrule!(data, rule::SetNeighbors, read, I)
+    let data=data, hood=neighborhood(rule), I=I, rule=rule, read=astuple(rule, read)
+        rule.f(data, hood, I, read...)
+    end
+end
+
+
+"""
+    Convolution(f, neighborhood=Moor(1)) 
+    Convolution{R,W}(f, neighborhood=Moor(1))
+
+A [`ManualRule`](@ref) to manually write to the array where you need to. 
+`f` is passed an indexable `data` object, and the index of the current cell, 
+followed by the required grid values for the index.
+
+To update the grid, you can use: [`add!`](@ref), [`sub!`](@ref) for `Number`,
+and [`and!`](@ref), [`or!`](@ref) for `Bool`. These methods safely combined 
+writes from all grid cells - directly using `setindex!` would cause bugs.
+
+## Example
+
+```julia
+rule = let x = 10
+    Convolution{Tuple{:a,:b},:b}() do data, I, a, b
+        add!(data[:b], a^x, I...)
+    end
+end
+```
+The `let` block greatly improves performance.
+"""
+struct Convolution{R,W,N} <: ManualNeighborhoodRule{R,W}
+    "The neighborhood of cells around the central cell"
+    neighborhood::N
+end
+Convolution{R,W}(; neighborhood) where {R,W} = Convolution{R,W}(neighborhood)
+
+@inline function applyrule(data, rule::Convolution, read, I)
+    kernel = neighborhood(rule)
+    LinearAlgebra.dot(kernel)
+end
 
 """
     method(rule)
@@ -289,3 +470,30 @@ Manual(; kwargs...) = _nofunctionerror(Manual)
 Get the method of a `Cell`, `Neighbors`, or `Manual` rule.
 """
 method(rule::Union{Cell,Neighbors,Manual}) = rule.f
+
+
+# Utils
+
+@noinline _nofunctionerror(T) = 
+    throw(ArgumentError("No function passed to $T. did you mean to use a `do` block?"))
+
+# Check number of args passed in as we don't get a normal method 
+# error because of the splatted args in the default constructor.
+function _checkfields(::Type{T}, args) where T 
+    length(fieldnames(T)) == length(args) || _fielderror(T, args)
+end
+
+@noinline function _fielderror(T, args)
+    throw(ArgumentError("$T has $(length(fieldnames(T))) fields: $(fieldnames(T)), you have used $(length(args))"))
+end
+
+asiterable(x::Symbol) = (x,)
+asiterable(x::Type{<:Tuple}) = x.parameters
+asiterable(x::Tuple) = x
+
+astuple(rule::Rule, state) = astuple(readkeys(rule), state)
+astuple(::Tuple, state) = state
+astuple(::Symbol, state) = (state,)
+
+keys2vals(keys::Tuple) = map(Val, keys)
+keys2vals(key::Symbol) = Val(key)

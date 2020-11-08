@@ -10,8 +10,8 @@ initb = [2 2 2
          2 2 2]
 initab = (a=inita, b=initb)
 
-life = Life(read=:a, write=:a);
-rs = Ruleset(life, timestep=Day(1))
+life = Life{:a,:a}()
+rs = Ruleset(life, timestep=Day(1));
 tspan_ = DateTime(2001):Day(1):DateTime(2001, 2)
 
 @testset "initdata!" begin

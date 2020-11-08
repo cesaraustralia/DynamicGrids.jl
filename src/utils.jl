@@ -12,9 +12,7 @@ it defaults to `nothing` and `false` is always returned.
 ismasked(data::AbstractSimData, I...) = ismasked(mask(data), I...)
 ismasked(data::GridData, I...) = ismasked(mask(data), I...)
 ismasked(mask::Nothing, I...) = false
-ismasked(mask::AbstractArray, I...) = begin
-    @inbounds return !(mask[I...])
-end
+ismasked(mask::AbstractArray, I...) = @inbounds !(mask[I...])
 
 wrap(x) = Val(x)
 wrap(T::Type) = wrap(T.parameters)
@@ -34,31 +32,33 @@ Test if a custom rule is inferred and the return type is correct when
 Type-stability can give orders of magnitude improvements in performance.
 """
 isinferred(output::Output, rules::Tuple) = isinferred(output, rules...)
-isinferred(output::Output, rules::Rule...) =
-    isinferred(output, Ruleset(rules...))
-isinferred(output::Output, ruleset::Ruleset) = begin
+isinferred(output::Output, rules::Rule...) = isinferred(output, Ruleset(rules...))
+function isinferred(output::Output, ruleset::Ruleset)
     ext = extent(output)
     ext = @set ext.init = asnamedtuple(init(output))
     simdata = SimData(ext, ruleset)
-    map(rules(ruleset)) do rule
+    precalcrules!(simdata)
+    map(precalculated_rules(simdata)) do rule
         isinferred(simdata, rule)
     end
-    true
+    return true
 end
 isinferred(simdata::SimData, rule::Rule) = _isinferred(simdata, rule)
-isinferred(simdata::SimData, rule::Union{NeighborhoodRule,Chain{<:Any,<:Any,<:Tuple{<:NeighborhoodRule,Vararg}}}) = begin
+function isinferred(simdata::SimData, 
+    rule::Union{NeighborhoodRule,Chain{<:Any,<:Any,<:Tuple{<:NeighborhoodRule,Vararg}}}
+)
     griddata = simdata[neighborhoodkey(rule)]
     buffers, bufrules = spreadbuffers(rule, DynamicGrids.init(griddata))
     rule = bufrules[1]
-    _isinferred(simdata, rule)
+    return _isinferred(simdata, rule)
 end
-isinferred(simdata::SimData, rule::ManualRule) = begin
+function isinferred(simdata::SimData, rule::ManualRule)
     rkeys, rgrids = getreadgrids(rule, simdata)
     wkeys, wgrids = getwritegrids(rule, simdata)
     simdata = @set simdata.grids = combinegrids(rkeys, rgrids, wkeys, wgrids)
     readval = readgrids(rkeys, rgrids, 1, 1)
     @inferred applyrule!(simdata, rule, readval, (1, 1))
-    true
+    return true
 end
 
 function _isinferred(simdata, rule)
@@ -70,7 +70,7 @@ function _isinferred(simdata, rule)
     writeval = @inferred applyrule(simdata, rule, readval, (1, 1))
     typeof(Tuple(writeval)) == typeof(ex_writeval) ||
         error("return type `$(typeof(Tuple(writeval)))` doesn't match grids `$(typeof(ex_writeval))`")
-    true
+    return true
 end
 
 example_writeval(grids::Tuple) = map(example_writeval, grids)

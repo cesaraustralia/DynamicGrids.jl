@@ -1,4 +1,4 @@
-using DynamicGrids, Dates, Test, Colors, ColorSchemes, FieldDefaults
+using DynamicGrids, Dates, Test, Colors, ColorSchemes
 using FreeTypeAbstraction
 using DynamicGrids: grid2image, processor, minval, maxval, normalise, SimData, NoDisplayImageOutput,
     isstored, isasync, initialise, finalise, delay, fps, settimestamp!, timestamp,
@@ -31,8 +31,6 @@ end
     @test scale(1.2, nothing, nothing) == 1.2
 end
 
-init = [8.0 10.0;
-        0.0  5.0]
 
 l0 = ARGB32(get(leonardo, 0))
 l05 = ARGB32(get(leonardo, 0.5))
@@ -47,6 +45,8 @@ DynamicGrids.showimage(image, o::NoDisplayImageOutput, f, t) = begin
 end
 
 @testset "basic ImageOutput" begin
+    init = [8.0 10.0;
+            0.0  5.0]
     output = NoDisplayImageOutput(init; tspan=1:1, maxval=40.0)
 
     @test parent(output) == [init]
@@ -92,6 +92,8 @@ end
 
 
 @testset "ColorProcessor" begin
+    init = [8.0 10.0;
+            0.0  5.0]
     proc = ColorProcessor(zerocolor=(1.0, 0.0, 0.0))
     output = NoDisplayImageOutput((a=init,); tspan=1:10, processor=proc, minval=0.0, maxval=10.0, store=true)
     maxval(output.imageconfig)
@@ -130,15 +132,17 @@ end
             font = "cantarell"
             face = findfont(font)
         end
-        refimg = ARGB32.(map(x -> ARGB32(1.0, 0.0, 0.0, 1.0), textinit))
-        renderstring!(refimg, string(DateTime(2001)), face, pixelsize, timepos...;
-                      fcolor=ARGB32(1.0, 1.0, 1.0, 1.0), bcolor=ARGB32(0.0, 0.0, 0.0, 1.0))
-        textconfig=TextConfig(; font=font, timepixels=pixelsize, namepixels=pixelsize)
+        if face !== nothing
+            refimg = ARGB32.(map(x -> ARGB32(1.0, 0.0, 0.0, 1.0), textinit))
+            renderstring!(refimg, string(DateTime(2001)), face, pixelsize, timepos...;
+                          fcolor=ARGB32(1.0, 1.0, 1.0, 1.0), bcolor=ARGB32(0.0, 0.0, 0.0, 1.0))
+            textconfig=TextConfig(; font=font, timepixels=pixelsize, namepixels=pixelsize)
 
-        proc = ColorProcessor(zerocolor=ARGB32(1.0, 0.0, 0.0, 1.0), textconfig=textconfig)
-        output = NoDisplayImageOutput((t=textinit,); tspan=1:1, processor=proc, store=true)
-        img = grid2image(proc, output, simdata, textinit, 1, DateTime(2001), nothing);
-        @test img == refimg
+            proc = ColorProcessor(zerocolor=ARGB32(1.0, 0.0, 0.0, 1.0), textconfig=textconfig)
+            output = NoDisplayImageOutput((t=textinit,); tspan=1:1, processor=proc, store=true)
+            img = grid2image(proc, output, simdata, textinit, 1, DateTime(2001), nothing);
+            @test img == refimg
+        end
     end
     
 end
@@ -154,7 +158,6 @@ end
             ]
     ruleset = Ruleset(;
         rules=(Life(),),
-            init=init,
         timestep=Day(1),
         overflow=WrapOverflow(),
         opt=SparseOpt(),
@@ -185,6 +188,8 @@ end
 end
 
 @testset "LayoutProcessor" begin
+    init = [8.0 10.0;
+            0.0  5.0]
     z0 = ARGB32(1, 0, 0)
     grey = ColorProcessor(zerocolor=z0)
     leo = ColorProcessor(scheme=leonardo, zerocolor=z0)
@@ -216,26 +221,28 @@ end
             font = "cantarell"
             face = findfont(font)
         end
-        refimg = cat(fill(ARGB32(1, 0, 0), 200, 200), fill(ARGB32(0), 200, 200), fill(ARGB32(1, 0, 0), 200, 200); dims=1)
-        renderstring!(refimg, string(DateTime(2001)), face, timepixels, timepos...;
-                      fcolor=ARGB32(RGB(1.0), 1.0), bcolor=ARGB32(RGB(0.0), 1.0))
+        if face !== nothing
+            refimg = cat(fill(ARGB32(1, 0, 0), 200, 200), fill(ARGB32(0), 200, 200), fill(ARGB32(1, 0, 0), 200, 200); dims=1)
+            renderstring!(refimg, string(DateTime(2001)), face, timepixels, timepos...;
+                          fcolor=ARGB32(RGB(1.0), 1.0), bcolor=ARGB32(RGB(0.0), 1.0))
 
-        namepixels = 15
-        nameposa = 3timepixels + namepixels, timepixels
-        renderstring!(refimg, "a", face, namepixels, nameposa...;
-                      fcolor=ARGB32(RGB(1.0), 1.0), bcolor=ARGB32(RGB(0.0), 1.0))
-        nameposb = 3timepixels + namepixels + 400, timepixels
-        renderstring!(refimg, "b", face, namepixels, nameposb...;
-                      fcolor=ARGB32(RGB(1.0), 1.0), bcolor=ARGB32(RGB(0.0), 1.0))
+            namepixels = 15
+            nameposa = 3timepixels + namepixels, timepixels
+            renderstring!(refimg, "a", face, namepixels, nameposa...;
+                          fcolor=ARGB32(RGB(1.0), 1.0), bcolor=ARGB32(RGB(0.0), 1.0))
+            nameposb = 3timepixels + namepixels + 400, timepixels
+            renderstring!(refimg, "b", face, namepixels, nameposb...;
+                          fcolor=ARGB32(RGB(1.0), 1.0), bcolor=ARGB32(RGB(0.0), 1.0))
 
-        textconfig = TextConfig(; font=font, timepixels=timepixels, namepixels=namepixels)
-        proc = LayoutProcessor([:a, nothing, :b], (grey, leo), textconfig)
+            textconfig = TextConfig(; font=font, timepixels=timepixels, namepixels=namepixels)
+            proc = LayoutProcessor([:a, nothing, :b], (grey, leo), textconfig)
 
-        output = NoDisplayImageOutput((t=textinit,); tspan=1:10, processor=proc, store=true, 
-                                 minval=(0, 0), maxval=(1, 1))
+            output = NoDisplayImageOutput((t=textinit,); tspan=1:10, processor=proc, store=true, 
+                                     minval=(0, 0), maxval=(1, 1))
 
-        img = grid2image(output, simdata, textinit, 1, DateTime(2001));
-        @test img == refimg
+            img = grid2image(output, simdata, textinit, 1, DateTime(2001));
+            @test img == refimg
+        end
     end
 end
 

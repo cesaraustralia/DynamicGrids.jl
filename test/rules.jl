@@ -1,5 +1,5 @@
-using DynamicGrids, Setfield, FieldMetadata, Test
-import DynamicGrids: applyrule, applyrule!, maprule!, 
+using DynamicGrids, ModelParameters, Setfield, Test
+import DynamicGrids: applyrule, applyrule!, maprule!, extent,
        source, dest, currenttime, getreadgrids, getwritegrids, combinegrids,
        SimData, WritableGridData, Rule, Extent, readkeys, writekeys
 
@@ -12,25 +12,134 @@ init  = [0 1 1 0
 @testset "Generic rule constructors" begin
    rule1 = Cell{:a,:b}(identity)
    @test rule1.f == identity
-   rule2 = Cell(identity, read=:a, write=:b)
-   @test rule1 == rule2
    @test_throws ArgumentError Cell()
    @test_throws ArgumentError Cell(identity, identity)
-   @test_throws MethodError Cell{:a, :b}(identity, read=:x, write=:y)
    rule1 = Neighbors{:a,:b}(identity, Moore(1))
    @test rule1.f == identity
-   rule2 = Neighbors(identity, read=:a, write=:b, neighborhood=Moore(1))
-   # Moore(1) is the default value
-   rule3 = Neighbors(identity, read=:a, write=:b)
-   @test rule1 == rule2 == rule3
+   rule2 = Neighbors{:a,:b}(identity; neighborhood=Moore(1))
+   @test rule1 == rule2
+   @test typeof(rule1)  == Neighbors{:a,:b,typeof(identity),Moore{1,Nothing}}
+   rule1 = Neighbors(identity, Moore(1))
+   @test rule1.f == identity
+   rule2 = Neighbors(identity; neighborhood=Moore(1))
+   @test typeof(rule1)  == Neighbors{:_default_,:_default_,typeof(identity),Moore{1,Nothing}}
+   @test rule1 == rule2
+   @test_throws ArgumentError Neighbors()
+   @test_throws ArgumentError Neighbors(identity, identity, identity)
+   rule1 = SetNeighbors{:a,:b}(identity, Moore(1))
+   @test rule1.f == identity
+   rule2 = SetNeighbors{:a,:b}(identity; neighborhood=Moore(1))
+   @test rule1 == rule2
+   @test typeof(rule1)  == SetNeighbors{:a,:b,typeof(identity),Moore{1,Nothing}}
+   rule1 = SetNeighbors(identity, Moore(1))
+   @test rule1.f == identity
+   rule2 = SetNeighbors(identity; neighborhood=Moore(1))
+   @test typeof(rule1)  == SetNeighbors{:_default_,:_default_,typeof(identity),Moore{1,Nothing}}
+   @test rule1 == rule2
    @test_throws ArgumentError Neighbors()
    @test_throws ArgumentError Neighbors(identity, identity, identity)
    rule1 = Manual{:a,:b}(identity)
    @test rule1.f == identity
-   rule2 = Manual(identity, read=:a, write=:b)
-   @test rule1 == rule2
    @test_throws ArgumentError Manual()
    @test_throws ArgumentError Manual(identity, identity)
+end
+
+
+@testset "Cell" begin
+    rule = Cell(x -> 2x)
+    @test applyrule(nothing, rule, 1, (0, 0)) == 2
+end
+
+@testset "Neighbors" begin
+    buf = [1 0 0; 0 0 1; 0 0 1]
+    rule = Neighbors(VonNeumann(1, buf)) do hood, state
+        sum(hood)
+    end
+    @test applyrule(nothing, rule, 0, (3, 3)) == 1
+    rule = Neighbors(Moore(1, buf)) do hood, state
+        sum(hood)
+    end
+    @test applyrule(nothing, rule, 0, (3, 3)) == 3
+end
+
+@testset "Convolution" begin
+    k = [1 0 1; 0 0 0; 1 0 1]
+    buf = [1 0 0; 0 0 1; 0 0 1]
+    ruleonv = Convolution(Kernel(k, buf))
+    @test applyrule(nothing, ruleonv, 0, (3, 3)) == 2
+end
+
+@testset "SetNeighbors" begin
+    init  = [0 1 0 0
+             0 0 0 0
+             0 0 0 0
+             0 1 0 0
+             0 0 1 0]
+    rule = SetNeighbors(VonNeumann(1)) do data, hood, I, state
+        if state > 0
+            for pos in positions(hood, I)
+                add!(first(data), 1, pos...) 
+            end
+        end
+    end
+    output = ArrayOutput(init; tspan=1:2)
+    data = SimData(extent(output), Ruleset(rule)) 
+    # Cant use applyrule! without a lot of work on SimData
+    # so just trun the whole thing
+    sim!(output, rule)
+    @test output[2] == [1 1 1 0
+                        0 1 0 0
+                        0 1 0 0
+                        1 1 2 0
+                        0 2 1 1]
+end
+
+@testset "Manual" begin
+    init  = [0 1 0 0
+             0 0 0 0
+             0 0 0 0
+             0 1 0 0
+             0 0 1 0]
+    rule = Manual() do data, I, state
+        if state > 0
+            pos = I[1] - 2, I[2]
+            isinbounds(pos, data) && add!(first(data), 1, pos...)
+        end
+    end
+
+    output = ArrayOutput(init; tspan=1:2)
+    data = SimData(extent(output), Ruleset(rule)) 
+    # Cant use applyrule! without a lot of work on SimData
+    # so just trun the whole thing
+    sim!(output, rule)
+    @test output[2] == [0 1 0 0
+                        0 1 0 0
+                        0 0 1 0
+                        0 1 0 0
+                        0 0 1 0]
+end
+
+@testset "Grid" begin
+    rule = Grid() do r, w
+        w .*= 2
+    end
+
+    init  = [0 1 0 0
+             0 0 0 0
+             0 0 0 0
+             0 1 0 0
+             0 0 1 0]
+
+    output = ArrayOutput(init; tspan=1:2)
+    data = SimData(extent(output), Ruleset(rule)) 
+    # Cant use applyrule! without a lot of work on SimData
+    # so just trun the whole thing
+    sim!(output, rule)
+    @test output[2] == [0 2 0 0
+                        0 0 0 0
+                        0 0 0 0
+                        0 2 0 0
+                        0 0 2 0]
 end
 
 
@@ -132,21 +241,26 @@ applyrule!(data, ::TestManual, state, index) = 0
 end
 
 struct TestManualWrite{R,W} <: ManualRule{R,W} end
-applyrule!(data, ::TestManualWrite, state, index) = data[:_default_][index[1], 2] = 0
+applyrule!(data, ::TestManualWrite{R,W}, state, index) where {R,W} = add!(data[W], 1, index[1], 2)
 
 @testset "A partial rule that writes to dest affects output" begin
-    final = [0 0 1 0;
-             0 0 1 0;
-             0 0 1 0;
-             0 0 1 0;
-             0 0 1 0]
+    init  = [0 1 1 0
+             0 1 1 0
+             0 1 1 0
+             0 1 1 0
+             0 1 1 0]
+    final = [0 5 1 0;
+             0 5 1 0;
+             0 5 1 0;
+             0 5 1 0;
+             0 5 1 0]
 
     rule = TestManualWrite()
     ruleset1 = Ruleset(rule; opt=NoOpt())
     ruleset2 = Ruleset(rule; opt=SparseOpt())
-    extent = Extent(; init=(_default_=init,), tspan=1:1)
-    simdata1 = SimData(extent, ruleset1)
-    simdata2 = SimData(extent, ruleset2)
+    ext = Extent(; init=(_default_=init,), tspan=1:1)
+    simdata1 = SimData(ext, ruleset1)
+    simdata2 = SimData(ext, ruleset2)
     resultdata1 = maprule!(simdata1, rule)
     resultdata2 = maprule!(simdata2, rule)
     @test source(first(resultdata1)) == final
@@ -169,9 +283,9 @@ applyrule(data, ::TestCellSquare, (state,), index) = state^2
                  TestCellSquare())
     ruleset1 = Ruleset(rule; opt=NoOpt())
     ruleset2 = Ruleset(rule; opt=SparseOpt())
-    extent = Extent(; init=(_default_=init,), tspan=1:1)
-    simdata1 = SimData(extent, ruleset1)
-    simdata2 = SimData(extent, ruleset2)
+    ext = Extent(; init=(_default_=init,), tspan=1:1)
+    simdata1 = SimData(ext, ruleset1)
+    simdata2 = SimData(ext, ruleset2)
     resultdata1 = maprule!(simdata1, rule);
     resultdata2 = maprule!(simdata2, rule);
     @test source(first(resultdata1)) == final
@@ -272,18 +386,27 @@ end
 
 @testset "life with generic constructors" begin
     @test Life(Moore(1), (1, 1), (5, 5)) ==
-          Life(; neighborhood=Moore(1), birth=(1, 1), sustain=(5, 5))
-    @test Life{:a,:b}(Moore(1), (1, 1), (5, 5)) ==
-          Life(; read=:a, write=:b, neighborhood=Moore(1), birth=(1, 1), sustain=(5, 5));
-    @test Life(read=:a, write=:b) == Life{:a,:b}()
-    @test Life() == Life(; read=:_default_)
+        Life(; neighborhood=Moore(1), born=(1, 1), survive=(5, 5))
+    @test Life{:a,:b}(Moore(1), (7, 1), (5, 3)) ==
+          Life{:a,:b}(neighborhood=Moore(1), born=(7, 1), survive=(5, 3))
+    # Defaults
+    @test Life() == Life(
+        Moore(1), 
+        Param(3, bounds=(0, 8)),
+        (Param(2, bounds=(0, 8)), Param(3, bounds=(0, 8)))
+    )
+    @test Life{:a,:b}() == Life{:a,:b}(
+         Moore(1), 
+         Param(3, bounds=(0, 8)),
+         (Param(2, bounds=(0, 8)), Param(3, bounds=(0, 8)))
+    )
 end
 
 @testset "generic ConstructionBase compatability" begin
-    life = Life{:x,:y}(; neighborhood=Moore(2), birth=(1, 1), sustain=(2, 2))
-    @set! life.birth = (5, 6)
-    @test life.birth == (5, 6)
-    @test life.sustain == (2, 2)
+    life = Life{:x,:y}(; neighborhood=Moore(2), born=(1, 1), survive=(2, 2))
+    @set! life.born = (5, 6)
+    @test life.born == (5, 6)
+    @test life.survive == (2, 2)
     @test readkeys(life) == :x
     @test writekeys(life) == :y
     @test DynamicGrids.neighborhood(life) == Moore(2)

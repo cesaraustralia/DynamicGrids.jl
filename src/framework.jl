@@ -30,15 +30,17 @@ Theses are the taken from the output argument by default.
 - `simdata`: a [`SimData`](@ref) object. Keeping it between simulations can reduce memory
   allocation when that is important.
 """
-sim!(output::Output, ruleset=ruleset(output);
+function sim!(
+     output::Output, ruleset=ruleset(output);
      init=init(output),
      mask=mask(output),
      tspan=tspan(output),
      aux=aux(output),
      fps=fps(output),
      nreplicates=nothing,
-     simdata=nothing, kwargs...) = begin
-
+     simdata=nothing, 
+     kwargs...
+)
     gridsize(init) == gridsize(DG.init(output)) || throw(ArgumentError("init size does not match output init"))
     # Some rules are only valid for a set time-step size.
     step(ruleset) !== nothing && step(ruleset) != step(tspan) &&
@@ -62,7 +64,7 @@ sim!(output::Output, ruleset=ruleset(output);
     # Let the init grid be displayed as long as a normal grid
     delay(output, 1)
     # Run the simulation over simdata and a unitrange
-    runsim!(output, simdata, 1:lastindex(tspan))
+    return runsim!(output, simdata, 1:lastindex(tspan))
 end
 
 """
@@ -71,9 +73,9 @@ end
 Run a simulation passing in rules without defining a `Ruleset`.
 """
 sim!(output::Output, rules::Tuple; kwargs...) = sim!(output::Output, rules...; kwargs...)
-sim!(output::Output, rules::Rule...; tspan=tspan(output), kwargs...) = begin
+function sim!(output::Output, rules::Rule...; tspan=tspan(output), kwargs...)
     ruleset = Ruleset(rules...; timestep=step(tspan), kwargs...)
-    sim!(output::Output, ruleset; tspan=tspan, kwargs...)
+    return sim!(output::Output, ruleset; tspan=tspan, kwargs...)
 end
 
 """
@@ -103,7 +105,8 @@ function resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
         tstop=last(tspan(output)),
         fps=fps(output),
         simdata=nothing,
-        nreplicates=nothing)
+        nreplicates=nothing
+)
     initialise(output)
     # Check status and arguments
     isrunning(output) && error("A simulation is already running in this output")
@@ -125,7 +128,7 @@ function resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
     setfps!(output, fps)
     extent = Extent(; init=asnamedtuple(init), mask=mask(output), aux=aux(output), tspan=new_tspan)
     simdata = initdata!(simdata, extent, ruleset, nreplicates)
-    runsim!(output, simdata, fspan)
+    return runsim!(output, simdata, fspan)
 end
 
 """
@@ -138,12 +141,13 @@ fixed trait or a field value depending on the output type.
 This allows interfaces with interactive components to update during
 the simulations.
 """
-runsim!(output, simdata, fspan) = 
+function runsim!(output, simdata, fspan) 
     if isasync(output)
         @async simloop!(output, simdata, fspan)
     else
         simloop!(output, simdata, fspan)
     end
+end
 
 """
     simloop!(output::Output, simdata::SimData, fspan::UnitRange)
@@ -183,5 +187,5 @@ function simloop!(output::Output, simdata, fspan)
         end
     end
     setrunning!(output, false)
-    output
+    return output
 end

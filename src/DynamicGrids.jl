@@ -13,43 +13,40 @@ using Colors,
       Crayons,
       DimensionalData,
       DocStringExtensions,
-      FieldDefaults,
-      FieldMetadata,
-      FieldDocTables,
       FreeTypeAbstraction,
       FileIO,
-      Mixers,
+      LinearAlgebra,
       OffsetArrays,
       REPL,
+      Reexport,
       Setfield,
       Test,
       UnicodeGraphics
 
+@reexport using ModelParameters
+
 const DG = DynamicGrids
 
-using Base: tail
+using Base: tail, @propagate_inbounds
 
 import Base: show, getindex, setindex!, lastindex, size, length, push!, append!,
              broadcast, broadcast!, similar, eltype, iterate
 
-import FieldMetadata: @description, description, 
-                      @bounds, bounds,
-                      @flattenable, flattenable,
-                      @default, default
-
-
 export sim!, resume!, savegif, isinferred, isinferred
 
-export rules, neighbors, inbounds, isinbounds, radius, gridsize, 
-       currenttime, currenttimestep, timestep
+export rules, neighbors, offsets, positions, radius, inbounds, isinbounds 
 
-export Rule, NeighborhoodRule, CellRule, ManualRule, ManualNeighborhoodRule
+export gridsize, currenttime, currenttimestep, timestep
 
-export Chain, Cell, Neighbors, Manual, Life
+export add!, sub!, and!, or!, xor!
+
+export Rule, NeighborhoodRule, CellRule, ManualRule, ManualNeighborhoodRule, GridRule
+
+export Cell, Neighbors, SetNeighbors, Convolution, Manual, Chain, Life, Grid 
 
 export AbstractRuleset, Ruleset
 
-export Neighborhood, AbstractRadialNeighborhood, Moore,
+export Neighborhood, RadialNeighborhood, AbstractKernel, Kernel, Moore,
        AbstractPositional, Positional, VonNeumann, LayeredPositional
 
 export PerformanceOpt, NoOpt, SparseOpt
@@ -66,11 +63,6 @@ export TextConfig
 export Greyscale, Grayscale
 
 export CharStyle, Block, Braile
-
-
-const FIELDDOCTABLE = FieldDocTable((:Description, :Default, :Bounds),
-                                    (description, default, bounds);
-                                    truncation=(100,40,100))
 
 # Documentation templates
 @template TYPES =

@@ -88,11 +88,11 @@ Converts output grids to a colorsheme.
 - `maskcolor`: a `Color` to use when cells are masked, or `nothing` to ignore.
 - `textconfig`: a [`TextConfig`](@ref) object.
 """
-@default_kw struct ColorProcessor{S,Z,M,TC} <: SingleGridProcessor
-    scheme::S      | Greyscale()
-    zerocolor::Z   | nothing
-    maskcolor::M   | nothing
-    textconfig::TC | nothing
+Base.@kwdef struct ColorProcessor{S,Z,M,TC} <: SingleGridProcessor
+    scheme::S      = Greyscale()
+    zerocolor::Z   = nothing
+    maskcolor::M   = nothing
+    textconfig::TC = nothing
 end
 ColorProcessor(scheme, zerocolor=nothing, maskcolor=nothing) =
     ColorProcessor(scheme, zerocolor, maskcolor, nothing)
@@ -167,11 +167,11 @@ The final color sums are combined into a composite color image for display.
 - `zerocolor`: an `RGB` color to use when values are zero, or `nothing` to ignore.
 - `maskcolor`: an `RGB` color to use when cells are masked, or `nothing` to ignore.
 """
-@default_kw struct ThreeColorProcessor{C<:Tuple,Z,M,TC} <: MultiGridProcessor
-    colors::C      | (Red(), Green(), Blue())
-    zerocolor::Z   | nothing
-    maskcolor::M   | nothing
-    textconfig::TC | nothing
+Base.@kwdef struct ThreeColorProcessor{C<:Tuple,Z,M,TC} <: MultiGridProcessor
+    colors::C      = (Red(), Green(), Blue())
+    zerocolor::Z   = nothing
+    maskcolor::M   = nothing
+    textconfig::TC = nothing
 end
 
 colors(processor::ThreeColorProcessor) = processor.colors
@@ -218,10 +218,10 @@ to be run for each.
   Can be `nothing` or any other value for grids not in layout.
 - `textconfig` : [`TextConfig`] object for printing time and grid name labels.
 """
-@default_kw struct LayoutProcessor{L<:AbstractMatrix,P,TC} <: MultiGridProcessor
-    layout::L      | throw(ArgumentError("must include an Array for the layout keyword"))
-    processors::P  | throw(ArgumentError("must include a tuple of processors, one for each grid"))
-    textconfig::TC | nothing
+Base.@kwdef struct LayoutProcessor{L<:AbstractMatrix,P,TC} <: MultiGridProcessor
+    layout::L
+    processors::P
+    textconfig::TC = nothing
     LayoutProcessor(layouts::L, processors::P, textconfig::TC) where {L,P,TC} = begin
         processors = map(p -> (@set p.textconfig = textconfig), map(_asprocessor, processors))
         new{L,typeof(processors),TC}(layouts, processors, textconfig)

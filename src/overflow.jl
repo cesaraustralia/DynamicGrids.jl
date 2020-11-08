@@ -1,29 +1,15 @@
-"""
-    inbounds(xs::Tuple, data)
-
-Check grid boundaries for a coordinate before writing in [`ManualRule`](@ref).
-
-Returns a tuple containing the coordinate(s) followed by a boolean `true`
-if the cell is in bounds, `false` if not.
-
-Overflow of type [`RemoveOverflow`](@ref) returns the coordinate and `false` to skip
-coordinates that overflow outside of the grid.
-
-[`WrapOverflow`](@ref) returns a tuple with the current position or it's
-wrapped equivalent, and `true` as it is allways in-bounds.
-"""
-@inline inbounds(xs::Tuple, data::SimData) = 
-    inbounds(xs, first(data))
-@inline inbounds(xs::Tuple, data::GridData) =
-    inbounds(xs, gridsize(data), overflow(data))
-@inline inbounds(xs::Tuple, maxs::Tuple, overflow) = begin
+# See interface docs
+@inline inbounds(xs::Tuple, data::SimData) = inbounds(xs, first(data))
+@inline inbounds(xs::Tuple, data::GridData) = inbounds(xs, gridsize(data), overflow(data))
+@inline function inbounds(xs::Tuple, maxs::Tuple, overflow)
     a, inbounds_a = inbounds(xs[1], maxs[1], overflow)
     b, inbounds_b = inbounds(xs[2], maxs[2], overflow)
     (a, b), inbounds_a & inbounds_b
 end
-@inline inbounds(x::Number, max::Number, overflow::RemoveOverflow) =
+@inline function inbounds(x::Number, max::Number, overflow::RemoveOverflow)
     x, isinbounds(x, max)
-@inline inbounds(x::Number, max::Number, overflow::WrapOverflow) =
+end
+@inline function inbounds(x::Number, max::Number, overflow::WrapOverflow)
     if x < oneunit(x)
         max + rem(x, max), true
     elseif x > max
@@ -31,15 +17,10 @@ end
     else
         x, true
     end
+end
 
-"""
-    isinbounds(xs::Tuple, data)
-
-Check that a coordinate is within the grid, usually in [`ManualRule`](@ref).
-
-Unlike [`inbounds`](@ref), [`Overflow`](@ref) status is ignored.
-"""
-@inline isinbounds(x::Tuple, data::Union{SimData,GridData}) = 
+# See interface docs
+@inline isinbounds(x::Tuple, data::Union{SimData,GridData}) =
     isinbounds(x::Tuple, gridsize(data))
 @inline isinbounds(xs::Tuple, maxs::Tuple) = all(isinbounds.(xs, maxs))
 @inline isinbounds(x::Number, max::Number) = x >= one(x) && x <= max
@@ -50,7 +31,7 @@ bounds checks on neighborhoods and still use a wraparound grid. =#
 handleoverflow!(grids::Tuple) = map(handleoverflow!, grids)
 handleoverflow!(griddata::GridData) = handleoverflow!(griddata, overflow(griddata))
 handleoverflow!(griddata::GridData, ::RemoveOverflow) = griddata
-handleoverflow!(griddata::GridData, ::WrapOverflow) = begin
+function handleoverflow!(griddata::GridData, ::WrapOverflow)
     r = radius(griddata)
     r < 1 && return griddata
 
@@ -83,7 +64,7 @@ handleoverflow!(griddata::GridData, ::WrapOverflow) = begin
     # Top Left
     @inbounds copyto!(src, CartesianIndices((startpadrow, startpadcol)),
                       src, CartesianIndices((endrow, endcol)))
-    # Top Right 
+    # Top Right
     @inbounds copyto!(src, CartesianIndices((startpadrow, endpadcol)),
                       src, CartesianIndices((endrow, startcol)))
     # Botom Left
