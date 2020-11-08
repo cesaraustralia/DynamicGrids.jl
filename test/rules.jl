@@ -386,9 +386,9 @@ end
 
 @testset "life with generic constructors" begin
     @test Life(Moore(1), (1, 1), (5, 5)) ==
-        Life(; neighborhood=Moore(1), birth=(1, 1), sustain=(5, 5))
+        Life(; neighborhood=Moore(1), born=(1, 1), survive=(5, 5))
     @test Life{:a,:b}(Moore(1), (7, 1), (5, 3)) ==
-          Life{:a,:b}(neighborhood=Moore(1), birth=(7, 1), sustain=(5, 3))
+          Life{:a,:b}(neighborhood=Moore(1), born=(7, 1), survive=(5, 3))
     # Defaults
     @test Life() == Life(
         Moore(1), 
@@ -403,10 +403,10 @@ end
 end
 
 @testset "generic ConstructionBase compatability" begin
-    life = Life{:x,:y}(; neighborhood=Moore(2), birth=(1, 1), sustain=(2, 2))
-    @set! life.birth = (5, 6)
-    @test life.birth == (5, 6)
-    @test life.sustain == (2, 2)
+    life = Life{:x,:y}(; neighborhood=Moore(2), born=(1, 1), survive=(2, 2))
+    @set! life.born = (5, 6)
+    @test life.born == (5, 6)
+    @test life.survive == (2, 2)
     @test readkeys(life) == :x
     @test writekeys(life) == :y
     @test DynamicGrids.neighborhood(life) == Moore(2)
