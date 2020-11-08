@@ -268,31 +268,9 @@ abstract type GridRule{R,W} <: Rule{R,W} end
     Grid{R,W}(f)
     Grid(f; read, write)
 
-A [`CellRule`](@ref) that applies a function `f` to the
-`read` grid cells and returns the `write` cells.
+Apply a rule to the whole grid.
 
-Especially convenient with `do` notation.
-
-## Example
-
-Set the cells of grid `:c` to the sum of `:a` and `:b`:
-
-```julia
-simplerule = Cell() do a, b
-    a + b
-end
-```
-
-If you need to use multiple grids (a and b), use the `read`
-and `write` arguments. If you want to use external variables,
-wrap the whole thing in a `let` block, for performance.
-
-```julia
-rule = let y = y
-    rule = Cell(read=(a, b), write=b) do a, b
-        a + b * y 
-    end
-end
+# TODO test and document.
 ```
 """
 struct Grid{R,W,F} <: GridRule{R,W}
