@@ -72,6 +72,9 @@ function ReadableGridData(init::AbstractArray, mask, radius, opt, overflow)
         updatestatus!(source, sourcestatus, deststatus, r)
         localstatus = zeros(Bool, 2, 2)
     else
+        if opt isa SparseOpt
+            opt = NoOpt()
+        end
         source = deepcopy(init)
         dest = deepcopy(init)
         sourcestatus = deststatus = true
@@ -131,10 +134,8 @@ end
 _setdeststatus!(d::WritableGridData, x, I) = _setdeststatus!(d::WritableGridData, opt(d), x, I) 
 function _setdeststatus!(d::WritableGridData, opt::SparseOpt, x, I)
     r = radius(d)
-    if r > 0
-        blockindex = indtoblock.(I .+ r, 2r)
-        @inbounds deststatus(d)[blockindex...] = !(opt.f(x))
-    end
+    blockindex = indtoblock.(I .+ r, 2r)
+    @inbounds deststatus(d)[blockindex...] = !(opt.f(x))
     return nothing
 end
 _setdeststatus!(d::WritableGridData, opt, x, I) = nothing
