@@ -40,7 +40,12 @@ run except where the neighborhood partially hangs over an area that is not grey.
 
 ![SparseOpt demonstration](https://raw.githubusercontent.com/cesaraustralia/DynamicGrids.jl/media/complexlife_spareseopt.gif)
 """
-struct SparseOpt <: PerformanceOpt end
+struct SparseOpt{F} <: PerformanceOpt
+    f::F
+end
+SparseOpt() = SparseOpt(==(0))
+
+struct GPUopt{F} <: PerformanceOpt end
 
 """
     NoOpt()
