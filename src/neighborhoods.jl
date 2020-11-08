@@ -61,7 +61,8 @@ Moore(radius::Int=1, buffer=nothing) = Moore{radius}(buffer)
 Moore{R}(buffer=nothing) where R = Moore{R,typeof(buffer)}(buffer)
 
 @inline function neighbors(hood::Moore{R}) where R
-    buflen = bufsize(R)^2
+    # Use linear indexing
+    buflen = (2R + 1)^2
     centerpoint = buflen ÷ 2 + 1
     return (buffer(hood)[i] for i in 1:buflen if i != centerpoint)
 end
