@@ -1,4 +1,4 @@
-using Documenter, DynamicGrids, Disributions
+using Documenter, DynamicGrids
 using DynamicGrids: AbstractSimData, SimData, GridData, ReadableGridData, WritableGridData,
       applyrule, applyrule!, inbounds
 
