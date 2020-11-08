@@ -46,7 +46,7 @@ export Cell, Neighbors, SetNeighbors, Convolution, Manual, Chain, Life
 
 export AbstractRuleset, Ruleset
 
-export Neighborhood, RadialNeighborhood, Kernel, Moore,
+export Neighborhood, RadialNeighborhood, AbstractKernel, Kernel, Moore,
        AbstractPositional, Positional, VonNeumann, LayeredPositional
 
 export PerformanceOpt, NoOpt, SparseOpt
