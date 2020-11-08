@@ -119,6 +119,28 @@ end
                         0 0 1 0]
 end
 
+@testset "Grid" begin
+    rule = Grid() do r, w
+        w .*= 2
+    end
+
+    init  = [0 1 0 0
+             0 0 0 0
+             0 0 0 0
+             0 1 0 0
+             0 0 1 0]
+
+    output = ArrayOutput(init; tspan=1:2)
+    data = SimData(extent(output), Ruleset(rule)) 
+    # Cant use applyrule! without a lot of work on SimData
+    # so just trun the whole thing
+    sim!(output, rule)
+    @test output[2] == [0 2 0 0
+                        0 0 0 0
+                        0 0 0 0
+                        0 2 0 0
+                        0 0 2 0]
+end
 
 
 struct AddOneRule{R,W} <: Rule{R,W} end

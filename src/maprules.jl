@@ -35,6 +35,17 @@ function maprule!(simdata::SimData, rule::Rule)
     # Combine the written grids with the original simdata
     replacegrids(simdata, wkeys, readonly_wgrids)
 end
+function maprule!(simdata::SimData, rule::GridRule)
+    rkeys, rgrids = getreadgrids(rule, simdata)
+    wkeys, wgrids = getwritegrids(rule, simdata)
+    # Cant use SparseOpt with GridRule yet
+    _checkhassparseopt(wgrids)
+    tempsimdata = combinegrids(simdata, rkeys, rgrids, wkeys, wgrids)
+    # Run the rule loop
+    applyrule!(tempsimdata, rule) 
+    # Combine the written grids with the original simdata
+    replacegrids(simdata, wkeys, _to_readonly(wgrids))
+end
 
 maybeupdatedest!(ds::Tuple, rule) = map(d -> maybeupdatedest!(d, rule), ds)
 maybeupdatedest!(d::WritableGridData, rule::Rule) = nothing
@@ -52,6 +63,11 @@ end
 _to_readonly(data::Tuple) = map(ReadableGridData, data)
 _to_readonly(data::WritableGridData) = ReadableGridData(data)
 
+_hassparseopt(wgrids::Tuple) = any(o -> o isa SparseOpt, map(opt, wgrids))
+_hassparseopt(wgrid) = opt(wgrid) isa SparseOpt
+
+@noinline _checkhassparseopt(wgrids) = 
+    _hassparseopt(wgrids) && error("Cant use SparseOpt with a GridRule")
 function maprule!(simdata::SimData, opt::PerformanceOpt, rule::Rule,
                   rkeys, rgrids, wkeys, wgrids, mask)
     let rule=rule, simdata=simdata, rkeys=rkeys, rgrids=rgrids, wkeys=wkeys, wgrid=wgrids

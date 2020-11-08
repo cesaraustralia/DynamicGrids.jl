@@ -70,16 +70,6 @@ function (::Type{T})(args...) where T<:Rule{R,W} where {R,W}
     T{map(typeof, args)...}(args...)
 end
 
-# Check number of args passed in as we don't get a normal method 
-# error because of the splatted args in the default constructor.
-function _checkfields(::Type{T}, args) where T 
-    length(fieldnames(T)) == length(args) || _fielderror(T, args)
-end
-
-@noinline function _fielderror(T, args)
-    throw(ArgumentError("$T has $(length(fieldnames(T))) fields: $(fieldnames(T)), you have used $(length(args))"))
-end
-
 
 @generated function Base.keys(rule::Rule{R,W}) where {R,W}
     Expr(:tuple, QuoteNode.(union(asiterable(W), asiterable(R)))...)
@@ -95,19 +85,10 @@ end
     Expr(:tuple, QuoteNode.(R.parameters)...)
 end
 
-keys2vals(keys::Tuple) = map(Val, keys)
-keys2vals(key::Symbol) = Val(key)
-
-asiterable(x::Symbol) = (x,)
-asiterable(x::Type{<:Tuple}) = x.parameters
-asiterable(x::Tuple) = x
-
 # Define the constructor for generic rule reconstruction in Flatten.jl and Setfield.jl
 function ConstructionBase.constructorof(::Type{T}) where T<:Rule{R,W} where {R,W}
     T.name.wrapper{R,W}
 end
-
-
 
 
 
@@ -228,6 +209,8 @@ abstract type ManualNeighborhoodRule{R,W} <: ManualRule{R,W} end
 
 neighbors(rule::ManualNeighborhoodRule) = neighbors(neighborhood(rule))
 neighborhood(rule::ManualNeighborhoodRule) = rule.neighborhood
+offsets(rule::ManualNeighborhoodRule) = offsets(neighborhood(rule))
+positions(rule::ManualNeighborhoodRule, args...) = positions(neighborhood(rule), args...)
 neighborhoodkey(rule::ManualNeighborhoodRule{R,W}) where {R,W} = R
 neighborhoodkey(rule::ManualNeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
 
@@ -248,30 +231,27 @@ struct YourGridRule{R,W} <: GridRule{R,W} end
 And applied as:
 
 ```julia
-function applyrule!(write, data::SimData, rule::YourGridRule{R,W}, read) where {R,W}
-    rand!(grids[W])
+function applyrule!(data::SimData, rule::YourGridRule{R,W}) where {R,W}
+    rand!(data[W])
 end
 ```
-
-As the `cellindex` is provided in `applyrule`, you can look up an [`aux`](@ref) array
-using `aux(data, Val{:auxname}())[cellindex...]` to access cell-specific variables for 
-your rule.
-
-It's good to add a struct field to hold the `Val{:auxname}()` object instead of
-using names directly, so that users can set the aux name themselves to suit the
-scripting context.
-
 """
 abstract type GridRule{R,W} <: Rule{R,W} end
 
 """
     Grid{R,W}(f)
-    Grid(f; read, write)
 
-Apply a rule to the whole grid.
+Apply a function `f` to fill whole grid/s.
 
-# TODO test and document.
+```jldoctest
+rule = Grid{:a,:b}() do a, b
+    b .= a
+end
 ```
+
+Never use assignment broadcast `.*=`, the write grids are not guarantieed to 
+have the same values as the same-named read grids R. Always copy from a read 
+grid to a write grid manually.
 """
 struct Grid{R,W,F} <: GridRule{R,W}
     "Function to apply to the read values"
@@ -279,16 +259,11 @@ struct Grid{R,W,F} <: GridRule{R,W}
 end
 Grid{R,W}(; kwargs...) where {R,W} = _nofunctionerror(Grid)
 
-@noinline _nofunctionerror(T) = 
-    throw(ArgumentError("No function passed to $T. did you mean to use a `do` block?"))
-
-@inline function applyrule!(write, data, rule::Grid, read)
-    let rule=rule, write = write, read=read
-        rule.f(
-            map(dest, astuple(writekeys(rule), write))..., 
-            map(source, astuple(readkeys(rule), read))...
-        )
-    end
+@inline function applyrule!(data, rule::Grid{R,W}) where {R,W}
+    rule.f(
+        map(r -> source(getindex(data, r)), asiterable(R))...,
+        map(w -> source(getindex(data, w)), asiterable(W))...,
+    )
 end
 
 
@@ -317,7 +292,7 @@ wrap the whole thing in a `let` block, for performance.
 
 ```julia
 rule = let y = y
-    rule = Cell(read=(a, b), write=b) do a, b
+    rule = Cell{Tuple{:a,:b},:b}() do a, b
         a + b * y 
     end
 end
@@ -329,18 +304,11 @@ struct Cell{R,W,F} <: CellRule{R,W}
 end
 Cell{R,W}(; kwargs...) where {R,W} = _nofunctionerror(Cell)
 
-@noinline _nofunctionerror(T) = 
-    throw(ArgumentError("No function passed to $T. did you mean to use a `do` block?"))
-
 @inline function applyrule(data, rule::Cell, state, I)
     let rule=rule, state=state
         rule.f(astuple(rule, state)...)
     end
 end
-
-astuple(rule::Rule, state) = astuple(readkeys(rule), state)
-astuple(::Tuple, state) = state
-astuple(::Symbol, state) = (state,)
 
 """
     Neighbors(f, neighborhood=Moor(1))
@@ -502,3 +470,30 @@ end
 Get the method of a `Cell`, `Neighbors`, or `Manual` rule.
 """
 method(rule::Union{Cell,Neighbors,Manual}) = rule.f
+
+
+# Utils
+
+@noinline _nofunctionerror(T) = 
+    throw(ArgumentError("No function passed to $T. did you mean to use a `do` block?"))
+
+# Check number of args passed in as we don't get a normal method 
+# error because of the splatted args in the default constructor.
+function _checkfields(::Type{T}, args) where T 
+    length(fieldnames(T)) == length(args) || _fielderror(T, args)
+end
+
+@noinline function _fielderror(T, args)
+    throw(ArgumentError("$T has $(length(fieldnames(T))) fields: $(fieldnames(T)), you have used $(length(args))"))
+end
+
+asiterable(x::Symbol) = (x,)
+asiterable(x::Type{<:Tuple}) = x.parameters
+asiterable(x::Tuple) = x
+
+astuple(rule::Rule, state) = astuple(readkeys(rule), state)
+astuple(::Tuple, state) = state
+astuple(::Symbol, state) = (state,)
+
+keys2vals(keys::Tuple) = map(Val, keys)
+keys2vals(key::Symbol) = Val(key)

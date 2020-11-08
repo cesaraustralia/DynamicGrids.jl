@@ -61,9 +61,9 @@ Moore(radius::Int=1, buffer=nothing) = Moore{radius}(buffer)
 Moore{R}(buffer=nothing) where R = Moore{R,typeof(buffer)}(buffer)
 
 @inline function neighbors(hood::Moore{R}) where R
-    hoodlen = hoodsize(R)^2
-    centerpoint = hoodlen ÷ 2 + 1
-    return (buffer(hood)[i] for i in 1:hoodlen if i != centerpoint)
+    buflen = bufsize(R)^2
+    centerpoint = buflen ÷ 2 + 1
+    return (buffer(hood)[i] for i in 1:buflen if i != centerpoint)
 end
 @inline function offsets(hood::Moore{R}) where R
     ((i, j) for j in -R:R, i in -R:R if i != (0, 0))
@@ -179,33 +179,23 @@ struct Positional{R,C<:CustomCoords,B} <: AbstractPositional{R,B}
     offsets::C
     buffer::B
 end
-
 Positional(args::CustomCoord...) = Positional(args)
 Positional(offsets::CustomCoords, buffer=nothing) =
-    Positional{absmaxcoord(offsets)}(offsets, buffer)
+    Positional{_absmaxcoord(offsets)}(offsets, buffer)
 Positional{R}(offsets::CustomCoords, buffer=nothing) where R =
     Positional{R,typeof(offsets),typeof(buffer)}(offsets, buffer)
 
-ConstructionBase.constructorof(::Type{Positional{R,C,B}}) where {R,C,B} =
-    Positional{R}
+# Calculate the maximum absolute value in the offsets to use as the radius
+_absmaxcoord(offsets::Union{AbstractArray,Tuple}) = maximum(map(x -> maximum(map(abs, x)), offsets))
+_absmaxcoord(neighborhood::Positional) = absmaxcoord(offsets(neighborhood))
 
-offsets(hood::Positional) = hood.offsets
+ConstructionBase.constructorof(::Type{Positional{R,C,B}}) where {R,C,B} = Positional{R}
 
 Base.length(hood::Positional) = length(offsets(hood))
 
-# Calculate the maximum absolute value in the offsets to use as the radius
-absmaxcoord(offsets::Union{AbstractArray,Tuple}) = maximum(map(x -> maximum(map(abs, x)), offsets))
-absmaxcoord(neighborhood::Positional) = absmaxcoord(offsets(neighborhood))
-
-"""
-    neighbors(hood::Positional)
-
-Returns an iterator over the `Positional` neighborhood cells around the current index.
-"""
-neighbors(hood::Positional) =
-    (buffer(hood)[(coord .+ radius(hood) .+ 1)...] for coord in offsets(hood))
-
 offsets(hood::Positional) = hood.offsets
+neighbors(hood::Positional) =
+    (buffer(hood)[(offset .+ radius(hood) .+ 1)...] for offset in offsets(hood))
 
 @inline function mapsetneighbor!(
     data::WritableGridData, hood::Positional, rule, state, index
