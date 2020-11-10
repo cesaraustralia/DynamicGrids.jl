@@ -217,11 +217,10 @@ in specific contexts.
 - `dest(data::SimData)` : get the `dest` grid that is being written to.
 
 """
-struct SimData{Y,X,G<:NamedTuple,E,RS,PRS,F} <: AbstractSimData{Y,X}
+struct SimData{Y,X,G<:NamedTuple,E,RS,F} <: AbstractSimData{Y,X}
     grids::G
     extent::E
     ruleset::RS
-    precalculated_ruleset::PRS
     currentframe::F
 end
 # Convert grids in extent to NamedTuple
@@ -238,26 +237,25 @@ SimData(extent::Extent{<:NamedTuple{Keys}}, ruleset::AbstractRuleset) where Keys
     end
     SimData(grids, extent, ruleset)
 end
-@inline SimData(grids::G, extent::E, ruleset::RS) where {G,E,RS} = begin
+@inline SimData(grids::G, extent::E, ruleset::AbstractRuleset) where {G,E} = begin
     currentframe = 1;
     Y, X = gridsize(extent)
-    precalc_rs = StaticRuleset(ruleset)
-    SimData{Y,X,G,E,RS,typeof(precalc_rs),Int}(
-        grids, extent, ruleset, precalc_rs, currentframe
+    ruleset = StaticRuleset(ruleset)
+    SimData{Y,X,G,E,typeof(ruleset),Int}(
+        grids, extent, ruleset, currentframe
     )
 end
 # For ConstrutionBase
 SimData{Y,X}(
-    grids::G, extent::E, ruleset::RS, precalculated_ruleset::PRS, currentframe::F
-) where {Y,X,G,E,RS,PRS,F} = begin
-    SimData{Y,X,G,E,RS,PRS,F}(grids, extent, ruleset, precalculated_ruleset, currentframe)
+    grids::G, extent::E, ruleset::RS, currentframe::F
+) where {Y,X,G,E,RS,F} = begin
+    SimData{Y,X,G,E,RS,F}(grids, extent, ruleset, currentframe)
 end
 ConstructionBase.constructorof(::Type{<:SimData{Y,X}}) where {Y,X} = SimData{Y,X}
 
 # Getters
 extent(d::SimData) = d.extent
 ruleset(d::SimData) = d.ruleset
-precalculated_ruleset(d::SimData) = d.precalculated_ruleset
 grids(d::SimData) = d.grids
 init(d::SimData) = init(extent(d))
 mask(d::SimData) = mask(first(d))
@@ -285,7 +283,6 @@ opt(d::SimData) = opt(ruleset(d))
 overflow(d::SimData) = overflow(ruleset(d))
 padval(d::SimData) = padval(ruleset(d))
 rules(d::SimData) = rules(ruleset(d))
-precalculated_rules(d::SimData) = rules(precalculated_ruleset(d))
 cellsize(d::SimData) = cellsize(ruleset(d))
 
 # Get the actual current timestep, e.g. seconds instead of variable periods like Month

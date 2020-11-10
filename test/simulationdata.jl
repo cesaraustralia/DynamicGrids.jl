@@ -11,7 +11,6 @@ initb = [2 2 2
 initab = (a=inita, b=initb)
 
 life = Life{:a,:a}()
-rs = Ruleset(life, timestep=Day(1));
 tspan_ = DateTime(2001):Day(1):DateTime(2001, 2)
 
 @testset "initdata!" begin
@@ -21,7 +20,7 @@ tspan_ = DateTime(2001):Day(1):DateTime(2001, 2)
     simdata = SimData(ext, rs)
     @test simdata isa SimData
     @test init(simdata) == initab
-    @test ruleset(simdata) === rs
+    @test ruleset(simdata) === StaticRuleset(rs)
     @test tspan(simdata) === tspan_
     @test currentframe(simdata) === 1
     @test first(simdata) === simdata[:a]
@@ -89,11 +88,12 @@ end
 end
 
 @testset "initdata! with replicates" begin
+    rs = Ruleset(life, timestep=Day(1));
     nreps = 2
     extent = Extent(; init=initab, tspan=tspan_)
     simdata = initdata!(nothing, extent, rs, nreps)
     @test simdata isa Vector{<:SimData}
-    @test all(DynamicGrids.ruleset.(simdata) .== Ref(rs))
+    @test all(DynamicGrids.ruleset.(simdata) .== Ref(StaticRuleset(rs)))
     @test all(map(tspan, simdata) .== Ref(tspan_))
     @test all(keys.(DynamicGrids.grids.(simdata)) .== Ref(keys(initab)))
     simdata2 = initdata!(simdata, extent, rs, nreps)

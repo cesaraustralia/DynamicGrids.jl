@@ -10,7 +10,7 @@ with `Threads.@threads`.
 TODO: use the new threading method.
 """
 function sequencerules!(simdata::AbstractSimData)
-    sequencerules!(simdata, precalculated_rules(simdata))
+    sequencerules!(simdata, rules(simdata))
 end
 function sequencerules!(data::AbstractVector{T}) where T<:AbstractSimData
     newdata = copy(data)

@@ -395,20 +395,32 @@ end
     SetNeighbors(f, neighborhood=Moor(1))
     SetNeighbors{R,W}(f, neighborhood=Moor(1))
 
-A [`ManualRule`](@ref) to manually write to the array where you need to.
-`f` is passed an indexable `data` object, and the index of the current cell,
-followed by the required grid values for the index.
+A [`ManualRule`](@ref) to manually write to the array with the specified 
+neighborhood. Indexing outside the neighborhood is undefined behaviour.
+
+Function `f` is passed an [`SimData`](@ref) object `data`, the specified 
+neighborhood object and the index of the current cell, followed by the required 
+grid values for the index. 
 
 To update the grid, you can use: [`add!`](@ref), [`sub!`](@ref) for `Number`,
-and [`and!`](@ref), [`or!`](@ref) for `Bool`. These methods safely combined
-writes from all grid cells - directly using `setindex!` would cause bugs.
+and [`and!`](@ref), [`or!`](@ref) for `Bool`. These methods can be safely combined
+writes from all grid cells. 
+
+Directly using `setindex!` is possible, but may cause bugs as multiple cells
+may write to the same location in an unpredicatble order. As a rule, directly
+setting a neighborhood index should only be done for a single value - then it can 
+be guaranteed that any writes from othe grid cells reach the same result.
+
+[`neighbors`], [`offsets`] and [`positions`](@ref) are useful methods
 
 ## Example
 
 ```julia
 rule = let x = 10
     SetNeighbors{Tuple{:a,:b},:b}() do data, hood, I, a, b
-        add!(data[:b], a^x, I...)
+        for pos in positions(hood)
+            add!(data[:b], a^x, pos...)
+        end
     end
 end
 ```

@@ -64,7 +64,7 @@ function sim!(
     # Let the init grid be displayed as long as a normal grid
     delay(output, 1)
     # Run the simulation over simdata and a unitrange
-    return runsim!(output, simdata, 1:lastindex(tspan))
+    return runsim!(output, simdata, ruleset, 1:lastindex(tspan))
 end
 
 """
@@ -128,7 +128,7 @@ function resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
     setfps!(output, fps)
     extent = Extent(; init=asnamedtuple(init), mask=mask(output), aux=aux(output), tspan=new_tspan)
     simdata = initdata!(simdata, extent, ruleset, nreplicates)
-    return runsim!(output, simdata, fspan)
+    return runsim!(output, simdata, ruleset, fspan)
 end
 
 """
@@ -141,11 +141,11 @@ fixed trait or a field value depending on the output type.
 This allows interfaces with interactive components to update during
 the simulations.
 """
-function runsim!(output, simdata, fspan) 
+function runsim!(output, simdata, ruleset, fspan) 
     if isasync(output)
-        @async simloop!(output, simdata, fspan)
+        @async simloop!(output, simdata, ruleset, fspan)
     else
-        simloop!(output, simdata, fspan)
+        simloop!(output, simdata, ruleset, fspan)
     end
 end
 
@@ -160,7 +160,7 @@ Operations on [`Rule`](@ref)s and [`SimData`](@ref) objects are in a
 functional style, as they are used in inner loops where immutability improves 
 performance.
 """
-function simloop!(output::Output, simdata, fspan)
+function simloop!(output::Output, simdata, ruleset, fspan)
     # Set the frame timestamp for fps calculation
     settimestamp!(output, first(fspan))
     # Initialise types etc
@@ -168,7 +168,9 @@ function simloop!(output::Output, simdata, fspan)
     # Loop over the simulation
     for f in fspan[2:end]
         # Get a data object with updated timestep and precalculate rules
-        simdata = updatetime(simdata, f) |> precalcrules |> sequencerules!
+        simdata = updatetime(simdata, f) |> 
+            sd -> precalcrules(sd, rules(ruleset)) |> 
+            sequencerules!
         # Save/do something with the the current grid
         storeframe!(output, simdata)
         # Let interface things happen
