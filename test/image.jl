@@ -137,9 +137,9 @@ end
             renderstring!(refimg, string(DateTime(2001)), face, pixelsize, timepos...;
                           fcolor=ARGB32(1.0, 1.0, 1.0, 1.0), bcolor=ARGB32(0.0, 0.0, 0.0, 1.0))
             textconfig=TextConfig(; font=font, timepixels=pixelsize, namepixels=pixelsize)
-
             proc = ColorProcessor(zerocolor=ARGB32(1.0, 0.0, 0.0, 1.0), textconfig=textconfig)
             output = NoDisplayImageOutput((t=textinit,); tspan=1:1, processor=proc, store=true)
+            simdata = SimData(extent(output), Ruleset())
             img = grid2image(proc, output, simdata, textinit, 1, DateTime(2001), nothing);
             @test img == refimg
         end
@@ -225,7 +225,6 @@ end
             refimg = cat(fill(ARGB32(1, 0, 0), 200, 200), fill(ARGB32(0), 200, 200), fill(ARGB32(1, 0, 0), 200, 200); dims=1)
             renderstring!(refimg, string(DateTime(2001)), face, timepixels, timepos...;
                           fcolor=ARGB32(RGB(1.0), 1.0), bcolor=ARGB32(RGB(0.0), 1.0))
-
             namepixels = 15
             nameposa = 3timepixels + namepixels, timepixels
             renderstring!(refimg, "a", face, namepixels, nameposa...;
@@ -233,17 +232,18 @@ end
             nameposb = 3timepixels + namepixels + 400, timepixels
             renderstring!(refimg, "b", face, namepixels, nameposb...;
                           fcolor=ARGB32(RGB(1.0), 1.0), bcolor=ARGB32(RGB(0.0), 1.0))
-
             textconfig = TextConfig(; font=font, timepixels=timepixels, namepixels=namepixels)
             proc = LayoutProcessor([:a, nothing, :b], (grey, leo), textconfig)
-
-            output = NoDisplayImageOutput((t=textinit,); tspan=1:10, processor=proc, store=true, 
-                                     minval=(0, 0), maxval=(1, 1))
-
+            output = NoDisplayImageOutput(
+                 textinit; tspan=1:10, processor=proc, store=true, 
+                 minval=(0, 0), maxval=(1, 1)
+            )
+            simdata = SimData(extent(output), Ruleset())
             img = grid2image(output, simdata, textinit, 1, DateTime(2001));
             @test img == refimg
         end
     end
+
 end
 
 @testset "ThreeColorProcessor" begin

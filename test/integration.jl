@@ -247,6 +247,58 @@ end
         end
     end
 
+    @testset "A large sim wors" begin
+        init = rand(Bool, 100, 100)
+        rule = Life(neighborhood=Moore(1))
+        sparse_opt = Ruleset(rule;
+            overflow=WrapOverflow(),
+            opt=SparseOpt(),
+        )
+        no_opt = Ruleset(rule;
+            overflow=WrapOverflow(),
+            opt=NoOpt(),
+        )
+        sparseopt_output = ArrayOutput(init; tspan=1:100)
+        sim!(sparseopt_output, sparse_opt)
+        noopt_output = ArrayOutput(init; tspan=1:100)
+        sim!(noopt_output, no_opt)
+        @test sparseopt_output[2] == noopt_output[2]
+        @test sparseopt_output[3] == noopt_output[3]
+        @test sparseopt_output[10] == noopt_output[10]
+        @test sparseopt_output[100] == noopt_output[100]
+
+        init = rand(Bool, 100, 100)
+        rule = Life(neighborhood=Moore(1))
+        sparse_opt = Ruleset(rule;
+            overflow=RemoveOverflow(),
+            opt=SparseOpt(),
+        )
+        no_opt = Ruleset(rule;
+            overflow=RemoveOverflow(),
+            opt=NoOpt(),
+        )
+        sparseopt_output = ArrayOutput(init; tspan=1:100)
+        sim!(sparseopt_output, sparse_opt)
+        noopt_output = ArrayOutput(init; tspan=1:100)
+        sim!(noopt_output, no_opt)
+        @test sparseopt_output[2] == noopt_output[2]
+        @test sparseopt_output[3] == noopt_output[3]
+        @test sparseopt_output[10] == noopt_output[10]
+        @test sparseopt_output[100] == noopt_output[100]
+    end
+end
+
+@testset "ResultOutput works" begin
+    ruleset = Ruleset(;
+        rules=(Life(),),
+        overflow=WrapOverflow(),
+        timestep=5u"s",
+        opt=NoOpt(),
+    )
+    tspan=0u"s":5u"s":30u"s"
+    output = ResultOutput(test6_7[:init]; tspan=tspan)
+    sim!(output, ruleset)
+    @test output[1] == test6_7[:test7]
 end
 
 @testset "REPLOutput block works, in Unitful.jl seconds" begin
@@ -258,8 +310,7 @@ end
     )
     tspan=0u"s":5u"s":6u"s"
     output = REPLOutput(test6_7[:init]; tspan=tspan, style=Block(), fps=100, store=true)
-    DynamicGrids.isstored(output)
-    DynamicGrids.store(output)
+    @test DynamicGrids.isstored(output) == true
     sim!(output, ruleset)
     resume!(output, ruleset; tstop=30u"s")
     @test output[2] == test6_7[:test2]

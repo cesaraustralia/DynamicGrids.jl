@@ -77,7 +77,8 @@ function handleoverflow!(griddata::GridData, ::WrapOverflow)
     wrapstatus!(sourcestatus(griddata))
 end
 
-function wrapstatus!(status)
+wrapstatus!(status::Nothing) = nothing
+function wrapstatus!(status::AbstractArray)
     # This could be further optimised.
     status[end-1, :] .|= status[1, :]
     status[:, end-1] .|= status[:, 1]

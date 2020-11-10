@@ -28,6 +28,10 @@ rules(chain::Chain) = chain.rules
 radius(chain::Chain) = radius(chain[1])
 neighborhoodkey(chain::Chain) = neighborhoodkey(chain[1])
 neighborhood(chain::Chain) = neighborhood(chain[1])
+@inline function setbuffer(chain::Chain{R,W}, buf) where {R,W} 
+    rules = (setbuffer(chain[1], buf), tail(chain.rules)...)
+    Chain{R,W,typeof(rules)}(rules)
+end
 
 function Base.tail(chain::Chain{R,W}) where {R,W}
     chaintail = tail(rules(chain))
