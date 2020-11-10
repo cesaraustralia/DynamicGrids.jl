@@ -16,7 +16,7 @@ end
 GridDataOrReps = Union{GridData, Vector{<:GridData}}
 
 # Array interface
-Base.size(d::GridData{Y,X,R}) where {Y,X,R} = Y + 2R, X + 2R
+Base.size(d::GridData) = size(source(d))
 Base.axes(d::GridData) = axes(source(d))
 Base.eltype(d::GridData) = eltype(source(d))
 Base.firstindex(d::GridData) = firstindex(source(d))
@@ -232,7 +232,9 @@ SimData(extent::Extent{<:NamedTuple{Keys}}, ruleset::AbstractRuleset) where Keys
     radii = NamedTuple{Keys}(get(radius(ruleset), key, 0) for key in Keys)
     # Construct the SimData for each grid
     grids = map(init(extent), radii) do in, r
-        ReadableGridData{y,x,r}(in, mask(extent), opt(ruleset), overflow(ruleset), padval(ruleset))
+        ReadableGridData{y,x,r}(
+            in, mask(extent), opt(ruleset), overflow(ruleset), padval(ruleset)
+        )
     end
     SimData(grids, extent, ruleset)
 end
@@ -313,9 +315,9 @@ Add padding around the original init array, offset into the negative
 So that the first real cell is still 1, 1
 =#
 function addpadding(init::AbstractArray{T,N}, r, padval) where {T,N}
-    sze = size(init)
-    paddedsize = sze .+ 4r
-    paddedindices = -r + 1:sze[1] + 3r, -r + 1:sze[2] + 3r
+    h, w = size(init)
+    paddedsize = h + 4r, w + 2r
+    paddedindices = -r + 1:h + 3r, -r + 1:w + r
     sourceparent = fill!(similar(init, paddedsize), padval)
     source = OffsetArray(sourceparent, paddedindices...)
     # Copy the init array to the middle section of the source array

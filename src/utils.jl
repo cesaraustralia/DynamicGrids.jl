@@ -46,9 +46,12 @@ isinferred(simdata::SimData, rule::Rule) = _isinferred(simdata, rule)
 function isinferred(simdata::SimData, 
     rule::Union{NeighborhoodRule,Chain{<:Any,<:Any,<:Tuple{<:NeighborhoodRule,Vararg}}}
 )
-    griddata = simdata[neighborhoodkey(rule)]
-    buffers, bufrules = spreadbuffers(rule, DynamicGrids.init(griddata))
-    rule = bufrules[1]
+    grid = simdata[neighborhoodkey(rule)]
+    r = max(1, radius(rule))
+    T = eltype(grid)
+    S = 2r + 1
+    buffer = SArray{Tuple{S,S},T,2,S^2}(Tuple(zero(T) for i in 1:S^2))
+    rule = setbuffer(rule, buffer)
     return _isinferred(simdata, rule)
 end
 function isinferred(simdata::SimData, rule::ManualRule)

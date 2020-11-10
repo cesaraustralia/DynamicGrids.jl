@@ -1,21 +1,7 @@
 using DynamicGrids, Setfield, Test
 import DynamicGrids: neighbors, sumneighbors, SimData, Extent, radius, neighbors,
        mapsetneighbor!, neighborhood, WritableGridData, dest, hoodsize, neighborhoodkey,
-       allocbuffer, allocbuffers, buffer, offsets
-
-@testset "allocbuffers" begin
-    @test allocbuffer(Bool[1 0], 1) == Bool[0 0 0
-                                            0 0 0
-                                            0 0 0]
-    @test allocbuffer(Int[1 0], 2) == [0 0 0 0 0
-                                       0 0 0 0 0
-                                       0 0 0 0 0
-                                       0 0 0 0 0
-                                       0 0 0 0 0]
-    @test allocbuffer([1.0, 2.0], Moore{4}()) == zeros(Float64, 9, 9)
-    @test allocbuffers(Bool[1 0], 2) == Tuple(zeros(Bool, 5, 5) for i in 1:4)
-    @test allocbuffers([1 0], Moore{3}()) == Tuple(zeros(Int, 7, 7) for i in 1:6)
-end
+       buffer, offsets
 
 @testset "neighbors" begin
     init = [0 0 0 1 1 1
@@ -95,6 +81,7 @@ end
         rule = Life(;neighborhood=Moore{1}([0 1 1; 0 0 0; 1 1 1]))
         @test sum(neighbors(rule)) == 5
     end
+
 end
 
 struct TestNeighborhoodRule{R,W,N} <: NeighborhoodRule{R,W}
@@ -122,7 +109,6 @@ end
     @test neighborhood(ruleB) == Moore{2}()
     @test neighborhoodkey(ruleA) == :a
     @test neighborhoodkey(ruleB) == :b
-
     ruleA = TestNeighborhoodRule{:a,:a}(Moore{3}())
     ruleB = TestNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}())
     @test neighbors(ruleA) isa Base.Generator

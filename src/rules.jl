@@ -1,18 +1,18 @@
 
 """
 A `Rule` object contains the information required to apply some
-logical rule to every cell of every timestep of a simulation. 
+logical rule to every cell of every timestep of a simulation.
 
 Rules can be chained together sequentially into [`Ruleset`](@ref)s.
 
 Rules are applied to the grid using the [`applyrule`](@ref) method:
 
 ```julia
-@inline applyrule(data::SimData, rule::YourRule, state, cellindex) =  
+@inline applyrule(data::SimData, rule::YourRule, state, cellindex) =
 ```
 
-Where cellindex is a `Tuple` of `Int`, and `state` is a single value, or a `NamedTuple` 
-if multiple grids are requested. The `NamedTuple` keys will match the 
+Where cellindex is a `Tuple` of `Int`, and `state` is a single value, or a `NamedTuple`
+if multiple grids are requested. The `NamedTuple` keys will match the
 keys in `R`, which is a type like `Tuple{:key1,:key1}` - note the names are user
 specified, and should never be fixed by a Rule - they can be retrieved from the type
 here as `A` and `B` :
@@ -21,14 +21,14 @@ here as `A` and `B` :
 applyrule(data::SimData, rule::YourCellRule{Tuple{R1,R2},Tuple{W1,W2}}, state, cellindex) where {R1,R2,W1,W2}
 ```
 
-By default the output is written to the current cell in the specified `W` write grid/s. 
+By default the output is written to the current cell in the specified `W` write grid/s.
 `Rule`s writing to multiple grids, simply return a `Tuple` in the order specified by
 the `W` type params.
 
 ## Precalculation
 
-[`precalcrule`](@ref) can be used to precalculate any fields that depend on the 
-timestep. Otherwise everything should be precalculated apon construction. 
+[`precalcrule`](@ref) can be used to precalculate any fields that depend on the
+timestep. Otherwise everything should be precalculated apon construction.
 
 Retreive required information from [`SimData`](@ref) such as [`currenttime`](@ref)
 or [`currentframe`](@ref). The return value is the updated rule.
@@ -43,7 +43,7 @@ Rules may run many millions of times during a simulation. They need to be fast.
 
 Some basic guidlines for writing rules are:
 - Never allocate memory in a `Rule` if you can help it.
-- Type stability is essential. [`isinferred`](@ref) is useful to check 
+- Type stability is essential. [`isinferred`](@ref) is useful to check
   if your rule is type-stable.
 - Using the `@inline` macro on `applyrule` can help force inlining your
   code into the simulation.
@@ -57,7 +57,7 @@ abstract type Rule{R,W} end
 #= Default constructors for all Rules.
 Sets both the read and write grids to `:_default`.
 
-This strategy relies on a one-to-one relationship between fields 
+This strategy relies on a one-to-one relationship between fields
 and type parameters, besides the initial `R` and `W` params.  =#
 
 # No {R,W} with args or kw
@@ -93,8 +93,8 @@ end
 
 
 """
-A `Rule` that only writes and uses a state from single cell of the read grids, 
-and has its return value written back to the same cell(s). 
+A `Rule` that only writes and uses a state from single cell of the read grids,
+and has its return value written back to the same cell(s).
 
 This limitation can be useful for performance optimisation,
 such as wrapping rules in [`Chain`](@ref) so that no writes occur between rules.
@@ -115,7 +115,7 @@ end
 ```
 
 As the `cellindex` is provided in `applyrule`, you can look up an [`aux`](@ref) array
-using `aux(data, Val{:auxname}())[cellindex...]` to access cell-specific variables for 
+using `aux(data, Val{:auxname}())[cellindex...]` to access cell-specific variables for
 your rule.
 
 It's good to add a struct field to hold the `Val{:auxname}()` object instead of
@@ -126,7 +126,7 @@ scripting context.
 abstract type CellRule{R,W} <: Rule{R,W} end
 
 """
-`ManualRule` is the supertype for rules that manually write to whichever cells of the 
+`ManualRule` is the supertype for rules that manually write to whichever cells of the
 grid that they choose, instead of automatically updating every cell with their output.
 
 `ManualRule` is applied with a method like:
@@ -140,15 +140,15 @@ end
 ```
 
 Note the `!` bang - this method alters the state of `data`. We also use the type
-parameter `W` (write) to index into the `data` object. You could also just use 
+parameter `W` (write) to index into the `data` object. You could also just use
 `first(dat)` when there is only one `W` write grid.
 
 To update the grid, you can use: [`add!`](@ref), [`sub!`](@ref) for `Number`,
-and [`and!`](@ref), [`or!`](@ref) for `Bool`. These methods safely combined 
+and [`and!`](@ref), [`or!`](@ref) for `Bool`. These methods safely combined
 writes from all grid cells - directly using `setindex!` would cause bugs.
 
-It there are multiple write grids, you will need to get the grid keys from 
-type parameters, here `W1` and `W2`: 
+It there are multiple write grids, you will need to get the grid keys from
+type parameters, here `W1` and `W2`:
 
 ```julia
 function applyrule(data, rule::YourManRule{R,Tuple{W1,W2}}, state, cellindex) where {R,W1,W2}
@@ -170,7 +170,7 @@ applyrule(data::SimData, rule::YourNeighborhoodRule, state, I)
 ```
 
 `NeighborhoodRule` must have a `neighborhood` field, that holds
-a [`Neighborhood`](@ref) object. `neighbors(rule)` returns an iterator 
+a [`Neighborhood`](@ref) object. `neighbors(rule)` returns an iterator
 over the surrounding cell pattern defined by the `Neighborhood`.
 
 For each cell in the grids the neighborhood buffer will be updated
@@ -181,7 +181,7 @@ neighborhood buffer for [`Moore`](@ref) neighborhoods. It also means
 that and no bounds checking is required in neighborhood code.
 
 For neighborhood rules with multiple read grids, the first is always
-the one used for the neighborhood, the others are passed in as additional 
+the one used for the neighborhood, the others are passed in as additional
 state for the cell. Any grids can be written to, but only for the current cell.
 """
 abstract type NeighborhoodRule{R,W} <: Rule{R,W} end
@@ -193,7 +193,7 @@ positions(rule::NeighborhoodRule, args...) = positions(neighborhood(rule), args.
 neighborhoodkey(rule::NeighborhoodRule{R,W}) where {R,W} = R
 # The first argument is for the neighborhood grid
 neighborhoodkey(rule::NeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
-@inline setbuffer(rule::NeighborhoodRule, buffer) = 
+@inline setbuffer(rule::NeighborhoodRule, buffer) =
     @set rule.neighborhood = setbuffer(rule.neighborhood, buffer)
 
 """
@@ -218,9 +218,9 @@ neighborhoodkey(rule::ManualNeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W}
 
 """
 A `Rule` applies to whole grids. This is used for operations that don't benefit from
-having neighborhood buffering or looping over the grid handled for them, or any specific 
-optimisations. Best suited to simple functions like `rand`(write)` or using convolutions 
-from other packages like DSP.jl. They may also be useful for doing other custom things that 
+having neighborhood buffering or looping over the grid handled for them, or any specific
+optimisations. Best suited to simple functions like `rand`(write)` or using convolutions
+from other packages like DSP.jl. They may also be useful for doing other custom things that
 don't fit into the DynamicGrids.jl framework during the simulation.
 
 Grid rules specify the grids they want and are sequenced just like any other grid.
@@ -250,8 +250,8 @@ rule = Grid{:a,:b}() do a, b
 end
 ```
 
-Never use assignment broadcast `.*=`, the write grids are not guarantieed to 
-have the same values as the same-named read grids R. Always copy from a read 
+Never use assignment broadcast `.*=`, the write grids are not guarantieed to
+have the same values as the same-named read grids R. Always copy from a read
 grid to a write grid manually.
 """
 struct Grid{R,W,F} <: GridRule{R,W}
@@ -294,7 +294,7 @@ wrap the whole thing in a `let` block, for performance.
 ```julia
 rule = let y = y
     rule = Cell{Tuple{:a,:b},:b}() do a, b
-        a + b * y 
+        a + b * y
     end
 end
 ```
@@ -313,18 +313,18 @@ end
 
 """
     Neighbors(f, neighborhood=Moor(1))
-    Neighbors{R,W}(f, neighborhood=Moore()) 
+    Neighbors{R,W}(f, neighborhood=Moore())
 
-A [`NeighborhoodRule`](@ref) that receives a neighbors object for the first 
-`read` grid and the passed in neighborhood, followed by the cell values for 
+A [`NeighborhoodRule`](@ref) that receives a neighbors object for the first
+`read` grid and the passed in neighborhood, followed by the cell values for
 the required grids, as with [`Cell`](@ref).
 
-Returned value(s) are written to the `write`/`W` grid. 
+Returned value(s) are written to the `write`/`W` grid.
 
-As with all [`NeighborhoodRule`](@ref), you do not have to check bounds at 
+As with all [`NeighborhoodRule`](@ref), you do not have to check bounds at
 grid edges, that is handled for you internally.
 
-Using [`SparseOpt`](@ref) may improve neighborhood performance 
+Using [`SparseOpt`](@ref) may improve neighborhood performance
 when zero values are common and can be safely ignored.
 
 ## Example
@@ -346,7 +346,7 @@ struct Neighbors{R,W,F,N} <: NeighborhoodRule{R,W}
     neighborhood::N
 end
 Neighbors{R,W}(; kwargs...) where {R,W} = _nofunctionerror(Neighbors)
-Neighbors{R,W}(f; neighborhood=Moore(1)) where {R,W} = 
+Neighbors{R,W}(f; neighborhood=Moore(1)) where {R,W} =
     Neighbors{R,W}(f, neighborhood)
 
 @inline function applyrule(data, rule::Neighbors, read, I)
@@ -359,12 +359,12 @@ end
     Manual(f)
     Manual{R,W}(f)
 
-A [`ManualRule`](@ref) to manually write to the array where you need to. 
-`f` is passed an indexable `data` object, and the index of the current cell, 
+A [`ManualRule`](@ref) to manually write to the array where you need to.
+`f` is passed an indexable `data` object, and the index of the current cell,
 followed by the required grid values for the index.
 
 To update the grid, you can use: [`add!`](@ref), [`sub!`](@ref) for `Number`,
-and [`and!`](@ref), [`or!`](@ref) for `Bool`. These methods safely combined 
+and [`and!`](@ref), [`or!`](@ref) for `Bool`. These methods safely combined
 writes from all grid cells - directly using `setindex!` would cause bugs.
 
 ## Example
@@ -392,15 +392,15 @@ end
 
 
 """
-    SetNeighbors(f, neighborhood=Moor(1)) 
+    SetNeighbors(f, neighborhood=Moor(1))
     SetNeighbors{R,W}(f, neighborhood=Moor(1))
 
-A [`ManualRule`](@ref) to manually write to the array where you need to. 
-`f` is passed an indexable `data` object, and the index of the current cell, 
+A [`ManualRule`](@ref) to manually write to the array where you need to.
+`f` is passed an indexable `data` object, and the index of the current cell,
 followed by the required grid values for the index.
 
 To update the grid, you can use: [`add!`](@ref), [`sub!`](@ref) for `Number`,
-and [`and!`](@ref), [`or!`](@ref) for `Bool`. These methods safely combined 
+and [`and!`](@ref), [`or!`](@ref) for `Bool`. These methods safely combined
 writes from all grid cells - directly using `setindex!` would cause bugs.
 
 ## Example
@@ -421,7 +421,7 @@ struct SetNeighbors{R,W,F,N} <: ManualNeighborhoodRule{R,W}
     neighborhood::N
 end
 SetNeighbors{R,W}(; kwargs...) where {R,W} = _nofunctionerror(SetNeighbors)
-SetNeighbors{R,W}(f; neighborhood=Moore(1)) where {R,W} = 
+SetNeighbors{R,W}(f; neighborhood=Moore(1)) where {R,W} =
     SetNeighbors{R,W}(f, neighborhood)
 
 @inline function applyrule!(data, rule::SetNeighbors, read, I)
@@ -432,7 +432,7 @@ end
 
 
 """
-    Convolution(f, neighborhood=Moor(1)) 
+    Convolution(f, neighborhood=Moor(1))
     Convolution{R,W}(f, neighborhood=Moor(1))
 
 A `Rule` that runs a basic convolution kernel over the grid.
@@ -441,14 +441,13 @@ A `Rule` that runs a basic convolution kernel over the grid.
 
 _Always_ use StaticArrays.jl to define the kernel matrix.
 
-Small radius convolutions in DynamicGrids.jl will be faster than using
-DSP.jl (~2x for radius 1). As the radius increases or grid size gets very large 
-(over 800*800) DSP.jl will be faster. But `Convolution` is very convenient 
-to use in the middle of a simlulation, combined with some other rules.
+Small radius convolutions in DynamicGrids.jl will be faster or comparable to using
+DSP.jl or ImageConvolutions.jl. As the radius increases or grid size gets very large
+these packages will be a lot faster.
 
-This is due to convolutions using the same mechanisms set up to run arbrary rules
-on neighborhoods (not just matrix multiply), and cannot be linearised in the same way
-as DSP.jl.
+But `Convolution` is convenient to chain into a simlulation, and combined with some other 
+rules. It should perform reasonably well in all but very large simulations or very large 
+kernels.
 
 ## Example
 
@@ -479,10 +478,10 @@ method(rule::Union{Cell,Neighbors,Manual}) = rule.f
 
 # Utils
 
-@noinline _nofunctionerror(t) = 
+@noinline _nofunctionerror(t) =
     throw(ArgumentError("No function passed to $t. Did you mean to use a do block?"))
 
-# Check number of args passed in as we don't get a normal method 
+# Check number of args passed in as we don't get a normal method
 # error because of the splatted args in the default constructor.
 @generated function _checkfields(::Type{T}, args::A) where {T,A<:Tuple}
     length(fieldnames(T)) == length(fieldnames(A)) ? :(nothing) : :(_fielderror(T, args))

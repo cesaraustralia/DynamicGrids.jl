@@ -85,6 +85,17 @@ These inlude the central cell.
 """
 abstract type AbstractKernel{R,B} <: RadialNeighborhood{R,B} end
 
+kernel(hood::AbstractKernel) = hood.kernel
+
+Base.length(hood::AbstractKernel{R}) where R = (2R + 1)^2
+Base.sum(hood::AbstractKernel) = sum(buffer(hood))
+neighbors(hood::AbstractKernel) = buffer(hood)
+
+LinearAlgebra.dot(hood::AbstractKernel) = kernel(hood) ⋅ buffer(hood)
+# The central cell is included
+@inline offsets(hood::AbstractKernel{R}) where R = ((i, j) for j in -R:R, i in -R:R)
+@inline setbuffer(n::AbstractKernel{R,K}, buf::B2) where {R,K,B2} = Kernel{R,K,B2}(n.kernel, buf)
+
 """
     Kernel{R}(kernel, buffer=nothing)
 
@@ -103,16 +114,9 @@ end
 @inline Kernel(R::Int) = Kernel{R}(nothing, nothing)
 @inline ConstructionBase.constructorof(::Type{Kernel{R,K,B}}) where {R,K,B} = Kernel{R}
 
-LinearAlgebra.dot(hood::Kernel) = kernel(hood) ⋅ buffer(hood)
-kernel(hood::Kernel) = hood.kernel
-# The central cell is included
-neighbors(hood::Kernel) = buffer(hood)
-@inline offsets(hood::Kernel{R}) where R = ((i, j) for j in -R:R, i in -R:R)
-@inline setbuffer(n::Kernel{R,K}, buf::B2) where {R,K,B2} = Kernel{R,K,B2}(n.kernel, buf)
 
-Base.length(hood::Kernel{R}) where R = (2R + 1)^2
-Base.sum(hood::Kernel) = sum(buffer(hood))
 
+# Depreciated 
 
 @inline function mapsetneighbor!(
     data::WritableGridData, hood::Neighborhood, rule, state, index

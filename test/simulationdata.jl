@@ -39,6 +39,8 @@ tspan_ = DateTime(2001):Day(1):DateTime(2001, 2)
         [0 0 0 0 0
          0 0 1 1 0
          0 0 1 1 0
+         0 0 0 0 0
+         0 0 0 0 0
          0 0 0 0 0]
 
     wgrida = WritableGridData(grida)
@@ -48,6 +50,7 @@ tspan_ = DateTime(2001):Day(1):DateTime(2001, 2)
     @test sourcestatus(grida) == deststatus(grida) == 
         [0 1 0 0
          0 1 0 0
+         0 0 0 0
          0 0 0 0]
 
     @test parent(source(gridb)) == parent(dest(gridb)) == 
@@ -56,10 +59,10 @@ tspan_ = DateTime(2001):Day(1):DateTime(2001, 2)
     @test sourcestatus(gridb) == deststatus(gridb) == nothing
 
     @test firstindex(grida) == 1
-    @test lastindex(grida) == 20
+    @test lastindex(grida) == 30
     @test gridsize(grida) == (2, 3)
-    @test size(grida) == (4, 5)
-    @test axes(grida) == (0:3, 0:4)
+    @test size(grida) == (6, 5)
+    @test axes(grida) == (0:5, 0:4)
     @test ndims(grida) == 2
     @test eltype(grida) == Int
     @test ismasked(grida, 1, 1) == false
@@ -80,7 +83,9 @@ end
     @test DynamicGrids.source(simdata2[:_default_]) == 
         OffsetArray([0 0 0 0
                      0 1 0 0
-                     0 0 0 0], (0:2, 0:3))
+                     0 0 0 0
+                     0 0 0 0
+                     0 0 0 0], (0:4, 0:3))
 end
 
 @testset "initdata! with replicates" begin

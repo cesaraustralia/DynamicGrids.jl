@@ -123,10 +123,11 @@ simdata::SimData, griddata::GridData{Y,X,R}, opt::NoOpt, rule, rkeys, rgrids,
         i = blocktoind(bi, B)
         # Loop along the block ROW.
         buffers = initialise_buffers(src, Val{R}(), i, 1)
+        blocklen = min(Y, i + B - 1) - i + 1
         for j = 1:X
             buffers = update_buffers(buffers, src, Val{R}(), i, j)
             # Loop over the COLUMN of buffers covering the block
-            for b in 1:B
+            for b in 1:blocklen
                 bufrule = setbuffer(rule, buffers[b])
                 I = i + b - 1, j
                 ismasked(mask, I...) && continue
@@ -139,6 +140,9 @@ simdata::SimData, griddata::GridData{Y,X,R}, opt::NoOpt, rule, rkeys, rgrids,
     end
     return nothing
 end
+
+
+
 # Neighorhood buffer optimisation combined with `SparseOpt`
 function mapneighborhoodrule!(
     simdata::SimData, griddata::GridData{Y,X,R}, opt::SparseOpt, rule, rkeys, rgrids, 
@@ -192,7 +196,8 @@ function mapneighborhoodrule!(
                     jstop = min(jstart + B - 1, X)
                     for j in jstart:jstop
                         # Loop over the grid ROWS inside the block
-                        for b in 1:B
+                        blocklen = min(Y, i + B - 1) - i + 1
+                        for b in 1:blocklen
                             I = i + b - 1, j
                             ismasked(mask, I...) && continue
                             readval = readgrids(rkeys, rgrids, I...)
@@ -229,12 +234,14 @@ function mapneighborhoodrule!(
                 curblockj = (j - jstart) ÷ R + 1
 
                 # Loop over the COLUMN of buffers covering the block
-                for b in 1:B
-                    bufrule = setbuffer(rule, buffers[b])
+                blocklen = min(Y, i + B - 1) - i + 1
+                for b in 1:blocklen
                     # Get the current cell index
                     I = i + b - 1, j
                     # Check the cell isn't masked
                     ismasked(mask, I...) && continue
+                    # Set rule buffer
+                    bufrule = setbuffer(rule, buffers[b])
                     # Get value/s for the cell
                     readval = readgridsorbuffer(rgrids, buffers[b], bufrule, I...)
                     # Run the rule
@@ -320,12 +327,18 @@ end
 
 # Reduces array reads for single grids, when we can just use
 # the center of the neighborhood buffer as the cell state
-@inline readgridsorbuffer(rgrids::Tuple, buffer, rule, I...) =
+@inline function readgridsorbuffer(rgrids::Tuple, buffer, rule, I...)
     readgrids(keys2vals(readkeys(rule)), rgrids, I...)
-@inline readgridsorbuffer(rgrids::ReadableGridData{<:Any,<:Any,R}, buffer, rule, I...) where R =
+end
+@inline function readgridsorbuffer(
+    rgrids::ReadableGridData{<:Any,<:Any,R}, buffer, rule, I...
+) where R
     buffer[R + 1, R + 1]
+end
 
-@generated function update_buffers(buffers::Tuple, src::AbstractArray{T}, ::Val{R}, i, j) where {T,R}
+@generated function update_buffers(
+    buffers::Tuple, src::AbstractArray{T}, ::Val{R}, i, j
+) where {T,R}
     B = 2R; S = 2R + 1; L = S^2
     newvals = Expr[]
     for n in 0:2B-1
