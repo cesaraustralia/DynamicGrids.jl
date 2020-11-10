@@ -1,4 +1,4 @@
-using DynamicGrids, ModelParameters, Setfield, Test
+using DynamicGrids, ModelParameters, Setfield, Test, StaticArrays
 import DynamicGrids: applyrule, applyrule!, maprule!, extent,
        source, dest, currenttime, getreadgrids, getwritegrids, combinegrids,
        SimData, WritableGridData, Rule, Extent, readkeys, writekeys
@@ -63,10 +63,12 @@ end
 end
 
 @testset "Convolution" begin
-    k = [1 0 1; 0 0 0; 1 0 1]
-    buf = [1 0 0; 0 0 1; 0 0 1]
-    ruleonv = Convolution(Kernel(k, buf))
-    @test applyrule(nothing, ruleonv, 0, (3, 3)) == 2
+    k = SA[1 0 1; 0 0 0; 1 0 1]
+    buf = SA[1 0 0; 0 0 1; 0 0 1]
+    rule = Convolution(Kernel(k, buf))
+    @test applyrule(nothing, rule, 0, (3, 3)) == 2
+    output = ArrayOutput(init; tspan=1:2)
+    sim!(output, rule)
 end
 
 @testset "SetNeighbors" begin

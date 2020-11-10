@@ -18,7 +18,7 @@ Moore{3}(allocbuffers(3, init))
 You can also change the length of the buffers tuple to
 experiment with cache performance.
 """
-abstract type Neighborhood{R,B} end
+abstract type Neighborhood{R} end
 
 ConstructionBase.constructorof(::Type{<:T}) where T <: Neighborhood{R} where R =
     T.name.wrapper{R}
@@ -37,7 +37,7 @@ Base.copyto!(dest::Neighborhood, dof, source::Neighborhood, sof, N) =
 """
 Moore-style square neighborhoods
 """
-abstract type RadialNeighborhood{R,B} <: Neighborhood{R,B} end
+abstract type RadialNeighborhood{R} <: Neighborhood{R} end
 
 """
     Moore(radius::Int=1)
@@ -48,7 +48,7 @@ vertical distance of the central cell. The central cell is omitted.
 The `buffer` argument may be required for performance
 optimisation, see [`Neighborhood`](@ref) for details.
 """
-struct Moore{R,B} <: RadialNeighborhood{R,B}
+struct Moore{R,B} <: RadialNeighborhood{R}
     buffer::B
 end
 # Buffer is updated later during the simulation.
@@ -83,7 +83,7 @@ Abstract supertype for kernel neighborhoods.
 
 These inlude the central cell.
 """
-abstract type AbstractKernel{R,B} <: RadialNeighborhood{R,B} end
+abstract type AbstractKernel{R} <: RadialNeighborhood{R} end
 
 kernel(hood::AbstractKernel) = hood.kernel
 
@@ -94,13 +94,12 @@ neighbors(hood::AbstractKernel) = buffer(hood)
 LinearAlgebra.dot(hood::AbstractKernel) = kernel(hood) ⋅ buffer(hood)
 # The central cell is included
 @inline offsets(hood::AbstractKernel{R}) where R = ((i, j) for j in -R:R, i in -R:R)
-@inline setbuffer(n::AbstractKernel{R,K}, buf::B2) where {R,K,B2} = Kernel{R,K,B2}(n.kernel, buf)
 
 """
     Kernel{R}(kernel, buffer=nothing)
 
 """
-struct Kernel{R,K,B} <: AbstractKernel{R,B}
+struct Kernel{R,K,B} <: AbstractKernel{R}
     "Kernal matrix"
     kernel::K
     "Neighborhood buffer"
@@ -114,6 +113,7 @@ end
 @inline Kernel(R::Int) = Kernel{R}(nothing, nothing)
 @inline ConstructionBase.constructorof(::Type{Kernel{R,K,B}}) where {R,K,B} = Kernel{R}
 
+@inline setbuffer(n::Kernel{R,K}, buf::B2) where {R,K,B2} = Kernel{R,K,B2}(n.kernel, buf)
 
 
 # Depreciated 
@@ -162,7 +162,7 @@ that are specified in relation to the central point of the current cell.
 They can be any arbitrary shape or size, but should be listed in column-major
 order for performance.
 """
-abstract type AbstractPositional{R,B} <: Neighborhood{R,B} end
+abstract type AbstractPositional{R} <: Neighborhood{R} end
 
 const CustomOffset = Tuple{Vararg{Int}}
 const CustomOffsets = Union{AbstractArray{<:CustomOffset},Tuple{Vararg{<:CustomOffset}}}
@@ -184,7 +184,7 @@ coordinates if they are not symmetrical.
 The `buffer` argument may be required for performance
 optimisation, see [`Neighborhood`] for more details.
 """
-struct Positional{R,O<:CustomOffsets,B} <: AbstractPositional{R,B}
+struct Positional{R,O<:CustomOffsets,B} <: AbstractPositional{R}
     "A tuple of tuples of Int, containing 2-D coordinates relative to the central point"
     offsets::O
     buffer::B
@@ -229,7 +229,7 @@ Sets of [`Positional`](@ref) neighborhoods that can have separate rules for each
 `neighbors` for `LayeredPositional` returns a tuple of iterators
 for each neighborhood layer.
 """
-struct LayeredPositional{R,L,B} <: AbstractPositional{R,B}
+struct LayeredPositional{R,L,B} <: AbstractPositional{R}
     "A tuple of custom neighborhoods"
     layers::L
     buffer::B
