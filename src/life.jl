@@ -56,11 +56,10 @@ struct Life{R,W,N,B,S,L} <: NeighborhoodRule{R,W}
     "Int, Array, Tuple or Iterable of values that match sum(neighbors) when cell is full"
     survive::S
     lookup::L
-
-    Life{R,W,N,B,S,L}(neighborhood::N, born::B, survive::S, lookup::L) where {R,W,N,B,S,L} = begin
-        lookup = Tuple(i in born for i in 0:8), Tuple(i in survive for i in 0:8)
-        new{R,W,N,B,S,typeof(lookup)}(neighborhood, born, survive, lookup)
-    end
+end
+Life{R,W}(neighborhood::N, born::B, survive::S, lookup_) where {R,W,N,B,S} = begin
+    lookup = Tuple(i in born for i in 0:8), Tuple(i in survive for i in 0:8)
+    Life{R,W,N,B,S,typeof(lookup)}(neighborhood, born, survive, lookup)
 end
 Life{R,W}(neighborhood, born, survive) where {R,W} =
     Life{R,W}(neighborhood, born, survive, nothing)
@@ -70,6 +69,10 @@ Life{R,W}(; neighborhood=Moore(1),
          ) where {R,W} =
     Life{R,W}(neighborhood, born, survive, nothing)
 
+function setbuffer(r::Life{R,W,N,B,S,L}, buffer) where {R,W,N,B,S,L} 
+    hood = setbuffer(r.neighborhood, buffer)
+    Life{R,W,typeof(hood),B,S,L}(hood, r.born, r.survive, r.lookup)
+end
 
 """
     applyrule(data::SimData, rule::Life, state, I)

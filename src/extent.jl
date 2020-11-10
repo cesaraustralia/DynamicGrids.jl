@@ -30,12 +30,12 @@ end
 Extent(init::I, mask::M, aux::A, tspan::T) where {I,M,A,T} = begin
     # Check grid sizes match
     gridsize = if init isa NamedTuple
-        size_ = size(first(init_))
+        size_ = size(first(init))
         if !all(map(i -> size(i) == size_, init))
             throw(ArgumentError("`init` grid sizes do not match"))
         end
     else
-        size_ = size(init_)
+        size_ = size(init)
     end
     if (mask !== nothing) && (size(mask) != size_) 
         throw(ArgumentError("`mask` size do not match `init`"))

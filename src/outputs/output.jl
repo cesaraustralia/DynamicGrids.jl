@@ -96,6 +96,13 @@ Finalise the output display, if it has one.
 finalise(o::Output) = nothing
 
 """
+    finalise(o::Output, data::SimData)
+
+Finalise the output data, then call `finalise(o)`.
+"""
+finalise!(o::Output, data::AbstractSimData) = finalise(o)
+
+"""
     delay(o::Output, f)
 
 `Graphic` outputs delay the simulations to match some `fps` rate,

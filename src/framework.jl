@@ -168,10 +168,7 @@ function simloop!(output::Output, simdata, fspan)
     # Loop over the simulation
     for f in fspan[2:end]
         # Get a data object with updated timestep and precalculate rules
-        simdata = updatetime(simdata, f)
-        precalcrules!(simdata)
-        # Run the ruleset and setup data for the next iteration
-        simdata = sequencerules!(simdata)
+        simdata = updatetime(simdata, f) |> precalcrules |> sequencerules!
         # Save/do something with the the current grid
         storeframe!(output, simdata)
         # Let interface things happen
@@ -182,7 +179,7 @@ function simloop!(output::Output, simdata, fspan)
         if !isrunning(output) || f == last(fspan)
             showframe(output, simdata, f, currenttime(simdata))
             setstoppedframe!(output, f)
-            finalise(output)
+            finalise!(output, simdata)
             break
         end
     end

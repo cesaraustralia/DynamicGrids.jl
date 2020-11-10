@@ -1,6 +1,7 @@
 using DynamicGrids, Test
 using DynamicGrids: isshowable, frameindex, storeframe!, SimData
 
+# Mostly outputs are tested in integration.jl
 @testset "Output construction" begin
     init = [10.0 11.0
             0.0   5.0]

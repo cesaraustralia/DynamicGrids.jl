@@ -2,17 +2,21 @@
 """
 Simulation data specific to a single grid.
 """
-abstract type GridData{T,N,I} <: AbstractArray{T,N} end
+abstract type GridData{Y,X,R,T,N,I} <: AbstractArray{T,N} end
 
-function (::Type{T})(d::GridData) where T <: GridData
-    T(init(d), mask(d), radius(d), opt(d), overflow(d), source(d), dest(d),
-      sourcestatus(d), deststatus(d), localstatus(d))
+function (::Type{G})(d::GridData{Y,X,R,T,N}) where {G<:GridData,Y,X,R,T,N}
+    args = init(d), mask(d), opt(d), overflow(d), padval(d), 
+        source(d), dest(d), sourcestatus(d), deststatus(d)
+    G{Y,X,R,T,N,map(typeof, args)...}(args...)
+end
+function ConstructionBase.constructorof(::Type{T}) where T<:GridData{Y,X,R} where {Y,X,R}
+    T.name.wrapper{Y,X,R}
 end
 
 GridDataOrReps = Union{GridData, Vector{<:GridData}}
 
 # Array interface
-Base.size(d::GridData) = size(source(d))
+Base.size(d::GridData{Y,X,R}) where {Y,X,R} = Y + 2R, X + 2R
 Base.axes(d::GridData) = axes(source(d))
 Base.eltype(d::GridData) = eltype(source(d))
 Base.firstindex(d::GridData) = firstindex(source(d))
@@ -21,15 +25,15 @@ Base.lastindex(d::GridData) = lastindex(source(d))
 # Getters
 init(d::GridData) = d.init
 mask(d::GridData) = d.mask
-radius(d::GridData) = d.radius
+radius(d::GridData{<:Any,<:Any,R}) where R = R
 radius(d::Tuple{<:GridData,Vararg}) = map(radius, d)
 opt(d::GridData) = d.opt
 overflow(d::GridData) = d.overflow
+padval(d::GridData) = d.padval
 source(d::GridData) = d.source
 dest(d::GridData) = d.dest
 sourcestatus(d::GridData) = d.sourcestatus
 deststatus(d::GridData) = d.deststatus
-localstatus(d::GridData) = d.localstatus
 gridsize(d::GridData) = size(init(d))
 gridsize(A::AbstractArray) = size(A)
 gridsize(nt::NamedTuple) = gridsize(first(nt))
@@ -40,49 +44,52 @@ gridsize(t::Tuple{}) = 0, 0
 
 """
     ReadableGridData(griddata::GridData)
-    ReadableGridData(init::AbstractArray, mask, radius, overflow)
+    ReadableGridData{Y,X,R}(init::AbstractArray, mask, opt, overflow, padval)
 
 Simulation data and storage passed to rules for each timestep.
 """
-struct ReadableGridData{T,N,I<:AbstractArray{T,N},M,R,Op,Ov,S,St,LSt} <: GridData{T,N,I}
+struct ReadableGridData{Y,X,R,T,N,I<:AbstractArray{T,N},M,Op,Ov,P,S,D,SSt,DSt} <: GridData{Y,X,R,T,N,I}
     init::I
     mask::M
-    radius::R
     opt::Op
     overflow::Ov
+    padval::P
     source::S
-    dest::S
-    sourcestatus::St
-    deststatus::St
-    localstatus::LSt
+    dest::D
+    sourcestatus::SSt
+    deststatus::DSt
+end
+function ReadableGridData{Y,X,R}(
+    init::I, mask::M, opt::Op, overflow::Ov, padval::P, source::S, 
+    dest::D, sourcestatus::SSt, deststatus::DSt
+) where {Y,X,R,I<:AbstractArray{T,N},M,Op,Ov,P,S,D,SSt,DSt} where {T,N}
+    ReadableGridData{Y,X,R,T,N,I,M,Op,Ov,P,S,D,SSt,DSt}(
+        init, mask, opt, overflow, padval, source, dest, sourcestatus, deststatus
+    )
 end
 # Generate simulation data to match a ruleset and init array.
-function ReadableGridData(init::AbstractArray, mask, radius, opt, overflow)
-    r = radius
+@inline function ReadableGridData{X,Y,R}(
+    init::AbstractArray, mask, opt, overflow, padval
+) where {Y,X,R}
     # We add one extra row and column of status blocks so
     # we dont have to worry about special casing the last block
-    if r > 0
-        hoodsize = 2r + 1
-        blocksize = 2r
-        source = addpadding(init, r)
-        dest = addpadding(init, r)
-        nblocs = indtoblock.(size(source), blocksize) .+ 1
-        sourcestatus = zeros(Bool, nblocs)
-        deststatus = zeros(Bool, nblocs)
-        updatestatus!(source, sourcestatus, deststatus, r)
-        localstatus = zeros(Bool, 2, 2)
+    if R > 0
+        source = addpadding(init, R, padval)
+        dest = addpadding(init, R, padval)
     else
         if opt isa SparseOpt
             opt = NoOpt()
         end
         source = deepcopy(init)
         dest = deepcopy(init)
-        sourcestatus = deststatus = true
-        localstatus = nothing
     end
+    sourcestatus, deststatus = _build_status(opt, source, R)
 
-    ReadableGridData(init, mask, radius, opt, overflow, source, dest,
-                     sourcestatus, deststatus, localstatus)
+    grid = ReadableGridData{X,Y,R}(
+        init, mask, opt, overflow, padval, source, dest, sourcestatus, deststatus
+    )
+    updatestatus!(grid)
+    return grid
 end
 
 Base.parent(d::ReadableGridData) = parent(source(d))
@@ -90,6 +97,16 @@ Base.parent(d::ReadableGridData) = parent(source(d))
 @propagate_inbounds function Base.getindex(d::ReadableGridData, I...)
     getindex(source(d), I...)
 end
+
+function _build_status(opt::SparseOpt, source, r)
+    hoodsize = 2r + 1
+    blocksize = 2r
+    nblocs = indtoblock.(size(source), blocksize) .+ 1
+    sourcestatus = zeros(Bool, nblocs)
+    deststatus = zeros(Bool, nblocs)
+    sourcestatus, deststatus
+end
+_build_status(opt::PerformanceOpt, init, r) = nothing, nothing
 
 
 """
@@ -99,19 +116,30 @@ Passed to rules `<: ManualRule`, and can be written to directly as
 an array. This handles updates to SparseOpt() and writing to
 the correct source/dest array.
 """
-struct WritableGridData{T,N,I<:AbstractArray{T,N},M,R,Op,Ov,S,St,LSt} <: GridData{T,N,I}
+struct WritableGridData{Y,X,R,T,N,I<:AbstractArray{T,N},M,Op,Ov,P,S,D,SSt,DSt} <: GridData{Y,X,R,T,N,I}
     init::I
     mask::M
-    radius::R
     opt::Op
     overflow::Ov
+    padval::P
     source::S
-    dest::S
-    sourcestatus::St
-    deststatus::St
-    localstatus::LSt
+    dest::D
+    sourcestatus::SSt
+    deststatus::DSt
+end
+function WritableGridData{Y,X,R}(
+    init::I, mask::M, opt::Op, overflow::Ov, padval::P, source::S, 
+    dest::D, sourcestatus::SSt, deststatus::DSt
+) where {Y,X,R,I<:AbstractArray{T,N},M,Op,Ov,P,S,D,SSt,DSt} where {T,N}
+    WritableGridData{Y,X,R,T,N,I,M,Op,Ov,P,S,D,SSt,DSt}(
+        init, mask, opt, overflow, padval, source, dest, sourcestatus, deststatus
+    )
 end
 
+Base.parent(d::WritableGridData) = parent(dest(d))
+@propagate_inbounds function Base.getindex(d::WritableGridData, I...)
+    getindex(source(d), I...)
+end
 Base.@propagate_inbounds Base.setindex!(d::WritableGridData, x, I...) = begin
     r = radius(d)
     _setdeststatus!(d, x, I)
@@ -140,17 +168,12 @@ function _setdeststatus!(d::WritableGridData, opt::SparseOpt, x, I)
 end
 _setdeststatus!(d::WritableGridData, opt, x, I) = nothing
 
-Base.parent(d::WritableGridData) = parent(dest(d))
-@propagate_inbounds function Base.getindex(d::WritableGridData, I...)
-    getindex(source(d), I...)
-end
 
 
-
-abstract type AbstractSimData end
+abstract type AbstractSimData{Y,X} end
 
 """
-    SimData(extent::Extent, ruleset::Ruleset)
+    SimData(extent::Extent, ruleset::AbstractRuleset)
 
 Simulation dataset to hold all intermediate arrays, timesteps
 and frame numbers for the current frame of the simulation.
@@ -180,6 +203,7 @@ In single grid simulations `SimData` can be indexed directly as if it is a `Matr
 - `radius(data::SimData)` : returns the `Int` radius used on the grid,
   which is also the amount of border padding.
 - `overflow(data::SimData)` : returns the [`Overflow`](@ref) - `RemoveOverflow` or `WrapOverflow`.
+- `padval(data::SimData)` : returns the value to use as grid border padding.
 
 These are available, but you probably shouldn't use them and thier behaviour
 is not guaranteed in furture versions. They will mean rule is useful only
@@ -188,34 +212,45 @@ in specific contexts.
 - `extent(d::SimData)` : get the simulation [`Extent`](@ref) object.
 - `init(data::SimData)` : get the simulation init `AbstractArray`/`NamedTuple`
 - `mask(data::SimData)` : get the simulation mask `AbstractArray`
-- `ruleset(d::SimData)` : get the simulation [`Ruleset`](@ref).
+- `ruleset(d::SimData)` : get the simulation [`AbstractRuleset`](@ref).
 - `source(data::SimData)` : get the `source` grid that is being read from.
 - `dest(data::SimData)` : get the `dest` grid that is being written to.
 
 """
-struct SimData{G<:NamedTuple,E,R,PR,F} <: AbstractSimData
+struct SimData{Y,X,G<:NamedTuple,E,RS,PRS,F} <: AbstractSimData{Y,X}
     grids::G
     extent::E
-    ruleset::R
-    precalculated_ruleset::PR
+    ruleset::RS
+    precalculated_ruleset::PRS
     currentframe::F
 end
 # Convert grids in extent to NamedTuple
-SimData(extent, ruleset::Ruleset) =
-    SimData(asnamedtuple(extent), ruleset::Ruleset)
-SimData(extent::Extent{<:NamedTuple{Keys}}, ruleset::Ruleset) where Keys = begin
+SimData(extent, ruleset::AbstractRuleset) = SimData(asnamedtuple(extent), ruleset)
+SimData(extent::Extent{<:NamedTuple{Keys}}, ruleset::AbstractRuleset) where Keys = begin
     # Calculate the neighborhood radus (and grid padding) for each grid
+    y, x = gridsize(extent)
     radii = NamedTuple{Keys}(get(radius(ruleset), key, 0) for key in Keys)
     # Construct the SimData for each grid
-    griddata = map(init(extent), radii) do in, ra
-        ReadableGridData(in, mask(extent), ra, opt(ruleset), overflow(ruleset))
+    grids = map(init(extent), radii) do in, r
+        ReadableGridData{y,x,r}(in, mask(extent), opt(ruleset), overflow(ruleset), padval(ruleset))
     end
-    SimData(griddata, extent, ruleset)
+    SimData(grids, extent, ruleset)
 end
-SimData(griddata::NamedTuple, extent, ruleset::Ruleset) = begin
+@inline SimData(grids::G, extent::E, ruleset::RS) where {G,E,RS} = begin
     currentframe = 1;
-    SimData(griddata, extent, ruleset, ruleset, currentframe)
+    Y, X = gridsize(extent)
+    precalc_rs = StaticRuleset(ruleset)
+    SimData{Y,X,G,E,RS,typeof(precalc_rs),Int}(
+        grids, extent, ruleset, precalc_rs, currentframe
+    )
 end
+# For ConstrutionBase
+SimData{Y,X}(
+    grids::G, extent::E, ruleset::RS, precalculated_ruleset::PRS, currentframe::F
+) where {Y,X,G,E,RS,PRS,F} = begin
+    SimData{Y,X,G,E,RS,PRS,F}(grids, extent, ruleset, precalculated_ruleset, currentframe)
+end
+ConstructionBase.constructorof(::Type{<:SimData{Y,X}}) where {Y,X} = SimData{Y,X}
 
 # Getters
 extent(d::SimData) = d.extent
@@ -237,6 +272,7 @@ currenttime(d::Vector{<:SimData}) = currenttime(d[1])
 Base.getindex(d::SimData, i::Symbol) = getindex(grids(d), i)
 
 @propagate_inbounds Base.setindex!(d::SimData, x, I...) = setindex!(first(grids(d)), x, I...)
+@propagate_inbounds Base.getindex(d::SimData, I...) = getindex(first(grids(d)), I...)
 Base.keys(d::SimData) = keys(grids(d))
 Base.values(d::SimData) = values(grids(d))
 Base.first(d::SimData) = first(grids(d))
@@ -245,6 +281,7 @@ Base.last(d::SimData) = last(grids(d))
 gridsize(d::SimData) = gridsize(first(d))
 opt(d::SimData) = opt(ruleset(d))
 overflow(d::SimData) = overflow(ruleset(d))
+padval(d::SimData) = padval(ruleset(d))
 rules(d::SimData) = rules(ruleset(d))
 precalculated_rules(d::SimData) = rules(precalculated_ruleset(d))
 cellsize(d::SimData) = cellsize(ruleset(d))
@@ -275,11 +312,11 @@ Find the maximum radius required by all rules
 Add padding around the original init array, offset into the negative
 So that the first real cell is still 1, 1
 =#
-function addpadding(init::AbstractArray{T,N}, r) where {T,N}
+function addpadding(init::AbstractArray{T,N}, r, padval) where {T,N}
     sze = size(init)
-    paddedsize = sze .+ 2r
-    paddedindices = -r + 1:sze[1] + r, -r + 1:sze[2] + r
-    sourceparent = fill!(similar(init, paddedsize), zero(T))
+    paddedsize = sze .+ 4r
+    paddedindices = -r + 1:sze[1] + 3r, -r + 1:sze[2] + 3r
+    sourceparent = fill!(similar(init, paddedsize), padval)
     source = OffsetArray(sourceparent, paddedindices...)
     # Copy the init array to the middle section of the source array
     for j in 1:size(init, 2), i in 1:size(init, 1)
@@ -292,26 +329,24 @@ end
 Initialise the block status array.
 This tracks whether anything has to be done in an area of the main array.
 =#
-function updatestatus!(grid::GridData)
-    updatestatus!(parent(source(grid)), sourcestatus(grid), deststatus(grid), radius(grid))
-end
-function updatestatus!(source, sourcestatus, deststatus, radius)
-    blocksize = 2radius
-    source = parent(source)
-    for i in CartesianIndices(source)
+updatestatus!(grid::GridData) = updatestatus!(opt(grid), grid)
+function updatestatus!(opt::SparseOpt, grid)
+    blocksize = 2 * radius(grid)
+    src = parent(source(grid))
+    for i in CartesianIndices(src)
         # Mark the status block if there is a non-zero value
-        if source[i] != 0
+        if !can_skip(opt, src[i])
             bi = indtoblock.(Tuple(i), blocksize)
-            @inbounds sourcestatus[bi...] = true
-            @inbounds deststatus[bi...] = true
+            @inbounds sourcestatus(grid)[bi...] = true
+            @inbounds deststatus(grid)[bi...] = true
         end
     end
     return nothing
 end
-updatestatus!(source, sourcestatus::Bool, deststatus::Bool, radius) = nothing
+updatestatus!(opt, grid) = nothing
 
 # When replicates are an Integer, construct a vector of SimData
-function initdata!(::Nothing, extent, ruleset::Ruleset, nreplicates::Integer)
+function initdata!(::Nothing, extent, ruleset::AbstractRuleset, nreplicates::Integer)
     [SimData(extent, ruleset) for r in 1:nreplicates]
 end
 # When simdata is a Vector, the existing SimData arrays are re-initialised
@@ -321,15 +356,15 @@ function initdata!(
     map(d -> initdata!(d, extent, ruleset, nothing), simdata)
 end
 # When no simdata is passed in, create new SimData
-function initdata!(::Nothing, extent, ruleset::Ruleset, nreplicates::Nothing)
+function initdata!(::Nothing, extent, ruleset::AbstractRuleset, nreplicates::Nothing)
     SimData(extent, ruleset)
 end
 # Initialise a SimData object with a new `Extent` and `Ruleset`.
 function initdata!(
-    simdata::AbstractSimData, extent::Extent, ruleset::Ruleset, nreplicates::Nothing
-)
+    simdata::AbstractSimData{Y,X}, extent::Extent, ruleset::AbstractRuleset, nreplicates::Nothing
+) where {Y,X}
     map(values(simdata), values(init(extent))) do grid, init
-        for j in 1:gridsize(grid)[2], i in 1:gridsize(grid)[1]
+        for j in 1:X, i in 1:Y
             @inbounds source(grid)[i, j] = dest(grid)[i, j] = init[i, j]
         end
         updatestatus!(grid)
@@ -340,7 +375,7 @@ function initdata!(
 end
 
 # Convert regular index to block index
-indtoblock(x::Int, blocksize::Int) = (x - 1) ÷ blocksize + 1
+@inline indtoblock(x::Int, blocksize::Int) = (x - 1) ÷ blocksize + 1
 
 # Convert block index to regular index
-blocktoind(x, blocksize) = (x - 1) * blocksize + 1
+@inline blocktoind(x, blocksize) = (x - 1) * blocksize + 1

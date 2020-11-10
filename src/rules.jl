@@ -193,7 +193,8 @@ positions(rule::NeighborhoodRule, args...) = positions(neighborhood(rule), args.
 neighborhoodkey(rule::NeighborhoodRule{R,W}) where {R,W} = R
 # The first argument is for the neighborhood grid
 neighborhoodkey(rule::NeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
-
+@inline setbuffer(rule::NeighborhoodRule, buffer) = 
+    @set rule.neighborhood = setbuffer(rule.neighborhood, buffer)
 
 """
 A Rule that only writes to its neighborhood, defined by its radius distance from the
@@ -434,34 +435,38 @@ end
     Convolution(f, neighborhood=Moor(1)) 
     Convolution{R,W}(f, neighborhood=Moor(1))
 
-A [`ManualRule`](@ref) to manually write to the array where you need to. 
-`f` is passed an indexable `data` object, and the index of the current cell, 
-followed by the required grid values for the index.
+A `Rule` that runs a basic convolution kernel over the grid.
 
-To update the grid, you can use: [`add!`](@ref), [`sub!`](@ref) for `Number`,
-and [`and!`](@ref), [`or!`](@ref) for `Bool`. These methods safely combined 
-writes from all grid cells - directly using `setindex!` would cause bugs.
+# Performance
+
+_Always_ use StaticArrays.jl to define the kernel matrix.
+
+Small radius convolutions in DynamicGrids.jl will be faster than using
+DSP.jl (~2x for radius 1). As the radius increases or grid size gets very large 
+(over 800*800) DSP.jl will be faster. But `Convolution` is very convenient 
+to use in the middle of a simlulation, combined with some other rules.
+
+This is due to convolutions using the same mechanisms set up to run arbrary rules
+on neighborhoods (not just matrix multiply), and cannot be linearised in the same way
+as DSP.jl.
 
 ## Example
 
 ```julia
-rule = let x = 10
-    Convolution{Tuple{:a,:b},:b}() do data, I, a, b
-        add!(data[:b], a^x, I...)
-    end
-end
+rule = Convolution(Kernel(SA[0.05 0.1 0.05; 0.1 0.4 0.1; 0.05 0.1 0.05]))
 ```
-The `let` block greatly improves performance.
 """
-struct Convolution{R,W,N} <: ManualNeighborhoodRule{R,W}
+struct Convolution{R,W,N} <: NeighborhoodRule{R,W}
     "The neighborhood of cells around the central cell"
     neighborhood::N
 end
+Convolution{R,W}(neighborhood::N) where {R,W,N} = Convolution{R,W,N}(neighborhood)
 Convolution{R,W}(; neighborhood) where {R,W} = Convolution{R,W}(neighborhood)
+ConstructionBase.constructorof(::Type{Convolution{R,W}}) where {R,W} = Convolution{R,W}
 
 @inline function applyrule(data, rule::Convolution, read, I)
     kernel = neighborhood(rule)
-    LinearAlgebra.dot(kernel)
+    @inbounds LinearAlgebra.dot(kernel.buffer, kernel.kernel)
 end
 
 """
@@ -474,13 +479,13 @@ method(rule::Union{Cell,Neighbors,Manual}) = rule.f
 
 # Utils
 
-@noinline _nofunctionerror(T) = 
-    throw(ArgumentError("No function passed to $T. did you mean to use a `do` block?"))
+@noinline _nofunctionerror(t) = 
+    throw(ArgumentError("No function passed to $t. Did you mean to use a do block?"))
 
 # Check number of args passed in as we don't get a normal method 
 # error because of the splatted args in the default constructor.
-function _checkfields(::Type{T}, args) where T 
-    length(fieldnames(T)) == length(args) || _fielderror(T, args)
+@generated function _checkfields(::Type{T}, args::A) where {T,A<:Tuple}
+    length(fieldnames(T)) == length(fieldnames(A)) ? :(nothing) : :(_fielderror(T, args))
 end
 
 @noinline function _fielderror(T, args)

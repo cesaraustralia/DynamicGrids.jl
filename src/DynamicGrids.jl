@@ -20,6 +20,7 @@ using Colors,
       REPL,
       Reexport,
       Setfield,
+      StaticArrays,
       Test,
       UnicodeGraphics
 
@@ -44,7 +45,7 @@ export Rule, NeighborhoodRule, CellRule, ManualRule, ManualNeighborhoodRule, Gri
 
 export Cell, Neighbors, SetNeighbors, Convolution, Manual, Chain, Life, Grid 
 
-export AbstractRuleset, Ruleset
+export AbstractRuleset, Ruleset, StaticRuleset
 
 export Neighborhood, RadialNeighborhood, AbstractKernel, Kernel, Moore,
        AbstractPositional, Positional, VonNeumann, LayeredPositional
@@ -53,7 +54,7 @@ export PerformanceOpt, NoOpt, SparseOpt
 
 export Overflow, RemoveOverflow, WrapOverflow
 
-export Output, GraphicOutput, ImageOutput, ArrayOutput, REPLOutput, GifOutput
+export Output, GraphicOutput, ImageOutput, ArrayOutput, ResultOutput, REPLOutput, GifOutput
 
 export GridProcessor, SingleGridProcessor, ColorProcessor, SparseOptInspector,
        MultiGridProcessor, ThreeColorProcessor, LayoutProcessor

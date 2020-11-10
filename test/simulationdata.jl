@@ -1,6 +1,6 @@
 using DynamicGrids, OffsetArrays, Test, Dates
 using DynamicGrids: initdata!, data, init, mask, radius, overflow, source, 
-    dest, sourcestatus, deststatus, localstatus, gridsize,
+    dest, sourcestatus, deststatus, gridsize,
     ruleset, grids, currentframe, grids, SimData, Extent,
     updatetime, ismasked, currenttimestep, WritableGridData, tspan
 
@@ -15,9 +15,10 @@ rs = Ruleset(life, timestep=Day(1));
 tspan_ = DateTime(2001):Day(1):DateTime(2001, 2)
 
 @testset "initdata!" begin
+    rs = Ruleset(life, timestep=Day(1); opt=SparseOpt());
 
-    extent = Extent(; init=initab, tspan=tspan_)
-    simdata = initdata!(nothing, extent, rs, nothing)
+    ext = Extent(; init=initab, tspan=tspan_)
+    simdata = SimData(ext, rs)
     @test simdata isa SimData
     @test init(simdata) == initab
     @test ruleset(simdata) === rs
@@ -52,26 +53,27 @@ tspan_ = DateTime(2001):Day(1):DateTime(2001, 2)
     @test parent(source(gridb)) == parent(dest(gridb)) == 
         [2 2 2
          2 2 2]
-    @test sourcestatus(gridb) == deststatus(gridb) == true
+    @test sourcestatus(gridb) == deststatus(gridb) == nothing
 
     @test firstindex(grida) == 1
     @test lastindex(grida) == 20
+    @test gridsize(grida) == (2, 3)
     @test size(grida) == (4, 5)
     @test axes(grida) == (0:3, 0:4)
     @test ndims(grida) == 2
     @test eltype(grida) == Int
     @test ismasked(grida, 1, 1) == false
 
-    extent = Extent(; init=initab, tspan=tspan_)
-    initdata!(simdata, extent, rs, nothing)
+    ext = Extent(; init=initab, tspan=tspan_)
+    initdata!(simdata, ext, rs, nothing)
 end
 
 @testset "initdata! with :_default_" begin
     initx = [1 0]
     rs = Ruleset(Life())
-    extent = Extent(; init=(_default_=initx,), tspan=tspan_)
-    simdata = initdata!(nothing, extent, rs, nothing)
-    simdata2 = initdata!(simdata, extent, rs, nothing)
+    ext = Extent(; init=(_default_=initx,), tspan=tspan_)
+    simdata = SimData(ext, rs)
+    simdata2 = initdata!(simdata, ext, rs, nothing)
     @test keys(simdata2) == (:_default_,)
     @test DynamicGrids.ruleset(simdata2) === rs
     @test DynamicGrids.init(simdata2[:_default_]) == [1 0]

@@ -36,8 +36,7 @@ isinferred(output::Output, rules::Rule...) = isinferred(output, Ruleset(rules...
 function isinferred(output::Output, ruleset::Ruleset)
     ext = extent(output)
     ext = @set ext.init = asnamedtuple(init(output))
-    simdata = SimData(ext, ruleset)
-    precalcrules!(simdata)
+    simdata = SimData(ext, ruleset) |> precalcrules
     map(precalculated_rules(simdata)) do rule
         isinferred(simdata, rule)
     end
