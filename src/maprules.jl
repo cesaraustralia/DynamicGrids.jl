@@ -42,9 +42,81 @@ function maprule!(simdata::SimData, rule::GridRule)
     _checkhassparseopt(wgrids)
     tempsimdata = combinegrids(simdata, rkeys, rgrids, wkeys, wgrids)
     # Run the rule loop
-    applyrule!(tempsimdata, rule) 
+    applyrule!(tempsimdata, rule)
     # Combine the written grids with the original simdata
     replacegrids(simdata, wkeys, _to_readonly(wgrids))
+end
+
+
+# GPUopt
+function maprule!(
+    simdata::SimData, opt::GPUopt, rule::Rule, rkeys, rgrids, wkeys, wgrids, mask
+)
+    kernel! = applyrule_kernel!(CPU(), 4)
+    wait(kernel!(
+        simdata, rule, rkeys, rgrids, wkeys, wgrids, mask;
+        ndrange=gridsize(simdata)
+    ))
+end
+
+# GPUopt
+function maprule!(
+    simdata::SimData, opt::GPUopt, rule::ManualRule, rkeys, rgrids, wkeys, wgrids, mask
+)
+    kernel! = applyrule_kernel!(CPU(), 4)
+    wait(kernel!(
+        simdata, rule, rkeys, rgrids, wkeys, wgrids, mask;
+        ndrange=gridsize(simdata)
+    ))
+end
+
+function maprule!(
+    simdata::SimData, opt::GPUopt,
+    rule::Union{NeighborhoodRule,Chain{<:Any,<:Any,<:Tuple{<:NeighborhoodRule,Vararg}}},
+    rkeys, rgrids, wkeys, wgrids, mask
+)
+    griddata = simdata[neighborhoodkey(rule)]
+    src, dst = parent(source(griddata)), parent(dest(griddata))
+
+    #= Blocks are 1 cell smaller than the neighborhood, because this works very nicely
+    for looking at only 4 blocks at a time. Larger blocks mean each neighborhood is more
+    likely to be active, smaller means handling more than 2 neighborhoods per block.
+    It would be good to test if this is the sweet spot for performance =#
+    kernel! = applyrule_kernel!(CPU(), 4)
+    wait(kernel!(
+        simdata, griddata, rule, rkeys, rgrids, wkeys, wgrids, mask;
+        ndrange=gridsize(simdata)
+    ))
+    return nothing
+end
+
+@kernel function applyrule_kernel!(
+    simdata::SimData, grid::GridData{Y,X,R}, rule::NeighborhoodRule,
+    rkeys, rgrids, wkeys, wgrids, mask
+) where {Y,X,R}
+    i, j = @index(Global, NTuple)
+    buffer = view(parent(source(grid)), i:i+2R, j:j+2R)
+    bufrule = setbuffer(rule, buffer)
+    readval = readgrids(rkeys, rgrids, i, j)
+    writeval = applyrule(simdata, bufrule, readval, (i, j))
+    writegrids!(wgrids, writeval, i, j)
+end
+
+@kernel function applyrule_kernel!(
+    simdata::SimData, rule::ManualRule, rkeys, rgrids, wkeys, wgrids, mask
+)
+    i, j = @index(Global, NTuple)
+    readval = readgrids(rkeys, rgrids, i, j)
+    applyrule!(simdata, rule, readval, (i, j))
+end
+
+@kernel function applyrule_kernel!(
+    simdata::SimData, rule::Rule, rkeys, rgrids, wkeys, wgrids, mask
+)
+    i, j = @index(Global, NTuple)
+    readval = readgrids(rkeys, rgrids, i, j)
+    writeval = applyrule(simdata, rule, readval, (i, j))
+    writegrids!(wgrids, writeval, i, j)
 end
 
 maybeupdatedest!(ds::Tuple, rule) = map(d -> maybeupdatedest!(d, rule), ds)
@@ -66,12 +138,14 @@ _to_readonly(data::WritableGridData) = ReadableGridData(data)
 _hassparseopt(wgrids::Tuple) = any(o -> o isa SparseOpt, map(opt, wgrids))
 _hassparseopt(wgrid) = opt(wgrid) isa SparseOpt
 
-@noinline _checkhassparseopt(wgrids) = 
+@noinline _checkhassparseopt(wgrids) =
     _hassparseopt(wgrids) && error("Cant use SparseOpt with a GridRule")
 
-function maprule!(simdata::SimData, opt::PerformanceOpt, rule::Rule,
-                  rkeys, rgrids, wkeys, wgrids, mask)
-    let simdata=simdata, opt=opt, rule=rule, rkeys=rkeys, rgrids=rgrids, wkeys=wkeys, wgrids=wgrids
+function maprule!(
+    simdata::SimData, opt, rule::Rule, rkeys, rgrids, wkeys, wgrids, mask
+)
+    let simdata=simdata, opt=opt, rule=rule, rkeys=rkeys, 
+        rgrids=rgrids, wkeys=wkeys, wgrids=wgrids
         optmap(opt, rgrids, wgrids) do i, j
             ismasked(mask, i, j) && return nothing
             readval = readgrids(rkeys, rgrids, i, j)
@@ -81,9 +155,11 @@ function maprule!(simdata::SimData, opt::PerformanceOpt, rule::Rule,
         end
     end
 end
-function maprule!(simdata::SimData, opt::PerformanceOpt, rule::ManualRule,
-                  rkeys, rgrids, wkeys, wgrids, mask)
-    let simdata=simdata, opt=opt, rule=rule, rkeys=rkeys, rgrids=rgrids, wkeys=wkeys, wgrids=wgrids
+function maprule!(
+    simdata::SimData, opt, rule::ManualRule, rkeys, rgrids, wkeys, wgrids, mask
+)
+    let simdata=simdata, opt=opt, rule=rule, rkeys=rkeys, rgrids=rgrids, 
+        wkeys=wkeys, wgrids=wgrids
         optmap(opt, rgrids, wgrids) do i, j
             ismasked(mask, i, j) && return
             readval = readgrids(rkeys, rgrids, i, j)
@@ -93,10 +169,10 @@ function maprule!(simdata::SimData, opt::PerformanceOpt, rule::ManualRule,
     end
 end
 function maprule!(
-    simdata::SimData{Y,X}, opt::PerformanceOpt,
-    rule::Union{NeighborhoodRule,Chain{<:Any,<:Any,<:Tuple{<:NeighborhoodRule,Vararg}}}, 
+    simdata::SimData, opt::PerformanceOpt,
+    rule::Union{NeighborhoodRule,Chain{<:Any,<:Any,<:Tuple{<:NeighborhoodRule,Vararg}}},
     rkeys, rgrids, wkeys, wgrids, mask
-) where {Y,X}
+)
     griddata = simdata[neighborhoodkey(rule)]
     src, dst = parent(source(griddata)), parent(dest(griddata))
 
@@ -113,13 +189,13 @@ end
 # Neighorhood buffer optimisation without `SparseOpt`
 # This is too many arguments
 function mapneighborhoodrule!(
-simdata::SimData, griddata::GridData{Y,X,R}, opt::NoOpt, rule, rkeys, rgrids, 
-    wkeys, wgrids, src, dst, mask
+    simdata::SimData, griddata::GridData{Y,X,R}, opt::NoOpt, rule, 
+    rkeys, rgrids, wkeys, wgrids, src, dst, mask
 ) where {Y,X,R}
     B = 2R
     # Loop down a block COLUMN
     for bi = 1:indtoblock(Y, B)
-        # Get current block
+        # Get current blocj:k
         i = blocktoind(bi, B)
         # Loop along the block ROW.
         buffers = initialise_buffers(src, Val{R}(), i, 1)
@@ -141,11 +217,9 @@ simdata::SimData, griddata::GridData{Y,X,R}, opt::NoOpt, rule, rkeys, rgrids,
     return nothing
 end
 
-
-
 # Neighorhood buffer optimisation combined with `SparseOpt`
 function mapneighborhoodrule!(
-    simdata::SimData, griddata::GridData{Y,X,R}, opt::SparseOpt, rule, rkeys, rgrids, 
+    simdata::SimData, griddata::GridData{Y,X,R}, opt::SparseOpt, rule, rkeys, rgrids,
     wkeys, wgrids, src, dst, mask
 ) where {Y,X,R}
     B = 2R
@@ -282,7 +356,7 @@ This can lead to order of magnitude performance improvments in sparse
 simulations where large areas of the grid are filled with zeros.
 """
 function optmap(
-    f, ::SparseOpt, rgrids::GridOrGridTuple, 
+    f, ::SparseOpt, rgrids::GridOrGridTuple,
     wgrids::Union{<:GridData{Y,X,R},Tuple{Vararg{<:GridData{Y,X,R}}}}
 ) where {Y,X,R}
     # Only use SparseOpt for single-grid rules with grid radii > 0
@@ -317,7 +391,7 @@ end
 
 Maps rule applicator over the grid with no optimisation
 """
-function optmap(f, ::NoOpt, rgrids::GridOrGridTuple, 
+function optmap(f, ::NoOpt, rgrids::GridOrGridTuple,
     wgrids::Union{<:GridData{Y,X,R},Tuple{Vararg{<:GridData{Y,X,R}}}}
 ) where {Y,X,R}
     for j in 1:X, i in 1:Y
