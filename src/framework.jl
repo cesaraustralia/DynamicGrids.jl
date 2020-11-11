@@ -38,7 +38,7 @@ function sim!(
      aux=aux(output),
      fps=fps(output),
      nreplicates=nothing,
-     simdata=nothing, 
+     simdata=nothing,
      kwargs...
 )
     gridsize(init) == gridsize(DG.init(output)) || throw(ArgumentError("init size does not match output init"))
@@ -73,9 +73,18 @@ end
 Run a simulation passing in rules without defining a `Ruleset`.
 """
 sim!(output::Output, rules::Tuple; kwargs...) = sim!(output::Output, rules...; kwargs...)
-function sim!(output::Output, rules::Rule...; tspan=tspan(output), kwargs...)
-    ruleset = Ruleset(rules...; timestep=step(tspan), kwargs...)
-    return sim!(output::Output, ruleset; tspan=tspan, kwargs...)
+function sim!(output::Output, rules::Rule...;
+    overflow=RemoveOverflow(),
+    opt=NoOpt(),
+    cellsize=1,
+    timestep=nothing,
+    padval=0,
+    kwargs...
+)
+    ruleset = Ruleset(rules...;
+        overflow=overflow, opt=opt, cellsize=cellsize, timestep=timestep, padval=padval
+    )
+    return sim!(output::Output, ruleset; kwargs...)
 end
 
 """
@@ -135,13 +144,13 @@ end
     runsim!(output::Output, args...)
 
 Simulation runner. Runs a simulation synchonously or asynchonously
-depending on the return value of `isasync(output)` - which may be a 
+depending on the return value of `isasync(output)` - which may be a
 fixed trait or a field value depending on the output type.
 
 This allows interfaces with interactive components to update during
 the simulations.
 """
-function runsim!(output, simdata, ruleset, fspan) 
+function runsim!(output, simdata, ruleset, fspan)
     if isasync(output)
         @async simloop!(output, simdata, ruleset, fspan)
     else
@@ -156,8 +165,8 @@ Loop over the frames in `fspan`, running the ruleset and displaying the output.
 
 Operations on outputs and rulesets are allways mutable and in-place.
 
-Operations on [`Rule`](@ref)s and [`SimData`](@ref) objects are in a 
-functional style, as they are used in inner loops where immutability improves 
+Operations on [`Rule`](@ref)s and [`SimData`](@ref) objects are in a
+functional style, as they are used in inner loops where immutability improves
 performance.
 """
 function simloop!(output::Output, simdata, ruleset, fspan)
@@ -168,8 +177,8 @@ function simloop!(output::Output, simdata, ruleset, fspan)
     # Loop over the simulation
     for f in fspan[2:end]
         # Get a data object with updated timestep and precalculate rules
-        simdata = updatetime(simdata, f) |> 
-            sd -> precalcrules(sd, rules(ruleset)) |> 
+        simdata = updatetime(simdata, f) |>
+            sd -> precalcrules(sd, rules(ruleset)) |>
             sequencerules!
         # Save/do something with the the current grid
         storeframe!(output, simdata)

@@ -110,10 +110,9 @@ function maprule!(
     return nothing
 end
 
-# Neighorhood buffer optimisation without `SparseOpt`
-# This is too many arguments
+# General neighorhood buffer windowing
 function mapneighborhoodrule!(
-simdata::SimData, griddata::GridData{Y,X,R}, opt::NoOpt, rule, rkeys, rgrids, 
+    simdata::SimData, griddata::GridData{Y,X,R}, opt::NoOpt, rule, rkeys, rgrids, 
     wkeys, wgrids, src, dst, mask
 ) where {Y,X,R}
     B = 2R
@@ -143,7 +142,7 @@ end
 
 
 
-# Neighorhood buffer optimisation combined with `SparseOpt`
+# Neighorhood buffer windowing combined with `SparseOpt`
 function mapneighborhoodrule!(
     simdata::SimData, griddata::GridData{Y,X,R}, opt::SparseOpt, rule, rkeys, rgrids, 
     wkeys, wgrids, src, dst, mask
