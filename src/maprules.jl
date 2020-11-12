@@ -52,7 +52,8 @@ end
 function maprule!(
     simdata::SimData, opt::GPUopt, rule::Rule, rkeys, rgrids, wkeys, wgrids, mask
 )
-    kernel! = applyrule_kernel!(CPU(), 4)
+    # kernel! = applyrule_kernel!(CUDADevice(),512)
+    kernel! = applyrule_kernel!(CPU(),5)
     wait(kernel!(
         simdata, rule, rkeys, rgrids, wkeys, wgrids, mask;
         ndrange=gridsize(simdata)
@@ -63,7 +64,8 @@ end
 function maprule!(
     simdata::SimData, opt::GPUopt, rule::ManualRule, rkeys, rgrids, wkeys, wgrids, mask
 )
-    kernel! = applyrule_kernel!(CPU(), 4)
+    # kernel! = applyrule_kernel!(CUDADevice(),512)
+    kernel! = applyrule_kernel!(CPU(),5)
     wait(kernel!(
         simdata, rule, rkeys, rgrids, wkeys, wgrids, mask;
         ndrange=gridsize(simdata)
@@ -77,59 +79,55 @@ function maprule!(
 )
     griddata = simdata[neighborhoodkey(rule)]
     src, dst = parent(source(griddata)), parent(dest(griddata))
+    r = radius(rule)
 
     #= Blocks are 1 cell smaller than the neighborhood, because this works very nicely
     for looking at only 4 blocks at a time. Larger blocks mean each neighborhood is more
     likely to be active, smaller means handling more than 2 neighborhoods per block.
     It would be good to test if this is the sweet spot for performance =#
-    kernel! = applyrule_kernel!(CPU(), 4)
+    kernel! = applyrule_kernel!(CUDADevice(),128)
+    # kernel! = applyrule_kernel!(CPU(),5)
     wait(kernel!(
-        simdata, griddata, rule, rkeys, rgrids, wkeys, wgrids, mask;
-        ndrange=gridsize(simdata)
+        simdata, griddata, rule, rkeys, rgrids, wkeys, wgrids, src, dst, mask;
+        ndrange=indtoblock(gridsize(simdata)[1], 2r)
     ))
+
     return nothing
 end
 
-@kernel function applyrule_kernel!(
-    simdata::SimData, grid::GridData{Y,X,R}, rule::NeighborhoodRule,
-    rkeys, rgrids, wkeys, wgrids, mask
-) where {Y,X,R}
-    i, j = @index(Global, NTuple)
-    buffer = view(parent(source(grid)), i:i+2R, j:j+2R)
-    bufrule = setbuffer(rule, buffer)
-    readval = readgrids(rkeys, rgrids, i, j)
-    writeval = applyrule(simdata, bufrule, readval, (i, j))
-    writegrids!(wgrids, writeval, i, j)
+@kernel function applyrule_kernel!(args...)
+    bi = @index(Global, NTuple)
+    rowkernel(args..., bi[1])
 end
 
-@kernel function applyrule_kernel!(
-    simdata::SimData, rule::ManualRule, rkeys, rgrids, wkeys, wgrids, mask
-)
-    i, j = @index(Global, NTuple)
-    readval = readgrids(rkeys, rgrids, i, j)
-    applyrule!(simdata, rule, readval, (i, j))
-end
+# @kernel function applyrule_kernel!(
+#     simdata::SimData, rule::ManualRule, rkeys, rgrids, wkeys, wgrids, mask
+# )
+#     i, j = @index(Global, NTuple)
+#     readval = readgrids(rkeys, rgrids, i, j)
+#     applyrule!(simdata, rule, readval, (i, j))
+# end
 
-@kernel function applyrule_kernel!(
-    simdata::SimData, rule::Rule, rkeys, rgrids, wkeys, wgrids, mask
-)
-    i, j = @index(Global, NTuple)
-    readval = readgrids(rkeys, rgrids, i, j)
-    writeval = applyrule(simdata, rule, readval, (i, j))
-    writegrids!(wgrids, writeval, i, j)
-end
+# @kernel function applyrule_kernel!(
+#     simdata::SimData, rule::Rule, rkeys, rgrids, wkeys, wgrids, mask
+# )
+#     i, j = @index(Global, NTuple)
+#     readval = readgrids(rkeys, rgrids, i, j)
+#     writeval = applyrule(simdata, rule, readval, (i, j))
+#     writegrids!(wgrids, writeval, i, j)
+# end
 
 maybeupdatedest!(ds::Tuple, rule) = map(d -> maybeupdatedest!(d, rule), ds)
 maybeupdatedest!(d::WritableGridData, rule::Rule) = nothing
 function maybeupdatedest!(d::WritableGridData, rule::ManualRule)
-    @inbounds copyto!(parent(dest(d)), parent(source(d)))
+    copyto!(parent(dest(d)), parent(source(d)))
 end
 
 maybecopystatus!(grid::Tuple{Vararg{<:GridData}}) = map(maybecopystatus!, grid)
 maybecopystatus!(grid::GridData) = maybecopystatus!(sourcestatus(grid), deststatus(grid))
 maybecopystatus!(srcstatus, deststatus) = nothing
 function maybecopystatus!(srcstatus::AbstractArray, deststatus::AbstractArray)
-    @inbounds return srcstatus .= deststatus
+    copyto!(srcstatus, deststatus)
 end
 
 _to_readonly(data::Tuple) = map(ReadableGridData, data)
@@ -192,30 +190,42 @@ function mapneighborhoodrule!(
     simdata::SimData, griddata::GridData{Y,X,R}, opt::NoOpt, rule, 
     rkeys, rgrids, wkeys, wgrids, src, dst, mask
 ) where {Y,X,R}
-    B = 2R
     # Loop down a block COLUMN
-    for bi = 1:indtoblock(Y, B)
-        # Get current blocj:k
-        i = blocktoind(bi, B)
-        # Loop along the block ROW.
-        buffers = initialise_buffers(src, Val{R}(), i, 1)
-        blocklen = min(Y, i + B - 1) - i + 1
-        for j = 1:X
-            buffers = update_buffers(buffers, src, Val{R}(), i, j)
-            # Loop over the COLUMN of buffers covering the block
-            for b in 1:blocklen
-                bufrule = setbuffer(rule, buffers[b])
-                I = i + b - 1, j
-                ismasked(mask, I...) && continue
-                # Run the rule using buffer b
-                readval = readgridsorbuffer(rgrids, buffers[b], bufrule, I...)
-                writeval = applyrule(simdata, bufrule, readval, I)
-                writegrids!(wgrids, writeval, I...)
-            end
-        end
+    for bi = 1:indtoblock(Y, 2R)
+        rowkernel(
+            simdata, griddata, rule, rkeys, rgrids, 
+            wkeys, wgrids, src, dst, mask, bi
+        )
     end
     return nothing
 end
+
+function rowkernel(
+    simdata::SimData, griddata::GridData{Y,X,R}, rule, 
+    rkeys, rgrids, wkeys, wgrids, src, dst, mask, bi
+) where {Y,X,R}
+    B = 2R
+    i = blocktoind(bi, B)
+    # Loop along the block ROW.
+    buffers = initialise_buffers(src, Val{R}(), i, 1)
+    blocklen = min(Y, i + B - 1) - i + 1
+    for j = 1:X
+        buffers = update_buffers(buffers, src, Val{R}(), i, j)
+        # Loop over the COLUMN of buffers covering the block
+        for b in 1:blocklen
+            bufrule = setbuffer(rule, buffers[b])
+            I = i + b - 1, j
+            ismasked(mask, I...) && continue
+            # Run the rule using buffer b
+            readval = buffers[b][R+1, R+1]#readgridsorbuffer(rgrids, buffers[b], bufrule, I...)
+            # writeval = applyrule(simdata, bufrule, readval, I)
+            writegrids!(wgrids, writeval, I...)
+        end
+    end
+end
+
+
+
 
 # Neighorhood buffer optimisation combined with `SparseOpt`
 function mapneighborhoodrule!(
@@ -416,13 +426,13 @@ end
     B = 2R; S = 2R + 1; L = S^2
     newvals = Expr[]
     for n in 0:2B-1
-        push!(newvals, :(@inbounds src[i + $n, j + 2R]))
+        push!(newvals, :(src[i + $n, j + 2R]))
     end
     newbuffers = Expr(:tuple)
     for b in 1:B
         bufvals = Expr(:tuple)
         for n in S+1:L
-            push!(bufvals.args, :(@inbounds buffers[$b][$n]))
+            push!(bufvals.args, :(buffers[$b][$n]))
         end
         for n in b:b+B
             push!(bufvals.args, newvals[n])
@@ -445,7 +455,7 @@ end
     for c in 0:S-2
         newcol = Expr[]
         for r in 0:2B-1
-            push!(newcol, :(@inbounds src[i + $r, j + $c]))
+            push!(newcol, :(src[i + $r, j + $c]))
         end
         push!(columns, newcol)
     end
@@ -477,7 +487,7 @@ function readgrids end
 @generated function readgrids(rkeys::Tuple, rgrids::Tuple, I...)
     expr = Expr(:tuple)
     for i in 1:length(rgrids.parameters)
-        push!(expr.args, :(@inbounds rgrids[$i][I...]))
+        push!(expr.args, :(rgrids[$i][I...]))
     end
     return quote
         keys = map(unwrap, rkeys)
@@ -486,7 +496,7 @@ function readgrids end
     end
 end
 function readgrids(rkeys::Val, rgrids::ReadableGridData, I...)
-    @inbounds rgrids[I...]
+    rgrids[I...]
 end
 
 
@@ -502,13 +512,13 @@ function writegrids end
 @generated function writegrids!(wdata::Tuple, vals::Union{Tuple,NamedTuple}, I...)
     expr = Expr(:block)
     for i in 1:length(wdata.parameters)
-        push!(expr.args, :(@inbounds dest(wdata[$i])[I...] = vals[$i]))
+        push!(expr.args, :(dest(wdata[$i])[I...] = vals[$i]))
     end
     push!(expr.args, :(nothing))
     return expr
 end
 function writegrids!(wdata::GridData, val, I...)
-    @inbounds dest(wdata)[I...] = val
+    dest(wdata)[I...] = val
     return nothing
 end
 

@@ -173,7 +173,7 @@ _setdeststatus!(d::WritableGridData, opt, x, I) = nothing
 abstract type AbstractSimData{Y,X} end
 
 """
-    SimData(extent::Extent, ruleset::AbstractRuleset)
+    SimData(extent::AbstractExtent, ruleset::AbstractRuleset)
 
 Simulation dataset to hold all intermediate arrays, timesteps
 and frame numbers for the current frame of the simulation.
@@ -209,7 +209,7 @@ These are available, but you probably shouldn't use them and thier behaviour
 is not guaranteed in furture versions. They will mean rule is useful only
 in specific contexts.
 
-- `extent(d::SimData)` : get the simulation [`Extent`](@ref) object.
+- `extent(d::SimData)` : get the simulation [`AbstractExtent`](@ref) object.
 - `init(data::SimData)` : get the simulation init `AbstractArray`/`NamedTuple`
 - `mask(data::SimData)` : get the simulation mask `AbstractArray`
 - `ruleset(d::SimData)` : get the simulation [`AbstractRuleset`](@ref).
@@ -225,7 +225,7 @@ struct SimData{Y,X,G<:NamedTuple,E,RS,F} <: AbstractSimData{Y,X}
 end
 # Convert grids in extent to NamedTuple
 SimData(extent, ruleset::AbstractRuleset) = SimData(asnamedtuple(extent), ruleset)
-SimData(extent::Extent{<:NamedTuple{Keys}}, ruleset::AbstractRuleset) where Keys = begin
+SimData(extent::AbstractExtent{<:NamedTuple{Keys}}, ruleset::AbstractRuleset) where Keys = begin
     # Calculate the neighborhood radus (and grid padding) for each grid
     y, x = gridsize(extent)
     radii = NamedTuple{Keys}(get(radius(ruleset), key, 0) for key in Keys)
@@ -240,9 +240,11 @@ end
 @inline SimData(grids::G, extent::E, ruleset::AbstractRuleset) where {G,E} = begin
     currentframe = 1;
     Y, X = gridsize(extent)
-    ruleset = StaticRuleset(ruleset)
-    SimData{Y,X,G,E,typeof(ruleset),Int}(
-        grids, extent, ruleset, currentframe
+    # SimData is isbits-only
+    s_extent = StaticExtent(extent)
+    s_ruleset = StaticRuleset(ruleset)
+    SimData{Y,X,G,typeof(s_extent),typeof(s_ruleset),Int}(
+        grids, s_extent, s_ruleset, currentframe
     )
 end
 # For ConstrutionBase
@@ -360,17 +362,18 @@ function initdata!(::Nothing, extent, ruleset::AbstractRuleset, nreplicates::Not
 end
 # Initialise a SimData object with a new `Extent` and `Ruleset`.
 function initdata!(
-    simdata::AbstractSimData{Y,X}, extent::Extent, ruleset::AbstractRuleset, nreplicates::Nothing
-) where {Y,X}
-    map(values(simdata), values(init(extent))) do grid, init
-        for j in 1:X, i in 1:Y
-            @inbounds source(grid)[i, j] = dest(grid)[i, j] = init[i, j]
-        end
-        updatestatus!(grid)
-    end
-    @set! simdata.extent = extent
-    @set! simdata.ruleset = ruleset
+    simdata::AbstractSimData, extent::AbstractExtent, ruleset::AbstractRuleset, nreplicates::Nothing
+)
+    map(_copygrids!, values(simdata), values(init(extent)))
+    @set! simdata.extent = StaticExtent(extent)
+    @set! simdata.ruleset = StaticRuleset(ruleset)
     simdata
+end
+
+function _copygrids!(grid::GridData{<:Any,<:Any,R}, init) where R
+    pad_axes = map(ax -> ax .+ R, axes(init))
+    copyto!(parent(source(grid)), CartesianIndices(pad_axes), init, CartesianIndices(init))
+    updatestatus!(grid)
 end
 
 # Convert regular index to block index

@@ -165,6 +165,13 @@ function simloop!(output::Output, simdata, ruleset, fspan)
     settimestamp!(output, first(fspan))
     # Initialise types etc
     simdata = updatetime(simdata, 1)
+    # if opt(simdata) isa GPUopt
+    simdata = Flatten.modify(simdata, Array) do A
+        sh = @cuStaticSharedMem(eltype(A), size(A))
+        copyto!(sh, A)
+    end
+    
+    # end
     # Loop over the simulation
     for f in fspan[2:end]
         # Get a data object with updated timestep and precalculate rules

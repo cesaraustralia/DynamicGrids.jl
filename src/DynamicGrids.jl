@@ -11,6 +11,7 @@ end DynamicGrids
 using Colors,
       ConstructionBase,
       Crayons,
+      CUDA,
       DimensionalData,
       DocStringExtensions,
       FreeTypeAbstraction,
