@@ -27,6 +27,14 @@ using DynamicGrids, Crayons
 init = rand(Bool, 150, 200)
 output = REPLOutput(init; tspan=1:200, fps=30, color=Crayon(foreground=:red, background=:black, bold=true))
 sim!(output, Life())
+
+# Or define it from scratch (yes this is actually the whole implementation!)
+const sum_states = (false, false, true, false, false, false, false, false, false), 
+                   (false, false, true, true,  false, false, false, false, false)
+life = Neighbors(Moore(1)) do hood, state
+    sum_states[state + 1][sum(hood) + 1]
+end
+sim!(output, life)
 ```
 
 ![REPL life](https://github.com/cesaraustralia/DynamicGrids.jl/blob/media/life.gif?raw=true)
