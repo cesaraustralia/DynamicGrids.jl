@@ -156,6 +156,8 @@ end
     return sum
 end
 
+function setneighbor! end
+
 """
 Neighborhoods are tuples or vectors of custom coordinates tuples
 that are specified in relation to the central point of the current cell.
