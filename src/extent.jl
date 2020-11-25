@@ -3,8 +3,11 @@ abstract type AbstractExtent{I,M,A} end
 init(e::AbstractExtent) = e.init
 mask(e::AbstractExtent) = e.mask
 aux(e::AbstractExtent) = e.aux
-@inline aux(e::AbstractExtent, key::Symbol) = aux(e)[key] # Should not be used in rules
-@inline aux(e::AbstractExtent, ::Val{Key}) where Key = aux(e)[Key] # Fast compile-time version
+@inline aux(e::AbstractExtent, key) = aux(aux(e), key)
+@inline aux(nt::NamedTuple, key::Symbol) = nt[key] # Should not be used in rules
+@inline aux(nt::NamedTuple, ::Val{Key}) where Key = nt[Key] # Fast compile-time version
+@noinline aux(::Nothing, val) = 
+    throw(ArgumentError("No aux data available. Pass a NamedTuple to the `aux=` keyword of the Output"))
 tspan(e::AbstractExtent) = e.tspan # Never type-stable, only access in `precalc` methods
 gridsize(extent::AbstractExtent) = gridsize(init(extent))
 

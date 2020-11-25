@@ -1,175 +1,4 @@
 
-"""
-Simulation data specific to a single grid.
-"""
-abstract type GridData{Y,X,R,T,N,I} <: AbstractArray{T,N} end
-
-function (::Type{G})(d::GridData{Y,X,R,T,N}) where {G<:GridData,Y,X,R,T,N}
-    args = init(d), mask(d), opt(d), overflow(d), padval(d), 
-        source(d), dest(d), sourcestatus(d), deststatus(d)
-    G{Y,X,R,T,N,map(typeof, args)...}(args...)
-end
-function ConstructionBase.constructorof(::Type{T}) where T<:GridData{Y,X,R} where {Y,X,R}
-    T.name.wrapper{Y,X,R}
-end
-
-GridDataOrReps = Union{GridData, Vector{<:GridData}}
-
-# Array interface
-Base.size(d::GridData) = size(source(d))
-Base.axes(d::GridData) = axes(source(d))
-Base.eltype(d::GridData) = eltype(source(d))
-Base.firstindex(d::GridData) = firstindex(source(d))
-Base.lastindex(d::GridData) = lastindex(source(d))
-
-# Getters
-init(d::GridData) = d.init
-mask(d::GridData) = d.mask
-radius(d::GridData{<:Any,<:Any,R}) where R = R
-radius(d::Tuple{<:GridData,Vararg}) = map(radius, d)
-opt(d::GridData) = d.opt
-overflow(d::GridData) = d.overflow
-padval(d::GridData) = d.padval
-source(d::GridData) = d.source
-dest(d::GridData) = d.dest
-sourcestatus(d::GridData) = d.sourcestatus
-deststatus(d::GridData) = d.deststatus
-gridsize(d::GridData) = size(init(d))
-gridsize(A::AbstractArray) = size(A)
-gridsize(nt::NamedTuple) = gridsize(first(nt))
-gridsize(nt::NamedTuple{(),Tuple{}}) = 0, 0
-gridsize(t::Tuple) = gridsize(first(t))
-gridsize(t::Tuple{}) = 0, 0
-
-
-"""
-    ReadableGridData(griddata::GridData)
-    ReadableGridData{Y,X,R}(init::AbstractArray, mask, opt, overflow, padval)
-
-Simulation data and storage passed to rules for each timestep.
-"""
-struct ReadableGridData{Y,X,R,T,N,I<:AbstractArray{T,N},M,Op,Ov,P,S,D,SSt,DSt} <: GridData{Y,X,R,T,N,I}
-    init::I
-    mask::M
-    opt::Op
-    overflow::Ov
-    padval::P
-    source::S
-    dest::D
-    sourcestatus::SSt
-    deststatus::DSt
-end
-function ReadableGridData{Y,X,R}(
-    init::I, mask::M, opt::Op, overflow::Ov, padval::P, source::S, 
-    dest::D, sourcestatus::SSt, deststatus::DSt
-) where {Y,X,R,I<:AbstractArray{T,N},M,Op,Ov,P,S,D,SSt,DSt} where {T,N}
-    ReadableGridData{Y,X,R,T,N,I,M,Op,Ov,P,S,D,SSt,DSt}(
-        init, mask, opt, overflow, padval, source, dest, sourcestatus, deststatus
-    )
-end
-# Generate simulation data to match a ruleset and init array.
-@inline function ReadableGridData{X,Y,R}(
-    init::AbstractArray, mask, opt, overflow, padval
-) where {Y,X,R}
-    # We add one extra row and column of status blocks so
-    # we dont have to worry about special casing the last block
-    if R > 0
-        source = addpadding(init, R, padval)
-        dest = addpadding(init, R, padval)
-    else
-        if opt isa SparseOpt
-            opt = NoOpt()
-        end
-        source = deepcopy(init)
-        dest = deepcopy(init)
-    end
-    sourcestatus, deststatus = _build_status(opt, source, R)
-
-    grid = ReadableGridData{X,Y,R}(
-        init, mask, opt, overflow, padval, source, dest, sourcestatus, deststatus
-    )
-    updatestatus!(grid)
-    return grid
-end
-
-Base.parent(d::ReadableGridData) = parent(source(d))
-
-@propagate_inbounds function Base.getindex(d::ReadableGridData, I...)
-    getindex(source(d), I...)
-end
-
-function _build_status(opt::SparseOpt, source, r)
-    hoodsize = 2r + 1
-    blocksize = 2r
-    nblocs = indtoblock.(size(source), blocksize) .+ 1
-    sourcestatus = zeros(Bool, nblocs)
-    deststatus = zeros(Bool, nblocs)
-    sourcestatus, deststatus
-end
-_build_status(opt::PerformanceOpt, init, r) = nothing, nothing
-
-
-"""
-    ReadableGridData(griddata::GridData)
-
-Passed to rules `<: ManualRule`, and can be written to directly as
-an array. This handles updates to SparseOpt() and writing to
-the correct source/dest array.
-"""
-struct WritableGridData{Y,X,R,T,N,I<:AbstractArray{T,N},M,Op,Ov,P,S,D,SSt,DSt} <: GridData{Y,X,R,T,N,I}
-    init::I
-    mask::M
-    opt::Op
-    overflow::Ov
-    padval::P
-    source::S
-    dest::D
-    sourcestatus::SSt
-    deststatus::DSt
-end
-function WritableGridData{Y,X,R}(
-    init::I, mask::M, opt::Op, overflow::Ov, padval::P, source::S, 
-    dest::D, sourcestatus::SSt, deststatus::DSt
-) where {Y,X,R,I<:AbstractArray{T,N},M,Op,Ov,P,S,D,SSt,DSt} where {T,N}
-    WritableGridData{Y,X,R,T,N,I,M,Op,Ov,P,S,D,SSt,DSt}(
-        init, mask, opt, overflow, padval, source, dest, sourcestatus, deststatus
-    )
-end
-
-Base.parent(d::WritableGridData) = parent(dest(d))
-@propagate_inbounds function Base.getindex(d::WritableGridData, I...)
-    getindex(source(d), I...)
-end
-Base.@propagate_inbounds Base.setindex!(d::WritableGridData, x, I...) = begin
-    r = radius(d)
-    _setdeststatus!(d, x, I)
-    dest(d)[I...] = x
-end
-
-# Methods for writing to a WritableGridData grid from ManualRule. These are (approximately)
-# associative and commutative so that write order does not affect the result.
-for (f, op) in ((:add!, :+), (:sub!, :-), (:and!, :&), (:or!, :|), (:xor!, :xor))
-    @eval begin
-        @propagate_inbounds function ($f)(d::WritableGridData, x, I...)
-            @boundscheck checkbounds(dest(d), I...)
-            @inbounds _setdeststatus!(d, x, I)
-            @inbounds ($f)(dest(d), x, I...)
-        end
-        @propagate_inbounds ($f)(A::AbstractArray, x, I...) = A[I...] = ($op)(A[I...], x)
-    end
-end
-
-_setdeststatus!(d::WritableGridData, x, I) = _setdeststatus!(d::WritableGridData, opt(d), x, I) 
-function _setdeststatus!(d::WritableGridData, opt::SparseOpt, x, I)
-    r = radius(d)
-    blockindex = indtoblock.(I .+ r, 2r)
-    @inbounds deststatus(d)[blockindex...] = !(opt.f(x))
-    return nothing
-end
-_setdeststatus!(d::WritableGridData, opt, x, I) = nothing
-
-
-
 abstract type AbstractSimData{Y,X} end
 
 """
@@ -232,7 +61,7 @@ SimData(extent::AbstractExtent{<:NamedTuple{Keys}}, ruleset::AbstractRuleset) wh
     # Construct the SimData for each grid
     grids = map(init(extent), radii) do in, r
         ReadableGridData{y,x,r}(
-            in, mask(extent), opt(ruleset), overflow(ruleset), padval(ruleset)
+            in, mask(extent), proc(ruleset), opt(ruleset), overflow(ruleset), padval(ruleset)
         )
     end
     SimData(grids, extent, ruleset)
@@ -254,6 +83,7 @@ SimData{Y,X}(
     SimData{Y,X,G,E,RS,F}(grids, extent, ruleset, currentframe)
 end
 ConstructionBase.constructorof(::Type{<:SimData{Y,X}}) where {Y,X} = SimData{Y,X}
+
 
 # Getters
 extent(d::SimData) = d.extent
@@ -281,6 +111,7 @@ Base.first(d::SimData) = first(grids(d))
 Base.last(d::SimData) = last(grids(d))
 
 gridsize(d::SimData) = gridsize(first(d))
+proc(d::SimData) = proc(ruleset(d))
 opt(d::SimData) = opt(ruleset(d))
 overflow(d::SimData) = overflow(ruleset(d))
 padval(d::SimData) = padval(ruleset(d))

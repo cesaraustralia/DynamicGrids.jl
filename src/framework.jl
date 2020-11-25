@@ -164,14 +164,7 @@ function simloop!(output::Output, simdata, ruleset, fspan)
     # Set the frame timestamp for fps calculation
     settimestamp!(output, first(fspan))
     # Initialise types etc
-    simdata = updatetime(simdata, 1)
-    # if opt(simdata) isa GPUopt
-    simdata = Flatten.modify(simdata, Array) do A
-        sh = @cuStaticSharedMem(eltype(A), size(A))
-        copyto!(sh, A)
-    end
-    
-    # end
+    simdata = updatetime(simdata, 1) |> proc_setup
     # Loop over the simulation
     for f in fspan[2:end]
         # Get a data object with updated timestep and precalculate rules
@@ -195,3 +188,6 @@ function simloop!(output::Output, simdata, ruleset, fspan)
     setrunning!(output, false)
     return output
 end
+
+proc_setup(simdata::SimData) = proc_setup(proc(simdata), simdata)
+proc_setup(proc, obj) = obj

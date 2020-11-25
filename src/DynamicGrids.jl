@@ -11,13 +11,10 @@ end DynamicGrids
 using Colors,
       ConstructionBase,
       Crayons,
-      CUDA,
       DimensionalData,
       DocStringExtensions,
       FreeTypeAbstraction,
       FileIO,
-      Flatten,
-      KernelAbstractions,
       LinearAlgebra,
       OffsetArrays,
       REPL,
@@ -42,7 +39,7 @@ export rules, neighbors, offsets, positions, radius, inbounds, isinbounds
 
 export gridsize, currenttime, currenttimestep, timestep
 
-export add!, sub!, and!, or!, xor!
+export add!, sub!, min!, max!, and!, or!, xor!
 
 export Rule, NeighborhoodRule, CellRule, ManualRule, ManualNeighborhoodRule, GridRule
 
@@ -52,6 +49,8 @@ export AbstractRuleset, Ruleset, StaticRuleset
 
 export Neighborhood, RadialNeighborhood, AbstractKernel, Kernel, Moore,
        AbstractPositional, Positional, VonNeumann, LayeredPositional
+
+export Processor, SingleCPU, ThreadedCPU
 
 export PerformanceOpt, NoOpt, SparseOpt
 
@@ -75,12 +74,14 @@ export CharStyle, Block, Braile
     $(DOCSTRING)
     """
 
+include("neighborhoods.jl")
 include("rules.jl")
+include("flags.jl")
 include("rulesets.jl")
 include("extent.jl")
+include("grid.jl")
 include("simulationdata.jl")
 include("chain.jl")
-include("neighborhoods.jl")
 include("outputs/output.jl")
 include("outputs/graphic.jl")
 include("outputs/image.jl")

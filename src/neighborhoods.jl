@@ -119,7 +119,7 @@ end
 # Depreciated 
 
 @inline function mapsetneighbor!(
-    data::WritableGridData, hood::Neighborhood, rule, state, index
+    grid, hood::Neighborhood, rule, state, index
 )
     r = radius(hood)
     sum = zero(state)
@@ -131,14 +131,14 @@ end
             ydest = y + index[1] - r - one(r)
             hood_index = (y, x)
             dest_index = (ydest, xdest)
-            sum += setneighbor!(data, hood, rule, state, hood_index, dest_index)
+            sum += setneighbor!(grid, hood, rule, state, hood_index, dest_index)
         end
     end
     return sum
 end
 
 @inline function mapsetneighbor!(
-    f, data::WritableGridData, hood, state, index
+    f, grid, hood, state, index
 )
     r = radius(hood)
     sum = zero(state)
@@ -150,7 +150,7 @@ end
             ydest = y + index[1] - r - one(r)
             hood_index = (y, x)
             dest_index = (ydest, xdest)
-            sum += setneighbor!(data, hood, rule, state, hood_index, dest_index)
+            sum += setneighbor!(grid, hood, rule, state, hood_index, dest_index)
         end
     end
     return sum
@@ -209,7 +209,7 @@ offsets(hood::Positional) = hood.offsets
 @inline setbuffer(n::Positional{R,O}, buf::B2) where {R,O,B2} = Positional{R,O,B2}(offsets(n), buf)
 
 @inline function mapsetneighbor!(
-    data::WritableGridData, hood::Positional, rule, state, index
+    data, hood::Positional, rule, state, index
 )
     r = radius(hood); sum = zero(state)
     # Loop over dispersal kernel grid dimensions
@@ -259,7 +259,7 @@ layer, for the cells around the current index.
 
 @inline Base.sum(hood::LayeredPositional) = map(sum, neighbors(hood))
 
-@inline mapsetneighbor!(data::WritableGridData, hood::LayeredPositional, rule, state, index) =
+@inline mapsetneighbor!(data, hood::LayeredPositional, rule, state, index) =
     map(layer -> mapsetneighbor!(data, layer, rule, state, index), hood.layers)
 
 """
@@ -279,24 +279,6 @@ function VonNeumann(radius=1, buffer=nothing)
     end
     return Positional(Tuple(offsets), buffer)
 end
-
-
-# Find the largest radius present in the passed in rules.
-radius(set::Ruleset) = radius(rules(set))
-function radius(rules::Tuple{Vararg{<:Rule}})
-    allkeys = Tuple(union(map(keys, rules)...))
-    maxradii = Tuple(radius(rules, key) for key in allkeys)
-    return NamedTuple{allkeys}(maxradii)
-end
-radius(rules::Tuple{}) = NamedTuple{(),Tuple{}}(())
-# Get radius of specific key from all rules
-radius(rules::Tuple{Vararg{<:Rule}}, key::Symbol) =
-    reduce(max, radius(i) for i in rules if key in keys(i); init=0)
-
-# TODO radius only for neighborhood grid
-radius(rule::NeighborhoodRule, args...) = radius(neighborhood(rule))
-radius(rule::ManualNeighborhoodRule, args...) = radius(neighborhood(rule))
-radius(rule::Rule, args...) = 0
 
 """
     hoodsize(radius)

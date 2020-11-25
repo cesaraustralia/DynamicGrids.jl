@@ -66,7 +66,7 @@ function (::Type{T})(args...; kw...) where T<:Rule
 end
 # {R,W} with args
 function (::Type{T})(args...) where T<:Rule{R,W} where {R,W}
-    _checkfields(T, args)
+    # _checkfields(T, args)
     T{map(typeof, args)...}(args...)
 end
 
@@ -90,6 +90,20 @@ function ConstructionBase.constructorof(::Type{T}) where T<:Rule{R,W} where {R,W
     T.name.wrapper{R,W}
 end
 
+
+
+# Find the largest radius present in the passed in rules.
+function radius(rules::Tuple{Vararg{<:Rule}})
+    allkeys = Tuple(union(map(keys, rules)...))
+    maxradii = Tuple(radius(rules, key) for key in allkeys)
+    return NamedTuple{allkeys}(maxradii)
+end
+radius(rules::Tuple{}) = NamedTuple{(),Tuple{}}(())
+# Get radius of specific key from all rules
+radius(rules::Tuple{Vararg{<:Rule}}, key::Symbol) =
+    reduce(max, radius(ru) for ru in rules if key in keys(ru); init=0)
+
+radius(rule::Rule, args...) = 0
 
 
 """
@@ -195,6 +209,7 @@ neighborhoodkey(rule::NeighborhoodRule{R,W}) where {R,W} = R
 neighborhoodkey(rule::NeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
 @inline setbuffer(rule::NeighborhoodRule, buffer) =
     @set rule.neighborhood = setbuffer(rule.neighborhood, buffer)
+radius(rule::NeighborhoodRule, args...) = radius(neighborhood(rule))
 
 """
 A Rule that only writes to its neighborhood, defined by its radius distance from the
@@ -214,6 +229,7 @@ offsets(rule::ManualNeighborhoodRule) = offsets(neighborhood(rule))
 positions(rule::ManualNeighborhoodRule, args...) = positions(neighborhood(rule), args...)
 neighborhoodkey(rule::ManualNeighborhoodRule{R,W}) where {R,W} = R
 neighborhoodkey(rule::ManualNeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
+radius(rule::ManualNeighborhoodRule, args...) = radius(neighborhood(rule))
 
 
 """
@@ -471,13 +487,24 @@ struct Convolution{R,W,N} <: NeighborhoodRule{R,W}
     "The neighborhood of cells around the central cell"
     neighborhood::N
 end
-Convolution{R,W}(neighborhood::N) where {R,W,N} = Convolution{R,W,N}(neighborhood)
+Convolution{R,W}(A::AbstractArray) where {R,W} = 
+    Convolution{R,W}(Kernel(A))
+    # Convolution{R,W}(Kernel(SMatrix{size(A)...}(A)))
 Convolution{R,W}(; neighborhood) where {R,W} = Convolution{R,W}(neighborhood)
 ConstructionBase.constructorof(::Type{Convolution{R,W}}) where {R,W} = Convolution{R,W}
 
 @inline function applyrule(data, rule::Convolution, read, I)
-    kernel = neighborhood(rule)
-    @inbounds LinearAlgebra.dot(kernel.buffer, kernel.kernel)
+    _dot(rule.neighborhood)
+    # @inbounds LinearAlgebra.dot(rule.neighborhood.buffer, rule.neighborhood.kernel)
+end
+
+# Write our own dot broadcast, as the StaticArrays.jl method breaks on GPUs
+function _dot(n::AbstractKernel{R}) where R 
+    s = zero(eltype(buffer(n)))
+    for i in 1:R^2
+        @inbounds s += sum(buffer(n)[i] * kernel(n)[i])
+    end
+    s
 end
 
 """
