@@ -74,21 +74,26 @@ an iterator.
 """
 function sumneighbors end
 
-"""
-    mapsetneighbor!(data, neighborhood, rule, state, index) => Nothing
-
-Run `setneighbor!` over all cells in the neighborhood and sums its return values.
-
-This is used only in [`ManualNeighborhoodRule`](@ref).
-"""
-function mapsetneighbor! end
 
 """
-    setneighbor!(data, neighborhood, rule, state, hood_index, dest_index)
+    offsets(x::Union{Neighborhood,NeighborhoodRule}}) => iterable
 
-Set value of a cell in the neighborhood. Called in `mapsetneighbor!`.
+Returns an iteraterable over all cells as a `Tuple` of the index 
+offset from the central cell.
+
+Custom `Neighborhood`s must define this method.
 """
-function setneighbor! end
+function offsets end
+
+"""
+    positions(x::Union{Neighborhood,NeighborhoodRule}}, cellindex::Tuple) => iterable
+
+Returns an iteraterable over all cells as a `Tuple` of the index 
+in the main array. Useful in [`ManualNeighborhoodRule`](@ref) for 
+setting neighborhood values.
+"""
+function positions end
+
 
 """
     add!(data::WritableGridData, x, I...)

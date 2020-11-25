@@ -60,6 +60,9 @@ that it does.
 """
 struct NoOpt <: PerformanceOpt end
 
+"""
+Abstract supertype for [`Ruleset`](@ref) objects and variants.
+"""
 abstract type AbstractRuleset <: AbstractModel end
 
 # Getters
