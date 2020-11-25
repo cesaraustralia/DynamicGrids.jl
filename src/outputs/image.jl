@@ -14,8 +14,13 @@ struct ImageConfig{P,Min,Max}
     minval::Min
     maxval::Max
 end
-ImageConfig(; processor=ColorProcessor(), minval=nothing, maxval=nothing, kwargs...) = 
+function ImageConfig(; 
+    init=nothing, font=autofont(), text=TextConfig(; font=font), 
+    scheme=Greyscale(), processor=autoprocessor(init, scheme, text), 
+    minval=nothing, maxval=nothing, kwargs...
+) 
     ImageConfig(processor, minval, maxval)
+end
 
 processor(ic::ImageConfig) = ic.processor
 minval(ic::ImageConfig) = ic.minval
@@ -47,11 +52,17 @@ abstract type ImageOutput{T} <: GraphicOutput{T} end
         kwargs...)
 
 Generic `ImageOutput` constructor that construct an `ImageOutput` from another `Output`.
+
 """
-(::Type{F})(o::T; frames=frames(o), extent=extent(o), graphicconfig=graphicconfig(o),
-    imageconfig=imageconfig(o), kwargs...) where F <: ImageOutput where T <: Output = 
-    F(; frames=frames, running=false, extent=extent, graphicconfig=graphicconfig, 
-      imageconfig=imageconfig, kwargs...)
+function (::Type{F})(o::T; 
+    frames=frames(o), extent=extent(o), graphicconfig=graphicconfig(o),
+    imageconfig=imageconfig(o), kwargs...
+) where F <: ImageOutput where T <: Output 
+    F(; 
+        frames=frames, running=false, extent=extent, graphicconfig=graphicconfig, 
+        imageconfig=imageconfig, kwargs...
+    )
+end
 
 """
     (::Type{<:ImageOutput})(init::Union{NamedTuple,AbstractMatrix}; 
@@ -62,19 +73,23 @@ Generic `ImageOutput` constructor that construct an `ImageOutput` from another `
 
 Generic `ImageOutput` constructor. Converts an init `AbstractArray` 
 to a vector of `AbstractArray`s, uses `kwargs` to constructs required 
-`extent, `graphicconfig` and `imageconfig` objects unless
-they are specifically passed in.
+[`Extent`](@ref), [`GraphicConfig`](@ref) and [`ImageConfig`](@ref) objects unless
+they are specifically passed in using `extent`, `graphicconfig`, `imageconfig`.
 
-Unused or mispelled keyword arguments are ignored.
+All other keyword arguments are passed to these constructors. 
+
+Unused or mis-spelled keyword arguments are ignored.
 """
-(::Type{T})(init::Union{NamedTuple,AbstractMatrix}; 
-            extent=nothing, graphicconfig=nothing, imageconfig=nothing, kwargs...
-           ) where T <: ImageOutput = begin
+function (::Type{T})(init::Union{NamedTuple,AbstractMatrix}; 
+    extent=nothing, graphicconfig=nothing, imageconfig=nothing, kwargs...
+) where T <: ImageOutput
     extent = extent isa Nothing ? Extent(; init=init, kwargs...) : extent
     graphicconfig = graphicconfig isa Nothing ? GraphicConfig(; kwargs...) : extent
-    imageconfig = imageconfig isa Nothing ? ImageConfig(; kwargs...) : imageconfig
-    T(; frames=[deepcopy(init)], running=false, 
-      extent=extent, graphicconfig=graphicconfig, imageconfig=imageconfig, kwargs...)
+    imageconfig = imageconfig isa Nothing ? ImageConfig(; init=init, kwargs...) : imageconfig
+    T(; 
+        frames=[deepcopy(init)], running=false, extent=extent, 
+        graphicconfig=graphicconfig, imageconfig=imageconfig, kwargs...
+    )
 end
 
 imageconfig(o::Output) = ImageConfig()
@@ -86,8 +101,9 @@ maxval(o::Output) = maxval(imageconfig(o))
 
 
 # Allow constructing a frame with the ruleset passed in instead of SimData
-showframe(frame, o::ImageOutput, data::SimData, f, t) =
+function showframe(frame, o::ImageOutput, data::SimData, f, t)
     showimage(grid2image(o, data, frame, f, t), o, data, f, t)
+end
 
 """
     showimage(image::AbstractArray{AGRB32,2}, output::ImageOutput, f, t)
@@ -112,6 +128,8 @@ mutable struct NoDisplayImageOutput{T,F<:AbstractVector{T},E,GC,IC} <: ImageOutp
     graphicconfig::GC
     imageconfig::IC
 end
-
-NoDisplayImageOutput(; frames, running, extent, graphicconfig, imageconfig, kwargs...) =
+function NoDisplayImageOutput(; 
+    frames, running, extent, graphicconfig, imageconfig, kwargs...
+)
     NoDisplayImageOutput(frames, running, extent, graphicconfig, imageconfig)
+end

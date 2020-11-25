@@ -1,3 +1,6 @@
+const MASKCOL = ARGB32(0.5)
+const ZEROCOL = ARGB32(0.3)
+
 """
     Greyscale(min=nothing, max=nothing)
 
@@ -39,8 +42,9 @@ Convert a grid or `NamedRuple` of grids to an `RGB` image, using a [`GridProcess
 But it they can be dispatched on together when required for custom outputs.
 """
 function grid2image end
-grid2image(o::ImageOutput, data::SimData, grids, f, t) =
+function grid2image(o::ImageOutput, data::SimData, grids, f, t)
     grid2image(processor(o), o, data, grids, f, t)
+end
 
 """
 Grid processors that convert one grid into an image array.
@@ -59,12 +63,12 @@ function grid2image(
     grid2image(p, o, data, first(grids), f, t, string(first(keys(grids))))
 end
 function grid2image(
-    p::SingleGridProcessor, o::Output, data::SimData, 
+    p::SingleGridProcessor, o::Output, data::SimData,
     grid::AbstractArray, f::Int, t, name=nothing
 )
     grid2image(p, mask(o), minval(o), maxval(o), data, grid, f, t, name)
 end
-function grid2image(p::SingleGridProcessor, mask, minval, maxval, data::SimData{Y,X}, 
+function grid2image(p::SingleGridProcessor, mask, minval, maxval, data::SimData{Y,X},
            grid::AbstractArray, f::Int, t, name=nothing
 ) where {Y,X}
     img = allocimage(grid)
@@ -98,12 +102,12 @@ Converts output grids to a colorsheme.
 """
 Base.@kwdef struct ColorProcessor{S,Z,M,TC} <: SingleGridProcessor
     scheme::S      = Greyscale()
-    zerocolor::Z   = nothing
-    maskcolor::M   = nothing
-    textconfig::TC = nothing
+    zerocolor::Z   = ZEROCOL
+    maskcolor::M   = MASKCOL
+    textconfig::TC = TextConfig()
 end
-ColorProcessor(scheme, zerocolor=nothing, maskcolor=nothing) =
-    ColorProcessor(scheme, zerocolor, maskcolor, nothing)
+ColorProcessor(scheme, zerocolor=ZEROCOL, maskcolor=MASKCOL) =
+    ColorProcessor(scheme, zerocolor, maskcolor, TextConfig())
 
 scheme(processor::ColorProcessor) = processor.scheme
 zerocolor(processor::ColorProcessor) = processor.zerocolor
@@ -111,8 +115,7 @@ maskcolor(processor::ColorProcessor) = processor.maskcolor
 textconfig(processor::ColorProcessor) = processor.textconfig
 
 # Show colorscheme in Atom etc
-Base.show(io::IO, m::MIME"image/svg+xml", p::ColorProcessor) =
-    show(io, m, scheme(p))
+Base.show(io::IO, m::MIME"image/svg+xml", p::ColorProcessor) = show(io, m, scheme(p))
 
 @inline function cell2rgb(p::ColorProcessor, mask, minval, maxval, data::SimData, val, I)
     if !(maskcolor(p) isa Nothing) && ismasked(mask, I...)
@@ -121,6 +124,8 @@ Base.show(io::IO, m::MIME"image/svg+xml", p::ColorProcessor) =
         normval = normalise(val, minval, maxval)
         if !(zerocolor(p) isa Nothing) && normval == zero(normval)
             rgb(zerocolor(p))
+        elseif normval isa Number && isnan(normval)
+            zerocolor(p) isa Nothing ? rgb(scheme(p), 0) : rgb(zerocolor(p))
         else
             rgb(scheme(p), normval)
         end
@@ -252,11 +257,13 @@ textconfig(p::LayoutProcessor) = p.textconfig
 function grid2image(
     p::LayoutProcessor, o::ImageOutput, data::SimData, grids::NamedTuple, f, t
 )
-    ngrids, nmin, nmax = map(length, (grids, minval(o), maxval(o)))
-    if !(ngrids == nmin == nmax)
-        ArgumentError(
-            "Number of grids ($ngrids), minval ($nmin) and maxval ($nmax) must be the same"
-        ) |> throw
+ 
+    ngrids = length(grids)
+    if !(minval(o) isa Nothing) 
+        length(minval(o)) == ngrids || _wronglengtherror(minval, ngrids, length(minval(o)))
+    end
+    if !(maxval(o) isa Nothing) 
+        length(maxval(o)) == ngrids || _wronglengtherror(maxval, ngrids, length(maxval(o)))
     end
 
     grid_ids = layout(p)
@@ -269,19 +276,27 @@ function grid2image(
         (ismissing(grid_id) || grid_id === nothing || grid_id == 0)  && continue
         n = if grid_id isa Symbol
             found = findfirst(k -> k === grid_id, keys(grids))
-            found === nothing && throw(ArgumentError("$grid_id is not in $(keys(grids))"))
+            found === nothing && _grididnotinkeyserror(grid_id, grids)
             found
         else
             grid_id
         end
         # Run processor for section
         key = keys(grids)[n]
-        _sectionloop(processors(p)[n], img, mask(o), minval(o)[n], maxval(o)[n],
+        _sectionloop(processors(p)[n], img, mask(o), _valn(minval(o), n), _valn(maxval(o), n),
                      data, grids[n], key, f, i, j)
     end
     rendertime!(img, textconfig(p), t)
     img
 end
+
+_valn(::Nothing, n) = nothing
+_valn(vals, n) = vals[n]
+
+@noinline _grididnotinkeyserror(grid_id, grids) =
+    throw(ArgumentError("$grid_id is not in $(keys(grids))"))
+@noinline _wronglengtherror(f, ngrids, n) =
+    throw(ArgumentError("Number of grids ($ngrids) and legtn of $f ($n) must be the same"))
 
 function _sectionloop(
     processor::SingleGridProcessor, img, mask, minval, maxval, data, grid, key, f, i, j
@@ -355,6 +370,20 @@ combinebands(c::Tuple{Green,Vararg}, xs, acc) =
     combinebands(tail(c), tail(xs), (acc[1], acc[2] + xs[1], acc[3]))
 combinebands(c::Tuple{Blue,Vararg}, xs, acc) =
     combinebands(tail(c), tail(xs), (acc[1], acc[2], acc[3] + xs[1]))
-combinebands(c::Tuple{Nothing,Vararg}, xs, acc) =
-    combinebands(tail(c), tail(xs), acc)
+combinebands(c::Tuple{Nothing,Vararg}, xs, acc) = combinebands(tail(c), tail(xs), acc)
 combinebands(c::Tuple{}, xs, acc) = rgb(acc...)
+
+function autoprocessor(init, scheme, textconfig)
+    ColorProcessor(first(_iterableschemes(scheme)), ZEROCOL, MASKCOL, textconfig)
+end
+function autoprocessor(init::NamedTuple, scheme, textconfig)
+    rows = length(init) ÷ 4 + 1
+    cols = (length(init) - 1) ÷ rows + 1
+    layout = reshape([keys(init)...], (rows, cols))
+    processors = autoprocessor.(values(init), _iterableschemes(scheme), Ref(textconfig))
+    LayoutProcessor(layout, processors, textconfig)
+end
+
+_iterableschemes(::Nothing) = (Greyscale(),)
+_iterableschemes(schemes::Union{Tuple,NamedTuple,AbstractVector}) = schemes
+_iterableschemes(scheme) = (scheme,)

@@ -9,9 +9,10 @@ Simulation outputs are decoupled from simulation behaviour,
 and in many cases can be used interchangeably.
 """
 abstract type Output{T} <: AbstractVector{T} end
-
 # Generic ImageOutput constructor. Converts an init array to vector of arrays.
-(::Type{T})(init::Union{NamedTuple,AbstractMatrix}; extent=nothing, kwargs...) where T <: Output = begin
+function (::Type{T})(
+    init::Union{NamedTuple,AbstractMatrix}; extent=nothing, kwargs...
+) where T <: Output
     extent = extent isa Nothing ? Extent(; init=init, kwargs...) : extent
     T(; frames=[deepcopy(init)], running=false, extent=extent, kwargs...)
 end
@@ -29,11 +30,13 @@ Base.@propagate_inbounds Base.setindex!(o::Output, x, i::Union{Int,AbstractVecto
 Base.push!(o::Output, x) = push!(frames(o), x)
 Base.step(o::Output) = step(tspan(o))
 
-DimensionalData.DimensionalArray(o::Output{<:NamedTuple}; key=first(keys(o[1]))) =
+function DimensionalData.DimensionalArray(o::Output{<:NamedTuple}; key=first(keys(o[1])))
     cat(map(f -> f[key], frames(o)...); dims=timedim(o))
-DimensionalData.DimensionalArray(o::Output{<:DimensionalArray}) =
+end
+function DimensionalData.DimensionalArray(o::Output{<:DimensionalArray})
     cat(frames(o)...; dims=timedim(o))
-DimensionalData.dims(o::Output) = begin
+end
+function DimensionalData.dims(o::Output)
     ts = tspan(o)
     val = isstored(o) ? ts : ts[end]:step(ts):ts[end]
     (Ti(val; mode=Sampled(Ordered(), Regular(step(ts)), Intervals(Start()))),)
@@ -139,14 +142,14 @@ function storeframe!(output::Output, data::AbstractSimData)
 end
 function storeframe!(::Type{<:NamedTuple}, output::Output, simdata::AbstractSimData, f::Int)
     map(values(grids(simdata)), keys(simdata)) do grid, key
-        _copyto_output!(output[f][key], grid, radius(grid))
+        copyto_output!(output[f][key], grid, proc(grid))
     end
 end
 function storeframe!(::Type{<:AbstractArray}, output::Output, simdata::AbstractSimData, f::Int)
     grid = first(grids(simdata))
-    _copyto_output!(output[f], grid, radius(grid))
+    copyto_output!(output[f], grid, proc(grid))
 end
-function _copyto_output!(outgrid, grid, r)
+function copyto_output!(outgrid, grid, proc::CPU)
     copyto!(outgrid, CartesianIndices(outgrid), source(grid), CartesianIndices(outgrid))
     return nothing
 end
@@ -184,7 +187,7 @@ end
 # Grids are preallocated and reused.
 initgrids!(o::Output, init) = initgrids!(o[1], o::Output, init)
 # Array grids are copied
-initgrids!(grid::AbstractArray, o::Output, init::AbstractArray) = begin
+function initgrids!(grid::AbstractArray, o::Output, init::AbstractArray)
     grid .= init
     # for f = (firstindex(o) + 1):lastindex(o)
         # @inbounds o[f] .= zero(eltype(init))
@@ -195,7 +198,7 @@ end
 initgrids!(grid::AbstractArray, o::Output, init::NamedTuple) =
     initgrids!(grid, o, first(init))
 # All arrays are copied if both are named tuples
-initgrids!(grids::NamedTuple, o::Output, init::NamedTuple) = begin
+function initgrids!(grids::NamedTuple, o::Output, init::NamedTuple)
     for key in keys(init)
         @inbounds grids[key] .= init[key]
     end

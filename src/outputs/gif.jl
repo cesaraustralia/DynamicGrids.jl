@@ -6,13 +6,15 @@ Write the output array to a gif. You must pass a processor keyword argument for 
 
 Saving very large gifs may trigger a bug in Imagemagick.
 """
-savegif(filename::String, o::Output, ruleset=Ruleset(); 
-        minval=minval(o), maxval=maxval(o), processor=processor(o), kwargs...) = begin
+function savegif(filename::String, o::Output, ruleset=Ruleset(); 
+    minval=minval(o), maxval=maxval(o), processor=processor(o), kwargs...
+)
     im_o = NoDisplayImageOutput(o; maxval=maxval, minval=minval, processor=processor)
     savegif(filename, im_o, ruleset; kwargs...) 
 end
-savegif(filename::String, o::ImageOutput, ruleset=Ruleset();
-        processor=processor(o), fps=fps(o), kwargs...) = begin
+function savegif(filename::String, o::ImageOutput, ruleset=Ruleset();
+    processor=processor(o), fps=fps(o), kwargs...
+)
     ext = extent(o)
     simdata = SimData(ext, ruleset)
     println(tspan(ext))
@@ -26,8 +28,14 @@ end
 
 
 """
-    GifOutput(init; filename, tspan, fps=25.0, store=false, 
-              processor=ColorProcessor(), minval=nothing, maxval=nothing)
+    GifOutput(init; 
+        filename, tspan, fps=25.0, store=false, 
+        font=autofont(),
+        scheme=Greyscale()
+        text=TextConfig(; font=font),
+        processor=autoprocessor(init, text)
+        minval=nothing, maxval=nothing
+    )
 
 Output that stores the simulation as images and saves a Gif file on completion.
 """
@@ -53,8 +61,9 @@ finalise(o::GifOutput) = savegif(o)
 allocgif(e::Extent) = zeros(ARGB32, gridsize(e)..., length(tspan(e)))
 
 savegif(o::GifOutput) = savegif(filename(o), o)
-savegif(filename::String, o::GifOutput, ruleset=nothing, fps=fps(o);
-        processor=nothing, kwargs...) = begin
+function savegif(filename::String, o::GifOutput, ruleset=nothing, fps=fps(o);
+    processor=nothing, kwargs...
+)
     !(processor isa Nothing) && @warn "Cannot set the processor on savegif for GifOutput. Run the sim again"
     FileIO.save(filename, gif(o); fps=fps, kwargs...)
 end
