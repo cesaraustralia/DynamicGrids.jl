@@ -158,7 +158,6 @@ end
 function storeframe!(output::Output{<:AbstractArray}, data::AbstractVector{<:AbstractSimData})
     f = frameindex(output, data[1])
     outgrid = output[f]
-    updatestatus!(grid)
     for I in CartesianIndices(outgrid)
         replicatesum = zero(eltype(outgrid))
         for g in grids.(data)

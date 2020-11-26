@@ -207,8 +207,9 @@ positions(rule::NeighborhoodRule, args...) = positions(neighborhood(rule), args.
 neighborhoodkey(rule::NeighborhoodRule{R,W}) where {R,W} = R
 # The first argument is for the neighborhood grid
 neighborhoodkey(rule::NeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
-@inline setbuffer(rule::NeighborhoodRule, buffer) =
-    @set rule.neighborhood = setbuffer(rule.neighborhood, buffer)
+_buffer(rule::NeighborhoodRule) = _buffer(neighborhood(rule))
+@inline _setbuffer(rule::NeighborhoodRule, _buffer) =
+    @set rule.neighborhood = _setbuffer(rule.neighborhood, _buffer)
 radius(rule::NeighborhoodRule, args...) = radius(neighborhood(rule))
 
 """
@@ -217,9 +218,6 @@ current point.
 
 ManualNeighborhood rules must return their radius with a `radius()` method, although
 by default this will be called on the result of `neighborhood(rule)`.
-
-TODO: performance optimisations with a neighborhood buffer,
-simular to [`NeighborhoodRule`](@ref) but for writing.
 """
 abstract type ManualNeighborhoodRule{R,W} <: ManualRule{R,W} end
 
@@ -487,24 +485,12 @@ struct Convolution{R,W,N} <: NeighborhoodRule{R,W}
     "The neighborhood of cells around the central cell"
     neighborhood::N
 end
-Convolution{R,W}(A::AbstractArray) where {R,W} = 
-    Convolution{R,W}(Kernel(A))
-    # Convolution{R,W}(Kernel(SMatrix{size(A)...}(A)))
+Convolution{R,W}(A::AbstractArray) where {R,W} = Convolution{R,W}(Kernel(SMatrix{size(A)...}(A)))
 Convolution{R,W}(; neighborhood) where {R,W} = Convolution{R,W}(neighborhood)
 ConstructionBase.constructorof(::Type{Convolution{R,W}}) where {R,W} = Convolution{R,W}
 
 @inline function applyrule(data, rule::Convolution, read, I)
-    _dot(rule.neighborhood)
-    # @inbounds LinearAlgebra.dot(rule.neighborhood.buffer, rule.neighborhood.kernel)
-end
-
-# Write our own dot broadcast, as the StaticArrays.jl method breaks on GPUs
-function _dot(n::AbstractKernel{R}) where R 
-    s = zero(eltype(buffer(n)))
-    for i in 1:R^2
-        @inbounds s += sum(buffer(n)[i] * kernel(n)[i])
-    end
-    s
+    @inbounds neighbors(rule) ⋅ kernel(neighborhood(rule))
 end
 
 """

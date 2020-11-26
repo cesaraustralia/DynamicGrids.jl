@@ -46,15 +46,16 @@ in specific contexts.
 - `dest(data::SimData)` : get the `dest` grid that is being written to.
 
 """
-struct SimData{Y,X,G<:NamedTuple,E,RS,F} <: AbstractSimData{Y,X}
+struct SimData{Y,X,G<:NamedTuple,E,RS,F,A} <: AbstractSimData{Y,X}
     grids::G
     extent::E
     ruleset::RS
     currentframe::F
+    auxframe::A
 end
 # Convert grids in extent to NamedTuple
 SimData(extent, ruleset::AbstractRuleset) = SimData(asnamedtuple(extent), ruleset)
-SimData(extent::AbstractExtent{<:NamedTuple{Keys}}, ruleset::AbstractRuleset) where Keys = begin
+function SimData(extent::AbstractExtent{<:NamedTuple{Keys}}, ruleset::AbstractRuleset) where Keys
     # Calculate the neighborhood radus (and grid padding) for each grid
     y, x = gridsize(extent)
     radii = NamedTuple{Keys}(get(radius(ruleset), key, 0) for key in Keys)
@@ -66,21 +67,21 @@ SimData(extent::AbstractExtent{<:NamedTuple{Keys}}, ruleset::AbstractRuleset) wh
     end
     SimData(grids, extent, ruleset)
 end
-@inline SimData(grids::G, extent::E, ruleset::AbstractRuleset) where {G,E} = begin
-    currentframe = 1;
+function SimData(grids::G, extent::E, ruleset::AbstractRuleset) where {G,E}
+    currentframe = 1; auxframe = nothing
     Y, X = gridsize(extent)
     # SimData is isbits-only
     s_extent = StaticExtent(extent)
     s_ruleset = StaticRuleset(ruleset)
-    SimData{Y,X,G,typeof(s_extent),typeof(s_ruleset),Int}(
-        grids, s_extent, s_ruleset, currentframe
+    SimData{Y,X,G,typeof(s_extent),typeof(s_ruleset),Int,Nothing}(
+        grids, s_extent, s_ruleset, currentframe, auxframe
     )
 end
 # For ConstrutionBase
-SimData{Y,X}(
-    grids::G, extent::E, ruleset::RS, currentframe::F
-) where {Y,X,G,E,RS,F} = begin
-    SimData{Y,X,G,E,RS,F}(grids, extent, ruleset, currentframe)
+function SimData{Y,X}(
+    grids::G, extent::E, ruleset::RS, currentframe::F, auxframe::A
+) where {Y,X,G,E,RS,F,A}
+    SimData{Y,X,G,E,RS,F,A}(grids, extent, ruleset, currentframe, auxframe)
 end
 ConstructionBase.constructorof(::Type{<:SimData{Y,X}}) where {Y,X} = SimData{Y,X}
 
@@ -92,6 +93,7 @@ grids(d::SimData) = d.grids
 init(d::SimData) = init(extent(d))
 mask(d::SimData) = mask(first(d))
 aux(d::SimData, args...) = aux(extent(d), args...)
+auxframe(d::SimData, key) = auxframe(d)[unwrap(key)]
 tspan(d::SimData) = tspan(extent(d))
 timestep(d::SimData) = step(tspan(d))
 currentframe(d::SimData) = d.currentframe
@@ -121,94 +123,60 @@ cellsize(d::SimData) = cellsize(ruleset(d))
 # Get the actual current timestep, e.g. seconds instead of variable periods like Month
 currenttimestep(d::SimData) = currenttime(d) + timestep(d) - currenttime(d)
 
-
-# Swap source and dest arrays. Allways returns regular SimData.
-swapsource(d::Tuple) = map(swapsource, d)
-function swapsource(grid::GridData)
-    src = grid.source
-    dst = grid.dest
-    @set! grid.dest = src
-    @set! grid.source = dst
-    srcstatus = grid.sourcestatus
-    dststatus = grid.deststatus
-    @set! grid.deststatus = srcstatus
-    return @set grid.sourcestatus = dststatus
-end
-
 # Uptate timestamp
-updatetime(simdata::SimData, f::Integer) = @set! simdata.currentframe = f
-updatetime(simdata::AbstractVector{<:SimData}, f) = updatetime.(simdata, f)
-
-#=
-Find the maximum radius required by all rules
-Add padding around the original init array, offset into the negative
-So that the first real cell is still 1, 1
-=#
-function addpadding(init::AbstractArray{T,N}, r, padval) where {T,N}
-    h, w = size(init)
-    paddedsize = h + 4r, w + 2r
-    paddedindices = -r + 1:h + 3r, -r + 1:w + r
-    sourceparent = fill!(similar(init, paddedsize), padval)
-    source = OffsetArray(sourceparent, paddedindices...)
-    # Copy the init array to the middle section of the source array
-    for j in 1:size(init, 2), i in 1:size(init, 1)
-        @inbounds source[i, j] = init[i, j]
-    end
-    return source
+_updatetime(simdata::AbstractVector{<:SimData}, f) = _updatetime.(simdata, f)
+function _updatetime(simdata::SimData, f::Integer) 
+    @set! simdata.currentframe = f
+    @set simdata.auxframe = _getauxframe(simdata)
 end
 
-#=
-Initialise the block status array.
-This tracks whether anything has to be done in an area of the main array.
-=#
-updatestatus!(grid::GridData) = updatestatus!(opt(grid), grid)
-function updatestatus!(opt::SparseOpt, grid)
-    blocksize = 2 * radius(grid)
-    src = parent(source(grid))
-    for i in CartesianIndices(src)
-        # Mark the status block if there is a non-zero value
-        if !can_skip(opt, src[i])
-            bi = indtoblock.(Tuple(i), blocksize)
-            @inbounds sourcestatus(grid)[bi...] = true
-            @inbounds deststatus(grid)[bi...] = true
-        end
-    end
-    return nothing
+_getauxframe(data) = _getauxframe(aux(data), data)
+_getauxframe(aux::NamedTuple, data) = map(A -> _getauxframe(A, data), aux)
+function _getauxframe(A::AbstractDimArray, data)
+    hasdim(A, Ti) || return nothing
+    # Convert Month etc timesteps to a realised DateTime period
+    i = length(first(dims(A, TimeDim)):step(dims(A, TimeDim)):currenttime(data))
+    _cyclic_index(i, size(A, 3))
 end
-updatestatus!(opt, grid) = nothing
+_getauxframe(aux, data) = nothing
+
+# TODO add cyclic index to DimensionalData so this isn't needed
+function _cyclic_index(i::Integer, len::Integer)
+    return if i > len
+        rem(i + len - 1, len) + 1
+    elseif i <= 0
+        i + (i ÷ len -1) * -len
+    else
+        i
+    end
+end
 
 # When replicates are an Integer, construct a vector of SimData
-function initdata!(::Nothing, extent, ruleset::AbstractRuleset, nreplicates::Integer)
+function _initdata!(::Nothing, extent, ruleset::AbstractRuleset, nreplicates::Integer)
     [SimData(extent, ruleset) for r in 1:nreplicates]
 end
 # When simdata is a Vector, the existing SimData arrays are re-initialised
-function initdata!(
+function _initdata!(
     simdata::AbstractVector{<:AbstractSimData}, extent, ruleset, nreplicates::Integer
 )
-    map(d -> initdata!(d, extent, ruleset, nothing), simdata)
+    map(d -> _initdata!(d, extent, ruleset, nothing), simdata)
 end
 # When no simdata is passed in, create new SimData
-function initdata!(::Nothing, extent, ruleset::AbstractRuleset, nreplicates::Nothing)
+function _initdata!(::Nothing, extent, ruleset::AbstractRuleset, nreplicates::Nothing)
     SimData(extent, ruleset)
 end
 # Initialise a SimData object with a new `Extent` and `Ruleset`.
-function initdata!(
+function _initdata!(
     simdata::AbstractSimData, extent::AbstractExtent, ruleset::AbstractRuleset, nreplicates::Nothing
 )
-    map(_copygrids!, values(simdata), values(init(extent)))
+    map(_copygrid!, values(simdata), values(init(extent)))
     @set! simdata.extent = StaticExtent(extent)
     @set! simdata.ruleset = StaticRuleset(ruleset)
     simdata
 end
 
-function _copygrids!(grid::GridData{<:Any,<:Any,R}, init) where R
-    pad_axes = map(ax -> ax .+ R, axes(init))
-    copyto!(parent(source(grid)), CartesianIndices(pad_axes), init, CartesianIndices(init))
-    updatestatus!(grid)
-end
-
 # Convert regular index to block index
-@inline indtoblock(x::Int, blocksize::Int) = (x - 1) ÷ blocksize + 1
+@inline _indtoblock(x::Int, blocksize::Int) = (x - 1) ÷ blocksize + 1
 
 # Convert block index to regular index
-@inline blocktoind(x, blocksize) = (x - 1) * blocksize + 1
+@inline _blocktoind(x, blocksize) = (x - 1) * blocksize + 1

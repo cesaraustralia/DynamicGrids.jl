@@ -8,15 +8,9 @@ The main kinds of neighborhood are demonstrated below:
 
 ![Neighborhoods](https://raw.githubusercontent.com/cesaraustralia/DynamicGrids.jl/media/Neighborhoods.png)
 
-If the allocation of neighborhood buffers during the simulation is costly
-(it usually isn't) you can use `allocbuffers` or preallocate them:
-
 ```julia
-Moore{3}(allocbuffers(3, init))
+Moore{3}()
 ```
-
-You can also change the length of the buffers tuple to
-experiment with cache performance.
 """
 abstract type Neighborhood{R} end
 
@@ -24,15 +18,15 @@ ConstructionBase.constructorof(::Type{<:T}) where T <: Neighborhood{R} where R =
     T.name.wrapper{R}
 
 radius(hood::Neighborhood{R}) where R = R
-buffer(hood::Neighborhood) = hood.buffer
+_buffer(hood::Neighborhood) = hood._buffer
 @inline positions(hood::Neighborhood, I) = (I .+ o for o in offsets(hood))
 
-Base.eltype(hood::Neighborhood) = eltype(buffer(hood))
+Base.eltype(hood::Neighborhood) = eltype(_buffer(hood))
 Base.iterate(hood::Neighborhood, args...) = iterate(neighbors(hood), args...)
-Base.getindex(hood::Neighborhood, I...) = getindex(buffer(hood), I...)
-Base.setindex!(hood::Neighborhood, val, I...) = setindex!(buffer(hood), val, I...)
+Base.getindex(hood::Neighborhood, I...) = getindex(_buffer(hood), I...)
+Base.setindex!(hood::Neighborhood, val, I...) = setindex!(_buffer(hood), val, I...)
 Base.copyto!(dest::Neighborhood, dof, source::Neighborhood, sof, N) =
-    copyto!(buffer(dest), dof, buffer(source), sof, N)
+    copyto!(_buffer(dest), dof, _buffer(source), sof, N)
 
 """
 Moore-style square neighborhoods
@@ -44,38 +38,35 @@ abstract type RadialNeighborhood{R} <: Neighborhood{R} end
 
 Moore neighborhoods define the neighborhood as all cells within a horizontal or
 vertical distance of the central cell. The central cell is omitted.
-
-The `buffer` argument may be required for performance
-optimisation, see [`Neighborhood`](@ref) for details.
 """
 struct Moore{R,B} <: RadialNeighborhood{R}
-    buffer::B
+    _buffer::B
 end
 # Buffer is updated later during the simulation.
 # but can be passed in now to avoid the allocation.
 # This might be bad design. SimData could instead hold a list of
 # ruledata for the rule that holds this buffer, with
 # the neighborhood. So you can do neighbors(data)
-Moore(radius::Int=1, buffer=nothing) = Moore{radius}(buffer)
-Moore{R}(buffer=nothing) where R = Moore{R,typeof(buffer)}(buffer)
+Moore(radius::Int=1, _buffer=nothing) = Moore{radius}(_buffer)
+Moore{R}(_buffer=nothing) where R = Moore{R,typeof(_buffer)}(_buffer)
 
 @inline function neighbors(hood::Moore{R}) where R
     # Use linear indexing
     buflen = (2R + 1)^2
     centerpoint = buflen ÷ 2 + 1
-    return (buffer(hood)[i] for i in 1:buflen if i != centerpoint)
+    return (_buffer(hood)[i] for i in 1:buflen if i != centerpoint)
 end
 @inline function offsets(hood::Moore{R}) where R
     ((i, j) for j in -R:R, i in -R:R if i != (0, 0))
 end
-@inline setbuffer(n::Moore{R}, buf::B2) where {R,B2} = Moore{R,B2}(buf)
+@inline _setbuffer(n::Moore{R}, buf::B2) where {R,B2} = Moore{R,B2}(buf)
 
 Base.length(hood::Moore{R}) where R = (2R + 1)^2 - 1
 # Neighborhood specific `sum` for performance:w
 Base.sum(hood::Moore) = _sum(hood, _centerval(hood))
 
-_centerval(hood::Neighborhood{R}) where R = buffer(hood)[R + 1, R + 1]
-_sum(hood::Neighborhood, cell) = sum(buffer(hood)) - cell
+_centerval(hood::Neighborhood{R}) where R = _buffer(hood)[R + 1, R + 1]
+_sum(hood::Neighborhood, cell) = sum(_buffer(hood)) - cell
 
 
 """
@@ -88,32 +79,31 @@ abstract type AbstractKernel{R} <: RadialNeighborhood{R} end
 kernel(hood::AbstractKernel) = hood.kernel
 
 Base.length(hood::AbstractKernel{R}) where R = (2R + 1)^2
-Base.sum(hood::AbstractKernel) = sum(buffer(hood))
-neighbors(hood::AbstractKernel) = buffer(hood)
+Base.sum(hood::AbstractKernel) = sum(_buffer(hood))
+neighbors(hood::AbstractKernel) = _buffer(hood)
 
-LinearAlgebra.dot(hood::AbstractKernel) = kernel(hood) ⋅ buffer(hood)
+LinearAlgebra.dot(hood::AbstractKernel) = kernel(hood) ⋅ neighbors(hood)
 # The central cell is included
 @inline offsets(hood::AbstractKernel{R}) where R = ((i, j) for j in -R:R, i in -R:R)
 
 """
-    Kernel{R}(kernel, buffer=nothing)
+    Kernel{R}(kernel, _buffer=nothing)
 
 """
 struct Kernel{R,K,B} <: AbstractKernel{R}
     "Kernal matrix"
     kernel::K
-    "Neighborhood buffer"
-    buffer::B
+    _buffer::B
 end
-@inline Kernel{R}(kernel, buffer=nothing) where R = 
-    Kernel{R,typeof(kernel),typeof(buffer)}(kernel, buffer)
-@inline Kernel(kernel::AbstractMatrix, buffer=nothing) = 
-    Kernel{(size(kernel, 1) - 1) ÷ 2}(kernel, buffer)
+@inline Kernel{R}(kernel, _buffer=nothing) where R = 
+    Kernel{R,typeof(kernel),typeof(_buffer)}(kernel, _buffer)
+@inline Kernel(kernel::AbstractMatrix, _buffer=nothing) = 
+    Kernel{(size(kernel, 1) - 1) ÷ 2}(kernel, _buffer)
 @inline Kernel{R}() where R = Kernel{R}(nothing, nothing)
 @inline Kernel(R::Int) = Kernel{R}(nothing, nothing)
 @inline ConstructionBase.constructorof(::Type{Kernel{R,K,B}}) where {R,K,B} = Kernel{R}
 
-@inline setbuffer(n::Kernel{R,K}, buf::B2) where {R,K,B2} = Kernel{R,K,B2}(n.kernel, buf)
+@inline _setbuffer(n::Kernel{R,K}, buf::B2) where {R,K,B2} = Kernel{R,K,B2}(n.kernel, buf)
 
 
 # Depreciated 
@@ -169,8 +159,7 @@ const CustomOffsets = Union{AbstractArray{<:CustomOffset},Tuple{Vararg{<:CustomO
 
 """
     Positional(coord::Tuple{Vararg{Int}}...)
-    Positional(offsets::Tuple{Tuple{Vararg{Int}}}, [buffer=nothing])
-    Positional{R}(offsets::Tuple, buffer)
+    Positional(offsets::Tuple{Tuple{Vararg{Int}}})
 
 Neighborhoods that can take arbitrary shapes by specifying each coordinate,
 as `Tuple{Int,Int}` of the row/column distance (positive and negative)
@@ -180,20 +169,17 @@ The neighborhood radius is calculated from the most distance coordinate.
 For simplicity the buffer read from the main grid is a square with sides
 `2r + 1` around the central point, and is not shrunk or offset to match the
 coordinates if they are not symmetrical.
-
-The `buffer` argument may be required for performance
-optimisation, see [`Neighborhood`] for more details.
 """
 struct Positional{R,O<:CustomOffsets,B} <: AbstractPositional{R}
     "A tuple of tuples of Int, containing 2-D coordinates relative to the central point"
     offsets::O
-    buffer::B
+    _buffer::B
 end
 Positional(args::CustomOffset...) = Positional(args)
-Positional(offsets::CustomOffsets, buffer=nothing) =
-    Positional{_absmaxcoord(offsets)}(offsets, buffer)
-Positional{R}(offsets::CustomOffsets, buffer=nothing) where R =
-    Positional{R,typeof(offsets),typeof(buffer)}(offsets, buffer)
+Positional(offsets::CustomOffsets, _buffer=nothing) =
+    Positional{_absmaxcoord(offsets)}(offsets, _buffer)
+Positional{R}(offsets::CustomOffsets, _buffer=nothing) where R =
+    Positional{R,typeof(offsets),typeof(_buffer)}(offsets, _buffer)
 
 # Calculate the maximum absolute value in the offsets to use as the radius
 _absmaxcoord(offsets::Union{AbstractArray,Tuple}) = maximum(map(x -> maximum(map(abs, x)), offsets))
@@ -205,8 +191,8 @@ Base.length(hood::Positional) = length(offsets(hood))
 
 offsets(hood::Positional) = hood.offsets
 @inline neighbors(hood::Positional) =
-    (buffer(hood)[(offset .+ radius(hood) .+ 1)...] for offset in offsets(hood))
-@inline setbuffer(n::Positional{R,O}, buf::B2) where {R,O,B2} = Positional{R,O,B2}(offsets(n), buf)
+    (_buffer(hood)[(offset .+ radius(hood) .+ 1)...] for offset in offsets(hood))
+@inline set_buffer(n::Positional{R,O}, buf::B2) where {R,O,B2} = Positional{R,O,B2}(offsets(n), buf)
 
 @inline function mapsetneighbor!(
     data, hood::Positional, rule, state, index
@@ -232,16 +218,16 @@ for each neighborhood layer.
 struct LayeredPositional{R,L,B} <: AbstractPositional{R}
     "A tuple of custom neighborhoods"
     layers::L
-    buffer::B
+    _buffer::B
 end
 LayeredPositional(layers::Positional...) =
     LayeredPositional(layers)
-LayeredPositional(layers::Tuple{Vararg{<:Positional}}, buffer=nothing) =
-    LayeredPositional{maximum(map(radius, layers))}(layers, buffer)
-LayeredPositional{R}(layers, buffer) where R = begin
-    # Child layers must have the same buffer
-    layers = map(l -> (@set l.buffer = buffer), layers)
-    LayeredPositional{R,typeof(layers),typeof(buffer)}(layers, buffer)
+LayeredPositional(layers::Tuple{Vararg{<:Positional}}, _buffer=nothing) =
+    LayeredPositional{maximum(map(radius, layers))}(layers, _buffer)
+LayeredPositional{R}(layers, _buffer) where R = begin
+    # Child layers must have the same _buffer
+    layers = map(l -> (@set l._buffer = _buffer), layers)
+    LayeredPositional{R,typeof(layers),typeof(_buffer)}(layers, _buffer)
 end
 
 
@@ -254,7 +240,7 @@ layer, for the cells around the current index.
 @inline neighbors(hood::LayeredPositional) = map(l -> neighbors(l), hood.layers)
 @inline offsets(hood::LayeredPositional) = map(l -> offsets(l), hood.layers)
 @inline positions(hood::LayeredPositional, args...) = map(l -> positions(l, args...), hood.layers)
-@inline setbuffer(n::LayeredPositional{R,L}, buf::B2) where {R,L,B2} = 
+@inline _setbuffer(n::LayeredPositional{R,L}, buf::B2) where {R,L,B2} = 
     LayeredPositional{R,L,B2}(n.layers, buf)
 
 @inline Base.sum(hood::LayeredPositional) = map(sum, neighbors(hood))
@@ -268,7 +254,7 @@ layer, for the cells around the current index.
 A convenience wrapper to build Von-Neumann neighborhoods as
 a [`Positional`](@ref) neighborhood.
 """
-function VonNeumann(radius=1, buffer=nothing)
+function VonNeumann(radius=1, _buffer=nothing)
     offsets = Tuple{Int,Int}[]
     rng = -radius:radius
     for j in rng, i in rng
@@ -277,7 +263,7 @@ function VonNeumann(radius=1, buffer=nothing)
             push!(offsets, (i, j))
         end
     end
-    return Positional(Tuple(offsets), buffer)
+    return Positional(Tuple(offsets), _buffer)
 end
 
 """

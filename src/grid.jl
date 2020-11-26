@@ -78,8 +78,8 @@ end
     # We add one extra row and column of status blocks so
     # we dont have to worry about special casing the last block
     if R > 0
-        source = addpadding(init, R, padval)
-        dest = addpadding(init, R, padval)
+        source = _addpadding(init, R, padval)
+        dest = _addpadding(init, R, padval)
     else
         if opt isa SparseOpt
             opt = NoOpt()
@@ -92,8 +92,65 @@ end
     grid = ReadableGridData{X,Y,R}(
         init, mask, proc, opt, overflow, padval, source, dest, sourcestatus, deststatus
     )
-    updatestatus!(grid)
+    _updatestatus!(grid)
     return grid
+end
+
+#=
+Initialise the block status array.
+This tracks whether anything has to be done in an area of the main array.
+=#
+_updatestatus!(grid::GridData) = _updatestatus!(opt(grid), grid)
+function _updatestatus!(opt::SparseOpt, grid)
+    blocksize = 2 * radius(grid)
+    src = parent(source(grid))
+    for i in CartesianIndices(src)
+        # Mark the status block if there is a non-zero value
+        if !can_skip(opt, src[i])
+            bi = _indtoblock.(Tuple(i), blocksize)
+            @inbounds sourcestatus(grid)[bi...] = true
+            @inbounds deststatus(grid)[bi...] = true
+        end
+    end
+    return nothing
+end
+_updatestatus!(opt, grid) = nothing
+
+function _copygrid!(grid::GridData{<:Any,<:Any,R}, init) where R
+    pad_axes = map(ax -> ax .+ R, axes(init))
+    copyto!(parent(source(grid)), CartesianIndices(pad_axes), init, CartesianIndices(init))
+    _updatestatus!(grid)
+end
+
+# Swap source and dest arrays. Allways returns regular SimData.
+_swapsource(d::Tuple) = map(_swapsource, d)
+function _swapsource(grid::GridData)
+    src = grid.source
+    dst = grid.dest
+    @set! grid.dest = src
+    @set! grid.source = dst
+    srcstatus = grid.sourcestatus
+    dststatus = grid.deststatus
+    @set! grid.deststatus = srcstatus
+    return @set grid.sourcestatus = dststatus
+end
+
+#=
+Find the maximum radius required by all rules
+Add padding around the original init array, offset into the negative
+So that the first real cell is still 1, 1
+=#
+function _addpadding(init::AbstractArray{T,N}, r, padval) where {T,N}
+    h, w = size(init)
+    paddedsize = h + 4r, w + 2r
+    paddedindices = -r + 1:h + 3r, -r + 1:w + r
+    sourceparent = fill!(similar(init, paddedsize), padval)
+    source = OffsetArray(sourceparent, paddedindices...)
+    # Copy the init array to the middle section of the source array
+    for j in 1:size(init, 2), i in 1:size(init, 1)
+        @inbounds source[i, j] = init[i, j]
+    end
+    return source
 end
 
 Base.parent(d::ReadableGridData) = parent(source(d))
@@ -105,7 +162,7 @@ end
 function _build_status(opt::SparseOpt, source, r)
     hoodsize = 2r + 1
     blocksize = 2r
-    nblocs = indtoblock.(size(source), blocksize) .+ 1
+    nblocs = _indtoblock.(size(source), blocksize) .+ 1
     sourcestatus = zeros(Bool, nblocs)
     deststatus = zeros(Bool, nblocs)
     sourcestatus, deststatus
@@ -155,7 +212,7 @@ end
 
 _setdeststatus!(d::WritableGridData, x, I) = _setdeststatus!(d::WritableGridData, opt(d), x, I)
 function _setdeststatus!(d::WritableGridData{Y,X,R}, opt::SparseOpt, x, I) where {Y,X,R}
-    blockindex = indtoblock.(I .+ R, 2R)
+    blockindex = _indtoblock.(I .+ R, 2R)
     @inbounds deststatus(d)[blockindex...] = !(opt.f(x))
     return nothing
 end

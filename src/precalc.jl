@@ -21,3 +21,4 @@ precalcrule(chain::Chain{R,W}, simdata) where {R,W} =
 precalcrule(rule, simdata) = precalcrules(rule, simdata)
 # The default is to return a rule unchanged
 precalcrules(rule, simdata) = rule
+
