@@ -18,8 +18,8 @@ struct Chain{R,W,T<:Union{Tuple{},Tuple{Union{<:NeighborhoodRule,<:CellRule},Var
 end
 Chain(rules...) = Chain(rules) 
 Chain(rules::Tuple) = begin
-    rkeys = Tuple{union(map(k -> asiterable(_readkeys(k)), rules)...)...}
-    wkeys = Tuple{union(map(k -> asiterable(_writekeys(k)), rules)...)...}
+    rkeys = Tuple{union(map(k -> _asiterable(_readkeys(k)), rules)...)...}
+    wkeys = Tuple{union(map(k -> _asiterable(_writekeys(k)), rules)...)...}
     Chain{rkeys,wkeys,typeof(rules)}(rules)
 end
 

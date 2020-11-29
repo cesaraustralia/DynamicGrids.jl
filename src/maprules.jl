@@ -15,7 +15,6 @@ function maprule!(data::SimData, rule::Rule)
     The structure of rgrids and wgrids determines the values that are sent to the rule
     are in a NamedTuple or single value, and wether a tuple of single return value
     is expected. There may be a cleaner way of doing this. =#
-
     rkeys, rgrids = _getreadgrids(rule, data)
     wkeys, wgrids = _getwritegrids(rule, data)
     # Copy the source to dest for grids we are writing to, if needed
@@ -23,9 +22,10 @@ function maprule!(data::SimData, rule::Rule)
     # Copy or zero out overflow where needed
     _handleoverflow!(wgrids)
     # Combine read and write grids to a temporary simdata object.
-    # This means that grids not asked for by rules are not available,
-    # and grids not specified to write to are read-only.
-    tempdata = _combinegrids(data, rkeys, rgrids, wkeys, wgrids)
+    # This means that grids not specified to write to are read-only.
+    allkeys = map(Val, keys(data)) 
+    allgrids = values(data)
+    tempdata = _combinegrids(data, allkeys, allgrids, wkeys, wgrids)
     # Run the rule loop
     maprule!(wgrids, tempdata, proc(data), opt(data), rule, rkeys, rgrids, wkeys)
     # Mask writes to dest if a mask isprovided, except for 
@@ -334,7 +334,7 @@ end
 # Reduces array reads for single grids, when we can just use
 # the center of the neighborhood buffer as the cell state
 @inline function _readgridsorbuffer(rgrids::Tuple, buffer, rule, I...)
-    _readgrids(keys2vals(_readkeys(rule)), rgrids, I...)
+    _readgrids(_keys2vals(_readkeys(rule)), rgrids, I...)
 end
 @inline function _readgridsorbuffer(
     rgrids::ReadableGridData{<:Any,<:Any,R}, buffer, rule, I...
@@ -488,8 +488,7 @@ end
 @inline function _combinegrids(rkeys::Tuple, rgrids::Tuple, wkey, wgrids)
     _combinegrids(rkeys, rgrids, (wkey,), (wgrids,))
 end
-@generated function _combinegrids(rkeys::Tuple{Vararg{<:Val}}, rgrids::Tuple,
-                       wkeys::Tuple{Vararg{<:Val}}, wgrids::Tuple)
+@generated function _combinegrids(rkeys::Tuple, rgrids::Tuple, wkeys::Tuple, wgrids::Tuple)
     rkeys = _vals2syms(rkeys)
     wkeys = _vals2syms(wkeys)
     keysexp = Expr(:tuple, QuoteNode.(wkeys)...)

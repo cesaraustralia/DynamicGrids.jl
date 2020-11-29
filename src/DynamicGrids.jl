@@ -35,17 +35,19 @@ using Base: tail, @propagate_inbounds
 import Base: show, getindex, setindex!, lastindex, size, length, push!, append!,
              broadcast, broadcast!, similar, eltype, iterate
 
-export sim!, resume!, savegif, isinferred, isinferred
+export sim!, resume!, savegif, isinferred
 
 export rules, neighbors, neighborhood, offsets, positions, radius, inbounds, isinbounds 
 
-export gridsize, currentframe, currenttime, currenttimestep, timestep, auxval
+export gridsize, currentframe, currenttime, currenttimestep, timestep
 
 export add!, sub!, min!, max!, and!, or!, xor!
 
 export Rule, NeighborhoodRule, CellRule, ManualRule, ManualNeighborhoodRule, GridRule
 
-export Cell, Neighbors, SetNeighbors, Convolution, Manual, Chain, Life, Grid 
+export Cell, Neighbors, SetNeighbors, Manual, Convolution, SetGrid, Life, CopyTo
+
+export Chain 
 
 export AbstractRuleset, Ruleset, StaticRuleset
 
@@ -58,7 +60,7 @@ export PerformanceOpt, NoOpt, SparseOpt
 
 export Overflow, RemoveOverflow, WrapOverflow
 
-export Aux
+export Aux, Grid
 
 export Output, GraphicOutput, ImageOutput, ArrayOutput, ResultOutput, REPLOutput, GifOutput
 
@@ -92,6 +94,7 @@ include("rulesets.jl")
 include("extent.jl")
 include("grid.jl")
 include("simulationdata.jl")
+include("aux.jl")
 include("chain.jl")
 include("outputs/output.jl")
 include("outputs/graphic.jl")

@@ -1,5 +1,5 @@
 using DynamicGrids, Test
-using DynamicGrids: inbounds, isinbounds
+using DynamicGrids: inbounds, isinbounds, _cyclic_index
 
 @testset "boundary overflow checks are working" begin
     @testset "inbounds with RemoveOverflow() returns index and false for an overflowed index" begin

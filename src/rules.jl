@@ -72,7 +72,7 @@ end
 
 
 @generated function Base.keys(rule::Rule{R,W}) where {R,W}
-    Expr(:tuple, QuoteNode.(union(asiterable(W), asiterable(R)))...)
+    Expr(:tuple, QuoteNode.(union(_asiterable(W), _asiterable(R)))...)
 end
 
 @inline _writekeys(::Rule{R,W}) where {R,W} = W
@@ -254,12 +254,12 @@ end
 abstract type GridRule{R,W} <: Rule{R,W} end
 
 """
-    Grid{R,W}(f)
+    SetGrid{R,W}(f)
 
 Apply a function `f` to fill whole grid/s.
 
 ```jldoctest
-rule = Grid{:a,:b}() do a, b
+rule = SetGrid{:a,:b}() do a, b
     b .= a
 end
 ```
@@ -268,16 +268,16 @@ Never use assignment broadcast `.*=`, the write grids are not guarantieed to
 have the same values as the same-named read grids R. Always copy from a read
 grid to a write grid manually.
 """
-struct Grid{R,W,F} <: GridRule{R,W}
+struct SetGrid{R,W,F} <: GridRule{R,W}
     "Function to apply to the read values"
     f::F
 end
-Grid{R,W}(; kwargs...) where {R,W} = _nofunctionerror(Grid)
+SetGrid{R,W}(; kwargs...) where {R,W} = _nofunctionerror(SetGrid)
 
-@inline function applyrule!(data, rule::Grid{R,W}) where {R,W}
+@inline function applyrule!(data, rule::SetGrid{R,W}) where {R,W}
     rule.f(
-        map(r -> source(getindex(data, r)), asiterable(R))...,
-        map(w -> source(getindex(data, w)), asiterable(W))...,
+        map(r -> source(getindex(data, r)), _asiterable(R))...,
+        map(w -> source(getindex(data, w)), _asiterable(W))...,
     )
 end
 
@@ -321,7 +321,7 @@ Cell{R,W}(; kwargs...) where {R,W} = _nofunctionerror(Cell)
 
 @inline function applyrule(data, rule::Cell, state, I)
     let rule=rule, state=state
-        rule.f(astuple(rule, state)...)
+        rule.f(_astuple(rule, state)...)
     end
 end
 
@@ -364,7 +364,7 @@ Neighbors{R,W}(f; neighborhood=Moore(1)) where {R,W} =
     Neighbors{R,W}(f, neighborhood)
 
 @inline function applyrule(data, rule::Neighbors, read, I)
-    let hood=neighborhood(rule), rule=rule, read=astuple(rule, read)
+    let hood=neighborhood(rule), rule=rule, read=_astuple(rule, read)
         rule.f(hood, read...)
     end
 end
@@ -399,7 +399,7 @@ end
 Manual{R,W}(; kwargs...) where {R,W} = _nofunctionerror(Manual)
 
 @inline function applyrule!(data, rule::Manual, read, I)
-    let data=data, I=I, rule=rule, read=astuple(rule, read)
+    let data=data, I=I, rule=rule, read=_astuple(rule, read)
         rule.f(data, I, read...)
     end
 end
@@ -451,7 +451,7 @@ SetNeighbors{R,W}(f; neighborhood=Moore(1)) where {R,W} =
     SetNeighbors{R,W}(f, neighborhood)
 
 @inline function applyrule!(data, rule::SetNeighbors, read, I)
-    let data=data, hood=neighborhood(rule), I=I, rule=rule, read=astuple(rule, read)
+    let data=data, hood=neighborhood(rule), I=I, rule=rule, read=_astuple(rule, read)
         rule.f(data, hood, I, read...)
     end
 end
@@ -515,14 +515,3 @@ end
 @noinline function _fielderror(T, args)
     throw(ArgumentError("$T has $(length(fieldnames(T))) fields: $(fieldnames(T)), you have used $(length(args))"))
 end
-
-asiterable(x::Symbol) = (x,)
-asiterable(x::Type{<:Tuple}) = x.parameters
-asiterable(x::Tuple) = x
-
-astuple(rule::Rule, state) = astuple(_readkeys(rule), state)
-astuple(::Tuple, state) = state
-astuple(::Symbol, state) = (state,)
-
-keys2vals(keys::Tuple) = map(Val, keys)
-keys2vals(key::Symbol) = Val(key)

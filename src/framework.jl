@@ -47,7 +47,7 @@ function sim!(
         throw(ArgumentError("tspan step $(step(tspan)) must equal rule step $(step(ruleset))"))
 
     # Rebuild Extent to allow kwarg alterations
-    extent = Extent(; init=asnamedtuple(init), mask=mask, aux=aux, tspan=tspan)
+    extent = Extent(; init=_asnamedtuple(init), mask=mask, aux=aux, tspan=tspan)
     # Set up output
     initialise(output)
     isrunning(output) && error("A simulation is already running in this output")
@@ -123,19 +123,19 @@ function resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
 
     # Calculate new timespan
     new_tspan = first(tspan(output)):step(tspan(output)):tstop
-    stoppedframe_ = stoppedframe(output)
-    fspan = stoppedframe_:lastindex(new_tspan)
+    frame = stoppedframe(output)
+    fspan = frame:lastindex(new_tspan)
     settspan!(output, new_tspan)
 
     # Use the last frame of the existing simulation as the init frame
-    if stoppedframe_ <= length(output)
-        init = output[stoppedframe_]
+    if frame <= length(output)
+        init = output[frame]
     else
         init = output[1]
     end
 
     setfps!(output, fps)
-    extent = Extent(; init=asnamedtuple(init), mask=mask(output), aux=aux(output), tspan=new_tspan)
+    extent = Extent(; init=_asnamedtuple(init), mask=mask(output), aux=aux(output), tspan=new_tspan)
     simdata = _initdata!(simdata, extent, ruleset, nreplicates)
     return runsim!(output, simdata, ruleset, fspan)
 end

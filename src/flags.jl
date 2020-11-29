@@ -74,3 +74,9 @@ Remove coordinates that overflow grid boundaries.
 """
 struct RemoveOverflow <: Overflow end
 
+
+struct Aux{K} end
+Aux(key::Symbol) = Aux{key}()
+
+struct Grid{K} end
+Grid(key::Symbol) = Grid{key}()

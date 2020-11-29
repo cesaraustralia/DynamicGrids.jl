@@ -54,7 +54,7 @@ struct SimData{Y,X,G<:NamedTuple,E,RS,F,A} <: AbstractSimData{Y,X}
     auxframe::A
 end
 # Convert grids in extent to NamedTuple
-SimData(extent, ruleset::AbstractRuleset) = SimData(asnamedtuple(extent), ruleset)
+SimData(extent, ruleset::AbstractRuleset) = SimData(_asnamedtuple(extent), ruleset)
 function SimData(extent::AbstractExtent{<:NamedTuple{Keys}}, ruleset::AbstractRuleset) where Keys
     # Calculate the neighborhood radus (and grid padding) for each grid
     y, x = gridsize(extent)
@@ -83,6 +83,7 @@ function SimData{Y,X}(
 ) where {Y,X,G,E,RS,F,A}
     SimData{Y,X,G,E,RS,F,A}(grids, extent, ruleset, currentframe, auxframe)
 end
+
 ConstructionBase.constructorof(::Type{<:SimData{Y,X}}) where {Y,X} = SimData{Y,X}
 
 
@@ -124,32 +125,12 @@ cellsize(d::SimData) = cellsize(ruleset(d))
 # Get the actual current timestep, e.g. seconds instead of variable periods like Month
 currenttimestep(d::SimData) = currenttime(d) + timestep(d) - currenttime(d)
 
+
 # Uptate timestamp
 _updatetime(simdata::AbstractVector{<:SimData}, f) = _updatetime.(simdata, f)
 function _updatetime(simdata::SimData, f::Integer) 
     @set! simdata.currentframe = f
-    @set simdata.auxframe = _getauxframe(simdata)
-end
-
-_getauxframe(data) = _getauxframe(aux(data), data)
-_getauxframe(aux::NamedTuple, data) = map(A -> _getauxframe(A, data), aux)
-function _getauxframe(A::AbstractDimArray, data)
-    hasdim(A, Ti) || return nothing
-    # Convert Month etc timesteps to a realised DateTime period
-    i = length(first(dims(A, TimeDim)):step(dims(A, TimeDim)):currenttime(data))
-    _cyclic_index(i, size(A, 3))
-end
-_getauxframe(aux, data) = nothing
-
-# TODO add cyclic index to DimensionalData so this isn't needed
-function _cyclic_index(i::Integer, len::Integer)
-    return if i > len
-        rem(i + len - 1, len) + 1
-    elseif i <= 0
-        i + (i ÷ len -1) * -len
-    else
-        i
-    end
+    @set simdata.auxframe = _calc_auxframe(simdata)
 end
 
 # When replicates are an Integer, construct a vector of SimData

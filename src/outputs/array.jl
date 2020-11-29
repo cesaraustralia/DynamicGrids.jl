@@ -15,7 +15,7 @@ mutable struct ArrayOutput{T,F<:AbstractVector{T},E} <: Output{T}
     extent::E
 end
 function ArrayOutput(; frames, running, extent, kwargs...)
-    append!(frames, zerogrids(init(extent), length(tspan(extent))-1))
+    append!(frames, _zerogrids(init(extent), length(tspan(extent))-1))
     ArrayOutput(frames, running, extent)
 end
 

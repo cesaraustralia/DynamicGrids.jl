@@ -108,7 +108,6 @@ end
             isinbounds(pos, data) && add!(first(data), 1, pos...)
         end
     end
-
     output = ArrayOutput(init; tspan=1:2)
     data = SimData(extent(output), Ruleset(rule)) 
     # Cant use applyrule! without a lot of work on SimData
@@ -121,17 +120,15 @@ end
                         0 0 1 0]
 end
 
-@testset "Grid" begin
-    rule = Grid() do r, w
+@testset "SetGrid" begin
+    rule = SetGrid() do r, w
         w .*= 2
     end
-
     init  = [0 1 0 0
              0 0 0 0
              0 0 0 0
              0 1 0 0
              0 0 1 0]
-
     output = ArrayOutput(init; tspan=1:2)
     data = SimData(extent(output), Ruleset(rule)) 
     # Cant use applyrule! without a lot of work on SimData
@@ -171,7 +168,6 @@ DynamicGrids.applyrule(data, ::AddOneRule, state, args...) = state + 1
                                        0.0 7.0 10.0
                                        5.0 8.0 0.0]
 end
-
 
 # Single grid rules
 
