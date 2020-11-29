@@ -39,8 +39,8 @@ function maprule!(data::SimData, rule::Rule)
     _replacegrids(data, wkeys, readonly_wgrids)
 end
 function maprule!(simdata::SimData, rule::GridRule)
-    rkeys, rgrids = getreadgrids(rule, simdata)
-    wkeys, wgrids = getwritegrids(rule, simdata)
+    rkeys, rgrids = _getreadgrids(rule, simdata)
+    wkeys, wgrids = _getwritegrids(rule, simdata)
     # Cant use SparseOpt with GridRule yet
     _checkhassparseopt(wgrids)
     tempsimdata = _combinegrids(simdata, rkeys, rgrids, wkeys, wgrids)
@@ -80,8 +80,8 @@ _to_readonly(data::WritableGridData) = ReadableGridData(data)
 _hassparseopt(wgrids::Tuple) = any(o -> o isa SparseOpt, map(opt, wgrids))
 _hassparseopt(wgrid) = opt(wgrid) isa SparseOpt
 
-@noinline _checkhassparseopt(wgrids) =
-    _hassparseopt(wgrids) && error("Cant use SparseOpt with a GridRule")
+@noinline _checkhassparseopt(wgrids) = nothing
+    # _hassparseopt(wgrids) && error("Cant use SparseOpt with a GridRule")
 
 const NeedsBuffer = Union{NeighborhoodRule,Chain{<:Any,<:Any,<:Tuple{<:NeighborhoodRule,Vararg}}}
 
@@ -91,10 +91,8 @@ function maprule!(
 ) where {Y,X,R}
     let simdata=simdata, proc=proc, opt=opt, rule=rule, 
         rkeys=rkeys, rgrids=rgrids, wkeys=wkeys, wgrids=wgrids
-        optmap(proc, opt, rgrids, Tuple{Y,X,R}) do j
-            for i in 1:Y 
-                rule_kernel!(wgrids, simdata, rule::Rule, rkeys, rgrids, wkeys, i, j)
-            end
+        optmap(proc, opt, rgrids, Tuple{Y,X,R}) do i, j
+            rule_kernel!(wgrids, simdata, rule, rkeys, rgrids, wkeys, i, j)
         end
     end
 end
@@ -115,14 +113,15 @@ end
 @inline function optmap(f, proc, ::SparseOpt, rgrids, ::Type{Tuple{Y,X,R}}) where {Y,X,R}
     # Only use SparseOpt for single-grid rules with grid radii > 0
     if R == 0
-        optmap(f, proc, NoOpt(), Tuple{Y,X,R})
+        optmap(f, proc, NoOpt(), rgrids, Tuple{Y,X,R})
         return nothing
     end
     B = 2R
-    let f=f, proc=proc, rgrids=rgrids
+    grid = rgrids isa Tuple ? first(rgrids) : rgrids
+    let f=f, proc=proc, grid=grid
         procmap(proc, 1:_indtoblock(X, B)) do bj
             for  bi in 1:_indtoblock(Y, B)
-                @inbounds sourcestatus(rgrids)[bi, bj] || return nothing
+                @inbounds sourcestatus(grid)[bi, bj] || return nothing
                 # Convert from padded block to init dimensionn
                 istart, jstart = _blocktoind(bi, B) - R, _blocktoind(bj, B) - R
                 # Stop at the init row/column size, not the padding or block multiple
@@ -140,7 +139,11 @@ end
 end
 # Run kernel over the whole grid, cell by cell
 @inline optmap(f, proc, ::NoOpt, g, ::Type{Tuple{Y,X,R}}) where {Y,X,R} = 
-    procmap(f, proc, 1:X) 
+    procmap(proc, 1:X) do j
+        for i in 1:Y
+            f(i, j)
+        end
+    end
 
 # Looping over cells or blocks on CPU
 @inline procmap(f, proc::SingleCPU, range) =
@@ -204,7 +207,7 @@ from the main array. =#
     src = parent(source(grid))
     buffers = _initialise_buffers(src, Val{R}(), i, 1)
     blocklen = min(Y, i + B - 1) - i + 1
-    for j = 1:X-1
+    for j = 1:X
         buffers = _update_buffers(buffers, src, Val{R}(), i, j)
         # Loop over the COLUMN of buffers covering the block
         for b in 1:blocklen
@@ -332,7 +335,7 @@ end
 # Reduces array reads for single grids, when we can just use
 # the center of the neighborhood buffer as the cell state
 @inline function _readgridsorbuffer(rgrids::Tuple, buffer, rule, I...)
-    _readgrids(keys2vals(readkeys(rule)), rgrids, I...)
+    _readgrids(keys2vals(_readkeys(rule)), rgrids, I...)
 end
 @inline function _readgridsorbuffer(
     rgrids::ReadableGridData{<:Any,<:Any,R}, buffer, rule, I...

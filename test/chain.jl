@@ -1,7 +1,7 @@
 using DynamicGrids, Test, BenchmarkTools
 
-using DynamicGrids: SimData, radius, rules, readkeys, writekeys, 
-    applyrule, sumneighbors, neighborhood, neighborhoodkey, Extent
+using DynamicGrids: SimData, radius, rules, _readkeys, _writekeys, 
+    applyrule, neighborhood, neighborhoodkey, Extent
 
 @testset "CellRule chain" begin
 
@@ -38,8 +38,8 @@ using DynamicGrids: SimData, radius, rules, readkeys, writekeys,
              0 0 0]
 
     chain = Chain(rule1, rule2, rule3, rule4)
-    @test readkeys(chain) == (:a, :b, :d, :c)
-    @test writekeys(chain) == (:b, :c, :d, :e, :a)
+    @test _readkeys(chain) == (:a, :b, :d, :c)
+    @test _writekeys(chain) == (:b, :c, :d, :e, :a)
 
     ruleset = Ruleset(chain)
     init = (a=agrid, b=bgrid, c=cgrid, d=dgrid, e=egrid)
@@ -164,5 +164,4 @@ end
          4 5 9 5 4
          3 3 5 3 3
          2 3 4 3 2]
-
 end

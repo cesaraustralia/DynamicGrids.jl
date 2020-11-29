@@ -75,13 +75,13 @@ end
     Expr(:tuple, QuoteNode.(union(asiterable(W), asiterable(R)))...)
 end
 
-@inline writekeys(::Rule{R,W}) where {R,W} = W
-@generated function writekeys(::Rule{R,W}) where {R,W<:Tuple}
+@inline _writekeys(::Rule{R,W}) where {R,W} = W
+@generated function _writekeys(::Rule{R,W}) where {R,W<:Tuple}
     Expr(:tuple, QuoteNode.(W.parameters)...)
 end
 
-@inline readkeys(::Rule{R,W}) where {R,W} = R
-@generated function readkeys(::Rule{R,W}) where {R<:Tuple,W}
+@inline _readkeys(::Rule{R,W}) where {R,W} = R
+@generated function _readkeys(::Rule{R,W}) where {R<:Tuple,W}
     Expr(:tuple, QuoteNode.(R.parameters)...)
 end
 
@@ -89,8 +89,6 @@ end
 function ConstructionBase.constructorof(::Type{T}) where T<:Rule{R,W} where {R,W}
     T.name.wrapper{R,W}
 end
-
-
 
 # Find the largest radius present in the passed in rules.
 function radius(rules::Tuple{Vararg{<:Rule}})
@@ -203,6 +201,7 @@ abstract type NeighborhoodRule{R,W} <: Rule{R,W} end
 neighbors(rule::NeighborhoodRule) = neighbors(neighborhood(rule))
 neighborhood(rule::NeighborhoodRule) = rule.neighborhood
 offsets(rule::NeighborhoodRule) = offsets(neighborhood(rule))
+kernel(rule::NeighborhoodRule) = kernel(neighborhood(rule))
 positions(rule::NeighborhoodRule, args...) = positions(neighborhood(rule), args...)
 neighborhoodkey(rule::NeighborhoodRule{R,W}) where {R,W} = R
 # The first argument is for the neighborhood grid
@@ -224,6 +223,7 @@ abstract type ManualNeighborhoodRule{R,W} <: ManualRule{R,W} end
 neighbors(rule::ManualNeighborhoodRule) = neighbors(neighborhood(rule))
 neighborhood(rule::ManualNeighborhoodRule) = rule.neighborhood
 offsets(rule::ManualNeighborhoodRule) = offsets(neighborhood(rule))
+kernel(rule::ManualNeighborhoodRule) = kernel(neighborhood(rule))
 positions(rule::ManualNeighborhoodRule, args...) = positions(neighborhood(rule), args...)
 neighborhoodkey(rule::ManualNeighborhoodRule{R,W}) where {R,W} = R
 neighborhoodkey(rule::ManualNeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
@@ -520,7 +520,7 @@ asiterable(x::Symbol) = (x,)
 asiterable(x::Type{<:Tuple}) = x.parameters
 asiterable(x::Tuple) = x
 
-astuple(rule::Rule, state) = astuple(readkeys(rule), state)
+astuple(rule::Rule, state) = astuple(_readkeys(rule), state)
 astuple(::Tuple, state) = state
 astuple(::Symbol, state) = (state,)
 

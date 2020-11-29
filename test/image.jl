@@ -45,14 +45,14 @@ DynamicGrids.showimage(image, o::NoDisplayImageOutput, f, t) = begin
 end
 
 @testset "basic ImageOutput" begin
-    init = [8.0 10.0;
-            0.0  5.0]
-    output = NoDisplayImageOutput(init; tspan=1:1, maxval=40.0)
+    init_ = [8.0 10.0;
+             0.0  5.0]
+    output = NoDisplayImageOutput(init_; tspan=1:1, maxval=40.0)
 
-    @test parent(output) == [init]
+    @test parent(output) == [init_]
     @test minval(output) === nothing
     @test maxval(output) === 40.0
-    @test processor(output) == ColorProcessor()
+    @test processor(output).scheme == Greyscale()
     @test isasync(output) == false
     @test isstored(output) == false
     @test initialise(output) === nothing
@@ -63,18 +63,18 @@ end
     settimestamp!(output, 1)
     @test timestamp(output) > pre
     @test length(output) == 1
-    push!(output, 2init)
+    push!(output, 2init_)
     @test length(output) == 2
-    @test output[2] == 2init
+    @test output[2] == 2init_
     @test tspan(output) == 1:1
     @test fps(output) === 25.0
     @test setfps!(output, 1000.0) === 1000.0
     @test fps(output) === 1000.0
-    output[1] = 5init
-    @test frames(output)[1] == 5init
+    output[1] = 5init_
+    @test frames(output)[1] == 5init_
     @test isshowable(output, 1)
 
-    output = NoDisplayImageOutput(init; tspan=1:10, maxval=40.0)
+    output = NoDisplayImageOutput(init_; tspan=1:10, maxval=40.0)
     simdata = SimData(extent(output), Ruleset(Life()))
     @test_broken showframe(output, simdata, 1, 1) ==
         [ARGB32(1.0, 1.0, 1.0) ARGB32(1.0, 1.0, 1.0)
@@ -86,20 +86,22 @@ end
     arrayoutput = ArrayOutput([0 0]; tspan=1:2)
     @test minval(arrayoutput) == nothing
     @test maxval(arrayoutput) == nothing
-    @test processor(arrayoutput) == ColorProcessor()
+    @test_broken processor(arrayoutput) == ColorProcessor()
     @test fps(arrayoutput) === nothing
 end
 
 
 @testset "ColorProcessor" begin
-    init = [8.0 10.0;
+    init_ = [8.0 10.0;
             0.0  5.0]
     proc = ColorProcessor(zerocolor=(1.0, 0.0, 0.0))
-    output = NoDisplayImageOutput((a=init,); tspan=1:10, processor=proc, minval=0.0, maxval=10.0, store=true)
-    maxval(output.imageconfig)
+    ic = DynamicGrids.ImageConfig(init=init_, processor=proc)
+    @test ic.processor === proc
+    output = NoDisplayImageOutput((a=init_,); tspan=1:10, processor=proc, minval=0.0, maxval=10.0, store=true)
+    @test processor(output) === output.imageconfig.processor === proc
     @test minval(output) === 0.0
     @test maxval(output) === 10.0
-    @test processor(output) == ColorProcessor(zerocolor=(1.0, 0.0, 0.0))
+    @test processor(output).zerocolor == ColorProcessor(zerocolor=(1.0, 0.0, 0.0)).zerocolor
     @test isstored(output) == true
     simdata = SimData(extent(output), Ruleset(Life()))
 
@@ -109,16 +111,16 @@ end
                      0.0 0.5]
 
     # Test greyscale Image conversion
-    @test grid2image(processor(output), output, simdata, (a=init,), 1, 1) ==
+    @test grid2image(processor(output), output, simdata, (a=init_,), 1, 1) ==
         [ARGB32(0.8, 0.8, 0.8) ARGB32(1.0, 1.0, 1.0)
          ARGB32(1.0, 0.0, 0.0) ARGB32(0.5, 0.5, 0.5)]
 
-    proc = ColorProcessor(;scheme=leonardo)
-    @test grid2image(proc, output, simdata, init, 1, 1) == [l08 l1
+    proc = ColorProcessor(; scheme=leonardo)
+    @test grid2image(proc, output, simdata, init_, 1, 1) == [l08 l1
                                                             l0 l05]
     z0 = ARGB32(1, 0, 0)
     proc = ColorProcessor(scheme=leonardo, zerocolor=z0)
-    @test grid2image(proc, output, simdata, init, 1, 1) == [l08 l1
+    @test grid2image(proc, output, simdata, init_, 1, 1) == [l08 l1
                                                             z0 l05]
 
     @testset "text captions" begin

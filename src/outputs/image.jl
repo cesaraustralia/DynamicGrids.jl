@@ -1,6 +1,14 @@
 """
     ImageConfig(processor, minval, maxval) 
-    ImageConfig(; processor=ColorProcessor(), minval=nothing, maxval=nothing) 
+    ImageConfig(; 
+        init=nothing, 
+        font=autofont(), 
+        scheme=Greyscale(), 
+        text=TextConfig(; font=font)
+        processor=autoprocessor(init),
+        minval=nothing, 
+        maxval=nothing
+    ) 
 
 Common configuration component for all [`ImageOutput`](@ref).
 

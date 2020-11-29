@@ -70,25 +70,50 @@ _sum(hood::Neighborhood, cell) = sum(_buffer(hood)) - cell
 
 
 """
+Abstract supertype for window neighborhoods.
+
+These are radial neighborhoods that inlude the central cell.
+"""
+abstract type AbstractWindow{R} <: RadialNeighborhood{R} end
+
+Base.length(hood::AbstractWindow{R}) where R = (2R + 1)^2
+neighbors(hood::AbstractWindow) = _buffer(hood)
+
+# The central cell is included
+@inline offsets(hood::AbstractWindow{R}) where R = ((i, j) for j in -R:R, i in -R:R)
+
+"""
+    Window{R}()
+
+A neighboorhood of radius R that includes the central cell.
+`R = 1` gives a 3x3 matrix.
+"""
+struct Window{R,K,B} <: AbstractWindow{R}
+    _buffer::B
+end
+@inline Window{R}(_buffer=nothing) where R = Window{R,typeof(_buffer)}(_buffer)
+@inline Window(R::Int) = Window{R}(nothing)
+
+@inline _setbuffer(::Window{R}, buf::B2) where {R,B2} = Window{R,B2}(buf)
+
+"""
 Abstract supertype for kernel neighborhoods.
 
-These inlude the central cell.
+These inlude the central cell, and have a kernel matrix
+that matches the window size, for convolution-like operations.
 """
-abstract type AbstractKernel{R} <: RadialNeighborhood{R} end
+abstract type AbstractKernel{R} <: AbstractWindow{R} end
 
 kernel(hood::AbstractKernel) = hood.kernel
-
-Base.length(hood::AbstractKernel{R}) where R = (2R + 1)^2
-Base.sum(hood::AbstractKernel) = sum(_buffer(hood))
-neighbors(hood::AbstractKernel) = _buffer(hood)
-
 LinearAlgebra.dot(hood::AbstractKernel) = kernel(hood) ⋅ neighbors(hood)
-# The central cell is included
-@inline offsets(hood::AbstractKernel{R}) where R = ((i, j) for j in -R:R, i in -R:R)
 
 """
-    Kernel{R}(kernel, _buffer=nothing)
+    Kernel{R}(kernel)
 
+A neighboorhood of radius R that includes the central cell,
+and holds a matching size kernel matrix.
+
+`R = 1` gives 3x3 matrices.
 """
 struct Kernel{R,K,B} <: AbstractKernel{R}
     "Kernal matrix"
@@ -107,44 +132,6 @@ end
 
 
 # Depreciated 
-
-@inline function mapsetneighbor!(
-    grid, hood::Neighborhood, rule, state, index
-)
-    r = radius(hood)
-    sum = zero(state)
-    # Loop over dispersal kernel grid dimensions
-    for x = one(r):2r + one(r)
-        xdest = x + index[2] - r - one(r)
-        for y = one(r):2r + one(r)
-            x == (r + one(r)) && y == (r + one(r)) && continue
-            ydest = y + index[1] - r - one(r)
-            hood_index = (y, x)
-            dest_index = (ydest, xdest)
-            sum += setneighbor!(grid, hood, rule, state, hood_index, dest_index)
-        end
-    end
-    return sum
-end
-
-@inline function mapsetneighbor!(
-    f, grid, hood, state, index
-)
-    r = radius(hood)
-    sum = zero(state)
-    # Loop over dispersal kernel grid dimensions
-    for x = one(r):2r + one(r)
-        xdest = x + index[2] - r - one(r)
-        for y = one(r):2r + one(r)
-            x == (r + one(r)) && y == (r + one(r)) && continue
-            ydest = y + index[1] - r - one(r)
-            hood_index = (y, x)
-            dest_index = (ydest, xdest)
-            sum += setneighbor!(grid, hood, rule, state, hood_index, dest_index)
-        end
-    end
-    return sum
-end
 
 """
 Neighborhoods are tuples or vectors of custom coordinates tuples
@@ -194,19 +181,6 @@ offsets(hood::Positional) = hood.offsets
     (_buffer(hood)[(offset .+ radius(hood) .+ 1)...] for offset in offsets(hood))
 @inline set_buffer(n::Positional{R,O}, buf::B2) where {R,O,B2} = Positional{R,O,B2}(offsets(n), buf)
 
-@inline function mapsetneighbor!(
-    data, hood::Positional, rule, state, index
-)
-    r = radius(hood); sum = zero(state)
-    # Loop over dispersal kernel grid dimensions
-    for offset in offsets(hood)
-        hood_index = offset .+ r
-        dest_index = index .+ offset
-        sum += setneighbor!(data, hood, rule, state, hood_index, dest_index)
-    end
-    return sum
-end
-
 """
     LayeredPositional(layers::Positional...)
 
@@ -230,13 +204,6 @@ LayeredPositional{R}(layers, _buffer) where R = begin
     LayeredPositional{R,typeof(layers),typeof(_buffer)}(layers, _buffer)
 end
 
-
-"""
-    neighbors(hood::Positional)
-
-Returns a tuple of iterators over each `Positional` neighborhood
-layer, for the cells around the current index.
-"""
 @inline neighbors(hood::LayeredPositional) = map(l -> neighbors(l), hood.layers)
 @inline offsets(hood::LayeredPositional) = map(l -> offsets(l), hood.layers)
 @inline positions(hood::LayeredPositional, args...) = map(l -> positions(l, args...), hood.layers)
@@ -244,9 +211,6 @@ layer, for the cells around the current index.
     LayeredPositional{R,L,B2}(n.layers, buf)
 
 @inline Base.sum(hood::LayeredPositional) = map(sum, neighbors(hood))
-
-@inline mapsetneighbor!(data, hood::LayeredPositional, rule, state, index) =
-    map(layer -> mapsetneighbor!(data, layer, rule, state, index), hood.layers)
 
 """
     VonNeumann(radius=1)

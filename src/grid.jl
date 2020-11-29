@@ -144,7 +144,7 @@ function _addpadding(init::AbstractArray{T,N}, r, padval) where {T,N}
     h, w = size(init)
     paddedsize = h + 4r, w + 2r
     paddedindices = -r + 1:h + 3r, -r + 1:w + r
-    sourceparent = fill!(similar(init, paddedsize), padval)
+    sourceparent = fill(eltype(init)(padval), paddedsize)
     source = OffsetArray(sourceparent, paddedindices...)
     # Copy the init array to the middle section of the source array
     for j in 1:size(init, 2), i in 1:size(init, 1)
@@ -204,7 +204,6 @@ Base.parent(d::WritableGridData) = parent(dest(d))
 @propagate_inbounds function Base.getindex(d::WritableGridData, I...)
     getindex(source(d), I...)
 end
-# This needs to be used with caution.
 @propagate_inbounds function Base.setindex!(d::WritableGridData, x, I...)
     _setdeststatus!(d, x, I)
     dest(d)[I...] = x

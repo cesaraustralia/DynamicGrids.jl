@@ -1,11 +1,14 @@
 abstract type AbstractExtent{I,M,A} end
 
+struct Aux{K} end
+Aux(key::Symbol) = Aux{key}()
+
 init(e::AbstractExtent) = e.init
 mask(e::AbstractExtent) = e.mask
 aux(e::AbstractExtent) = e.aux
 @inline aux(e::AbstractExtent, key) = aux(aux(e), key)
 @inline aux(nt::NamedTuple, key::Symbol) = nt[key] # Should not be used in rules
-@inline aux(nt::NamedTuple, ::Val{Key}) where Key = nt[Key] # Fast compile-time version
+@inline aux(nt::NamedTuple, ::Aux{Key}) where Key = nt[Key] # Fast compile-time version
 @noinline aux(::Nothing, val) = 
     throw(ArgumentError("No aux data available. Pass a NamedTuple to the `aux=` keyword of the Output"))
 tspan(e::AbstractExtent) = e.tspan # Never type-stable, only access in `precalc` methods
@@ -27,7 +30,7 @@ to `Output` constructors instead of `init`, `mask`, `aux` and `tspan`.
 
 - `init`: initialisation `Array`/`NamedTuple` for grid/s.
 - `mask`: `BitArray` for defining cells that will/will not be run.
-- `aux`: NamedTuple of arbitrary input data. Use `aux(data, Vale{:key})` to access from 
+- `aux`: NamedTuple of arbitrary input data. Use `aux(data, Aux(:key))` to access from 
   a `Rule` in a type-stable way.
 - `tspan`: Time span range. Never type-stable, only access this in `precalc` methods
 """

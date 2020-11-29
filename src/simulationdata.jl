@@ -73,7 +73,7 @@ function SimData(grids::G, extent::E, ruleset::AbstractRuleset) where {G,E}
     # SimData is isbits-only
     s_extent = StaticExtent(extent)
     s_ruleset = StaticRuleset(ruleset)
-    SimData{Y,X,G,typeof(s_extent),typeof(s_ruleset),Int,Nothing}(
+    SimData{Y,X,G,typeof(s_extent),typeof(s_ruleset),Int,typeof(auxframe)}(
         grids, s_extent, s_ruleset, currentframe, auxframe
     )
 end
@@ -94,6 +94,7 @@ init(d::SimData) = init(extent(d))
 mask(d::SimData) = mask(first(d))
 aux(d::SimData, args...) = aux(extent(d), args...)
 auxframe(d::SimData, key) = auxframe(d)[unwrap(key)]
+auxframe(d::SimData) = d.auxframe
 tspan(d::SimData) = tspan(extent(d))
 timestep(d::SimData) = step(tspan(d))
 currentframe(d::SimData) = d.currentframe

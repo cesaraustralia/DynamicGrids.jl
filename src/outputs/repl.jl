@@ -1,10 +1,5 @@
 using REPL
 
-function __init__()
-    global terminal
-    terminal = REPL.Terminals.TTYTerminal(get(ENV, "TERM", Base.Sys.iswindows() ? "" : "dumb"), stdin, stdout, stderr)
-end
-
 abstract type CharStyle end
 struct Block <: CharStyle end
 struct Braile <: CharStyle end

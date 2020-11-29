@@ -1,7 +1,7 @@
 using DynamicGrids, Setfield, Test
 import DynamicGrids: neighbors, sumneighbors, SimData, Extent, radius, neighbors,
        mapsetneighbor!, neighborhood, WritableGridData, dest, hoodsize, neighborhoodkey,
-       buffer, offsets
+       _buffer, offsets
 
 @testset "neighbors" begin
     init = [0 0 0 1 1 1
@@ -13,9 +13,7 @@ import DynamicGrids: neighbors, sumneighbors, SimData, Extent, radius, neighbors
 
     moore = Moore{1}(init[1:3, 1:3])
 
-    @test buffer(moore) == init[1:3, 1:3]
-    multibuffer = Moore{1}(zeros(Int, 3, 3))
-    @test buffer(multibuffer) == zeros(Int, 3, 3)
+    @test _buffer(moore) == init[1:3, 1:3]
     @test hoodsize(moore) == 3
     @test moore[2, 2] == 0
     @test length(moore) == 8
@@ -27,7 +25,7 @@ import DynamicGrids: neighbors, sumneighbors, SimData, Extent, radius, neighbors
                                     (0, 1), (1, -1), (1, 0), (1, 1))
     vonneumann = VonNeumann(1, init[1:3, 1:3])
     @test offsets(vonneumann) == ((0, -1), (-1, 0), (1, 0), (0, 1))
-    @test buffer(vonneumann) == init[1:3, 1:3]
+    @test _buffer(vonneumann) == init[1:3, 1:3]
     @test hoodsize(vonneumann) == 3
     @test vonneumann[2, 1] == 1
     @test length(vonneumann) == 4
@@ -116,8 +114,14 @@ end
     @test neighborhood(ruleB) == Moore{2}()
     @test neighborhoodkey(ruleA) == :a
     @test neighborhoodkey(ruleB) == :b
-    @test Tuple(offsets(ruleB)) === ((-2, -2), (-2, -1), (-2, 0), (-2, 1), (-2, 2), (-1, -2), (-1, -1), (-1, 0), (-1, 1), (-1, 2), (0, -2), (0, -1), (0, 0), (0, 1), (0, 2), (1, -2), (1, -1), (1, 0), (1, 1), (1, 2), (2, -2), (2, -1), (2, 0), (2, 1), (2, 2))
-    @test Tuple(positions(ruleB, (10, 10))) == ((8, 8), (8, 9), (8, 10), (8, 11), (8, 12), (9, 8), (9, 9), (9, 10), (9, 11), (9, 12), (10, 8), (10, 9), (10, 10), (10, 11), (10, 12), (11, 8), (11, 9), (11, 10), (11, 11), (11, 12), (12, 8), (12, 9), (12, 10), (12, 11), (12, 12))
+    @test Tuple(offsets(ruleB)) === 
+        ((-2, -2), (-2, -1), (-2, 0), (-2, 1), (-2, 2), (-1, -2), (-1, -1), (-1, 0), 
+         (-1, 1), (-1, 2), (0, -2), (0, -1), (0, 0), (0, 1), (0, 2), (1, -2), (1, -1), 
+         (1, 0), (1, 1), (1, 2), (2, -2), (2, -1), (2, 0), (2, 1), (2, 2))
+    @test Tuple(positions(ruleB, (10, 10))) == 
+        ((8, 8), (8, 9), (8, 10), (8, 11), (8, 12), (9, 8), (9, 9), (9, 10), (9, 11), 
+         (9, 12), (10, 8), (10, 9), (10, 10), (10, 11), (10, 12), (11, 8), (11, 9), 
+         (11, 10), (11, 11), (11, 12), (12, 8), (12, 9), (12, 10), (12, 11), (12, 12))
 end
 
 @testset "radius" begin
@@ -153,8 +157,8 @@ end
     hood = Moore(1)
     rule = TestManualNeighborhoodRule{:a,:a}(hood)
     ruleset = Ruleset(rule)
-    extent = Extent(; init=(_default_=init,), tspan=1:1)
-    simdata = SimData(extent, ruleset)
+    ext = Extent(; init=(_default_=init,), tspan=1:1)
+    simdata = SimData(ext, ruleset)
     state = 5
     index = (3, 3)
     @test mapsetneighbor!(WritableGridData(first(simdata)), hood, rule, state, index) == 40
@@ -169,8 +173,8 @@ end
     hood = Positional(((-1, -1), (1, 1)))
     rule = TestManualNeighborhoodRule{:a,:a}(hood)
     ruleset = Ruleset(rule)
-    extent = Extent(; init=(_default_=init,), tspan=1:1)
-    simdata = SimData(extent, ruleset)
+    ext = Extent(; init=(_default_=init,), tspan=1:1)
+    simdata = SimData(ext, ruleset)
     state = 1
     index = (5, 5)
     @test mapsetneighbor!(WritableGridData(first(simdata)), neighborhood(rule), rule, state, index) == 2
@@ -190,8 +194,8 @@ end
     rule = TestManualNeighborhoodRule{:a,:a}(hood)
     @test radius(rule) === 2
     ruleset = Ruleset(rule)
-    extent = Extent(; init=(_default_=init,), tspan=1:1)
-    simdata = SimData(extent, ruleset)
+    ext = Extent(; init=(_default_=init,), tspan=1:1)
+    simdata = SimData(ext, ruleset)
     state = 1
     index = (3, 3)
     @test mapsetneighbor!(WritableGridData(first(simdata)), neighborhood(rule), rule, state, index) == (2, 2)

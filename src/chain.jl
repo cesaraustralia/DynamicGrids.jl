@@ -18,8 +18,8 @@ struct Chain{R,W,T<:Union{Tuple{},Tuple{Union{<:NeighborhoodRule,<:CellRule},Var
 end
 Chain(rules...) = Chain(rules) 
 Chain(rules::Tuple) = begin
-    rkeys = Tuple{union(map(k -> asiterable(readkeys(k)), rules)...)...}
-    wkeys = Tuple{union(map(k -> asiterable(writekeys(k)), rules)...)...}
+    rkeys = Tuple{union(map(k -> asiterable(_readkeys(k)), rules)...)...}
+    wkeys = Tuple{union(map(k -> asiterable(_writekeys(k)), rules)...)...}
     Chain{rkeys,wkeys,typeof(rules)}(rules)
 end
 
@@ -28,8 +28,8 @@ rules(chain::Chain) = chain.rules
 radius(chain::Chain) = radius(chain[1])
 neighborhoodkey(chain::Chain) = neighborhoodkey(chain[1])
 neighborhood(chain::Chain) = neighborhood(chain[1])
-@inline function setbuffer(chain::Chain{R,W}, buf) where {R,W} 
-    rules = (setbuffer(chain[1], buf), tail(chain.rules)...)
+@inline function _setbuffer(chain::Chain{R,W}, buf) where {R,W} 
+    rules = (_setbuffer(chain[1], buf), tail(chain.rules)...)
     Chain{R,W,typeof(rules)}(rules)
 end
 
@@ -49,24 +49,24 @@ Base.lastindex(chain::Chain) = lastindex(rules(chain))
         rule_expr = quote
             rule = chain[$i]
             # Get the state needed by this rule
-            read = filter_readstate(rule, state)
+            read = _filter_readstate(rule, state)
             # Run the rule
             write = applyrule(data, rule, read, index)
             # Create new state with the result and state from other rules
-            state = update_chainstate(rule, state, write)
+            state = _update_chainstate(rule, state, write)
         end
         push!(expr.args, rule_expr)
     end
-    push!(expr.args, :(filter_writestate(chain, state)))
+    push!(expr.args, :(_filter_writestate(chain, state)))
     expr
 end
 
 """
-    filter_readstate(rule, state::NamedTuple)
+    _filter_readstate(rule, state::NamedTuple)
 
 Get the state to pass to the specific rule as a `NamedTuple` or single value
 """
-@generated function filter_readstate(::Rule{R,W}, state::NamedTuple) where {R<:Tuple,W}
+@generated function _filter_readstate(::Rule{R,W}, state::NamedTuple) where {R<:Tuple,W}
     expr = Expr(:tuple)
     keys = Tuple(R.parameters)
     for k in keys
@@ -74,14 +74,14 @@ Get the state to pass to the specific rule as a `NamedTuple` or single value
     end
     :(NamedTuple{$keys,typeof($expr)}($expr))
 end
-@inline filter_readstate(::Rule{R,W}, state::NamedTuple) where {R,W} = state[R]
+@inline _filter_readstate(::Rule{R,W}, state::NamedTuple) where {R,W} = state[R]
 
 """
-    filter_writestate(rule, state::NamedTuple)
+    _filter_writestate(rule, state::NamedTuple)
 
 Get the state to write for the specific rule
 """
-@generated function filter_writestate(::Rule{R,W}, state::NamedTuple) where {R<:Tuple,W}
+@generated function _filter_writestate(::Rule{R,W}, state::NamedTuple) where {R<:Tuple,W}
     expr = Expr(:tuple)
     keys = Tuple(W.parameters)
     for k in keys
@@ -89,7 +89,7 @@ Get the state to write for the specific rule
     end
     expr
 end
-@inline filter_writestate(rule::Rule{R,W}, state::NamedTuple) where {R,W} = state[W]
+@inline _filter_writestate(rule::Rule{R,W}, state::NamedTuple) where {R,W} = state[W]
 
 """
     update_chainstate(rule::Rule, state::NamedTuple, writestate)
@@ -98,7 +98,7 @@ Merge new state with previous state.
 
 Returns a new `NamedTuple` with all keys having the most recent state
 """
-@generated function update_chainstate(rule::Rule{R,W}, state::NamedTuple{K,V}, writestate
+@generated function _update_chainstate(rule::Rule{R,W}, state::NamedTuple{K,V}, writestate
                                      ) where {R,W,K,V}
     expr = Expr(:tuple)
     writekeys = W isa Symbol ? (W,) : W.parameters

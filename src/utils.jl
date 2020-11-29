@@ -14,12 +14,10 @@ ismasked(data::GridData, I...) = ismasked(mask(data), I...)
 ismasked(mask::Nothing, I...) = false
 ismasked(mask::AbstractArray, I...) = @inbounds !(mask[I...])
 
-wrap(x) = Val(x)
-wrap(T::Type) = wrap(T.parameters)
-wrap(xs::Union{Core.SimpleVector,Tuple,AbstractArray}) = (map(x -> Val(x), xs)...,)
-
 unwrap(x) = x
 unwrap(::Val{X}) where X = X
+unwrap(::Aux{X}) where X = X
+unwrap(::Type{Aux{X}}) where X = X
 unwrap(::Type{Val{X}}) where X = X
 
 """
@@ -51,32 +49,32 @@ function isinferred(simdata::SimData,
     T = eltype(grid)
     S = 2r + 1
     buffer = SArray{Tuple{S,S},T,2,S^2}(Tuple(zero(T) for i in 1:S^2))
-    rule = setbuffer(rule, buffer)
+    rule = _setbuffer(rule, buffer)
     return _isinferred(simdata, rule)
 end
 function isinferred(simdata::SimData, rule::ManualRule)
-    rkeys, rgrids = getreadgrids(rule, simdata)
-    wkeys, wgrids = getwritegrids(rule, simdata)
-    simdata = @set simdata.grids = combinegrids(rkeys, rgrids, wkeys, wgrids)
-    readval = readgrids(rkeys, rgrids, 1, 1)
+    rkeys, rgrids = _getreadgrids(rule, simdata)
+    wkeys, wgrids = _getwritegrids(rule, simdata)
+    simdata = @set simdata.grids = _combinegrids(rkeys, rgrids, wkeys, wgrids)
+    readval = _readgrids(rkeys, rgrids, 1, 1)
     @inferred applyrule!(simdata, rule, readval, (1, 1))
     return true
 end
 
 function _isinferred(simdata, rule)
-    rkeys, rgrids = getreadgrids(rule, simdata)
-    wkeys, wgrids = getwritegrids(rule, simdata)
-    simdata = @set simdata.grids = combinegrids(rkeys, rgrids, wkeys, wgrids)
-    readval = readgrids(rkeys, rgrids, 1, 1)
-    ex_writeval = Tuple(example_writeval(wgrids))
+    rkeys, rgrids = _getreadgrids(rule, simdata)
+    wkeys, wgrids = _getwritegrids(rule, simdata)
+    simdata = @set simdata.grids = _combinegrids(rkeys, rgrids, wkeys, wgrids)
+    readval = _readgrids(rkeys, rgrids, 1, 1)
+    ex_writeval = Tuple(_example_writeval(wgrids))
     writeval = @inferred applyrule(simdata, rule, readval, (1, 1))
     typeof(Tuple(writeval)) == typeof(ex_writeval) ||
         error("return type `$(typeof(Tuple(writeval)))` doesn't match grids `$(typeof(ex_writeval))`")
     return true
 end
 
-example_writeval(grids::Tuple) = map(example_writeval, grids)
-example_writeval(grid::WritableGridData) = grid[1, 1]
+_example_writeval(grids::Tuple) = map(_example_writeval, grids)
+_example_writeval(grid::WritableGridData) = grid[1, 1]
 
 asnamedtuple(x::NamedTuple) = x
 asnamedtuple(x::AbstractArray) = (_default_=x,)
@@ -85,3 +83,43 @@ asnamedtuple(e::Extent) = Extent(asnamedtuple(init(e)), mask(e), aux(e), tspan(e
 zerogrids(initgrid::AbstractArray, nframes) = [zero(initgrid) for f in 1:nframes]
 zerogrids(initgrids::NamedTuple, nframes) =
     [map(grid -> zero(grid), initgrids) for f in 1:nframes]
+
+
+"""
+    auxval(rule::Rule, data::SimData, key, I...)
+
+Returns the value of a single layer or interplated value from a sequence of layers.
+
+Corresponding layers must be include as the `aux` keyword to the `Output` or `sim!`.
+
+If the key is not a symbol 
+"""
+auxval(data::SimData, val, I...) = val
+auxval(data::SimData, key::Union{Symbol,Aux}, I...) = _auxval(aux(data, key), data, key, I...) 
+# If there is no time dimension we return the same data for every timestep
+_auxval(A::Matrix, data, key, y, x) = A[y, x] 
+function _auxval(A::AbstractDimArray{<:Any,2}, data, key, y, x) 
+    # X = DD.basetypeof(dims(A, XDim))
+    # Y = DD.basetypeof(dims(A, YDim))
+    A[y, x]
+end
+function _auxval(A::AbstractDimArray{<:Any,3}, data, key, y, x) 
+    # X = DD.basetypeof(dims(A, XDim))
+    # Y = DD.basetypeof(dims(A, YDim))
+    A[y, x, auxframe(data, key)]
+end
+
+function boundscheck_aux(data::SimData, auxkey::Aux{Key}) where Key 
+    a = aux(data)
+    (a isa NamedTuple && haskey(a, Key)) || _auxmissingerror(Key)
+    gsize = gridsize(data)
+    asize = size(a[Key], 1), size(a[Key], 2)
+    if asize != gsize
+        _auxsizeerror(Key, asize, gsize)
+    end
+end
+
+@noinline _auxmissingerror(key, asize, gsize) = 
+    error("Aux grid $key is not present in aux")
+@noinline _auxsizeerror(key, asize, gsize) = 
+    error("Aux grid $key is size $asize does not match grid size $gsize")

@@ -49,16 +49,22 @@ mutable struct GifOutput{T,F<:AbstractVector{T},E,GC,IC,G,N} <: ImageOutput{T}
     filename::N
 end
 GifOutput(; frames, running, extent, graphicconfig, imageconfig, filename, kwargs...) =
-    GifOutput(frames, running, extent, graphicconfig, imageconfig, allocgif(extent), filename)
+    GifOutput(frames, running, extent, graphicconfig, imageconfig, allocgif(imageconfig, extent), filename)
 
 filename(o::GifOutput) = o.filename
 gif(o::GifOutput) = o.gif
 
-showimage(image, o::GifOutput, data::SimData, f, t) = gif(o)[:, :, f] = image 
+showimage(image, o::GifOutput, data::SimData, f, t) = gif(o)[:, :, f] .= image 
 
 finalise(o::GifOutput) = savegif(o)
 
-allocgif(e::Extent) = zeros(ARGB32, gridsize(e)..., length(tspan(e)))
+allocgif(i::ImageConfig, e::Extent) = allocgif(processor(i), i::ImageConfig, e::Extent) 
+function allocgif(::Processor, i::ImageConfig, e::Extent)
+    zeros(ARGB32, gridsize(e)..., length(tspan(e)))
+end
+function allocgif(p::LayoutProcessor, i::ImageConfig, e::Extent)
+    zeros(ARGB32, (gridsize(e) .* size(p.layout))..., length(tspan(e)))
+end
 
 savegif(o::GifOutput) = savegif(filename(o), o)
 function savegif(filename::String, o::GifOutput, ruleset=nothing, fps=fps(o);

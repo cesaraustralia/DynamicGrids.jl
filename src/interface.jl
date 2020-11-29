@@ -17,7 +17,6 @@ the grids specified by the `W` type parameter.
 """
 function applyrule end
 
-
 """
     applyrule!(data::SimData, rule::ManualRule{R,W}, state, index::Tuple{Int,Int}) => Nothing
 
@@ -36,7 +35,6 @@ Only grids specified with the `W` type parameter will be writable from `data`.
 - `index`: a (row, column) tuple of Int for the current cell coordinates - `t`: the current time step
 """
 function applyrule! end
-
 
 """
     precalcrule(rule::Rule, data::SimData) => Rule
@@ -63,32 +61,6 @@ Returns an iteraterable generator over all cells in the neighborhood.
 Custom `Neighborhood`s must define this method.
 """
 function neighbors end
-
-"""
-    sumneighbors(hood::Neighborhood, state::T) => T
-
-Sums all cells in the neighborhood. This is identical to running
-`sum(neighbors(hood))` but it can be more efficient than as
-it may use matrix algra libraries for `sum`, instead of regular sum over
-an iterator.
-"""
-function sumneighbors end
-
-"""
-    mapsetneighbor!(data, neighborhood, rule, state, index) => Nothing
-
-Run `setneighbor!` over all cells in the neighborhood and sums its return values.
-
-This is used only in [`ManualNeighborhoodRule`](@ref).
-"""
-function mapsetneighbor! end
-
-"""
-    setneighbor!(data, neighborhood, rule, state, hood_index, dest_index)
-
-Set value of a cell in the neighborhood. Called in `mapsetneighbor!`.
-"""
-function setneighbor! end
 
 """
     add!(data::WritableGridData, x, I...)
