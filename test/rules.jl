@@ -1,7 +1,7 @@
 using DynamicGrids, ModelParameters, Setfield, Test, StaticArrays, LinearAlgebra
-import DynamicGrids: applyrule, applyrule!, maprule!, extent, source, dest, currenttime, 
-       _getreadgrids, _getwritegrids, _combinegrids, _readkeys, _writekeys
-       SimData, WritableGridData, Rule, Extent, 
+import DynamicGrids: applyrule, applyrule!, maprule!, extent, source, dest,
+       _getreadgrids, _getwritegrids, _combinegrids, _readkeys, _writekeys,
+       SimData, WritableGridData, Rule, Extent
 
 init  = [0 1 1 0
          0 1 1 0

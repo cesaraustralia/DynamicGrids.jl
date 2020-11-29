@@ -1,8 +1,7 @@
 using DynamicGrids, OffsetArrays, Test, Dates
-using DynamicGrids: _initdata!, data, init, mask, radius, overflow, source, 
-    dest, sourcestatus, deststatus, gridsize,
-    ruleset, grids, currentframe, grids, SimData, Extent,
-    _updatetime, ismasked, currenttimestep, WritableGridData, tspan
+using DynamicGrids: _initdata!, data, init, mask, overflow, source, dest, 
+    sourcestatus, deststatus, gridsize, ruleset, grids, SimData, Extent,
+    _updatetime, ismasked, WritableGridData, tspan
 
 inita = [0 1 1
          0 1 1]

@@ -37,9 +37,9 @@ import Base: show, getindex, setindex!, lastindex, size, length, push!, append!,
 
 export sim!, resume!, savegif, isinferred, isinferred
 
-export rules, neighbors, offsets, positions, radius, inbounds, isinbounds 
+export rules, neighbors, neighborhood, offsets, positions, radius, inbounds, isinbounds 
 
-export gridsize, currenttime, currenttimestep, timestep, auxval
+export gridsize, currentframe, currenttime, currenttimestep, timestep, auxval
 
 export add!, sub!, min!, max!, and!, or!, xor!
 

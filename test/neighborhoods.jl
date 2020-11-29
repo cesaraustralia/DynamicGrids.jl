@@ -1,7 +1,6 @@
 using DynamicGrids, Setfield, Test
-import DynamicGrids: neighbors, sumneighbors, SimData, Extent, radius, neighbors,
-       mapsetneighbor!, neighborhood, WritableGridData, dest, hoodsize, neighborhoodkey,
-       _buffer, offsets
+import DynamicGrids: SimData, Extent, WritableGridData, 
+       radius, dest, hoodsize, neighborhoodkey, _buffer
 
 @testset "neighbors" begin
     init = [0 0 0 1 1 1
@@ -98,7 +97,6 @@ function DynamicGrids.applyrule!(
 end
 
 
-
 @testset "neighborhood rules" begin
     ruleA = TestManualNeighborhoodRule{:a,:a}(Moore{3}())
     ruleB = TestManualNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}())
@@ -137,75 +135,6 @@ end
     output = ArrayOutput(init; tspan=1:3)
     sim!(output, ruleset)
     # TODO make sure 2 radii can coexist
-end
-
-function DynamicGrids.setneighbor!(
-    data, hood, rule::TestManualNeighborhoodRule, state, hood_index, dest_index
-)
-    add!(data, state, dest_index...)
-    return state
-end
-
-@testset "mapsetneighbor! (decpreciated)" begin
-    init = [0 1 2 3 4 5
-            0 1 2 3 4 5
-            0 1 2 3 4 5
-            0 1 2 3 4 5
-            0 1 2 3 4 5
-            0 1 2 3 4 5]
-
-    hood = Moore(1)
-    rule = TestManualNeighborhoodRule{:a,:a}(hood)
-    ruleset = Ruleset(rule)
-    ext = Extent(; init=(_default_=init,), tspan=1:1)
-    simdata = SimData(ext, ruleset)
-    state = 5
-    index = (3, 3)
-    @test mapsetneighbor!(WritableGridData(first(simdata)), hood, rule, state, index) == 40
-    @test dest(first(simdata)) ==
-        [0 1 2 3 4 5
-         0 6 7 8 4 5
-         0 6 2 8 4 5
-         0 6 7 8 4 5
-         0 1 2 3 4 5
-         0 1 2 3 4 5]
-
-    hood = Positional(((-1, -1), (1, 1)))
-    rule = TestManualNeighborhoodRule{:a,:a}(hood)
-    ruleset = Ruleset(rule)
-    ext = Extent(; init=(_default_=init,), tspan=1:1)
-    simdata = SimData(ext, ruleset)
-    state = 1
-    index = (5, 5)
-    @test mapsetneighbor!(WritableGridData(first(simdata)), neighborhood(rule), rule, state, index) == 2
-    @test dest(first(simdata)) ==
-        [0 1 2 3 4 5
-         0 1 2 3 4 5
-         0 1 2 3 4 5
-         0 1 2 4 4 5
-         0 1 2 3 4 5
-         0 1 2 3 4 6]
-
-
-    hood = LayeredPositional(
-        (Positional(((-1, -1), (1, 1))), Positional(((-2, -2), (2, 2)))),
-        nothing,
-    )
-    rule = TestManualNeighborhoodRule{:a,:a}(hood)
-    @test radius(rule) === 2
-    ruleset = Ruleset(rule)
-    ext = Extent(; init=(_default_=init,), tspan=1:1)
-    simdata = SimData(ext, ruleset)
-    state = 1
-    index = (3, 3)
-    @test mapsetneighbor!(WritableGridData(first(simdata)), neighborhood(rule), rule, state, index) == (2, 2)
-    @test dest(first(simdata)) ==
-        [1 1 2 3 4 5
-         0 2 2 3 4 5
-         0 1 2 3 4 5
-         0 1 2 4 4 5
-         0 1 2 3 5 5
-         0 1 2 3 4 5]
 end
 
 @testset "Positional" begin

@@ -144,12 +144,12 @@ function cell2rgb(p::SparseOptInspector, mask, minval, maxval, data::SimData, va
     opt(data) isa SparseOpt || error("Can only use SparseOptInspector with SparseOpt grids")
     r = radius(first(grids(data)))
     blocksize = 2r
-    blockindex = indtoblock.((I[1] + r,  I[2] + r), blocksize)
+    blockindex = _indtoblock.((I[1] + r,  I[2] + r), blocksize)
     normedval = normalise(val, minval, maxval)
     status = sourcestatus(first(data))
     # This is done at the start of the next frame, so wont show up in
     # the image properly. So do it preemtively?
-    wrapstatus!(status)
+    _wrapstatus!(status)
     if status[blockindex...]
         if normedval > 0
             rgb(normedval)
