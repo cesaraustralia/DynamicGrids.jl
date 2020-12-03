@@ -106,7 +106,6 @@ function maprule!(
     return nothing
 end
 
-
 ### Rules that don't need a neighborhood buffer ####################
 
 # Run kernels with SparseOpt

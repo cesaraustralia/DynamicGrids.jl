@@ -130,9 +130,6 @@ end
 
 @inline _setbuffer(n::Kernel{R,K}, buf::B2) where {R,K,B2} = Kernel{R,K,B2}(n.kernel, buf)
 
-
-# Depreciated 
-
 """
 Neighborhoods are tuples or vectors of custom coordinates tuples
 that are specified in relation to the central point of the current cell.

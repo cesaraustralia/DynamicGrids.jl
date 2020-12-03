@@ -20,7 +20,7 @@ function ArrayOutput(; frames, running, extent, kwargs...)
 end
 
 """
-    ArrayOutput(init; tspan::AbstractRange) 
+    ResultOutput(init; tspan::AbstractRange) 
 
 A simple output that only stores the final result, not intermediate frames.
 

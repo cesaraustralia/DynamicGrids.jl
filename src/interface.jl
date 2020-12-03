@@ -63,6 +63,26 @@ Custom `Neighborhood`s must define this method.
 function neighbors end
 
 """
+    offsets(x::Union{Neighborhood,NeighborhoodRule}}) => iterable
+
+Returns an iteraterable over all cells as a `Tuple` of the index 
+offset from the central cell.
+
+Custom `Neighborhood`s must define this method.
+"""
+function offsets end
+
+"""
+    positions(x::Union{Neighborhood,NeighborhoodRule}}, cellindex::Tuple) => iterable
+
+Returns an iteraterable over all cells as a `Tuple` of the index 
+in the main array. Useful in [`ManualNeighborhoodRule`](@ref) for 
+setting neighborhood values.
+"""
+function positions end
+
+
+"""
     add!(data::WritableGridData, x, I...)
     add!(A::AbstractArray, x, I...)
 

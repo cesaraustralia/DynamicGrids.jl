@@ -87,10 +87,6 @@ DynamicGrids.neighbors
 DynamicGrids.positions
 DynamicGrids.offsets
 DynamicGrids.sumneighbors
-DynamicGrids.mapsetneighbor!
-DynamicGrids.setneighbor!
-DynamicGrids.allocbuffers
-DynamicGrids.hoodsize
 ```
 
 ## Manual Rules
@@ -111,6 +107,7 @@ xor!
 ```@docs
 Output
 ArrayOutput
+ResultOutput
 GraphicOutput
 REPLOutput
 ImageOutput
