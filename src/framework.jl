@@ -177,7 +177,7 @@ function simloop!(output::Output, simdata, ruleset, fspan)
     # Loop over the simulation
     for f in fspan[2:end]
         # Get a data object with updated timestep and precalculate rules
-        simdata = updatetime(simdata, f) |>
+        simdata = _updatetime(simdata, f) |>
             sd -> precalcrules(sd, rules(ruleset)) |>
             sequencerules!
         # Save/do something with the the current grid
@@ -198,5 +198,7 @@ function simloop!(output::Output, simdata, ruleset, fspan)
     return output
 end
 
+# Allows different processors to modify the simdata object
+# GPU needs this to convert arrays to CuArray
 proc_setup(simdata::SimData) = proc_setup(proc(simdata), simdata)
 proc_setup(proc, obj) = obj
