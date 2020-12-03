@@ -28,10 +28,10 @@ end
 
 #= Wrap overflow where required. This optimisation allows us to ignore
 bounds checks on neighborhoods and still use a wraparound grid. =#
-handleoverflow!(grids::Tuple) = map(handleoverflow!, grids)
-handleoverflow!(griddata::GridData) = handleoverflow!(griddata, overflow(griddata))
-handleoverflow!(griddata::GridData, ::RemoveOverflow) = griddata
-function handleoverflow!(griddata::GridData, ::WrapOverflow)
+_handleoverflow!(grids::Tuple) = map(_handleoverflow!, grids)
+_handleoverflow!(griddata::GridData) = _handleoverflow!(griddata, overflow(griddata))
+_handleoverflow!(griddata::GridData, ::RemoveOverflow) = griddata
+function _handleoverflow!(griddata::GridData, ::WrapOverflow)
     r = radius(griddata)
     r < 1 && return griddata
 
@@ -74,11 +74,11 @@ function handleoverflow!(griddata::GridData, ::WrapOverflow)
     @inbounds copyto!(src, CartesianIndices((endpadrow, endpadcol)),
                       src, CartesianIndices((startrow, startcol)))
 
-    wrapstatus!(sourcestatus(griddata))
+    _wrapstatus!(sourcestatus(griddata))
 end
 
-wrapstatus!(status::Nothing) = nothing
-function wrapstatus!(status::AbstractArray)
+_wrapstatus!(status::Nothing) = nothing
+function _wrapstatus!(status::AbstractArray)
     # This could be further optimised.
     status[end-1, :] .|= status[1, :]
     status[:, end-1] .|= status[:, 1]

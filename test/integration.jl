@@ -166,7 +166,7 @@ test5_6 = (
 end
 
 @testset "Life simulation with RemoveOverflow and replicates" begin
-    init =      Bool[
+    init_ =     Bool[
                  0 0 0 0 0 0 0
                  0 0 0 0 1 1 1
                  0 0 0 0 0 0 1
@@ -216,19 +216,19 @@ end
                 ]
 
     rule = Life{:a,:a}(neighborhood=Moore(1))
-    ruleset = Ruleset(rule;
+    rs = Ruleset(rule;
         timestep=Day(2),
         overflow=RemoveOverflow(),
         opt=NoOpt(),
     )
 
     @testset "Wrong timestep throws an error" begin
-        output = ArrayOutput(init; tspan=1:7)
-        @test_throws ArgumentError sim!(output, ruleset; tspan=Date(2001, 1, 1):Month(1):Date(2001, 3, 1))
+        output = ArrayOutput(init_; tspan=1:7)
+        @test_throws ArgumentError sim!(output, rs; tspan=Date(2001, 1, 1):Month(1):Date(2001, 3, 1))
     end
 
     @testset "Results match glider behaviour" begin
-        output = ArrayOutput((a=init,); tspan=(Date(2001, 1, 1):Day(2):Date(2001, 1, 14)))
+        output = ArrayOutput((a=init_,); tspan=(Date(2001, 1, 1):Day(2):Date(2001, 1, 14)))
         @testset "NoOpt" begin
             sim!(output, rule; overflow=RemoveOverflow(), opt=NoOpt())
             @test output[2][:a] == test2_rem

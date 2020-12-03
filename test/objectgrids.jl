@@ -1,8 +1,5 @@
 using DynamicGrids, StaticArrays, Test
 
-using DynamicGrids: SimData, radius, rules, readkeys, writekeys, 
-    applyrule, sumneighbors, neighborhood, neighborhoodkey, Extent
-
 @testset "CellRule that multiples a StaticArray" begin
     rule = Cell{:grid1,:grid1}() do state
          2state

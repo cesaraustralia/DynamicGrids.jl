@@ -54,7 +54,7 @@ function sim!(
     setrunning!(output, true) || error("Could not start the simulation with this output")
     settspan!(output, tspan)
     # Create or update the combined data object for the simulation
-    simdata = initdata!(simdata, extent, ruleset, nreplicates)
+    simdata = _initdata!(simdata, extent, ruleset, nreplicates)
     # Delete grids output by the previous simulations
     initgrids!(output, init)
     # Set run speed for GraphicOutputs
@@ -136,7 +136,7 @@ function resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
 
     setfps!(output, fps)
     extent = Extent(; init=asnamedtuple(init), mask=mask(output), aux=aux(output), tspan=new_tspan)
-    simdata = initdata!(simdata, extent, ruleset, nreplicates)
+    simdata = _initdata!(simdata, extent, ruleset, nreplicates)
     return runsim!(output, simdata, ruleset, fspan)
 end
 
@@ -173,11 +173,11 @@ function simloop!(output::Output, simdata, ruleset, fspan)
     # Set the frame timestamp for fps calculation
     settimestamp!(output, first(fspan))
     # Initialise types etc
-    simdata = updatetime(simdata, 1)
+    simdata = _updatetime(simdata, 1) |> proc_setup
     # Loop over the simulation
     for f in fspan[2:end]
         # Get a data object with updated timestep and precalculate rules
-        simdata = updatetime(simdata, f) |>
+        simdata = _updatetime(simdata, f) |>
             sd -> precalcrules(sd, rules(ruleset)) |>
             sequencerules!
         # Save/do something with the the current grid
@@ -197,3 +197,8 @@ function simloop!(output::Output, simdata, ruleset, fspan)
     setrunning!(output, false)
     return output
 end
+
+# Allows different processors to modify the simdata object
+# GPU needs this to convert arrays to CuArray
+proc_setup(simdata::SimData) = proc_setup(proc(simdata), simdata)
+proc_setup(proc, obj) = obj

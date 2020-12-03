@@ -66,7 +66,7 @@ function (::Type{T})(args...; kw...) where T<:Rule
 end
 # {R,W} with args
 function (::Type{T})(args...) where T<:Rule{R,W} where {R,W}
-    _checkfields(T, args)
+    # _checkfields(T, args)
     T{map(typeof, args)...}(args...)
 end
 
@@ -75,13 +75,13 @@ end
     Expr(:tuple, QuoteNode.(union(asiterable(W), asiterable(R)))...)
 end
 
-@inline writekeys(::Rule{R,W}) where {R,W} = W
-@generated function writekeys(::Rule{R,W}) where {R,W<:Tuple}
+@inline _writekeys(::Rule{R,W}) where {R,W} = W
+@generated function _writekeys(::Rule{R,W}) where {R,W<:Tuple}
     Expr(:tuple, QuoteNode.(W.parameters)...)
 end
 
-@inline readkeys(::Rule{R,W}) where {R,W} = R
-@generated function readkeys(::Rule{R,W}) where {R<:Tuple,W}
+@inline _readkeys(::Rule{R,W}) where {R,W} = R
+@generated function _readkeys(::Rule{R,W}) where {R<:Tuple,W}
     Expr(:tuple, QuoteNode.(R.parameters)...)
 end
 
@@ -90,6 +90,18 @@ function ConstructionBase.constructorof(::Type{T}) where T<:Rule{R,W} where {R,W
     T.name.wrapper{R,W}
 end
 
+# Find the largest radius present in the passed in rules.
+function radius(rules::Tuple{Vararg{<:Rule}})
+    allkeys = Tuple(union(map(keys, rules)...))
+    maxradii = Tuple(radius(rules, key) for key in allkeys)
+    return NamedTuple{allkeys}(maxradii)
+end
+radius(rules::Tuple{}) = NamedTuple{(),Tuple{}}(())
+# Get radius of specific key from all rules
+radius(rules::Tuple{Vararg{<:Rule}}, key::Symbol) =
+    reduce(max, radius(ru) for ru in rules if key in keys(ru); init=0)
+
+radius(rule::Rule, args...) = 0
 
 
 """
@@ -189,12 +201,15 @@ abstract type NeighborhoodRule{R,W} <: Rule{R,W} end
 neighbors(rule::NeighborhoodRule) = neighbors(neighborhood(rule))
 neighborhood(rule::NeighborhoodRule) = rule.neighborhood
 offsets(rule::NeighborhoodRule) = offsets(neighborhood(rule))
+kernel(rule::NeighborhoodRule) = kernel(neighborhood(rule))
 positions(rule::NeighborhoodRule, args...) = positions(neighborhood(rule), args...)
 neighborhoodkey(rule::NeighborhoodRule{R,W}) where {R,W} = R
 # The first argument is for the neighborhood grid
 neighborhoodkey(rule::NeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
-@inline setbuffer(rule::NeighborhoodRule, buffer) =
-    @set rule.neighborhood = setbuffer(rule.neighborhood, buffer)
+_buffer(rule::NeighborhoodRule) = _buffer(neighborhood(rule))
+@inline _setbuffer(rule::NeighborhoodRule, _buffer) =
+    @set rule.neighborhood = _setbuffer(rule.neighborhood, _buffer)
+radius(rule::NeighborhoodRule, args...) = radius(neighborhood(rule))
 
 """
 A Rule that only writes to its neighborhood, defined by its radius distance from the
@@ -202,18 +217,17 @@ current point.
 
 ManualNeighborhood rules must return their radius with a `radius()` method, although
 by default this will be called on the result of `neighborhood(rule)`.
-
-TODO: performance optimisations with a neighborhood buffer,
-simular to [`NeighborhoodRule`](@ref) but for writing.
 """
 abstract type ManualNeighborhoodRule{R,W} <: ManualRule{R,W} end
 
 neighbors(rule::ManualNeighborhoodRule) = neighbors(neighborhood(rule))
 neighborhood(rule::ManualNeighborhoodRule) = rule.neighborhood
 offsets(rule::ManualNeighborhoodRule) = offsets(neighborhood(rule))
+kernel(rule::ManualNeighborhoodRule) = kernel(neighborhood(rule))
 positions(rule::ManualNeighborhoodRule, args...) = positions(neighborhood(rule), args...)
 neighborhoodkey(rule::ManualNeighborhoodRule{R,W}) where {R,W} = R
 neighborhoodkey(rule::ManualNeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
+radius(rule::ManualNeighborhoodRule, args...) = radius(neighborhood(rule))
 
 
 """
@@ -471,13 +485,12 @@ struct Convolution{R,W,N} <: NeighborhoodRule{R,W}
     "The neighborhood of cells around the central cell"
     neighborhood::N
 end
-Convolution{R,W}(neighborhood::N) where {R,W,N} = Convolution{R,W,N}(neighborhood)
+Convolution{R,W}(A::AbstractArray) where {R,W} = Convolution{R,W}(Kernel(SMatrix{size(A)...}(A)))
 Convolution{R,W}(; neighborhood) where {R,W} = Convolution{R,W}(neighborhood)
 ConstructionBase.constructorof(::Type{Convolution{R,W}}) where {R,W} = Convolution{R,W}
 
 @inline function applyrule(data, rule::Convolution, read, I)
-    kernel = neighborhood(rule)
-    @inbounds LinearAlgebra.dot(kernel.buffer, kernel.kernel)
+    @inbounds neighbors(rule) ⋅ kernel(neighborhood(rule))
 end
 
 """
@@ -507,7 +520,7 @@ asiterable(x::Symbol) = (x,)
 asiterable(x::Type{<:Tuple}) = x.parameters
 asiterable(x::Tuple) = x
 
-astuple(rule::Rule, state) = astuple(readkeys(rule), state)
+astuple(rule::Rule, state) = astuple(_readkeys(rule), state)
 astuple(::Tuple, state) = state
 astuple(::Symbol, state) = (state,)
 

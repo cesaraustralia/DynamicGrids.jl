@@ -1,10 +1,5 @@
 using REPL
 
-function __init__()
-    global terminal
-    terminal = REPL.Terminals.TTYTerminal(get(ENV, "TERM", Base.Sys.iswindows() ? "" : "dumb"), stdin, stdout, stderr)
-end
-
 abstract type CharStyle end
 struct Block <: CharStyle end
 struct Braile <: CharStyle end
@@ -36,17 +31,21 @@ mutable struct REPLOutput{T,F<:AbstractVector{T},E,GC,Co,St,Cu} <: GraphicOutput
     running::Bool
     extent::E
     graphicconfig::GC
-    color::Co  
-    style::St 
+    color::Co
+    style::St
     cutoff::Cu
 end
-REPLOutput(; frames, running, extent, graphicconfig,
-           color=:white, cutoff=0.5, style=Block(), kwargs...) =
-    REPLOutput(frames, running, extent, graphicconfig, color, style, cutoff) 
+function REPLOutput(;
+    frames, running, extent, graphicconfig,
+    color=:white, cutoff=0.5, style=Block(), kwargs...
+)
+    REPLOutput(frames, running, extent, graphicconfig, color, style, cutoff)
+end
 
-showframe(frame::NamedTuple, o::REPLOutput, data::SimData, f, t) = 
+function showframe(frame::NamedTuple, o::REPLOutput, data::SimData, f, t)
     showframe(first(frame), o, data, f, t)
-showframe(frame::AbstractArray, o::REPLOutput, data::SimData, f, t) = begin
+end
+function showframe(frame::AbstractArray, o::REPLOutput, data::SimData, f, t)
     # Print the frame
     put((0, 0), o.color, replframe(o, frame))
     # Print the timestamp in the top right corner
@@ -82,7 +81,7 @@ chartype(o::REPLOutput) = chartype(o.style)
 chartype(s::Braile) = YBRAILE, XBRAILE, brailize
 chartype(s::Block) = YBLOCK, XBLOCK, blockize
 
-replframe(o, frame) = begin
+function replframe(o, frame)
     ystep, xstep, f = chartype(o)
 
     # Limit output area to available terminal size.

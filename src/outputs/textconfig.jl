@@ -1,15 +1,20 @@
 """
-    TextConfig(; font::String, namepixels=14, timepixels=14,
-               namepos=(timepixels+namepixels, timepixels),
-               timepos=(timepixels, timepixels),
-               fcolor=ARGB32(1.0), bcolor=ARGB32(RGB(0.0), 1.0),)
+    TextConfig(; 
+        font::String=autofont(), 
+        namepixels=14, 
+        timepixels=14,
+        namepos=(timepixels+namepixels, timepixels),
+        timepos=(timepixels, timepixels),
+        fcolor=ARGB32(1.0), 
+        bcolor=ARGB32(0.3)
+    )
     TextConfig(face, namepixels, namepos, timepixels, timepos, fcolor, bcolor)
 
 Text configuration for printing timestep and grid name on the image.
 
 # Arguments
 
-- `namepixels` and `timepixels`: set the pixel size of the font. 
+- `namepixels` and `timepixels`: set the pixel size of the font.
 - `timepos` and `namepos`: tuples that set the label positions, in pixels.
 - `fcolor` and `bcolor`: the foreground and background colors, as `ARGB32`.
 """
@@ -22,22 +27,53 @@ struct TextConfig{F,NPi,NPo,TPi,TPo,FC,BC}
     fcolor::FC
     bcolor::BC
 end
-TextConfig(; font, namepixels=12, timepixels=12,
-           namepos=(3timepixels + namepixels, timepixels),
-           timepos=(2timepixels, timepixels),
-           fcolor=ARGB32(1.0), bcolor=ARGB32(RGB(0.0), 1.0),
-          ) = begin
-    face = FreeTypeAbstraction.findfont(font)
-    face isa Nothing && throw(ArgumentError("Font $font can not be found in this system"))
+function TextConfig(;
+    font=autofont(), namepixels=12, timepixels=12,
+    namepos=(3timepixels + namepixels, timepixels),
+    timepos=(2timepixels, timepixels),
+    fcolor=ARGB32(1.0), bcolor=ZEROCOL,
+)
+    if font isa AbstractString
+        face = FreeTypeAbstraction.findfont(font)
+        face isa Nothing && _fontnotfounderror(font)
+    else
+        error("$font is not a font name String")
+    end
     TextConfig(face, namepixels, namepos, timepixels, timepos, fcolor, bcolor)
 end
+
+function autofont()
+    font = if Sys.islinux()
+        "Bookman"
+    else
+        "arial"
+    end
+    face = FreeTypeAbstraction.findfont(font)
+    face isa Nothing && _nofonterror(font)
+    return font 
+end
+
+@noinline _fontnotfounderror(font) =
+    throw(ArgumentError(
+        """
+        Font $font can not be found in this system, specify an existing font name `String` 
+        with the `font` keyword, or specify `text=nothing` to display no text."
+        """
+    ))
+@noinline _nofonterror(font) =
+    error(
+        """
+        Your system does not contain the default font $font. Specify font by passing a font
+        name `String` to the keyword argument `font` for the `Output` or `ImageConfig`.
+        """
+    )
 
 """
     rendertext!(img, config::TextConfig, name, t)
 
 Render time `name` and `t` as text onto the image, following config settings.
 """
-rendertext!(img, config::TextConfig, name, t) = begin
+function rendertext!(img, config::TextConfig, name, t)
     rendername!(img, config::TextConfig, name)
     rendertime!(img, config::TextConfig, t)
     img
@@ -49,7 +85,7 @@ rendertext!(img, config::Nothing, name, t) = nothing
 
 Render `name` as text on the image following config settings.
 """
-rendername!(img, config::TextConfig, name) = begin
+function rendername!(img, config::TextConfig, name)
     renderstring!(img, name, config.face, config.namepixels, config.namepos...;
                   fcolor=config.fcolor, bcolor=config.bcolor)
     img
@@ -63,7 +99,7 @@ rendername!(img, config::Nothing, name::Nothing) = img
 
 Render time `t` as text on the image following config settings.
 """
-rendertime!(img, config::TextConfig, t) = begin
+function rendertime!(img, config::TextConfig, t)
     renderstring!(img, string(t), config.face, config.timepixels, config.timepos...;
                   fcolor=config.fcolor, bcolor=config.bcolor)
     img
