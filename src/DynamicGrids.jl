@@ -65,7 +65,7 @@ export Aux, Grid
 export Output, GraphicOutput, ImageOutput, ArrayOutput, ResultOutput, REPLOutput, GifOutput
 
 export GridProcessor, SingleGridProcessor, ColorProcessor, SparseOptInspector,
-       MultiGridProcessor, ThreeColorProcessor, LayoutProcessor
+       MultiGridProcessor, LayoutProcessor
 
 export TextConfig
 

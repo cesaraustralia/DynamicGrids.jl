@@ -49,7 +49,7 @@ function autofont()
         "arial"
     end
     face = FreeTypeAbstraction.findfont(font)
-    face isa Nothing && _nofonterror(font)
+    face isa Nothing && _nodefaultfonterror(font)
     return font 
 end
 
@@ -60,7 +60,7 @@ end
         with the `font` keyword, or specify `text=nothing` to display no text."
         """
     ))
-@noinline _nofonterror(font) =
+@noinline _nodefaultfonterror(font) =
     error(
         """
         Your system does not contain the default font $font. Specify font by passing a font
@@ -73,37 +73,39 @@ end
 
 Render time `name` and `t` as text onto the image, following config settings.
 """
-function rendertext!(img, config::TextConfig, name, t)
-    rendername!(img, config::TextConfig, name)
-    rendertime!(img, config::TextConfig, t)
+function _rendertext!(img, config::TextConfig, name, t)
+    _rendername!(img, config::TextConfig, name)
+    _rendertime!(img, config::TextConfig, t)
     img
 end
-rendertext!(img, config::Nothing, name, t) = nothing
+_rendertext!(img, config::Nothing, name, t) = nothing
 
 """
     rendername!(img, config::TextConfig, name)
 
 Render `name` as text on the image following config settings.
 """
-function rendername!(img, config::TextConfig, name)
+function _rendername!(img, config::TextConfig, name)
     renderstring!(img, name, config.face, config.namepixels, config.namepos...;
-                  fcolor=config.fcolor, bcolor=config.bcolor)
+        fcolor=config.fcolor, bcolor=config.bcolor
+    )
     img
 end
-rendername!(img, config::TextConfig, name::Nothing) = img
-rendername!(img, config::Nothing, name) = img
-rendername!(img, config::Nothing, name::Nothing) = img
+_rendername!(img, config::TextConfig, name::Nothing) = img
+_rendername!(img, config::Nothing, name) = img
+_rendername!(img, config::Nothing, name::Nothing) = img
 
 """
     rendertime!(img, config::TextConfig, t)
 
 Render time `t` as text on the image following config settings.
 """
-function rendertime!(img, config::TextConfig, t)
+function _rendertime!(img, config::TextConfig, t)
     renderstring!(img, string(t), config.face, config.timepixels, config.timepos...;
-                  fcolor=config.fcolor, bcolor=config.bcolor)
+        fcolor=config.fcolor, bcolor=config.bcolor
+    )
     img
 end
-rendertime!(img, config::Nothing, t) = img
-rendertime!(img, config::TextConfig, t::Nothing) = img
-rendertime!(img, config::Nothing, t::Nothing) = img
+_rendertime!(img, config::Nothing, t) = img
+_rendertime!(img, config::TextConfig, t::Nothing) = img
+_rendertime!(img, config::Nothing, t::Nothing) = img

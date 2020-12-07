@@ -41,6 +41,9 @@ function sim!(
      simdata=nothing,
      kwargs...
 )
+    isrunning(output) && error("A simulation is already running in this output")
+    setrunning!(output, true) || error("Could not start the simulation with this output")
+
     gridsize(init) == gridsize(DG.init(output)) || throw(ArgumentError("init size does not match output init"))
     # Some rules are only valid for a set time-step size.
     step(ruleset) !== nothing && step(ruleset) != step(tspan) &&
@@ -49,19 +52,15 @@ function sim!(
     # Rebuild Extent to allow kwarg alterations
     extent = Extent(; init=_asnamedtuple(init), mask=mask, aux=aux, tspan=tspan)
     # Set up output
-    initialise(output)
-    isrunning(output) && error("A simulation is already running in this output")
-    setrunning!(output, true) || error("Could not start the simulation with this output")
     settspan!(output, tspan)
     # Create or update the combined data object for the simulation
     simdata = _initdata!(simdata, extent, ruleset, nreplicates)
-    # Delete grids output by the previous simulations
-    initgrids!(output, init)
+    init_output_grids!(output, init)
     # Set run speed for GraphicOutputs
     setfps!(output, fps)
     # Show the first grid
-    showframe(output, simdata, 1, first(tspan))
-    # Let the init grid be displayed as long as a normal grid
+    _showframe(output, simdata)
+    # Let the init grid be displayed for as long as a normal grid
     delay(output, 1)
     # Run the simulation over simdata and a unitrange
     return runsim!(output, simdata, ruleset, 1:lastindex(tspan))
@@ -116,7 +115,7 @@ function resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
         simdata=nothing,
         nreplicates=nothing
 )
-    initialise(output)
+    initialise!(output)
     # Check status and arguments
     isrunning(output) && error("A simulation is already running in this output")
     setrunning!(output, true) || error("Could not start the simulation with this output")
@@ -188,7 +187,7 @@ function simloop!(output::Output, simdata, ruleset, fspan)
         delay(output, f)
         # Exit gracefully
         if !isrunning(output) || f == last(fspan)
-            showframe(output, simdata, f, currenttime(simdata))
+            _showframe(output, simdata)
             setstoppedframe!(output, f)
             finalise!(output, simdata)
             break
