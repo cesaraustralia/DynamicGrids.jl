@@ -5,7 +5,7 @@ precalcrules(simdata::Vector, rules::Tuple) = map(sd -> precalcrules(sd, rules),
 function precalcrules(sd::SimData, rules::Tuple)
     @set sd.ruleset = ModelParameters.setparent(
         ruleset(sd),
-        precalcrules(proc_setup(proc(sd), ModelParameters.stripparams(rules)), sd)
+        precalcrules(_proc_setup(proc(sd), ModelParameters.stripparams(rules)), sd)
     )
 end
 

@@ -1,4 +1,4 @@
-using DynamicGrids, Test, Dates, Unitful
+using DynamicGrids, DimensionalData, Test, Dates, Unitful
 
 # life glider sims
 
@@ -308,34 +308,34 @@ end
         timestep=5u"s",
         opt=NoOpt(),
     )
-    tspan=0u"s":5u"s":6u"s"
-    output = REPLOutput(test6_7[:init]; tspan=tspan, style=Block(), fps=100, store=true)
+    output = REPLOutput(test6_7[:init]; 
+        tspan=0u"s":5u"s":6u"s", style=Block(), fps=100, store=true
+    )
     @test DynamicGrids.isstored(output) == true
     sim!(output, ruleset)
     resume!(output, ruleset; tstop=30u"s")
-    @test output[2] == test6_7[:test2]
-    @test output[3] == test6_7[:test3]
-    @test output[5] == test6_7[:test5]
-    @test output[7] == test6_7[:test7]
+    @test output[Ti(5u"s")] == test6_7[:test2]
+    @test output[Ti(10u"s")] == test6_7[:test3]
+    @test output[Ti(20u"s")] == test6_7[:test5]
+    @test output[Ti(30u"s")] == test6_7[:test7]
 end
 
 @testset "REPLOutput braile works, in Months" begin
-    init_a = (_default_=test6_7[:init],)
     ruleset = Ruleset(Life();
         overflow=WrapOverflow(),
         timestep=Month(1),
         opt=SparseOpt(),
     )
-    tspan = Date(2010, 4):Month(1):Date(2010, 7)
-    output = REPLOutput(init_a; tspan=tspan, style=Braile(), fps=100, store=false)
+    tspan_ = Date(2010, 4):Month(1):Date(2010, 7)
+    output = REPLOutput(test6_7[:init]; tspan=tspan_, style=Braile(), fps=100, store=false)
 
     sim!(output, ruleset)
-    @test output[1][:_default_] == test6_7[:test4]
+    @test output[Ti(Date(2010, 7))] == test6_7[:test4]
     @test DynamicGrids.tspan(output) == Date(2010, 4):Month(1):Date(2010, 7)
 
     resume!(output, ruleset; tstop=Date(2010, 10))
     @test DynamicGrids.tspan(output) == Date(2010, 4):Month(1):Date(2010, 10)
-    @test output[1][:_default_] == test6_7[:test7]
+    @test output[1] == test6_7[:test7]
 
 end
 

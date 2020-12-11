@@ -1,5 +1,7 @@
 # If there is no time dimension we return the same data for every timestep
-_auxval(A::Matrix, data::SimData, key::Union{Aux,Symbol}, y, x) = A[y, x]
+_auxval(data::AbstractSimData, key::Union{Aux,Symbol}, I...) = 
+    _auxval(aux(data, key), data, key, I...)
+_auxval(A::AbstractMatrix, data::SimData, key::Union{Aux,Symbol}, y, x) = A[y, x]
 function _auxval(A::AbstractDimArray{<:Any,2}, data::SimData, key::Union{Aux,Symbol}, y, x)
     # X = DD.basetypeof(dims(A, XDim))
     # Y = DD.basetypeof(dims(A, YDim))

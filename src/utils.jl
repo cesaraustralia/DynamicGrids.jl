@@ -11,7 +11,7 @@ Currently this is cycled by default, but will use Cyclic mode in DiensionalData.
 """
 @inline Base.get(data::SimData, val, I...) = val
 @inline Base.get(data::SimData, key::Grid{K}, I...) where K = data[K][I...]
-@inline Base.get(data::SimData, key::Aux, I...) = _auxval(aux(data, key), data, key, I...)
+@inline Base.get(data::SimData, key::Aux, I...) = _auxval(data, key, I...)
 
 """
     ismasked(data, I...)
@@ -27,12 +27,6 @@ ismasked(data::AbstractSimData, I...) = ismasked(mask(data), I...)
 ismasked(data::GridData, I...) = ismasked(mask(data), I...)
 ismasked(mask::Nothing, I...) = false
 ismasked(mask::AbstractArray, I...) = @inbounds !(mask[I...])
-
-unwrap(x) = x
-unwrap(::Val{X}) where X = X
-unwrap(::Aux{X}) where X = X
-unwrap(::Type{<:Aux{X}}) where X = X
-unwrap(::Type{<:Val{X}}) where X = X
 
 """
     isinferred(output::Output, ruleset::Ruleset)
@@ -110,3 +104,9 @@ _zerogrids(initgrids::NamedTuple, nframes) =
 @inline _keys2vals(keys::Tuple) = map(Val, keys)
 @inline _keys2vals(key::Symbol) = Val(key)
 
+
+_unwrap(x) = x
+_unwrap(::Val{X}) where X = X
+_unwrap(::Aux{X}) where X = X
+_unwrap(::Type{<:Aux{X}}) where X = X
+_unwrap(::Type{<:Val{X}}) where X = X

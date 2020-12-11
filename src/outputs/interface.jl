@@ -71,12 +71,20 @@ Other outputs just do nothing and continue.
 function delay end
 
 """
+    showframe(o::Output, data::AbstractSimData)
     showframe(frame::NamedTuple, o::Output, data::AbstractSimData)
     showframe(frame::AbstractArray, o::Output, data::AbstractSimData)
 
 Display the grid/s somehow in the output, if it can do that.
 """
 function showframe end
+
+"""
+    showimage(image::AbstractArray, o::ImageOutput, data::AbstractSimData)
+
+Display an image generated from the grid, for all [`ImageOutput`](@ref).
+"""
+function showimage end
 
 """
     frameindex(o::Output, data::AbstractSimData)

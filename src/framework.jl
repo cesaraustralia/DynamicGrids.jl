@@ -58,8 +58,10 @@ function sim!(
     init_output_grids!(output, init)
     # Set run speed for GraphicOutputs
     setfps!(output, fps)
+    # Run any initialisation the output needs to do
+    initialise!(output, simdata)
     # Show the first grid
-    _showframe(output, simdata)
+    showframe(output, simdata)
     # Let the init grid be displayed for as long as a normal grid
     delay(output, 1)
     # Run the simulation over simdata and a unitrange
@@ -115,10 +117,8 @@ function resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
         simdata=nothing,
         nreplicates=nothing
 )
-    initialise!(output)
     # Check status and arguments
     isrunning(output) && error("A simulation is already running in this output")
-    setrunning!(output, true) || error("Could not start the simulation with this output")
 
     # Calculate new timespan
     new_tspan = first(tspan(output)):step(tspan(output)):tstop
@@ -136,6 +136,8 @@ function resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
     setfps!(output, fps)
     extent = Extent(; init=_asnamedtuple(init), mask=mask(output), aux=aux(output), tspan=new_tspan)
     simdata = _initdata!(simdata, extent, ruleset, nreplicates)
+    initialise!(output, simdata)
+    setrunning!(output, true) || error("Could not start the simulation with this output")
     return runsim!(output, simdata, ruleset, fspan)
 end
 
@@ -172,7 +174,7 @@ function simloop!(output::Output, simdata, ruleset, fspan)
     # Set the frame timestamp for fps calculation
     settimestamp!(output, first(fspan))
     # Initialise types etc
-    simdata = _updatetime(simdata, 1) |> proc_setup
+    simdata = _updatetime(simdata, 1) |> _proc_setup
     # Loop over the simulation
     for f in fspan[2:end]
         # Get a data object with updated timestep and precalculate rules
@@ -187,7 +189,7 @@ function simloop!(output::Output, simdata, ruleset, fspan)
         delay(output, f)
         # Exit gracefully
         if !isrunning(output) || f == last(fspan)
-            _showframe(output, simdata)
+            showframe(output, simdata)
             setstoppedframe!(output, f)
             finalise!(output, simdata)
             break
@@ -199,5 +201,5 @@ end
 
 # Allows different processors to modify the simdata object
 # GPU needs this to convert arrays to CuArray
-proc_setup(simdata::SimData) = proc_setup(proc(simdata), simdata)
-proc_setup(proc, obj) = obj
+_proc_setup(simdata::SimData) = _proc_setup(proc(simdata), simdata)
+_proc_setup(proc, obj) = obj

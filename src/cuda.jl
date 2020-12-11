@@ -11,9 +11,9 @@ CuGPU() = CuGPU{32}()
 Adapt.adapt_structure(to, x::Union{SimData,GridData,Rule}) =
     Flatten.modify(A -> adapt(to, A), x, Union{CuArray,Array,AbstractDimArray}, SArray)
 
-proc_setup(::CuGPU, obj) = Flatten.modify(CuArray, obj, Union{Array,BitArray}, SArray)
+_proc_setup(::CuGPU, obj) = Flatten.modify(CuArray, obj, Union{Array,BitArray}, SArray)
 
-function copyto_output!(outgrid, grid, proc::CuGPU)
+function _copyto_output!(outgrid, grid, proc::CuGPU)
     src = adapt(Array, source(grid))
     copyto!(outgrid, CartesianIndices(outgrid), src, CartesianIndices(outgrid))
     return nothing

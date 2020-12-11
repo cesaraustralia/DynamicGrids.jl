@@ -413,7 +413,7 @@ function _readgrids end
         push!(expr.args, :(@inbounds rgrids[$i][I...]))
     end
     return quote
-        keys = map(unwrap, rkeys)
+        keys = map(_unwrap, rkeys)
         vals = $expr
         NamedTuple{keys,typeof(vals)}(vals)
     end
@@ -517,7 +517,7 @@ function _replacegrids(simdata::AbstractSimData, newkeys, newgrids)
     @set simdata.grids = _replacegrids(grids(simdata), newkeys, newgrids)
 end
 @generated function _replacegrids(allgrids::NamedTuple, newkeys::Tuple, newgrids::Tuple)
-    newkeys = map(unwrap, newkeys.parameters)
+    newkeys = map(_unwrap, newkeys.parameters)
     allkeys = allgrids.parameters[1]
     expr = Expr(:tuple)
     for key in allkeys
@@ -535,7 +535,7 @@ end
     end
 end
 @generated function _replacegrids(allgrids::NamedTuple, newkey::Val, newgrid::GridData)
-    newkey = unwrap(newkey)
+    newkey = _unwrap(newkey)
     allkeys = allgrids.parameters[1]
     expr = Expr(:tuple)
     for key in allkeys

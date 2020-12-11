@@ -117,11 +117,11 @@ showframe(frame::NamedTuple, o::GraphicOutput, data::AbstractSimData) =
 @noinline showframe(frame::AbstractArray, o::GraphicOutput, data::AbstractSimData) =
     error("showframe not defined for $(nameof(typeof(o)))")
 
-function initialise!(output::GraphicOutput, data::AbstractSimData) 
+function initialise!(o::GraphicOutput, data::AbstractSimData) 
     initalisegraphics(o, data)
 end
-function finalise!(output::GraphicOutput, data::AbstractSimData) 
-    _storeframe!(eltype(output), output, data)
+function finalise!(o::GraphicOutput, data::AbstractSimData) 
+    _storeframe!(eltype(o), o, data)
     finalisegraphics(o, data)
 end
 

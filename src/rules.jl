@@ -69,6 +69,10 @@ function (::Type{T})(args...) where T<:Rule{R,W} where {R,W}
     # _checkfields(T, args)
     T{map(typeof, args)...}(args...)
 end
+# Only R specified
+function (::Type{T})(args...; kw...) where T<:Rule{R} where R
+    T{R}(args...; kw...)
+end
 
 
 @generated function Base.keys(rule::Rule{R,W}) where {R,W}

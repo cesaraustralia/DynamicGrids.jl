@@ -25,6 +25,7 @@ Base.lastindex(o::Output) = lastindex(parent(o))
 Base.push!(o::Output, x) = push!(parent(o), x)
 Base.step(o::Output) = step(tspan(o))
 
+# DimensionalData interface
 function DimensionalData.dims(o::Output)
     ts = tspan(o)
     val = isstored(o) ? ts : ts[end]:step(ts):ts[end]
@@ -32,6 +33,10 @@ function DimensionalData.dims(o::Output)
 end
 DimensionalData.refdims(o::Output) = ()
 DimensionalData.name(o::Output) = NoName()
+DimensionalData.metadata(o::Output) = NoMetadata()
+# Output bebuild just returns a DimArray
+DimensionalData.rebuild(o::Output, data, dims::Tuple, refdims, metadata) = 
+    DimArray(data, dims, refdims, name, metadata)
 
 # Getters and setters
 frames(o::Output) = o.frames
@@ -128,7 +133,7 @@ init_output_grids!(grid::AbstractArray, o::Output, init::NamedTuple) =
 # All arrays are copied if both are named tuples
 function init_output_grids!(grids::NamedTuple, o::Output, inits::NamedTuple)
     map(grids, inits) do grid, init
-        grids .= init
+        grid .= init
     end
     return o
 end
