@@ -27,9 +27,9 @@ NeighborhoodRule
 Neighbors
 Convolution
 Life
-ManualRule
+SetCellRule
 Manual
-ManualNeighborhoodRule
+SetNeighborhoodRule
 SetNeighbors
 GridRule
 Grid

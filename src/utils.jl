@@ -60,7 +60,7 @@ function isinferred(simdata::SimData,
     rule = _setbuffer(rule, buffer)
     return _isinferred(simdata, rule)
 end
-function isinferred(simdata::SimData, rule::ManualRule)
+function isinferred(simdata::SimData, rule::SetCellRule)
     rkeys, rgrids = _getreadgrids(rule, simdata)
     wkeys, wgrids = _getwritegrids(rule, simdata)
     simdata = @set simdata.grids = _combinegrids(rkeys, rgrids, wkeys, wgrids)

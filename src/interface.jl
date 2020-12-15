@@ -18,13 +18,13 @@ the grids specified by the `W` type parameter.
 function applyrule end
 
 """
-    applyrule!(data::SimData, rule::ManualRule{R,W}, state, index::Tuple{Int,Int}) => Nothing
+    applyrule!(data::SimData, rule::{R,W}, state, index::Tuple{Int,Int}) => Nothing
 
 Apply a rule to the cell state and manually write to the grid data array.
-Used in all rules inheriting from [`ManualRule`](@ref).
+Used in all rules inheriting from [``](@ref).
 
 This is called in internal `maprule!` methods during the simulation, not by
-the user. Custom [`ManualRule`](@ref) implementations must define this method.
+the user. Custom [``](@ref) implementations must define this method.
 
 Only grids specified with the `W` type parameter will be writable from `data`.
 
@@ -76,7 +76,7 @@ function offsets end
     positions(x::Union{Neighborhood,NeighborhoodRule}}, cellindex::Tuple) => iterable
 
 Returns an iteraterable over all cells as a `Tuple` of the index 
-in the main array. Useful in [`ManualNeighborhoodRule`](@ref) for 
+in the main array. Useful in [`SetNeighborhoodRule`](@ref) for 
 setting neighborhood values.
 """
 function positions end
@@ -89,7 +89,7 @@ Add the value `x` to a grid cell.
 ## Example useage
 
 ```julia
-function applyrule!(data::SimData, rule::MyManualRule{A,B}, state, cellindex) where {A,B}
+function applyrule!(data::SimData, rule::My{A,B}, state, cellindex) where {A,B}
 
     dest, is_inbounds = inbounds(jump .+ cellindex, gridsize(data))
 
@@ -148,7 +148,7 @@ function xor! end
 """
     inbounds(I::Tuple, data::SimData) => Tuple{NTuple{2,Int},Bool}
 
-Check grid boundaries for a coordinate before writing in [`ManualRule`](@ref).
+Check grid boundaries for a coordinate before writing in [``](@ref).
 
 Returns a `Tuple` containing a coordinates `Tuple` and a `Bool` - `true`
 if the cell is in bounds, `false` if not.
@@ -164,7 +164,7 @@ function inbounds end
 """
     isinbounds(I::Tuple, data)
 
-Check that a coordinate is within the grid, usually in [`ManualRule`](@ref).
+Check that a coordinate is within the grid, usually in [``](@ref).
 
 Unlike [`inbounds`](@ref), [`Overflow`](@ref) status is ignored.
 """

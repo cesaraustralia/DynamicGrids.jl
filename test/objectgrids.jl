@@ -42,7 +42,7 @@ end
     ], (5, 5))
 end
 
-@testset "ManualRule randomly updates a StaticArray" begin
+@testset " randomly updates a StaticArray" begin
     rule = Manual{:grid1,:grid1}() do data, I, state
         if I == (2, 2) || I == (1, 3)
             data[:grid1][I...] = SA[99.0, 100.0]
@@ -119,7 +119,7 @@ end
     ], (5, 5))
 end
 
-@testset "ManualRule randomly updates a struct" begin
+@testset " randomly updates a struct" begin
     rule = Manual{:grid1,:grid1}() do data, I, state
         if I == (2, 2) || I == (1, 3)
             data[:grid1][I...] = TS(99.0, 100.0)

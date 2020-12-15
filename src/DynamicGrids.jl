@@ -43,9 +43,9 @@ export gridsize, currentframe, currenttime, currenttimestep, timestep
 
 export add!, sub!, min!, max!, and!, or!, xor!
 
-export Rule, NeighborhoodRule, CellRule, ManualRule, ManualNeighborhoodRule, GridRule
+export Rule, NeighborhoodRule, CellRule, SetCellRule, SetNeighborhoodRule, SetGridRule
 
-export Cell, Neighbors, SetNeighbors, Manual, Convolution, SetGrid, Life, CopyTo
+export Cell, Neighbors, SetNeighbors, SetCell, Convolution, SetGrid, Life, CopyTo
 
 export Chain 
 

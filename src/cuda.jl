@@ -69,7 +69,7 @@ end
     nothing
 end
 # Kernels that run for every cell
-@kernel function cu_rule_kernel!(wgrids, simdata, rule::ManualRule, rkeys, rgrids, wkeys)
+@kernel function cu_rule_kernel!(wgrids, simdata, rule::, rkeys, rgrids, wkeys)
     i, j = @index(Global, NTuple)
     readval = _readgrids(rkeys, rgrids, i, j)
     applyrule!(simdata, rule, readval, (i, j))

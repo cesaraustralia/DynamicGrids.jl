@@ -38,11 +38,9 @@ function maprule!(data::SimData, rule::Rule)
     # Combine the written grids with the original simdata
     _replacegrids(data, wkeys, readonly_wgrids)
 end
-function maprule!(simdata::SimData, rule::GridRule)
+function maprule!(simdata::SimData, rule::SetGridRule)
     rkeys, rgrids = _getreadgrids(rule, simdata)
     wkeys, wgrids = _getwritegrids(rule, simdata)
-    # Cant use SparseOpt with GridRule yet
-    _checkhassparseopt(wgrids)
     tempsimdata = _combinegrids(simdata, rkeys, rgrids, wkeys, wgrids)
     # Run the rule loop
     applyrule!(tempsimdata, rule)
@@ -52,7 +50,7 @@ end
 
 _maybeupdatedest!(ds::Tuple, rule) = map(d -> _maybeupdatedest!(d, rule), ds)
 _maybeupdatedest!(d::WritableGridData, rule::Rule) = nothing
-function _maybeupdatedest!(d::WritableGridData, rule::ManualRule)
+function _maybeupdatedest!(d::WritableGridData, rule::SetCellRule)
     copyto!(parent(dest(d)), parent(source(d)))
 end
 
@@ -79,9 +77,6 @@ _to_readonly(data::WritableGridData) = ReadableGridData(data)
 
 _hassparseopt(wgrids::Tuple) = any(o -> o isa SparseOpt, map(opt, wgrids))
 _hassparseopt(wgrid) = opt(wgrid) isa SparseOpt
-
-@noinline _checkhassparseopt(wgrids) = nothing
-    # _hassparseopt(wgrids) && error("Cant use SparseOpt with a GridRule")
 
 const NeedsBuffer = Union{NeighborhoodRule,Chain{<:Any,<:Any,<:Tuple{<:NeighborhoodRule,Vararg}}}
 
@@ -160,7 +155,7 @@ end
     _writegrids!(wgrids, writeval, i, j)
     nothing
 end
-@inline function rule_kernel!(wgrids, simdata, rule::ManualRule, rkeys, rgrids, wkeys, i, j)
+@inline function rule_kernel!(wgrids, simdata, rule::SetCellRule, rkeys, rgrids, wkeys, i, j)
     readval = _readgrids(rkeys, rgrids, i, j)
     applyrule!(simdata, rule, readval, (i, j))
     nothing

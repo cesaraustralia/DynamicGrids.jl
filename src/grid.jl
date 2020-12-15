@@ -173,7 +173,7 @@ _build_status(opt::PerformanceOpt, init, r) = nothing, nothing
 """
     WritableGridData(grid::GridData)
 
-Passed to rules `<: ManualRule`, and can be written to directly as
+Passed to rules `<: `, and can be written to directly as
 an array. This handles updates to SparseOpt() and writing to
 the correct source/dest array.
 """
@@ -223,7 +223,7 @@ _setdeststatus!(d::WritableGridData, opt, x, I) = nothing
 const atomic_ops = ((:add!, :+), (:sub!, :-), (:min!, :min), (:max!, :max),
                     (:and!, :&), (:or!, :|), (:xor!, :xor))
 
-# Methods for writing to a WritableGridData grid from ManualRule. These are
+# Methods for writing to a WritableGridData grid from . These are
 # associative and commutative so that write order does not affect the result.
 for (f, op) in atomic_ops
     @eval begin

@@ -213,7 +213,7 @@ applyrule(data, ::TestRule, state, index) = 0
     @test source(resultdata2[:a]) == final
 end
 
-struct TestManual{R,W} <: ManualRule{R,W} end
+struct TestManual{R,W} <: {R,W} end
 applyrule!(data, ::TestManual, state, index) = 0
 
 @testset "A partial rule that returns zero does nothing" begin
@@ -238,7 +238,7 @@ applyrule!(data, ::TestManual, state, index) = 0
     @test source(resultdata2[:_default_]) == init
 end
 
-struct TestManualWrite{R,W} <: ManualRule{R,W} end
+struct TestManualWrite{R,W} <: {R,W} end
 applyrule!(data, ::TestManualWrite{R,W}, state, index) where {R,W} = add!(data[W], 1, index[1], 2)
 
 @testset "A partial rule that writes to dest affects output" begin

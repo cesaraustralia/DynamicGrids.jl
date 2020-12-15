@@ -142,13 +142,13 @@ scripting context.
 abstract type CellRule{R,W} <: Rule{R,W} end
 
 """
-`ManualRule` is the supertype for rules that manually write to whichever cells of the
+`SetCellRule` is the supertype for rules that manually write to whichever cells of the
 grid that they choose, instead of automatically updating every cell with their output.
 
-`ManualRule` is applied with a method like:
+`SetCellRule` is applied with a method like:
 
 ```julia
-function applyrule!(data::SimData, rule::YourManualRule{R,W}, state, cellindex) where {R,W}
+function applyrule!(data::SimData, rule::YourSetCellRule{R,W}, state, cellindex) where {R,W}
      inc = 1
      add!(data[W], inc, cellindex...)
      return nothing
@@ -175,7 +175,7 @@ function applyrule(data, rule::YourManRule{R,Tuple{W1,W2}}, state, cellindex) wh
 end
 ```
 """
-abstract type ManualRule{R,W} <: Rule{R,W} end
+abstract type SetCellRule{R,W} <: Rule{R,W} end
 
 """
 A Rule that only accesses a neighborhood centered around the current cell.
@@ -216,22 +216,24 @@ _buffer(rule::NeighborhoodRule) = _buffer(neighborhood(rule))
 radius(rule::NeighborhoodRule, args...) = radius(neighborhood(rule))
 
 """
-A Rule that only writes to its neighborhood, defined by its radius distance from the
-current point.
+A Rule that only writes to its neighborhood.
 
-ManualNeighborhood rules must return their radius with a `radius()` method, although
-by default this will be called on the result of `neighborhood(rule)`.
+[`positions`](@ref) and [`offsets`](@ref) are useful iterators for modifying
+neighborhood values.
+
+SetNeighborhood rules must return a `Neighborhood` object from `neighborhood(rule)`.
+By default this is `rule.neighborhood`. If this property exists, no interface methods 
+are required.
 """
-abstract type ManualNeighborhoodRule{R,W} <: ManualRule{R,W} end
+abstract type SetNeighborhoodRule{R,W} <: SetCellRule{R,W} end
 
-neighbors(rule::ManualNeighborhoodRule) = neighbors(neighborhood(rule))
-neighborhood(rule::ManualNeighborhoodRule) = rule.neighborhood
-offsets(rule::ManualNeighborhoodRule) = offsets(neighborhood(rule))
-kernel(rule::ManualNeighborhoodRule) = kernel(neighborhood(rule))
-positions(rule::ManualNeighborhoodRule, args...) = positions(neighborhood(rule), args...)
-neighborhoodkey(rule::ManualNeighborhoodRule{R,W}) where {R,W} = R
-neighborhoodkey(rule::ManualNeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
-radius(rule::ManualNeighborhoodRule, args...) = radius(neighborhood(rule))
+neighborhood(rule::SetNeighborhoodRule) = rule.neighborhood
+offsets(rule::SetNeighborhoodRule) = offsets(neighborhood(rule))
+kernel(rule::SetNeighborhoodRule) = kernel(neighborhood(rule))
+positions(rule::SetNeighborhoodRule, args...) = positions(neighborhood(rule), args...)
+radius(rule::SetNeighborhoodRule, args...) = radius(neighborhood(rule))
+neighborhoodkey(rule::SetNeighborhoodRule{R,W}) where {R,W} = R
+neighborhoodkey(rule::SetNeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
 
 
 """
@@ -244,18 +246,18 @@ don't fit into the DynamicGrids.jl framework during the simulation.
 Grid rules specify the grids they want and are sequenced just like any other grid.
 
 ```julia
-struct YourGridRule{R,W} <: GridRule{R,W} end
+struct YourSetGridRule{R,W} <: SetGridRule{R,W} end
 ```
 
 And applied as:
 
 ```julia
-function applyrule!(data::SimData, rule::YourGridRule{R,W}) where {R,W}
+function applyrule!(data::SimData, rule::YourSetGridRule{R,W}) where {R,W}
     rand!(data[W])
 end
 ```
 """
-abstract type GridRule{R,W} <: Rule{R,W} end
+abstract type SetGridRule{R,W} <: Rule{R,W} end
 
 """
     SetGrid{R,W}(f)
@@ -268,11 +270,11 @@ rule = SetGrid{:a,:b}() do a, b
 end
 ```
 
-Never use assignment broadcast `.*=`, the write grids are not guarantieed to
-have the same values as the same-named read grids R. Always copy from a read
+Never use assignment broadcast `.*=`, as the write grids `W` are not guarantieed to
+have the same values as the read grids `R`. Always copy from a read
 grid to a write grid manually.
 """
-struct SetGrid{R,W,F} <: GridRule{R,W}
+struct SetGrid{R,W,F} <: SetGridRule{R,W}
     "Function to apply to the read values"
     f::F
 end
@@ -374,10 +376,10 @@ Neighbors{R,W}(f; neighborhood=Moore(1)) where {R,W} =
 end
 
 """
-    Manual(f)
-    Manual{R,W}(f)
+    Set(f)
+    Set{R,W}(f)
 
-A [`ManualRule`](@ref) to manually write to the array where you need to.
+A [`SetCellRule`](@ref) to manually write to the array where you need to.
 `f` is passed an indexable `data` object, and the index of the current cell,
 followed by the required grid values for the index.
 
@@ -389,20 +391,20 @@ writes from all grid cells - directly using `setindex!` would cause bugs.
 
 ```julia
 rule = let x = 10
-    Manual{Tuple{:a,:b},:b}() do data, I, a, b
+    Set{Tuple{:a,:b},:b}() do data, I, a, b
         add!(data[:b], a^x, I...)
     end
 end
 ```
 The `let` block greatly improves performance.
 """
-struct Manual{R,W,F} <: ManualRule{R,W}
-    "Function to apply to the data, index and read values"
+struct SetCell{R,W,F} <: SetCellRule{R,W}
+    "Function to apply to data, index and read state arguments"
     f::F
 end
-Manual{R,W}(; kwargs...) where {R,W} = _nofunctionerror(Manual)
+SetCell{R,W}(; kwargs...) where {R,W} = _nofunctionerror(Set)
 
-@inline function applyrule!(data, rule::Manual, read, I)
+@inline function applyrule!(data, rule::SetCell, read, I)
     let data=data, I=I, rule=rule, read=_astuple(rule, read)
         rule.f(data, I, read...)
     end
@@ -413,7 +415,7 @@ end
     SetNeighbors(f, neighborhood=Moor(1))
     SetNeighbors{R,W}(f, neighborhood=Moor(1))
 
-A [`ManualRule`](@ref) to manually write to the array with the specified 
+A [`SetCellRule`](@ref) to manually write to the array with the specified 
 neighborhood. Indexing outside the neighborhood is undefined behaviour.
 
 Function `f` is passed an [`SimData`](@ref) object `data`, the specified 
@@ -444,7 +446,7 @@ end
 ```
 The `let` block greatly improves performance.
 """
-struct SetNeighbors{R,W,F,N} <: ManualNeighborhoodRule{R,W}
+struct SetNeighbors{R,W,F,N} <: SetNeighborhoodRule{R,W}
     "Function to apply to the data, index and read values"
     f::F
     "The neighborhood of cells around the central cell"
@@ -500,9 +502,9 @@ end
 """
     method(rule)
 
-Get the method of a `Cell`, `Neighbors`, or `Manual` rule.
+Get the method of a `Cell`, `Neighbors`, or `SetCell` rule.
 """
-method(rule::Union{Cell,Neighbors,Manual}) = rule.f
+method(rule::Union{Cell,Neighbors,SetCell,SetNeighbors,SetGrid}) = rule.f
 
 
 # Utils
