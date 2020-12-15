@@ -19,8 +19,8 @@ function maprule!(data::SimData, rule::Rule)
     wkeys, wgrids = _getwritegrids(rule, data)
     # Copy the source to dest for grids we are writing to, if needed
     _maybeupdatedest!(wgrids, rule)
-    # Copy or zero out overflow where needed
-    _handleoverflow!(wgrids)
+    # Copy or zero out boundary where needed
+    _handleboundary!(wgrids)
     # Combine read and write grids to a temporary simdata object.
     # This means that grids not specified to write to are read-only.
     allkeys = map(Val, keys(data)) 

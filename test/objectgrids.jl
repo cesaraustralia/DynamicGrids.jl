@@ -1,7 +1,7 @@
 using DynamicGrids, StaticArrays, Test
 
 @testset "CellRule that multiples a StaticArray" begin
-    rule = Cell{:grid1,:grid1}() do state
+    rule = Cell{:grid1}() do state
          2state
     end
     init = (grid1 = fill(SA[1.0, 2.0], 5, 5),)
@@ -24,7 +24,7 @@ using DynamicGrids, StaticArrays, Test
 end
 
 @testset "Neighborhood Rule that sums a Neighborhood of StaticArrays" begin
-    rule = Neighbors{Tuple{:grid1,:grid2}, :grid1}(Moore(1)) do neighborhood, state1, state2
+    rule = Neighbors{Tuple{:grid1,:grid2},:grid1}(Moore(1)) do neighborhood, state1, state2
         sum(neighborhood) .+ state2
     end
     init = (
@@ -43,7 +43,7 @@ end
 end
 
 @testset " randomly updates a StaticArray" begin
-    rule = Manual{:grid1,:grid1}() do data, I, state
+    rule = SetCell{:grid1}() do data, I, state
         if I == (2, 2) || I == (1, 3)
             data[:grid1][I...] = SA[99.0, 100.0]
         end
@@ -101,7 +101,7 @@ Base.zero(::Type{<:TestStruct{T1,T2}}) where {T1,T2} = TestStruct(zero(T1), zero
 end
 
 @testset "Neighborhood Rule that sums a Neighborhood of stucts" begin
-    rule = Neighbors{Tuple{:grid1,:grid2}, :grid1}(Moore(1)) do neighborhood, state1, state2
+    rule = Neighbors{Tuple{:grid1,:grid2},:grid1}(Moore(1)) do neighborhood, state1, state2
         sum(neighborhood) + state2
     end
     init = (
@@ -120,7 +120,7 @@ end
 end
 
 @testset " randomly updates a struct" begin
-    rule = Manual{:grid1,:grid1}() do data, I, state
+    rule = SetCell{:grid1,:grid1}() do data, I, state
         if I == (2, 2) || I == (1, 3)
             data[:grid1][I...] = TS(99.0, 100.0)
         end

@@ -166,7 +166,7 @@ end
     ruleset = Ruleset(;
         rules=(Life(),),
         timestep=Day(1),
-        overflow=WrapOverflow(),
+        boundary=Wrap(),
         opt=SparseOpt(),
     )
     proc = SparseOptInspector()

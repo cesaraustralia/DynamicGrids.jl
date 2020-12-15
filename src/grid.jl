@@ -5,7 +5,7 @@ Simulation data specific to a single grid.
 abstract type GridData{Y,X,R,T,N,I} <: AbstractArray{T,N} end
 
 function (::Type{G})(d::GridData{Y,X,R,T,N}) where {G<:GridData,Y,X,R,T,N}
-    args = init(d), mask(d), proc(d), opt(d), overflow(d), padval(d),
+    args = init(d), mask(d), proc(d), opt(d), boundary(d), padval(d),
         source(d), dest(d), sourcestatus(d), deststatus(d)
     G{Y,X,R,T,N,map(typeof, args)...}(args...)
 end
@@ -29,7 +29,7 @@ radius(d::GridData{<:Any,<:Any,R}) where R = R
 radius(d::Tuple{<:GridData,Vararg}) = map(radius, d)
 proc(d::GridData) = d.proc
 opt(d::GridData) = d.opt
-overflow(d::GridData) = d.overflow
+boundary(d::GridData) = d.boundary
 padval(d::GridData) = d.padval
 source(d::GridData) = d.source
 dest(d::GridData) = d.dest
@@ -45,7 +45,7 @@ gridsize(t::Tuple{}) = 0, 0
 
 """
     ReadableGridData(grid::GridData)
-    ReadableGridData{Y,X,R}(init::AbstractArray, mask, opt, overflow, padval)
+    ReadableGridData{Y,X,R}(init::AbstractArray, mask, opt, boundary, padval)
 
 Simulation data and storage passed to rules for each timestep.
 """
@@ -56,7 +56,7 @@ struct ReadableGridData{
     mask::M
     proc::P
     opt::Op
-    overflow::Ov
+    boundary::Ov
     padval::PV
     source::S
     dest::D
@@ -64,16 +64,16 @@ struct ReadableGridData{
     deststatus::DSt
 end
 function ReadableGridData{Y,X,R}(
-    init::I, mask::M, proc::P, opt::Op, overflow::Ov, padval::PV, source::S,
+    init::I, mask::M, proc::P, opt::Op, boundary::Ov, padval::PV, source::S,
     dest::D, sourcestatus::SSt, deststatus::DSt
 ) where {Y,X,R,I<:AbstractArray{T,N},M,P,Op,Ov,PV,S,D,SSt,DSt} where {T,N}
     ReadableGridData{Y,X,R,T,N,I,M,P,Op,Ov,PV,S,D,SSt,DSt}(
-        init, mask, proc, opt, overflow, padval, source, dest, sourcestatus, deststatus
+        init, mask, proc, opt, boundary, padval, source, dest, sourcestatus, deststatus
     )
 end
 # Generate simulation data to match a ruleset and init array.
 @inline function ReadableGridData{X,Y,R}(
-    init::AbstractArray, mask, proc, opt, overflow, padval
+    init::AbstractArray, mask, proc, opt, boundary, padval
 ) where {Y,X,R}
     # We add one extra row and column of status blocks so
     # we dont have to worry about special casing the last block
@@ -90,7 +90,7 @@ end
     sourcestatus, deststatus = _build_status(opt, source, R)
 
     grid = ReadableGridData{X,Y,R}(
-        init, mask, proc, opt, overflow, padval, source, dest, sourcestatus, deststatus
+        init, mask, proc, opt, boundary, padval, source, dest, sourcestatus, deststatus
     )
     _updatestatus!(grid)
     return grid
@@ -184,7 +184,7 @@ struct WritableGridData{
     mask::M
     proc::P
     opt::Op
-    overflow::Ov
+    boundary::Ov
     padval::PV
     source::S
     dest::D
@@ -192,11 +192,11 @@ struct WritableGridData{
     deststatus::DSt
 end
 function WritableGridData{Y,X,R}(
-    init::I, mask::M, proc::P, opt::Op, overflow::Ov, padval::PV, 
+    init::I, mask::M, proc::P, opt::Op, boundary::Ov, padval::PV, 
     source::S, dest::D, sourcestatus::SSt, deststatus::DSt
 ) where {Y,X,R,I<:AbstractArray{T,N},M,P,Op,Ov,PV,S,D,SSt,DSt} where {T,N}
     WritableGridData{Y,X,R,T,N,I,M,P,Op,Ov,PV,S,D,SSt,DSt}(
-        init, mask, proc, opt, overflow, padval, source, dest, sourcestatus, deststatus
+        init, mask, proc, opt, boundary, padval, source, dest, sourcestatus, deststatus
     )
 end
 

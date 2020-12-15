@@ -58,7 +58,7 @@ export Processor, SingleCPU, ThreadedCPU
 
 export PerformanceOpt, NoOpt, SparseOpt
 
-export Overflow, RemoveOverflow, WrapOverflow
+export Boundary, Remove, Wrap
 
 export Aux, Grid
 
@@ -109,7 +109,7 @@ include("framework.jl")
 include("precalc.jl")
 include("sequencerules.jl")
 include("maprules.jl")
-include("overflow.jl")
+include("boundaries.jl")
 include("utils.jl")
 include("life.jl")
 include("show.jl")

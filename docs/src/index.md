@@ -165,12 +165,12 @@ DynamicGrids.rgb
 
 ## Ruleset config
 
-### Overflow
+### Boundary conditions
 
 ```@docs
-Overflow
-WrapOverflow
-RemoveOverflow
+Boundary
+Wrap
+Remove
 ```
 
 ### Optimisation

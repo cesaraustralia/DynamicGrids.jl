@@ -153,10 +153,10 @@ Check grid boundaries for a coordinate before writing in [``](@ref).
 Returns a `Tuple` containing a coordinates `Tuple` and a `Bool` - `true`
 if the cell is in bounds, `false` if not.
 
-Overflow of type [`RemoveOverflow`](@ref) returns the coordinate and `false` to skip
-coordinates that overflow outside of the grid.
+Boundary of type [`Remove`](@ref) returns the coordinate and `false` to skip
+coordinates that boundary outside of the grid.
 
-[`WrapOverflow`](@ref) returns a tuple with the current position or it's
+[`Wrap`](@ref) returns a tuple with the current position or it's
 wrapped equivalent, and `true` as it is allways in-bounds.
 """
 function inbounds end
@@ -166,7 +166,7 @@ function inbounds end
 
 Check that a coordinate is within the grid, usually in [``](@ref).
 
-Unlike [`inbounds`](@ref), [`Overflow`](@ref) status is ignored.
+Unlike [`inbounds`](@ref), [`Boundary`](@ref) status is ignored.
 """
 function isinbounds end
 

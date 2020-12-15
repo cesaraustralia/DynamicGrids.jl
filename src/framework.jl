@@ -75,7 +75,7 @@ Run a simulation passing in rules without defining a `Ruleset`.
 """
 sim!(output::Output, rules::Tuple; kwargs...) = sim!(output::Output, rules...; kwargs...)
 function sim!(output::Output, rules::Rule...;
-    overflow=RemoveOverflow(),
+    boundary=Remove(),
     opt=NoOpt(),
     cellsize=1,
     timestep=nothing,
@@ -83,7 +83,7 @@ function sim!(output::Output, rules::Rule...;
     kwargs...
 )
     ruleset = Ruleset(rules...;
-        overflow=overflow, opt=opt, cellsize=cellsize, timestep=timestep, padval=padval
+        boundary=boundary, opt=opt, cellsize=cellsize, timestep=timestep, padval=padval
     )
     return sim!(output::Output, ruleset; kwargs...)
 end

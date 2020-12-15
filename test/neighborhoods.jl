@@ -100,7 +100,8 @@ end
 @testset "neighborhood rules" begin
     ruleA = TestSetNeighborhoodRule{:a,:a}(Moore{3}())
     ruleB = TestSetNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}())
-    @test neighbors(ruleA) isa Base.Generator
+    @test offsets(ruleA) isa Base.Generator
+    @test positions(ruleA, (1, 1)) isa Base.Generator
     @test neighborhood(ruleA) == Moore{3}()
     @test neighborhood(ruleB) == Moore{2}()
     @test neighborhoodkey(ruleA) == :a
@@ -108,6 +109,7 @@ end
     ruleA = TestNeighborhoodRule{:a,:a}(Moore{3}())
     ruleB = TestNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}())
     @test neighbors(ruleA) isa Base.Generator
+    @test offsets(ruleA) isa Base.Generator
     @test neighborhood(ruleA) == Moore{3}()
     @test neighborhood(ruleB) == Moore{2}()
     @test neighborhoodkey(ruleA) == :a

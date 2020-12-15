@@ -31,7 +31,7 @@ In single grid simulations `SimData` can be indexed directly as if it is a `Matr
 - `timestep(d::SimData)`: get the simulaiton time step.
 - `radius(data::SimData)` : returns the `Int` radius used on the grid,
   which is also the amount of border padding.
-- `overflow(data::SimData)` : returns the [`Overflow`](@ref) - `RemoveOverflow` or `WrapOverflow`.
+- `boundary(data::SimData)` : returns the [`Boundary`](@ref) - `Remove` or `Wrap`.
 - `padval(data::SimData)` : returns the value to use as grid border padding.
 
 These are available, but you probably shouldn't use them and thier behaviour
@@ -62,7 +62,7 @@ function SimData(extent::AbstractExtent{<:NamedTuple{Keys}}, ruleset::AbstractRu
     # Construct the SimData for each grid
     grids = map(init(extent), radii) do in, r
         ReadableGridData{y,x,r}(
-            in, mask(extent), proc(ruleset), opt(ruleset), overflow(ruleset), padval(ruleset)
+            in, mask(extent), proc(ruleset), opt(ruleset), boundary(ruleset), padval(ruleset)
         )
     end
     SimData(grids, extent, ruleset)
@@ -117,7 +117,7 @@ Base.last(d::SimData) = last(grids(d))
 gridsize(d::SimData) = gridsize(first(d))
 proc(d::SimData) = proc(ruleset(d))
 opt(d::SimData) = opt(ruleset(d))
-overflow(d::SimData) = overflow(ruleset(d))
+boundary(d::SimData) = boundary(ruleset(d))
 padval(d::SimData) = padval(ruleset(d))
 rules(d::SimData) = rules(ruleset(d))
 cellsize(d::SimData) = cellsize(ruleset(d))
