@@ -111,7 +111,7 @@ minval(o::Output) = minval(imageconfig(o))
 maxval(o::Output) = maxval(imageconfig(o))
 imgbuffer(o::Output) = imgbuffer(imageconfig(o))
 
-function showframe(o::ImageOutput, data::SimData)
+function showframe(o::ImageOutput, data)
     showimage(grid2image!(o, data), o, data)
 end
 

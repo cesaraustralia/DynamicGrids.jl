@@ -39,7 +39,7 @@ and provide a [`showframe`](@ref) method.
 - `graphicconfig(output) => GraphicConfig`
 - `isasync(output) => Bool`: does the output need to run asynchronously, 
   in a separate thread.
-- `showframe(grid::Union{Array,NamedTuple}, o::ThisOutput, data::SimData)` :
+- `showframe(grid::Union{Array,NamedTuple}, o::ThisOutput, data)` :
   in which the output generally show the frame graphically in some way.
 
 See [`REPLOutput`](@ref) for an example.
@@ -88,7 +88,7 @@ delay(o::GraphicOutput, f::Int) =
     sleep(max(0.0, timestamp(o) + (f - stampframe(o))/fps(o) - time()))
 isshowable(o::GraphicOutput, f) = true
 
-function storeframe!(o::GraphicOutput, data::AbstractSimData)
+function storeframe!(o::GraphicOutput, data)
     f = frameindex(o, data)
     if f > length(o)
         _pushgrid!(eltype(o), o)
@@ -105,25 +105,25 @@ end
 _pushgrid!(::Type{<:NamedTuple}, o) = push!(o, map(grid -> similar(grid), o[1]))
 _pushgrid!(::Type{<:AbstractArray}, o) = push!(o, similar(o[1]))
 
-function showframe(o::GraphicOutput, data::AbstractSimData)
+function showframe(o::GraphicOutput, data)
     # Take a view over each grid, as it may be padded
     frame = map(grids(data)) do grid
         view(grid, Base.OneTo.(gridsize(grid))...) 
     end
     showframe(frame, o, data)
 end
-showframe(frame::NamedTuple, o::GraphicOutput, data::AbstractSimData) =
+showframe(frame::NamedTuple, o::GraphicOutput, data) =
     showframe(first(frame), o, data)
-@noinline showframe(frame::AbstractArray, o::GraphicOutput, data::AbstractSimData) =
+@noinline showframe(frame::AbstractArray, o::GraphicOutput, data) =
     error("showframe not defined for $(nameof(typeof(o)))")
 
-function initialise!(o::GraphicOutput, data::AbstractSimData) 
+function initialise!(o::GraphicOutput, data) 
     initalisegraphics(o, data)
 end
-function finalise!(o::GraphicOutput, data::AbstractSimData) 
+function finalise!(o::GraphicOutput, data) 
     _storeframe!(eltype(o), o, data)
     finalisegraphics(o, data)
 end
 
-initalisegraphics(o::GraphicOutput, data::AbstractSimData) = nothing
-finalisegraphics(o::GraphicOutput, data::AbstractSimData) = showframe(o, data)
+initalisegraphics(o::GraphicOutput, data) = nothing
+finalisegraphics(o::GraphicOutput, data) = showframe(o, data)

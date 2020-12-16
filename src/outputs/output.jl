@@ -62,27 +62,27 @@ setstoppedframe!(o::Output, f) = nothing
 isasync(o::Output) = false
 isstored(o::Output) = true
 isshowable(o::Output, frame) = false
-initialise!(o::Output, data::AbstractSimData) = nothing
-finalise!(o::Output, data::AbstractSimData) = nothing
-initialisegraphics(o::Output, data::AbstractSimData) = nothing
-finalisegraphics(o::Output, data::AbstractSimData) = nothing
+initialise!(o::Output, data) = nothing
+finalise!(o::Output, data) = nothing
+initialisegraphics(o::Output, data) = nothing
+finalisegraphics(o::Output, data) = nothing
 delay(o::Output, frame) = nothing
 showframe(o::Output, data) = nothing
 
 frameindex(o::Output, data::AbstractSimData) = frameindex(o, currentframe(data))
 frameindex(o::Output, f::Int) = isstored(o) ? f : oneunit(f)
 
-function storeframe!(output::Output, data::AbstractSimData)
+function storeframe!(output::Output, data)
     checkbounds(output, frameindex(output, data))
     _storeframe!(eltype(output), output, data)
 end
 
-function _storeframe!(::Type{<:NamedTuple}, output::Output, data::AbstractSimData)
+function _storeframe!(::Type{<:NamedTuple}, output::Output, data)
     map(values(grids(data)), keys(data)) do grid, key
         _copyto_output!(output[frameindex(output, data)][key], grid, proc(grid))
     end
 end
-function _storeframe!(::Type{<:AbstractArray}, output::Output, data::AbstractSimData)
+function _storeframe!(::Type{<:AbstractArray}, output::Output, data)
     grid = first(grids(data))
     _copyto_output!(output[frameindex(output, data)], grid, proc(grid))
 end
@@ -92,7 +92,7 @@ function _copyto_output!(outgrid, grid, proc::CPU)
 end
 
 # Replicated frames
-function storeframe!(output::Output{<:AbstractArray}, data::AbstractVector{<:AbstractSimData})
+function storeframe!(output::Output{<:AbstractArray}, data::AbstractVector)
     f = frameindex(output, data[1])
     outgrid = output[f]
     for I in CartesianIndices(outgrid)
@@ -104,7 +104,7 @@ function storeframe!(output::Output{<:AbstractArray}, data::AbstractVector{<:Abs
     end
     return nothing
 end
-function storeframe!(output::Output{<:NamedTuple}, data::AbstractVector{<:AbstractSimData})
+function storeframe!(output::Output{<:NamedTuple}, data::AbstractVector)
     f = frameindex(output, data[1])
     outgrids = output[f]
     gridsreps = NamedTuple{keys(first(data))}(map(d -> d[key], data) for key in keys(first(data)))
