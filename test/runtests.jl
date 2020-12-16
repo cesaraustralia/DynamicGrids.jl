@@ -20,7 +20,7 @@ end
 @time @safetestset "chain" begin include("chain.jl") end
 @time @safetestset "integration" begin include("integration.jl") end
 @time @safetestset "show" begin include("show.jl") end
-@time @safetestset "aux" begin include("aux.jl") end
+@time @safetestset "aux" begin include("auxilary.jl") end
 # ImageMagick breaks in windows travis for some reason
 if !Sys.iswindows() 
     @time @safetestset "image" begin include("image.jl") end
