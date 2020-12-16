@@ -1,4 +1,4 @@
-using DynamicGrids, Test, Dates, Unitful
+using DynamicGrids, DimensionalData, Test, Dates, Unitful
 
 # life glider sims
 
@@ -118,7 +118,7 @@ test5_6 = (
 )
 
 
-@testset "Life simulation with WrapOverflow" begin
+@testset "Life simulation with Wrap" begin
     # Test on two sizes to test half blocks on both axes
     for test in (test5_6, test6_7)
         # Loop over shifing init arrays to make sure they all work
@@ -129,13 +129,13 @@ test5_6 = (
                 sparse_ruleset = Ruleset(;
                     rules=(rule,),
                     timestep=Day(2),
-                    overflow=WrapOverflow(),
+                    boundary=Wrap(),
                     opt=SparseOpt(),
                 )
                 noopt_ruleset = Ruleset(;
                     rules=(Life(),),
                     timestep=Day(2),
-                    overflow=WrapOverflow(),
+                    boundary=Wrap(),
                     opt=NoOpt(),
                 )
                 sparse_output = ArrayOutput(test[:init]; tspan=Date(2001, 1, 1):Day(2):Date(2001, 1, 14))
@@ -165,7 +165,7 @@ test5_6 = (
     end
 end
 
-@testset "Life simulation with RemoveOverflow and replicates" begin
+@testset "Life simulation with Remove boudary and replicates" begin
     init_ =     Bool[
                  0 0 0 0 0 0 0
                  0 0 0 0 1 1 1
@@ -218,7 +218,7 @@ end
     rule = Life{:a,:a}(neighborhood=Moore(1))
     rs = Ruleset(rule;
         timestep=Day(2),
-        overflow=RemoveOverflow(),
+        boundary=Remove(),
         opt=NoOpt(),
     )
 
@@ -230,7 +230,7 @@ end
     @testset "Results match glider behaviour" begin
         output = ArrayOutput((a=init_,); tspan=(Date(2001, 1, 1):Day(2):Date(2001, 1, 14)))
         @testset "NoOpt" begin
-            sim!(output, rule; overflow=RemoveOverflow(), opt=NoOpt())
+            sim!(output, rule; boundary=Remove(), opt=NoOpt())
             @test output[2][:a] == test2_rem
             @test output[3][:a] == test3_rem
             @test output[4][:a] == test4_rem
@@ -238,7 +238,7 @@ end
             @test output[7][:a] == test7_rem
         end
         @testset "SparseOpt" begin
-            sim!(output, rule; overflow=RemoveOverflow(), opt=SparseOpt())
+            sim!(output, rule; boundary=Remove(), opt=SparseOpt())
             @test output[2][:a] == test2_rem
             @test output[3][:a] == test3_rem
             @test output[4][:a] == test4_rem
@@ -251,11 +251,11 @@ end
         init = rand(Bool, 100, 100)
         rule = Life(neighborhood=Moore(1))
         sparse_opt = Ruleset(rule;
-            overflow=WrapOverflow(),
+            boundary=Wrap(),
             opt=SparseOpt(),
         )
         no_opt = Ruleset(rule;
-            overflow=WrapOverflow(),
+            boundary=Wrap(),
             opt=NoOpt(),
         )
         sparseopt_output = ArrayOutput(init; tspan=1:100)
@@ -270,11 +270,11 @@ end
         init = rand(Bool, 100, 100)
         rule = Life(neighborhood=Moore(1))
         sparse_opt = Ruleset(rule;
-            overflow=RemoveOverflow(),
+            boundary=Remove(),
             opt=SparseOpt(),
         )
         no_opt = Ruleset(rule;
-            overflow=RemoveOverflow(),
+            boundary=Remove(),
             opt=NoOpt(),
         )
         sparseopt_output = ArrayOutput(init; tspan=1:100)
@@ -291,7 +291,7 @@ end
 @testset "ResultOutput works" begin
     ruleset = Ruleset(;
         rules=(Life(),),
-        overflow=WrapOverflow(),
+        boundary=Wrap(),
         timestep=5u"s",
         opt=NoOpt(),
     )
@@ -304,38 +304,38 @@ end
 @testset "REPLOutput block works, in Unitful.jl seconds" begin
     ruleset = Ruleset(;
         rules=(Life(),),
-        overflow=WrapOverflow(),
+        boundary=Wrap(),
         timestep=5u"s",
         opt=NoOpt(),
     )
-    tspan=0u"s":5u"s":6u"s"
-    output = REPLOutput(test6_7[:init]; tspan=tspan, style=Block(), fps=100, store=true)
+    output = REPLOutput(test6_7[:init]; 
+        tspan=0u"s":5u"s":6u"s", style=Block(), fps=100, store=true
+    )
     @test DynamicGrids.isstored(output) == true
     sim!(output, ruleset)
     resume!(output, ruleset; tstop=30u"s")
-    @test output[2] == test6_7[:test2]
-    @test output[3] == test6_7[:test3]
-    @test output[5] == test6_7[:test5]
-    @test output[7] == test6_7[:test7]
+    @test output[Ti(5u"s")] == test6_7[:test2]
+    @test output[Ti(10u"s")] == test6_7[:test3]
+    @test output[Ti(20u"s")] == test6_7[:test5]
+    @test output[Ti(30u"s")] == test6_7[:test7]
 end
 
 @testset "REPLOutput braile works, in Months" begin
-    init_a = (_default_=test6_7[:init],)
     ruleset = Ruleset(Life();
-        overflow=WrapOverflow(),
+        boundary=Wrap(),
         timestep=Month(1),
         opt=SparseOpt(),
     )
-    tspan = Date(2010, 4):Month(1):Date(2010, 7)
-    output = REPLOutput(init_a; tspan=tspan, style=Braile(), fps=100, store=false)
+    tspan_ = Date(2010, 4):Month(1):Date(2010, 7)
+    output = REPLOutput(test6_7[:init]; tspan=tspan_, style=Braile(), fps=100, store=false)
 
     sim!(output, ruleset)
-    @test output[1][:_default_] == test6_7[:test4]
+    @test output[Ti(Date(2010, 7))] == test6_7[:test4]
     @test DynamicGrids.tspan(output) == Date(2010, 4):Month(1):Date(2010, 7)
 
     resume!(output, ruleset; tstop=Date(2010, 10))
     @test DynamicGrids.tspan(output) == Date(2010, 4):Month(1):Date(2010, 10)
-    @test output[1][:_default_] == test6_7[:test7]
+    @test output[1] == test6_7[:test7]
 
 end
 

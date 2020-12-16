@@ -15,17 +15,17 @@ function maprule!(data::SimData, rule::Rule)
     The structure of rgrids and wgrids determines the values that are sent to the rule
     are in a NamedTuple or single value, and wether a tuple of single return value
     is expected. There may be a cleaner way of doing this. =#
-
     rkeys, rgrids = _getreadgrids(rule, data)
     wkeys, wgrids = _getwritegrids(rule, data)
     # Copy the source to dest for grids we are writing to, if needed
     _maybeupdatedest!(wgrids, rule)
-    # Copy or zero out overflow where needed
-    _handleoverflow!(wgrids)
+    # Copy or zero out boundary where needed
+    _handleboundary!(wgrids)
     # Combine read and write grids to a temporary simdata object.
-    # This means that grids not asked for by rules are not available,
-    # and grids not specified to write to are read-only.
-    tempdata = _combinegrids(data, rkeys, rgrids, wkeys, wgrids)
+    # This means that grids not specified to write to are read-only.
+    allkeys = map(Val, keys(data)) 
+    allgrids = values(data)
+    tempdata = _combinegrids(data, allkeys, allgrids, wkeys, wgrids)
     # Run the rule loop
     maprule!(wgrids, tempdata, proc(data), opt(data), rule, rkeys, rgrids, wkeys)
     # Mask writes to dest if a mask isprovided, except for 
@@ -38,11 +38,9 @@ function maprule!(data::SimData, rule::Rule)
     # Combine the written grids with the original simdata
     _replacegrids(data, wkeys, readonly_wgrids)
 end
-function maprule!(simdata::SimData, rule::GridRule)
+function maprule!(simdata::SimData, rule::SetGridRule)
     rkeys, rgrids = _getreadgrids(rule, simdata)
     wkeys, wgrids = _getwritegrids(rule, simdata)
-    # Cant use SparseOpt with GridRule yet
-    _checkhassparseopt(wgrids)
     tempsimdata = _combinegrids(simdata, rkeys, rgrids, wkeys, wgrids)
     # Run the rule loop
     applyrule!(tempsimdata, rule)
@@ -52,7 +50,7 @@ end
 
 _maybeupdatedest!(ds::Tuple, rule) = map(d -> _maybeupdatedest!(d, rule), ds)
 _maybeupdatedest!(d::WritableGridData, rule::Rule) = nothing
-function _maybeupdatedest!(d::WritableGridData, rule::ManualRule)
+function _maybeupdatedest!(d::WritableGridData, rule::SetCellRule)
     copyto!(parent(dest(d)), parent(source(d)))
 end
 
@@ -79,9 +77,6 @@ _to_readonly(data::WritableGridData) = ReadableGridData(data)
 
 _hassparseopt(wgrids::Tuple) = any(o -> o isa SparseOpt, map(opt, wgrids))
 _hassparseopt(wgrid) = opt(wgrid) isa SparseOpt
-
-@noinline _checkhassparseopt(wgrids) = nothing
-    # _hassparseopt(wgrids) && error("Cant use SparseOpt with a GridRule")
 
 const NeedsBuffer = Union{NeighborhoodRule,Chain{<:Any,<:Any,<:Tuple{<:NeighborhoodRule,Vararg}}}
 
@@ -160,7 +155,7 @@ end
     _writegrids!(wgrids, writeval, i, j)
     nothing
 end
-@inline function rule_kernel!(wgrids, simdata, rule::ManualRule, rkeys, rgrids, wkeys, i, j)
+@inline function rule_kernel!(wgrids, simdata, rule::SetCellRule, rkeys, rgrids, wkeys, i, j)
     readval = _readgrids(rkeys, rgrids, i, j)
     applyrule!(simdata, rule, readval, (i, j))
     nothing
@@ -334,7 +329,7 @@ end
 # Reduces array reads for single grids, when we can just use
 # the center of the neighborhood buffer as the cell state
 @inline function _readgridsorbuffer(rgrids::Tuple, buffer, rule, I...)
-    _readgrids(keys2vals(_readkeys(rule)), rgrids, I...)
+    _readgrids(_keys2vals(_readkeys(rule)), rgrids, I...)
 end
 @inline function _readgridsorbuffer(
     rgrids::ReadableGridData{<:Any,<:Any,R}, buffer, rule, I...
@@ -413,7 +408,7 @@ function _readgrids end
         push!(expr.args, :(@inbounds rgrids[$i][I...]))
     end
     return quote
-        keys = map(unwrap, rkeys)
+        keys = map(_unwrap, rkeys)
         vals = $expr
         NamedTuple{keys,typeof(vals)}(vals)
     end
@@ -488,8 +483,7 @@ end
 @inline function _combinegrids(rkeys::Tuple, rgrids::Tuple, wkey, wgrids)
     _combinegrids(rkeys, rgrids, (wkey,), (wgrids,))
 end
-@generated function _combinegrids(rkeys::Tuple{Vararg{<:Val}}, rgrids::Tuple,
-                       wkeys::Tuple{Vararg{<:Val}}, wgrids::Tuple)
+@generated function _combinegrids(rkeys::Tuple, rgrids::Tuple, wkeys::Tuple, wgrids::Tuple)
     rkeys = _vals2syms(rkeys)
     wkeys = _vals2syms(wkeys)
     keysexp = Expr(:tuple, QuoteNode.(wkeys)...)
@@ -518,7 +512,7 @@ function _replacegrids(simdata::AbstractSimData, newkeys, newgrids)
     @set simdata.grids = _replacegrids(grids(simdata), newkeys, newgrids)
 end
 @generated function _replacegrids(allgrids::NamedTuple, newkeys::Tuple, newgrids::Tuple)
-    newkeys = map(unwrap, newkeys.parameters)
+    newkeys = map(_unwrap, newkeys.parameters)
     allkeys = allgrids.parameters[1]
     expr = Expr(:tuple)
     for key in allkeys
@@ -536,7 +530,7 @@ end
     end
 end
 @generated function _replacegrids(allgrids::NamedTuple, newkey::Val, newgrid::GridData)
-    newkey = unwrap(newkey)
+    newkey = _unwrap(newkey)
     allkeys = allgrids.parameters[1]
     expr = Expr(:tuple)
     for key in allkeys

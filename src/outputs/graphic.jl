@@ -20,12 +20,12 @@ stampframe(gc::GraphicConfig) = gc.stampframe
 stoppedframe(gc::GraphicConfig) = gc.stoppedframe
 store(gc::GraphicConfig) = gc.store
 setfps!(gc::GraphicConfig, x) = gc.fps = x
-function settimestamp!(o::GraphicConfig, f)
+function settimestamp!(o::GraphicConfig, frame::Int)
     o.timestamp = time()
-    o.stampframe = f
+    o.stampframe = frame
 end
 
-setstoppedframe!(gc::GraphicConfig, f) = gc.stoppedframe = f
+setstoppedframe!(gc::GraphicConfig, frame::Int) = gc.stoppedframe = frame
 
 """
 Outputs that display the simulation frames live.
@@ -33,9 +33,29 @@ Outputs that display the simulation frames live.
 All `GraphicOutputs` have a [`GraphicConfig`](@ref) object
 and provide a [`showframe`](@ref) method.
 
+## Interface Methods
+
+- `extent(output) => Extent`
+- `graphicconfig(output) => GraphicConfig`
+- `isasync(output) => Bool`: does the output need to run asynchronously, 
+  in a separate thread.
+- `showframe(grid::Union{Array,NamedTuple}, o::ThisOutput, data)` :
+  in which the output generally show the frame graphically in some way.
+
 See [`REPLOutput`](@ref) for an example.
+
+## Constructor Keyword Arguments: 
+
+The default constructor will generate these objects from keyword arguments and pass 
+them to the object constructor, which must accept the following
+
+- `frames`: a Vector of simulation frames (`NamedTuple` or `Array`). 
+- `running`: A Bool.
+- `extent` an [`Extent`](@ref) object.
+- `graphicconfig` a [`GraphicConfig`](@ref)object.
+
 """
-abstract type GraphicOutput{T} <: Output{T} end
+abstract type GraphicOutput{T,F} <: Output{T,F} end
 
 # Generic ImageOutput constructor. Converts an init array to vector of arrays.
 function (::Type{T})(
@@ -51,32 +71,33 @@ end
 graphicconfig(o::Output) = GraphicConfig()
 graphicconfig(o::GraphicOutput) = o.graphicconfig
 
-# Field getters and setters
+# Forwarded getters and setters
 fps(o::GraphicOutput) = fps(graphicconfig(o))
 timestamp(o::GraphicOutput) = timestamp(graphicconfig(o))
 stampframe(o::GraphicOutput) = stampframe(graphicconfig(o))
 stoppedframe(o::GraphicOutput) = stoppedframe(graphicconfig(o))
-store(o::GraphicOutput) = store(graphicconfig(o))
 isstored(o::GraphicOutput) = store(o)
+store(o::GraphicOutput) = store(graphicconfig(o))
 
 setfps!(o::GraphicOutput, x) = setfps!(graphicconfig(o), x)
 settimestamp!(o::GraphicOutput, f) = settimestamp!(graphicconfig(o), f)
 setstoppedframe!(o::GraphicOutput, f) = setstoppedframe!(graphicconfig(o), f)
 
-# Output interface
 # Delay output to maintain the frame rate
 delay(o::GraphicOutput, f) =
     sleep(max(0.0, timestamp(o) + (f - stampframe(o))/fps(o) - time()))
 isshowable(o::GraphicOutput, f) = true
 
-function storeframe!(o::GraphicOutput, data::AbstractSimData)
+function storeframe!(o::GraphicOutput, data)
     f = frameindex(o, data)
     if f > length(o)
         _pushgrid!(eltype(o), o)
     end
-    storeframe!(eltype(o), o, data, f)
+    if isstored(o)
+        _storeframe!(eltype(o), o, data)
+    end
     if isshowable(o, currentframe(data)) 
-        showframe(o, data, currentframe(data), currenttime(data))
+        showframe(o, data)
     end
     return nothing
 end
@@ -84,7 +105,25 @@ end
 _pushgrid!(::Type{<:NamedTuple}, o) = push!(o, map(grid -> similar(grid), o[1]))
 _pushgrid!(::Type{<:AbstractArray}, o) = push!(o, similar(o[1]))
 
-# Get frame f from output and call showframe again
-#showframe(o::GraphicOutput, f, t) = showframe(o, Ruleset(), f, t)
-showframe(o::GraphicOutput, data::AbstractSimData, f, t) =
-    showframe(o[frameindex(o, f)], o, data, f, t)
+function showframe(o::GraphicOutput, data)
+    # Take a view over each grid, as it may be padded
+    frame = map(grids(data)) do grid
+        view(grid, Base.OneTo.(gridsize(grid))...) 
+    end
+    showframe(frame, o, data)
+end
+showframe(frame::NamedTuple, o::GraphicOutput, data) =
+    showframe(first(frame), o, data)
+@noinline showframe(frame::AbstractArray, o::GraphicOutput, data) =
+    error("showframe not defined for $(nameof(typeof(o)))")
+
+function initialise!(o::GraphicOutput, data) 
+    initalisegraphics(o, data)
+end
+function finalise!(o::GraphicOutput, data) 
+    _storeframe!(eltype(o), o, data)
+    finalisegraphics(o, data)
+end
+
+initalisegraphics(o::GraphicOutput, data) = nothing
+finalisegraphics(o::GraphicOutput, data) = showframe(o, data)

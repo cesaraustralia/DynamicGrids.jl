@@ -32,19 +32,20 @@ image for display. Frames may be one or multiple grids.
 """
 abstract type GridProcessor end
 
+imgsize(p::GridProcessor, init::NamedTuple) = imgsize(p, first(init))
+imgsize(::GridProcessor, init::AbstractArray) = size(init)
 textconfig(::GridProcessor) = nothing
 
 """
-    grid2image(o::ImageOutput, data::SimData, grids, f, t)
-    grid2image(p::GridProcessor, o::ImageOutput, data::SimData, grids, f, t)
+    grid2image!(o::ImageOutput, data::SimData)
+    grid2image!(p::GridProcessor, o::ImageOutput, data::SimData, grids; t=currenttime(data))
 
 Convert a grid or `NamedRuple` of grids to an `RGB` image, using a [`GridProcessor`](@ref).
 But it they can be dispatched on together when required for custom outputs.
 """
-function grid2image end
-function grid2image(o::ImageOutput, data::SimData, grids, f, t)
-    grid2image(processor(o), o, data, grids, f, t)
-end
+function grid2image! end
+grid2image!(o::ImageOutput, data::SimData) = grid2image!(imgbuffer(o), processor(o), o, data)
+grid2image!(img, proc, o::ImageOutput, data::SimData) = grid2image!(img, proc, o, data, grids(data))
 
 """
 Grid processors that convert one grid into an image array.
@@ -54,38 +55,32 @@ used with a `NamedTuple` of grids.
 """
 abstract type SingleGridProcessor <: GridProcessor end
 
-allocimage(grid::AbstractArray) = allocimage(size(grid))
-allocimage(size::Tuple) = fill(ARGB32(0.0, 0.0, 0.0, 1.0), size)
+_allocimage(p::GridProcessor, init) = fill(ARGB32(0), imgsize(p, init)...)
 
-function grid2image(
-    p::SingleGridProcessor, o::ImageOutput, data::SimData, grids::NamedTuple, f::Int, t
+function grid2image!(
+    img, p::SingleGridProcessor, o::ImageOutput, data::SimData, grids::NamedTuple;
+    name=string(first(keys(grids))), time=currenttime(data)
 )
-    grid2image(p, o, data, first(grids), f, t, string(first(keys(grids))))
+    grid2image!(img, p, o, data, first(grids); name=name, time=time)
 end
-function grid2image(
-    p::SingleGridProcessor, o::Output, data::SimData,
-    grid::AbstractArray, f::Int, t, name=nothing
+function grid2image!(
+    img, p::SingleGridProcessor, o::ImageOutput, data::SimData, grid::AbstractArray;
+    name=nothing, time=currenttime(data)
 )
-    grid2image(p, mask(o), minval(o), maxval(o), data, grid, f, t, name)
+    grid2image!(img, p, mask(o), minval(o), maxval(o), data, grid; name=name, time=time)
 end
-function grid2image(p::SingleGridProcessor, mask, minval, maxval, data::SimData{Y,X},
-           grid::AbstractArray, f::Int, t, name=nothing
+function grid2image!(
+    img, p::SingleGridProcessor, mask, minval, maxval, data::SimData{Y,X}, grid::AbstractArray;
+    name=nothing, time=currenttime(data)
 ) where {Y,X}
-    img = allocimage(grid)
     for j in 1:X, i in 1:Y
         @inbounds val = grid[i, j]
         pixel = rgb(cell2rgb(p, mask, minval, maxval, data, val, (i, j)))
         @inbounds img[i, j] = pixel
     end
-    rendertext!(img, textconfig(p), name, t)
+    _rendertext!(img, textconfig(p), name, time)
     return img
 end
-
-
-"""
-Processors that convert a frame containing multiple grids into a single image.
-"""
-abstract type MultiGridProcessor <: GridProcessor end
 
 """
     ColorProcessor(; scheme=Greyscale(), zerocolor=nothing, maskcolor=nothing)
@@ -109,10 +104,10 @@ end
 ColorProcessor(scheme, zerocolor=ZEROCOL, maskcolor=MASKCOL) =
     ColorProcessor(scheme, zerocolor, maskcolor, TextConfig())
 
-scheme(processor::ColorProcessor) = processor.scheme
-zerocolor(processor::ColorProcessor) = processor.zerocolor
-maskcolor(processor::ColorProcessor) = processor.maskcolor
-textconfig(processor::ColorProcessor) = processor.textconfig
+scheme(p::ColorProcessor) = p.scheme
+zerocolor(p::ColorProcessor) = p.zerocolor
+maskcolor(p::ColorProcessor) = p.maskcolor
+textconfig(p::ColorProcessor) = p.textconfig
 
 # Show colorscheme in Atom etc
 Base.show(io::IO, m::MIME"image/svg+xml", p::ColorProcessor) = show(io, m, scheme(p))
@@ -164,60 +159,11 @@ function cell2rgb(p::SparseOptInspector, mask, minval, maxval, data::SimData, va
 end
 
 
-abstract type BandColor end
-
-struct Red <: BandColor end
-struct Green <: BandColor end
-struct Blue <: BandColor end
 
 """
-    ThreeColorProcessor(; colors=(Red(), Green(), Blue()), zerocolor=nothing, maskcolor=nothing)
-
-Assigns `Red()`, `Blue()`, `Green()` or `nothing` to
-any number of dynamic grids in any order. Duplicate colors will be summed.
-The final color sums are combined into a composite color image for display.
-
-## Arguments / Keyword Arguments
-- `colors`: a tuple or `Red()`, `Green()`, `Blue()`, or `nothing` matching the number of grids.
-- `zerocolor`: an `RGB` color to use when values are zero, or `nothing` to ignore.
-- `maskcolor`: an `RGB` color to use when cells are masked, or `nothing` to ignore.
+Processors that convert a frame containing multiple grids into a single image.
 """
-Base.@kwdef struct ThreeColorProcessor{C<:Tuple,Z,M,TC} <: MultiGridProcessor
-    colors::C      = (Red(), Green(), Blue())
-    zerocolor::Z   = nothing
-    maskcolor::M   = nothing
-    textconfig::TC = nothing
-end
-
-colors(processor::ThreeColorProcessor) = processor.colors
-zerocolor(processor::ThreeColorProcessor) = processor.zerocolor
-maskcolor(processor::ThreeColorProcessor) = processor.maskcolor
-
-function grid2image(p::ThreeColorProcessor, o::ImageOutput, data::SimData, grids::NamedTuple, f, t)
-    img = allocimage(first(grids))
-    ncols, ngrids, nmin, nmax = map(length, (colors(p), grids, minval(o), maxval(o)))
-    if !(ngrids == ncols == nmin == nmax)
-        ArgumentError(
-            "Number of grids ($ngrids), processor colors ($ncols), " *
-            "minval ($nmin) and maxival ($nmax) must be the same"
-        ) |> throw
-    end
-    for i in CartesianIndices(first(grids))
-        img[i] = if !(maskcolor(p) isa Nothing) && ismasked(mask(o), i)
-            rgb(maskcolor(p))
-        else
-            xs = map(values(grids), minval(o), maxval(o)) do g, mi, ma
-                normalise(g[i], mi, ma)
-            end
-            if !(zerocolor(p) isa Nothing) && all(map((x, c) -> c isa Nothing || x == zero(x), xs, colors(p)))
-                rgb(zerocolor(p))
-            else
-                rgb(combinebands(colors(p), xs))
-            end
-        end
-    end
-    img
-end
+abstract type MultiGridProcessor <: GridProcessor end
 
 """
     LayoutProcessor(layout::Array, processors::Matrix, textconfig::TextConfig)
@@ -253,22 +199,21 @@ layout(p::LayoutProcessor) = p.layout
 processors(p::LayoutProcessor) = p.processors
 textconfig(p::LayoutProcessor) = p.textconfig
 
+imgsize(p::LayoutProcessor, init::NamedTuple) = size(first(init)) .* size(p.layout)
 
-function grid2image(
-    p::LayoutProcessor, o::ImageOutput, data::SimData, grids::NamedTuple, f, t
+
+function grid2image!(
+    img, p::LayoutProcessor, o::ImageOutput, data::SimData, grids::NamedTuple
 )
- 
     ngrids = length(grids)
-    if !(minval(o) isa Nothing) 
+    if !(minval(o) isa Nothing)
         length(minval(o)) == ngrids || _wronglengtherror(minval, ngrids, length(minval(o)))
     end
-    if !(maxval(o) isa Nothing) 
+    if !(maxval(o) isa Nothing)
         length(maxval(o)) == ngrids || _wronglengtherror(maxval, ngrids, length(maxval(o)))
     end
 
     grid_ids = layout(p)
-    sze = size(first(grids))
-    img = allocimage(sze .* size(grid_ids))
     # Loop over the layout matrix
     for i in 1:size(grid_ids, 1), j in 1:size(grid_ids, 2)
         grid_id = grid_ids[i, j]
@@ -281,12 +226,17 @@ function grid2image(
         else
             grid_id
         end
+        I, J = map((i, j), gridsize(data)) do k, s
+            (k - 1) * s + 1:k * s
+        end
         # Run processor for section
-        key = keys(grids)[n]
-        _sectionloop(processors(p)[n], img, mask(o), _valn(minval(o), n), _valn(maxval(o), n),
-                     data, grids[n], key, f, i, j)
+        grid2image!(
+            view(img, I, J), processors(p)[n], mask(o), _valn(minval(o), n), 
+            _valn(maxval(o), n), data, grids[n];
+            name=string(keys(grids)[n]), time=nothing
+        )
     end
-    rendertime!(img, textconfig(p), t)
+    _rendertime!(img, textconfig(p), currenttime(data))
     img
 end
 
@@ -298,18 +248,23 @@ _valn(vals, n) = vals[n]
 @noinline _wronglengtherror(f, ngrids, n) =
     throw(ArgumentError("Number of grids ($ngrids) and legtn of $f ($n) must be the same"))
 
-function _sectionloop(
-    processor::SingleGridProcessor, img, mask, minval, maxval, data, grid, key, f, i, j
-)
-    # We pass `nothing` for time as we don't want to print it multiple times.
-    section = grid2image(processor, mask, minval, maxval, data, grid, f, nothing, string(key))
-    @assert eltype(section) == eltype(img)
-    sze = size(section)
-    # Copy section into image
-    for y in 1:sze[2], x in 1:sze[1]
-        img[x + (i - 1) * sze[1], y + (j - 1) * sze[2]] = section[x, y]
-    end
+
+# Automatically choose a processor
+
+function autoprocessor(init, scheme, textconfig)
+    ColorProcessor(first(_iterableschemes(scheme)), ZEROCOL, MASKCOL, textconfig)
 end
+function autoprocessor(init::NamedTuple, scheme, textconfig)
+    rows = length(init) ÷ 4 + 1
+    cols = (length(init) - 1) ÷ rows + 1
+    layout = reshape([keys(init)...], (rows, cols))
+    processors = autoprocessor.(values(init), _iterableschemes(scheme), Ref(textconfig))
+    LayoutProcessor(layout, processors, textconfig)
+end
+
+_iterableschemes(::Nothing) = (Greyscale(),)
+_iterableschemes(schemes::Union{Tuple,NamedTuple,AbstractVector}) = schemes
+_iterableschemes(scheme) = (scheme,)
 
 
 # Color manipulation tools
@@ -357,33 +312,3 @@ rgb(val::Bool) = (ARGB32(0), ARGB32(1))[val+1]
 Convert a color scheme and value to an RGB value.
 """
 rgb(scheme, val) = rgb(get(scheme, val))
-
-"""
-    combinebands(c::Tuple{Vararg{<:BandColor}, acc, xs)
-
-Assign values to color bands given in any order, and output as RGB.
-"""
-combinebands(colors, xs) = combinebands(colors, xs, (0.0, 0.0, 0.0))
-combinebands(c::Tuple{Red,Vararg}, xs, acc) =
-    combinebands(tail(c), tail(xs), (acc[1] + xs[1], acc[2], acc[3]))
-combinebands(c::Tuple{Green,Vararg}, xs, acc) =
-    combinebands(tail(c), tail(xs), (acc[1], acc[2] + xs[1], acc[3]))
-combinebands(c::Tuple{Blue,Vararg}, xs, acc) =
-    combinebands(tail(c), tail(xs), (acc[1], acc[2], acc[3] + xs[1]))
-combinebands(c::Tuple{Nothing,Vararg}, xs, acc) = combinebands(tail(c), tail(xs), acc)
-combinebands(c::Tuple{}, xs, acc) = rgb(acc...)
-
-function autoprocessor(init, scheme, textconfig)
-    ColorProcessor(first(_iterableschemes(scheme)), ZEROCOL, MASKCOL, textconfig)
-end
-function autoprocessor(init::NamedTuple, scheme, textconfig)
-    rows = length(init) ÷ 4 + 1
-    cols = (length(init) - 1) ÷ rows + 1
-    layout = reshape([keys(init)...], (rows, cols))
-    processors = autoprocessor.(values(init), _iterableschemes(scheme), Ref(textconfig))
-    LayoutProcessor(layout, processors, textconfig)
-end
-
-_iterableschemes(::Nothing) = (Greyscale(),)
-_iterableschemes(schemes::Union{Tuple,NamedTuple,AbstractVector}) = schemes
-_iterableschemes(scheme) = (scheme,)

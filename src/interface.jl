@@ -18,13 +18,13 @@ the grids specified by the `W` type parameter.
 function applyrule end
 
 """
-    applyrule!(data::SimData, rule::ManualRule{R,W}, state, index::Tuple{Int,Int}) => Nothing
+    applyrule!(data::SimData, rule::{R,W}, state, index::Tuple{Int,Int}) => Nothing
 
 Apply a rule to the cell state and manually write to the grid data array.
-Used in all rules inheriting from [`ManualRule`](@ref).
+Used in all rules inheriting from [``](@ref).
 
 This is called in internal `maprule!` methods during the simulation, not by
-the user. Custom [`ManualRule`](@ref) implementations must define this method.
+the user. Custom [``](@ref) implementations must define this method.
 
 Only grids specified with the `W` type parameter will be writable from `data`.
 
@@ -76,22 +76,20 @@ function offsets end
     positions(x::Union{Neighborhood,NeighborhoodRule}}, cellindex::Tuple) => iterable
 
 Returns an iteraterable over all cells as a `Tuple` of the index 
-in the main array. Useful in [`ManualNeighborhoodRule`](@ref) for 
+in the main array. Useful in [`SetNeighborhoodRule`](@ref) for 
 setting neighborhood values.
 """
 function positions end
 
-
 """
     add!(data::WritableGridData, x, I...)
-    add!(A::AbstractArray, x, I...)
 
 Add the value `x` to a grid cell.
 
 ## Example useage
 
 ```julia
-function applyrule!(data::SimData, rule::MyManualRule{A,B}, state, cellindex) where {A,B}
+function applyrule!(data::SimData, rule::My{A,B}, state, cellindex) where {A,B}
 
     dest, is_inbounds = inbounds(jump .+ cellindex, gridsize(data))
 
@@ -104,11 +102,24 @@ function add! end
 
 """
     sub!(data::WritableGridData, x, I...)
-    sub!(A::AbstractArray, x, I...)
 
 Subtract the value `x` from a grid cell. See `add!` for example usage.
 """
 function sub! end
+
+"""
+    min!(data::WritableGridData, x, I...)
+
+Set a gride cell to the minimum of `x` and the current value. See `add!` for example usage.
+"""
+function min! end
+
+"""
+    max!(data::WritableGridData, x, I...)
+
+Set a gride cell to the maximum of `x` and the current value. See `add!` for example usage.
+"""
+function max! end
 
 """
     and!(data::WritableGridData, x, I...)
@@ -135,27 +146,27 @@ Set the grid cell `c` to `xor(c, x)`. See `add!` for example usage.
 function xor! end
 
 """
-    inbounds(xs::Tuple, data::SimData) => Tuple{NTuple{2,Int},Bool}
+    inbounds(I::Tuple, data::SimData) => Tuple{NTuple{2,Int},Bool}
 
-Check grid boundaries for a coordinate before writing in [`ManualRule`](@ref).
+Check grid boundaries for a coordinate before writing in [``](@ref).
 
 Returns a `Tuple` containing a coordinates `Tuple` and a `Bool` - `true`
 if the cell is in bounds, `false` if not.
 
-Overflow of type [`RemoveOverflow`](@ref) returns the coordinate and `false` to skip
-coordinates that overflow outside of the grid.
+Boundary of type [`Remove`](@ref) returns the coordinate and `false` to skip
+coordinates that boundary outside of the grid.
 
-[`WrapOverflow`](@ref) returns a tuple with the current position or it's
+[`Wrap`](@ref) returns a tuple with the current position or it's
 wrapped equivalent, and `true` as it is allways in-bounds.
 """
 function inbounds end
 
 """
-    isinbounds(xs::Tuple, data)
+    isinbounds(I::Tuple, data)
 
-Check that a coordinate is within the grid, usually in [`ManualRule`](@ref).
+Check that a coordinate is within the grid, usually in [``](@ref).
 
-Unlike [`inbounds`](@ref), [`Overflow`](@ref) status is ignored.
+Unlike [`inbounds`](@ref), [`Boundary`](@ref) status is ignored.
 """
 function isinbounds end
 
@@ -169,16 +180,14 @@ function radius end
 """
     init(obj) => Union{AbstractArray,NamedTUple}
 
-Retrieve the mask from an [`Output`](@ref),
-[`Extent`](@ref) or [`SimData`](@ref) object.
+Retrieve the mask from an [`Output`](@ref), [`Extent`](@ref) or [`SimData`](@ref) object.
 """
 function init end
 
 """
     mask(obj) => AbstractArray
 
-Retrieve the mask from an [`Output`](@ref),
-[`Extent`](@ref) or [`SimData`](@ref) object.
+Retrieve the mask from an [`Output`](@ref), [`Extent`](@ref) or [`SimData`](@ref) object.
 """
 function mask end
 
@@ -213,18 +222,6 @@ This will be in whatever type/units you specify in `tspan`.
 function timestep end
 
 """
-    currenttimestep(simdata::SimData)
-
-Retrieve the current timestep from a [`SimData`](@ref) object.
-
-This may be different from the `timestep`. If the simulation is in `Month`,
-`currenttimestep` will return `Seconds` for the length of the specific month.
-
-This will be in whatever type/units you specify in `tspan`.
-"""
-function currenttimestep end
-
-"""
     currentframe(simdata::SimData) => Int
 
 Retrieve the current simulation frame a [`SimData`](@ref) object.
@@ -239,3 +236,14 @@ Retrieve the current simulation time from a [`SimData`](@ref) object.
 This will be in whatever type/units you specify in `tspan`.
 """
 function currenttime end
+
+"""
+    currenttimestep(simdata::SimData)
+
+Retrieve the current timestep from a [`SimData`](@ref) object.
+
+This may be different from the `timestep`. If the timestep is `Month`,
+`currenttimestep` will return `Seconds` for the length of the specific month.
+"""
+function currenttimestep end
+

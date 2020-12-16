@@ -87,20 +87,21 @@ end
 DynamicGrids.applyrule(data, rule::TestNeighborhoodRule, state, index) =
     state
 
-struct TestManualNeighborhoodRule{R,W,N} <: ManualNeighborhoodRule{R,W}
+struct TestSetNeighborhoodRule{R,W,N} <: SetNeighborhoodRule{R,W}
     neighborhood::N
 end
 function DynamicGrids.applyrule!(
-    data, rule::TestManualNeighborhoodRule{R,Tuple{W1,}}, state, index
+    data, rule::TestSetNeighborhoodRule{R,Tuple{W1,}}, state, index
 ) where {R,W1} 
     add!(data[W1], state[1], index...)
 end
 
 
 @testset "neighborhood rules" begin
-    ruleA = TestManualNeighborhoodRule{:a,:a}(Moore{3}())
-    ruleB = TestManualNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}())
-    @test neighbors(ruleA) isa Base.Generator
+    ruleA = TestSetNeighborhoodRule{:a,:a}(Moore{3}())
+    ruleB = TestSetNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}())
+    @test offsets(ruleA) isa Base.Generator
+    @test positions(ruleA, (1, 1)) isa Base.Generator
     @test neighborhood(ruleA) == Moore{3}()
     @test neighborhood(ruleB) == Moore{2}()
     @test neighborhoodkey(ruleA) == :a
@@ -108,6 +109,7 @@ end
     ruleA = TestNeighborhoodRule{:a,:a}(Moore{3}())
     ruleB = TestNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}())
     @test neighbors(ruleA) isa Base.Generator
+    @test offsets(ruleA) isa Base.Generator
     @test neighborhood(ruleA) == Moore{3}()
     @test neighborhood(ruleB) == Moore{2}()
     @test neighborhoodkey(ruleA) == :a
@@ -125,7 +127,7 @@ end
 @testset "radius" begin
     init = (a=[1.0 2.0], b=[10.0 11.0])
     ruleA = TestNeighborhoodRule{:a,:a}(Moore{3}())
-    ruleB = TestManualNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}())
+    ruleB = TestSetNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}())
     ruleset = Ruleset(ruleA, ruleB)
     @test radius(ruleA) == 3
     @test radius(ruleB) == 2

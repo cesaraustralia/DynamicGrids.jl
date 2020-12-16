@@ -31,7 +31,7 @@ In single grid simulations `SimData` can be indexed directly as if it is a `Matr
 - `timestep(d::SimData)`: get the simulaiton time step.
 - `radius(data::SimData)` : returns the `Int` radius used on the grid,
   which is also the amount of border padding.
-- `overflow(data::SimData)` : returns the [`Overflow`](@ref) - `RemoveOverflow` or `WrapOverflow`.
+- `boundary(data::SimData)` : returns the [`Boundary`](@ref) - `Remove` or `Wrap`.
 - `padval(data::SimData)` : returns the value to use as grid border padding.
 
 These are available, but you probably shouldn't use them and thier behaviour
@@ -54,7 +54,7 @@ struct SimData{Y,X,G<:NamedTuple,E,RS,F,A} <: AbstractSimData{Y,X}
     auxframe::A
 end
 # Convert grids in extent to NamedTuple
-SimData(extent, ruleset::AbstractRuleset) = SimData(asnamedtuple(extent), ruleset)
+SimData(extent, ruleset::AbstractRuleset) = SimData(_asnamedtuple(extent), ruleset)
 function SimData(extent::AbstractExtent{<:NamedTuple{Keys}}, ruleset::AbstractRuleset) where Keys
     # Calculate the neighborhood radus (and grid padding) for each grid
     y, x = gridsize(extent)
@@ -62,7 +62,7 @@ function SimData(extent::AbstractExtent{<:NamedTuple{Keys}}, ruleset::AbstractRu
     # Construct the SimData for each grid
     grids = map(init(extent), radii) do in, r
         ReadableGridData{y,x,r}(
-            in, mask(extent), proc(ruleset), opt(ruleset), overflow(ruleset), padval(ruleset)
+            in, mask(extent), proc(ruleset), opt(ruleset), boundary(ruleset), padval(ruleset)
         )
     end
     SimData(grids, extent, ruleset)
@@ -83,6 +83,7 @@ function SimData{Y,X}(
 ) where {Y,X,G,E,RS,F,A}
     SimData{Y,X,G,E,RS,F,A}(grids, extent, ruleset, currentframe, auxframe)
 end
+
 ConstructionBase.constructorof(::Type{<:SimData{Y,X}}) where {Y,X} = SimData{Y,X}
 
 
@@ -93,7 +94,7 @@ grids(d::SimData) = d.grids
 init(d::SimData) = init(extent(d))
 mask(d::SimData) = mask(first(d))
 aux(d::SimData, args...) = aux(extent(d), args...)
-auxframe(d::SimData, key) = auxframe(d)[unwrap(key)]
+auxframe(d::SimData, key) = auxframe(d)[_unwrap(key)]
 auxframe(d::SimData) = d.auxframe
 tspan(d::SimData) = tspan(extent(d))
 timestep(d::SimData) = step(tspan(d))
@@ -116,7 +117,7 @@ Base.last(d::SimData) = last(grids(d))
 gridsize(d::SimData) = gridsize(first(d))
 proc(d::SimData) = proc(ruleset(d))
 opt(d::SimData) = opt(ruleset(d))
-overflow(d::SimData) = overflow(ruleset(d))
+boundary(d::SimData) = boundary(ruleset(d))
 padval(d::SimData) = padval(ruleset(d))
 rules(d::SimData) = rules(ruleset(d))
 cellsize(d::SimData) = cellsize(ruleset(d))
@@ -124,32 +125,12 @@ cellsize(d::SimData) = cellsize(ruleset(d))
 # Get the actual current timestep, e.g. seconds instead of variable periods like Month
 currenttimestep(d::SimData) = currenttime(d) + timestep(d) - currenttime(d)
 
+
 # Uptate timestamp
 _updatetime(simdata::AbstractVector{<:SimData}, f) = _updatetime.(simdata, f)
 function _updatetime(simdata::SimData, f::Integer) 
     @set! simdata.currentframe = f
-    @set simdata.auxframe = _getauxframe(simdata)
-end
-
-_getauxframe(data) = _getauxframe(aux(data), data)
-_getauxframe(aux::NamedTuple, data) = map(A -> _getauxframe(A, data), aux)
-function _getauxframe(A::AbstractDimArray, data)
-    hasdim(A, Ti) || return nothing
-    # Convert Month etc timesteps to a realised DateTime period
-    i = length(first(dims(A, TimeDim)):step(dims(A, TimeDim)):currenttime(data))
-    _cyclic_index(i, size(A, 3))
-end
-_getauxframe(aux, data) = nothing
-
-# TODO add cyclic index to DimensionalData so this isn't needed
-function _cyclic_index(i::Integer, len::Integer)
-    return if i > len
-        rem(i + len - 1, len) + 1
-    elseif i <= 0
-        i + (i ÷ len -1) * -len
-    else
-        i
-    end
+    @set simdata.auxframe = _calc_auxframe(simdata)
 end
 
 # When replicates are an Integer, construct a vector of SimData

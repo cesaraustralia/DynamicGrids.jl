@@ -9,7 +9,7 @@ They are potentially compiled together into a single function call, especially i
 use `@inline` on all `applyrule` methods. `Chain` can hold either all [`CellRule`](@ref) 
 or [`NeighborhoodRule`](@ref) followed by [`CellRule`](@ref).
 
-[`ManualRule`](@ref) can't be used in `Chain`, as it doesn't have a return value.
+[``](@ref) can't be used in `Chain`, as it doesn't have a return value.
 
 ![Chain rule diagram](https://raw.githubusercontent.com/cesaraustralia/DynamicGrids.jl/media/Chain.png)
 """
@@ -18,8 +18,8 @@ struct Chain{R,W,T<:Union{Tuple{},Tuple{Union{<:NeighborhoodRule,<:CellRule},Var
 end
 Chain(rules...) = Chain(rules) 
 Chain(rules::Tuple) = begin
-    rkeys = Tuple{union(map(k -> asiterable(_readkeys(k)), rules)...)...}
-    wkeys = Tuple{union(map(k -> asiterable(_writekeys(k)), rules)...)...}
+    rkeys = Tuple{union(map(k -> _asiterable(_readkeys(k)), rules)...)...}
+    wkeys = Tuple{union(map(k -> _asiterable(_writekeys(k)), rules)...)...}
     Chain{rkeys,wkeys,typeof(rules)}(rules)
 end
 

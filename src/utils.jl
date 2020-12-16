@@ -1,5 +1,19 @@
 
 """
+    Base.get(data::SimData, keyorval, I...)
+
+Allows parameters to be taken from a single value, another grid or an aux array.
+
+If aux arrays are a `DimArray` time sequence (with a `Ti` dim) the currect date will be 
+calculated automatically.
+
+Currently this is cycled by default, but will use Cyclic mode in DiensionalData.jl in future.
+"""
+@inline Base.get(data::SimData, val, I...) = val
+@inline Base.get(data::SimData, key::Grid{K}, I...) where K = data[K][I...]
+@inline Base.get(data::SimData, key::Aux, I...) = _auxval(data, key, I...)
+
+"""
     ismasked(data, I...)
 
 Check if a cell is masked, using the `mask` array.
@@ -14,12 +28,6 @@ ismasked(data::GridData, I...) = ismasked(mask(data), I...)
 ismasked(mask::Nothing, I...) = false
 ismasked(mask::AbstractArray, I...) = @inbounds !(mask[I...])
 
-unwrap(x) = x
-unwrap(::Val{X}) where X = X
-unwrap(::Aux{X}) where X = X
-unwrap(::Type{Aux{X}}) where X = X
-unwrap(::Type{Val{X}}) where X = X
-
 """
     isinferred(output::Output, ruleset::Ruleset)
     isinferred(output::Output, rules::Rule...)
@@ -33,7 +41,7 @@ isinferred(output::Output, rules::Tuple) = isinferred(output, rules...)
 isinferred(output::Output, rules::Rule...) = isinferred(output, Ruleset(rules...))
 function isinferred(output::Output, ruleset::Ruleset)
     ext = extent(output)
-    ext = @set ext.init = asnamedtuple(init(output))
+    ext = @set ext.init = _asnamedtuple(init(output))
     simdata = precalcrules(SimData(ext, ruleset), rules(ruleset))
     map(rules(simdata)) do rule
         isinferred(simdata, rule)
@@ -52,7 +60,7 @@ function isinferred(simdata::SimData,
     rule = _setbuffer(rule, buffer)
     return _isinferred(simdata, rule)
 end
-function isinferred(simdata::SimData, rule::ManualRule)
+function isinferred(simdata::SimData, rule::SetCellRule)
     rkeys, rgrids = _getreadgrids(rule, simdata)
     wkeys, wgrids = _getwritegrids(rule, simdata)
     simdata = @set simdata.grids = _combinegrids(rkeys, rgrids, wkeys, wgrids)
@@ -73,53 +81,32 @@ function _isinferred(simdata, rule)
     return true
 end
 
+
 _example_writeval(grids::Tuple) = map(_example_writeval, grids)
 _example_writeval(grid::WritableGridData) = grid[1, 1]
 
-asnamedtuple(x::NamedTuple) = x
-asnamedtuple(x::AbstractArray) = (_default_=x,)
-asnamedtuple(e::Extent) = Extent(asnamedtuple(init(e)), mask(e), aux(e), tspan(e))
-
-zerogrids(initgrid::AbstractArray, nframes) = [zero(initgrid) for f in 1:nframes]
-zerogrids(initgrids::NamedTuple, nframes) =
+_zerogrids(initgrid::AbstractArray, nframes) = [zero(initgrid) for f in 1:nframes]
+_zerogrids(initgrids::NamedTuple, nframes) =
     [map(grid -> zero(grid), initgrids) for f in 1:nframes]
 
+@inline _asiterable(x::Symbol) = (x,)
+@inline _asiterable(x::Type{<:Tuple}) = x.parameters
+@inline _asiterable(x::Tuple) = x
 
-"""
-    auxval(rule::Rule, data::SimData, key, I...)
+@inline _astuple(rule::Rule, state) = _astuple(_readkeys(rule), state)
+@inline _astuple(::Tuple, state) = state
+@inline _astuple(::Symbol, state) = (state,)
 
-Returns the value of a single layer or interplated value from a sequence of layers.
+@inline _asnamedtuple(x::NamedTuple) = x
+@inline _asnamedtuple(x::AbstractArray) = (_default_=x,)
+@inline _asnamedtuple(e::Extent) = Extent(_asnamedtuple(init(e)), mask(e), aux(e), tspan(e))
 
-Corresponding layers must be include as the `aux` keyword to the `Output` or `sim!`.
+@inline _keys2vals(keys::Tuple) = map(Val, keys)
+@inline _keys2vals(key::Symbol) = Val(key)
 
-If the key is not a symbol 
-"""
-auxval(data::SimData, val, I...) = val
-auxval(data::SimData, key::Union{Symbol,Aux}, I...) = _auxval(aux(data, key), data, key, I...) 
-# If there is no time dimension we return the same data for every timestep
-_auxval(A::Matrix, data, key, y, x) = A[y, x] 
-function _auxval(A::AbstractDimArray{<:Any,2}, data, key, y, x) 
-    # X = DD.basetypeof(dims(A, XDim))
-    # Y = DD.basetypeof(dims(A, YDim))
-    A[y, x]
-end
-function _auxval(A::AbstractDimArray{<:Any,3}, data, key, y, x) 
-    # X = DD.basetypeof(dims(A, XDim))
-    # Y = DD.basetypeof(dims(A, YDim))
-    A[y, x, auxframe(data, key)]
-end
 
-function boundscheck_aux(data::SimData, auxkey::Aux{Key}) where Key 
-    a = aux(data)
-    (a isa NamedTuple && haskey(a, Key)) || _auxmissingerror(Key)
-    gsize = gridsize(data)
-    asize = size(a[Key], 1), size(a[Key], 2)
-    if asize != gsize
-        _auxsizeerror(Key, asize, gsize)
-    end
-end
-
-@noinline _auxmissingerror(key, asize, gsize) = 
-    error("Aux grid $key is not present in aux")
-@noinline _auxsizeerror(key, asize, gsize) = 
-    error("Aux grid $key is size $asize does not match grid size $gsize")
+_unwrap(x) = x
+_unwrap(::Val{X}) where X = X
+_unwrap(::Aux{X}) where X = X
+_unwrap(::Type{<:Aux{X}}) where X = X
+_unwrap(::Type{<:Val{X}}) where X = X

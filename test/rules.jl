@@ -38,10 +38,10 @@ init  = [0 1 1 0
    @test rule1 == rule2
    @test_throws ArgumentError Neighbors()
    # @test_throws ArgumentError Neighbors(identity, identity, identity)
-   rule1 = Manual{:a,:b}(identity)
+   rule1 = SetCell{:a,:b}(identity)
    @test rule1.f == identity
-   @test_throws ArgumentError Manual()
-   # @test_throws ArgumentError Manual(identity, identity)
+   @test_throws ArgumentError SetCell()
+   # @test_throws ArgumentError SetCell(identity, identity)
 end
 
 
@@ -96,19 +96,18 @@ end
                         0 2 1 1]
 end
 
-@testset "Manual" begin
+@testset "SetCell" begin
     init  = [0 1 0 0
              0 0 0 0
              0 0 0 0
              0 1 0 0
              0 0 1 0]
-    rule = Manual() do data, I, state
+    rule = SetCell() do data, I, state
         if state > 0
             pos = I[1] - 2, I[2]
             isinbounds(pos, data) && add!(first(data), 1, pos...)
         end
     end
-
     output = ArrayOutput(init; tspan=1:2)
     data = SimData(extent(output), Ruleset(rule)) 
     # Cant use applyrule! without a lot of work on SimData
@@ -121,17 +120,15 @@ end
                         0 0 1 0]
 end
 
-@testset "Grid" begin
-    rule = Grid() do r, w
+@testset "SetGrid" begin
+    rule = SetGrid() do r, w
         w .*= 2
     end
-
     init  = [0 1 0 0
              0 0 0 0
              0 0 0 0
              0 1 0 0
              0 0 1 0]
-
     output = ArrayOutput(init; tspan=1:2)
     data = SimData(extent(output), Ruleset(rule)) 
     # Cant use applyrule! without a lot of work on SimData
@@ -172,7 +169,6 @@ DynamicGrids.applyrule(data, ::AddOneRule, state, args...) = state + 1
                                        5.0 8.0 0.0]
 end
 
-
 # Single grid rules
 
 struct TestRule{R,W} <: Rule{R,W} end
@@ -190,7 +186,7 @@ applyrule(data, ::TestRule, state, index) = 0
     ruleset2 = Ruleset(rule; opt=SparseOpt())
     mask = nothing
 
-    @test DynamicGrids.overflow(ruleset1) === RemoveOverflow()
+    @test DynamicGrids.boundary(ruleset1) === Remove()
     @test DynamicGrids.opt(ruleset1) === NoOpt()
     @test DynamicGrids.opt(ruleset2) === SparseOpt()
     @test DynamicGrids.cellsize(ruleset1) === 1
@@ -217,11 +213,11 @@ applyrule(data, ::TestRule, state, index) = 0
     @test source(resultdata2[:a]) == final
 end
 
-struct TestManual{R,W} <: ManualRule{R,W} end
-applyrule!(data, ::TestManual, state, index) = 0
+struct TestSetCell{R,W} <: SetCellRule{R,W} end
+applyrule!(data, ::TestSetCell, state, index) = 0
 
 @testset "A partial rule that returns zero does nothing" begin
-    rule = TestManual()
+    rule = TestSetCell()
     ruleset1 = Ruleset(rule; opt=NoOpt())
     ruleset2 = Ruleset(rule; opt=SparseOpt())
     mask = nothing
@@ -242,8 +238,8 @@ applyrule!(data, ::TestManual, state, index) = 0
     @test source(resultdata2[:_default_]) == init
 end
 
-struct TestManualWrite{R,W} <: ManualRule{R,W} end
-applyrule!(data, ::TestManualWrite{R,W}, state, index) where {R,W} = add!(data[W], 1, index[1], 2)
+struct TestSetCellWrite{R,W} <: SetCellRule{R,W} end
+applyrule!(data, ::TestSetCellWrite{R,W}, state, index) where {R,W} = add!(data[W], 1, index[1], 2)
 
 @testset "A partial rule that writes to dest affects output" begin
     init  = [0 1 1 0
@@ -257,7 +253,7 @@ applyrule!(data, ::TestManualWrite{R,W}, state, index) where {R,W} = add!(data[W
              0 5 1 0;
              0 5 1 0]
 
-    rule = TestManualWrite()
+    rule = TestSetCellWrite()
     ruleset1 = Ruleset(rule; opt=NoOpt())
     ruleset2 = Ruleset(rule; opt=SparseOpt())
     ext = Extent(; init=(_default_=init,), tspan=1:1)

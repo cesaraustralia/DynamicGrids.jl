@@ -1,5 +1,5 @@
 using DynamicGrids, OffsetArrays, Test, Dates
-using DynamicGrids: _initdata!, data, init, mask, overflow, source, dest, 
+using DynamicGrids: _initdata!, data, init, mask, boundary, source, dest, 
     sourcestatus, deststatus, gridsize, ruleset, grids, SimData, Extent,
     _updatetime, ismasked, WritableGridData, tspan
 
@@ -24,7 +24,7 @@ tspan_ = DateTime(2001):Day(1):DateTime(2001, 2)
     @test currentframe(simdata) === 1
     @test first(simdata) === simdata[:a]
     @test last(simdata) === simdata[:b]
-    @test overflow(simdata) === RemoveOverflow()
+    @test boundary(simdata) === Remove()
     @test gridsize(simdata) == (2, 3)
     updated = _updatetime(simdata, 2)
     @test currenttimestep(simdata) == Millisecond(86400000)

@@ -54,23 +54,29 @@ Base.Threads.unlock(opt::ThreadedCPU) = unlock(opt.spinlock)
 
 
 """
-Singleton types for choosing the grid overflow rule used in
+Singleton types for choosing the grid boundary rule used in
 [`inbounds`](@ref) and [`NeighborhoodRule`](@ref) buffers.
 These determine what is done when a neighborhood or jump extends outside of the grid.
 """
-abstract type Overflow end
+abstract type Boundary end
 
 """
-    WrapOverflow()
+    Wrap()
 
-Wrap cordinates that overflow boundaries back to the opposite side of the grid.
+Wrap cordinates that boundary boundaries back to the opposite side of the grid.
 """
-struct WrapOverflow <: Overflow end
+struct Wrap <: Boundary end
 
 """
-    RemoveOverflow()
+    Remove()
 
-Remove coordinates that overflow grid boundaries.
+Remove coordinates that boundary grid boundaries.
 """
-struct RemoveOverflow <: Overflow end
+struct Remove <: Boundary end
 
+
+struct Aux{K} end
+Aux(key::Symbol) = Aux{key}()
+
+struct Grid{K} end
+Grid(key::Symbol) = Grid{key}()

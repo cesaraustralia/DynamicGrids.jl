@@ -41,27 +41,28 @@ function sim!(
      simdata=nothing,
      kwargs...
 )
+    isrunning(output) && error("A simulation is already running in this output")
+    setrunning!(output, true) || error("Could not start the simulation with this output")
+
     gridsize(init) == gridsize(DG.init(output)) || throw(ArgumentError("init size does not match output init"))
     # Some rules are only valid for a set time-step size.
     step(ruleset) !== nothing && step(ruleset) != step(tspan) &&
         throw(ArgumentError("tspan step $(step(tspan)) must equal rule step $(step(ruleset))"))
 
     # Rebuild Extent to allow kwarg alterations
-    extent = Extent(; init=asnamedtuple(init), mask=mask, aux=aux, tspan=tspan)
+    extent = Extent(; init=_asnamedtuple(init), mask=mask, aux=aux, tspan=tspan)
     # Set up output
-    initialise(output)
-    isrunning(output) && error("A simulation is already running in this output")
-    setrunning!(output, true) || error("Could not start the simulation with this output")
     settspan!(output, tspan)
     # Create or update the combined data object for the simulation
     simdata = _initdata!(simdata, extent, ruleset, nreplicates)
-    # Delete grids output by the previous simulations
-    initgrids!(output, init)
+    init_output_grids!(output, init)
     # Set run speed for GraphicOutputs
     setfps!(output, fps)
+    # Run any initialisation the output needs to do
+    initialise!(output, simdata)
     # Show the first grid
-    showframe(output, simdata, 1, first(tspan))
-    # Let the init grid be displayed as long as a normal grid
+    showframe(output, simdata)
+    # Let the init grid be displayed for as long as a normal grid
     delay(output, 1)
     # Run the simulation over simdata and a unitrange
     return runsim!(output, simdata, ruleset, 1:lastindex(tspan))
@@ -74,7 +75,7 @@ Run a simulation passing in rules without defining a `Ruleset`.
 """
 sim!(output::Output, rules::Tuple; kwargs...) = sim!(output::Output, rules...; kwargs...)
 function sim!(output::Output, rules::Rule...;
-    overflow=RemoveOverflow(),
+    boundary=Remove(),
     opt=NoOpt(),
     cellsize=1,
     timestep=nothing,
@@ -82,7 +83,7 @@ function sim!(output::Output, rules::Rule...;
     kwargs...
 )
     ruleset = Ruleset(rules...;
-        overflow=overflow, opt=opt, cellsize=cellsize, timestep=timestep, padval=padval
+        boundary=boundary, opt=opt, cellsize=cellsize, timestep=timestep, padval=padval
     )
     return sim!(output::Output, ruleset; kwargs...)
 end
@@ -116,27 +117,27 @@ function resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
         simdata=nothing,
         nreplicates=nothing
 )
-    initialise(output)
     # Check status and arguments
     isrunning(output) && error("A simulation is already running in this output")
-    setrunning!(output, true) || error("Could not start the simulation with this output")
 
     # Calculate new timespan
     new_tspan = first(tspan(output)):step(tspan(output)):tstop
-    stoppedframe_ = stoppedframe(output)
-    fspan = stoppedframe_:lastindex(new_tspan)
+    frame = stoppedframe(output)
+    fspan = frame:lastindex(new_tspan)
     settspan!(output, new_tspan)
 
     # Use the last frame of the existing simulation as the init frame
-    if stoppedframe_ <= length(output)
-        init = output[stoppedframe_]
+    if frame <= length(output)
+        init = output[frame]
     else
         init = output[1]
     end
 
     setfps!(output, fps)
-    extent = Extent(; init=asnamedtuple(init), mask=mask(output), aux=aux(output), tspan=new_tspan)
+    extent = Extent(; init=_asnamedtuple(init), mask=mask(output), aux=aux(output), tspan=new_tspan)
     simdata = _initdata!(simdata, extent, ruleset, nreplicates)
+    initialise!(output, simdata)
+    setrunning!(output, true) || error("Could not start the simulation with this output")
     return runsim!(output, simdata, ruleset, fspan)
 end
 
@@ -173,7 +174,7 @@ function simloop!(output::Output, simdata, ruleset, fspan)
     # Set the frame timestamp for fps calculation
     settimestamp!(output, first(fspan))
     # Initialise types etc
-    simdata = _updatetime(simdata, 1) |> proc_setup
+    simdata = _updatetime(simdata, 1) |> _proc_setup
     # Loop over the simulation
     for f in fspan[2:end]
         # Get a data object with updated timestep and precalculate rules
@@ -188,7 +189,7 @@ function simloop!(output::Output, simdata, ruleset, fspan)
         delay(output, f)
         # Exit gracefully
         if !isrunning(output) || f == last(fspan)
-            showframe(output, simdata, f, currenttime(simdata))
+            showframe(output, simdata)
             setstoppedframe!(output, f)
             finalise!(output, simdata)
             break
@@ -200,5 +201,5 @@ end
 
 # Allows different processors to modify the simdata object
 # GPU needs this to convert arrays to CuArray
-proc_setup(simdata::SimData) = proc_setup(proc(simdata), simdata)
-proc_setup(proc, obj) = obj
+_proc_setup(simdata::SimData) = _proc_setup(proc(simdata), simdata)
+_proc_setup(proc, obj) = obj

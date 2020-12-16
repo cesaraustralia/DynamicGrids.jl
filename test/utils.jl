@@ -1,22 +1,22 @@
 using DynamicGrids, Test
-using DynamicGrids: inbounds, isinbounds
+using DynamicGrids: inbounds, isinbounds, _cyclic_index
 
-@testset "boundary overflow checks are working" begin
-    @testset "inbounds with RemoveOverflow() returns index and false for an overflowed index" begin
-        @test inbounds((1, 1), (4, 5), RemoveOverflow()) == ((1,1),true)
-        @test inbounds((2, 3), (4, 5), RemoveOverflow()) == ((2,3),true)
-        @test inbounds((4, 5), (4, 5), RemoveOverflow()) == ((4,5),true)
-        @test inbounds((-3, -100), (4, 5), RemoveOverflow()) == ((-3,-100),false)
-        @test inbounds((0, 0), (4, 5), RemoveOverflow()) == ((0,0),false)
-        @test inbounds((2, 3), (3, 2), RemoveOverflow()) == ((2,3),false)
-        @test inbounds((2, 3), (1, 4), RemoveOverflow()) == ((2,3),false)
-        @test inbounds((200, 300), (2, 3), RemoveOverflow()) == ((200,300),false)
+@testset "boundary boundary checks are working" begin
+    @testset "inbounds with Remove() returns index and false for an boundaryed index" begin
+        @test inbounds((1, 1), (4, 5), Remove()) == ((1,1),true)
+        @test inbounds((2, 3), (4, 5), Remove()) == ((2,3),true)
+        @test inbounds((4, 5), (4, 5), Remove()) == ((4,5),true)
+        @test inbounds((-3, -100), (4, 5), Remove()) == ((-3,-100),false)
+        @test inbounds((0, 0), (4, 5), Remove()) == ((0,0),false)
+        @test inbounds((2, 3), (3, 2), Remove()) == ((2,3),false)
+        @test inbounds((2, 3), (1, 4), Remove()) == ((2,3),false)
+        @test inbounds((200, 300), (2, 3), Remove()) == ((200,300),false)
     end
-    @testset "inbounds with WrapOverflow() returns new index and true for an overflowed index" begin
-        @test inbounds((-2,3), (10, 10), WrapOverflow()) == ((8,3),true)
-        @test inbounds((2,0), (10, 10), WrapOverflow()) == ((2,10),true)
-        @test inbounds((22,0), (10, 10), WrapOverflow()) == ((2,10),true)
-        @test inbounds((-22,0), (10, 10), WrapOverflow()) == ((8,10),true)
+    @testset "inbounds with Wrap() returns new index and true for an boundaryed index" begin
+        @test inbounds((-2,3), (10, 10), Wrap()) == ((8,3),true)
+        @test inbounds((2,0), (10, 10), Wrap()) == ((2,10),true)
+        @test inbounds((22,0), (10, 10), Wrap()) == ((2,10),true)
+        @test inbounds((-22,0), (10, 10), Wrap()) == ((8,10),true)
     end
     @testset "isinbounds" begin
         @test isinbounds((4, 5), (4, 5)) == true
@@ -48,14 +48,14 @@ end
 
     @testset "let blocks" begin
         a = 0.7
-        rule = Manual() do data, index, x
+        rule = SetCell() do data, index, x
             add!(first(data), round(Int, a + x), index...)
         end
         output = ArrayOutput(zeros(Int, 10, 10); tspan=1:10)
         @test_throws ErrorException isinferred(output, Ruleset(rule))
         a = 0.7
         rule = let a = a
-            Manual() do data, index, x
+            SetCell() do data, index, x
                 add!(first(data), round(Int, a), index...)
             end
         end

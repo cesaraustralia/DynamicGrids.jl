@@ -1,5 +1,5 @@
 using DynamicGrids, Test, Dates
-import DynamicGrids: RemoveOverflow, NoOpt
+import DynamicGrids: Remove, NoOpt
 
 life = Life() 
 @test occursin("Life{:_default_,:_default_}", sprint((io, s) -> show(io, MIME"text/plain"(), s), life))
@@ -8,13 +8,13 @@ life = Life()
 rs = Ruleset(; 
     rules=(Life(),), 
     timestep=Day(1), 
-    overflow=RemoveOverflow(),
+    boundary=Remove(),
     opt=NoOpt(),
 )
 @test occursin("Ruleset =", sprint((io, s) -> show(io, MIME"text/plain"(), s), rs))
 @test occursin("Life{:_default_,:_default_}", sprint((io, s) -> show(io, MIME"text/plain"(), s), rs))
 @test occursin(r"opt = .*NoOpt()", "nopt = DynamicGrids.NoOpt()")
-@test occursin(r"overflow = .*RemoveOverflow()", sprint((io, s) -> show(io, MIME"text/plain"(), s), rs))
+@test occursin(r"boundary = .*Remove()", sprint((io, s) -> show(io, MIME"text/plain"(), s), rs))
 
 rule1 = Cell{:a,:b}() do a
     2a

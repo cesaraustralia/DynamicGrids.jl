@@ -1,8 +1,5 @@
 abstract type AbstractExtent{I,M,A} end
 
-struct Aux{K} end
-Aux(key::Symbol) = Aux{key}()
-
 init(e::AbstractExtent) = e.init
 mask(e::AbstractExtent) = e.mask
 aux(e::AbstractExtent) = e.aux

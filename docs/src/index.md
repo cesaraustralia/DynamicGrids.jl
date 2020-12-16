@@ -27,9 +27,9 @@ NeighborhoodRule
 Neighbors
 Convolution
 Life
-ManualRule
+SetCellRule
 Manual
-ManualNeighborhoodRule
+SetNeighborhoodRule
 SetNeighbors
 GridRule
 Grid
@@ -165,12 +165,12 @@ DynamicGrids.rgb
 
 ## Ruleset config
 
-### Overflow
+### Boundary conditions
 
 ```@docs
-Overflow
-WrapOverflow
-RemoveOverflow
+Boundary
+Wrap
+Remove
 ```
 
 ### Optimisation
