@@ -88,47 +88,66 @@ neighbors(hood::AbstractWindow) = _buffer(hood)
 A neighboorhood of radius R that includes the central cell.
 `R = 1` gives a 3x3 matrix.
 """
-struct Window{R,K,B} <: AbstractWindow{R}
+struct Window{R,B} <: AbstractWindow{R}
     _buffer::B
 end
-@inline Window{R}(_buffer=nothing) where R = Window{R,typeof(_buffer)}(_buffer)
-@inline Window(R::Int) = Window{R}(nothing)
+@inline Window{R}() where R = Window{R,Nothing}(nothing)
+@inline Window(R::Int) = Window{R}()
+@inline Window(A::AbstractArray) = Window{(size(A, 1) - 1) ÷ 2}()
 
 @inline _setbuffer(::Window{R}, buf::B2) where {R,B2} = Window{R,B2}(buf)
 
 """
 Abstract supertype for kernel neighborhoods.
 
-These inlude the central cell, and have a kernel matrix
-that matches the window size, for convolution-like operations.
+These can wrap any other neighborhood object, and include a kernel of 
+the same length and positions as the neighborhood.
 """
-abstract type AbstractKernel{R} <: AbstractWindow{R} end
+abstract type AbstractKernel{R} <: Neighborhood{R} end
 
+neighborhood(hood::AbstractKernel) = hood.neighborhood
+neighbors(hood::AbstractKernel) = neighbors(neighborhood(hood))
 kernel(hood::AbstractKernel) = hood.kernel
-LinearAlgebra.dot(hood::AbstractKernel) = kernel(hood) ⋅ neighbors(hood)
+
+Base.length(hood::AbstractKernel) = length(neighborhood(hood))
+
+# We override dot for AbstractKernel as we always mean the sum of the 
+# products of the kernel and buffer values - never a nested dot product.
+function LinearAlgebra.dot(hood::AbstractKernel{R}) where R
+    sum = zero(eltype(kernel(hood)))
+    @simd for i in 1:length(hood) 
+        @inbounds sum += kernel(hood)[i] * neighbors(hood)[i]
+    end
+    sum
+end
 
 """
-    Kernel{R}(kernel)
+    Kernel(neighborhood, kernel)
 
-A neighboorhood of radius R that includes the central cell,
-and holds a matching size kernel matrix.
+Wrap any other neighborhood object, and includes a kernel of 
+the same length and positions as the neighborhood.
 
 `R = 1` gives 3x3 matrices.
 """
-struct Kernel{R,K,B} <: AbstractKernel{R}
-    "Kernal matrix"
+struct Kernel{R,N,K} <: AbstractKernel{R}
+    neighborhood::N
     kernel::K
-    _buffer::B
 end
-@inline Kernel{R}(kernel, _buffer=nothing) where R = 
-    Kernel{R,typeof(kernel),typeof(_buffer)}(kernel, _buffer)
-@inline Kernel(kernel::AbstractMatrix, _buffer=nothing) = 
-    Kernel{(size(kernel, 1) - 1) ÷ 2}(kernel, _buffer)
-@inline Kernel{R}() where R = Kernel{R}(nothing, nothing)
-@inline Kernel(R::Int) = Kernel{R}(nothing, nothing)
-@inline ConstructionBase.constructorof(::Type{Kernel{R,K,B}}) where {R,K,B} = Kernel{R}
+@inline Kernel(A::AbstractMatrix) = Kernel(Window(A), A)
+@inline function Kernel(hood::N, kernel::K) where {N<:Neighborhood{R},K} where R
+    length(hood) == length(kernel) || _kernel_length_error(hood, kernel)
+    Kernel{R,N,K}(hood, kernel)
+end
 
-@inline _setbuffer(n::Kernel{R,K}, buf::B2) where {R,K,B2} = Kernel{R,K,B2}(n.kernel, buf)
+@noinline _kernel_length_error(hood, kernel) =
+    throw(ArgumentError("Neighborhood length $(length(hood)) does not match kernel length $(length(kernel))"))
+
+@inline function _setbuffer(n::Kernel{R,<:Any,K}, buf) where {R,K}
+    hood = _setbuffer(neighborhood(n), buf)
+    Kernel{R,typeof(hood),K}(hood, kernel(n))
+end
+
+@inline ConstructionBase.constructorof(::Type{Kernel{R,N,K}}) where {R,N,K} = Kernel{R}
 
 """
 Neighborhoods are tuples or vectors of custom coordinates tuples

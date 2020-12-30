@@ -65,7 +65,8 @@ end
 @testset "Convolution" begin
     k = SA[1 0 1; 0 0 0; 1 0 1]
     buf = SA[1 0 0; 0 0 1; 0 0 1]
-    rule = Convolution(Kernel(k, buf))
+    hood = Window{1,typeof(buf)}(buf)
+    rule = Convolution(Kernel(hood, k))
     @test applyrule(nothing, rule, 0, (3, 3)) == k ⋅ buf
     output = ArrayOutput(init; tspan=1:2)
     sim!(output, rule)
