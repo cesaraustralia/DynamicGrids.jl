@@ -5,7 +5,8 @@ struct Block <: CharStyle end
 struct Braile <: CharStyle end
 
 """
-    REPLOutput(init; tspan, fps=25.0, store=false, color=:white, cutoff=0.5, style=Block())
+    REPLOutput(init; tspan, aux=nothing, mask=nothing, padval=zero(eltype(init)), 
+        fps=25.0, store=false, color=:white, cutoff=0.5, style=Block())
 
 An output that is displayed directly in the REPL. It can either store or discard
 simulation frames.
@@ -15,11 +16,15 @@ simulation frames.
 
 ### Keyword Arguments:
 - `tspan`: `AbstractRange` timespan for the simulation
-- `fps::Real`: frames per second to display the simulation
-- `store::Bool`: whether ot store the simulation frames for later use
+- `mask`: `BitArray` for defining cells that will/will not be run.
+- `aux`: `NamedTuple` of arbitrary input data. Use `get(data, Aux(:key), I...)` 
+  to access from a `Rule` in a type-stable way.
+- `padval`: padding value for grids with neighborhood rules. The default is `zero(eltype(init))`.
+- `fps`: `Real` frames per second to display the simulation
+- `store`: `Bool` whether ot store the simulation frames for later use
 - `color`: a color from Crayons.jl
-- `cutoff::Real`: the cutoff point to display a full or empty cell. Default is `0.5`
-- `style::CharStyle`: `Block()` or `Braile()` style printing. `Braile` uses 1/4 the screen space.
+- `cutoff`: `Real` cutoff point to display a full or empty cell. Default is `0.5`
+- `style`: `CharStyle` `Block()` or `Braile()` printing. `Braile` uses 1/4 the screen space of `Block`.
 
 ```julia
 REPLOutput(init)

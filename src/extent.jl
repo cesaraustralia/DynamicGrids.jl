@@ -29,6 +29,7 @@ to `Output` constructors instead of `init`, `mask`, `aux` and `tspan`.
 - `mask`: `BitArray` for defining cells that will/will not be run.
 - `aux`: NamedTuple of arbitrary input data. Use `aux(data, Aux(:key))` to access from 
   a `Rule` in a type-stable way.
+- `padval`: padding value for grids with neighborhood rules. The default is `zero(eltype(init))`.
 - `tspan`: Time span range. Never type-stable, only access this in `precalc` methods
 """
 mutable struct Extent{I<:Union{AbstractArray,NamedTuple},
