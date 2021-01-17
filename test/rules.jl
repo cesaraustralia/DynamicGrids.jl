@@ -102,7 +102,7 @@ end
     rule = SetNeighbors(VonNeumann(1)) do data, hood, I, state
         if state > 0
             for pos in positions(hood, I)
-                add!(first(data), 1, pos...) 
+                add!(data, 1, pos...) 
             end
         end
     end
@@ -110,18 +110,20 @@ end
     data = SimData(output, Ruleset(rule)) 
     # Cant use applyrule! without a lot of work on SimData
     # so just trun the whole thing
-    refoutput = [1 1 1 0
-                 0 1 0 0
-                 0 1 0 0
-                 1 1 2 0
-                 0 2 1 1]
+    ref_output = [1 1 1 0
+                  0 1 0 0
+                  0 1 0 0
+                  1 1 2 0
+                  0 2 1 1]
 
     sim!(output, rule)
-    @test output[2] == refoutput
+    @test output[2] == ref_output
     sim!(output, rule; proc=ThreadedCPU())
-    @test output[2] == refoutput
+    @test output[2] == ref_output
     sim!(output, rule; opt=SparseOpt())
-    @test_broken output[2] == refoutput
+    @test output[2] == ref_output
+    sim!(output, rule; opt=SparseOpt(), proc=ThreadedCPU())
+    @test output[2] == ref_output
 end
 
 @testset "SetCell" begin
@@ -141,23 +143,18 @@ end
         end
         data = SimData(output, Ruleset(rule)) 
         sim!(output, rule)
-        @test output[2] == [0 1 0 0
-                            0 1 0 0
-                            0 0 1 0
-                            0 1 0 0
-                            0 0 1 0]
+        ref_out = [0 1 0 0
+                   0 1 0 0
+                   0 0 1 0
+                   0 1 0 0
+                   0 0 1 0]
+        @test output[2] == ref_out
         sim!(output, rule; proc=ThreadedCPU())
-        @test output[2] == [0 1 0 0
-                            0 1 0 0
-                            0 0 1 0
-                            0 1 0 0
-                            0 0 1 0]
+        @test output[2] == ref_out
         sim!(output, rule; opt=SparseOpt())
-        @test output[2] == [0 1 0 0
-                            0 1 0 0
-                            0 0 1 0
-                            0 1 0 0
-                            0 0 1 0]
+        @test output[2] == ref_out
+        sim!(output, rule; opt=SparseOpt(), proc=ThreadedCPU())
+        @test output[2] == ref_out
     end
     @testset "setindex!" begin
         rule = SetCell() do data, I, state

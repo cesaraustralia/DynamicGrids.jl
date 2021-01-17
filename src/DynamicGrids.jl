@@ -3,8 +3,7 @@ module DynamicGrids
 @doc let
     path = joinpath(dirname(@__DIR__), "README.md")
     include_dependency(path)
-    # Run examples
-    replace(read(path, String), "```julia" => "```@example")
+    read(path, String)
 end DynamicGrids
 
 
@@ -87,13 +86,15 @@ end
     $(DOCSTRING)
     """
 
+include("interface.jl")
+include("flags.jl")
 include("neighborhoods.jl")
 include("rules.jl")
-include("flags.jl")
 include("rulesets.jl")
 include("extent.jl")
 include("grid.jl")
 include("simulationdata.jl")
+include("atomic.jl")
 include("auxilary.jl")
 include("chain.jl")
 include("outputs/output.jl")
@@ -104,7 +105,6 @@ include("outputs/processors.jl")
 include("outputs/array.jl")
 include("outputs/repl.jl")
 include("outputs/gif.jl")
-include("interface.jl")
 include("framework.jl")
 include("precalc.jl")
 include("sequencerules.jl")

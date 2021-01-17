@@ -72,11 +72,15 @@ end
     @test all(frames(output)[1] .=== 5init_)
     @test isshowable(output, 1)
 
-    output = NoDisplayImageOutput(init_; tspan=1:10, maxval=40.0)
+    output = NoDisplayImageOutput(init_; 
+        tspan=1:10, maxval=40.0,
+        processor=ColorProcessor(; textconfig=nothing),
+    )
     simdata = SimData(extent(output), Ruleset(Life()))
-    @test_broken showframe(output, simdata, 1, 1) ==
-        [ARGB32(1.0, 1.0, 1.0) ARGB32(1.0, 1.0, 1.0)
-         ARGB32(0.0, 0.0, 0.0) ARGB32(1.0, 1.0, 1.0)]
+    z0 = DynamicGrids.ZEROCOL
+    @test showframe(output, simdata) ==
+        [ARGB32(0.2, 0.2, 0.2) ARGB32(0.25, 0.25, 0.25)
+         z0                    ARGB32(0.125, 0.125, 0.125)]
     savegif("test.gif", output)
     @test isfile("test.gif")
     rm("test.gif")
@@ -168,8 +172,7 @@ end
              0 0 0 0 0 0 0
              0 0 0 0 0 0 0
             ]
-    ruleset = Ruleset(;
-        rules=(Life(),),
+    ruleset = Ruleset(Life();
         timestep=Day(1),
         boundary=Wrap(),
         opt=SparseOpt(),

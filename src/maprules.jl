@@ -112,7 +112,6 @@ end
     let f=f, proc=proc, grid=grid
         procmap(proc, 1:_indtoblock(X, B)) do bj
             for  bi in 1:_indtoblock(Y, B)
-                @inbounds sourcestatus(grid)[bi, bj] || return nothing
                 # Convert from padded block to init dimensionn
                 istart, jstart = _blocktoind(bi, B) - R, _blocktoind(bj, B) - R
                 # Stop at the init row/column size, not the padding or block multiple
@@ -122,7 +121,6 @@ end
                 for j in jstart:jstop, i in istart:istop
                     f(i, j)
                 end
-                return nothing
             end
         end
     end
