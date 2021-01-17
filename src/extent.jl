@@ -1,4 +1,4 @@
-abstract type AbstractExtent{I,M,A} end
+abstract type AbstractExtent{I,M,A,PV} end
 
 init(e::AbstractExtent) = e.init
 mask(e::AbstractExtent) = e.mask
@@ -7,6 +7,7 @@ aux(e::AbstractExtent) = e.aux
 @inline aux(nt::NamedTuple, ::Aux{Key}) where Key = nt[Key] # Fast compile-time version
 @noinline aux(::Nothing, key) = 
     throw(ArgumentError("No aux data available. Pass a NamedTuple to the `aux=` keyword of the Output"))
+padval(e::AbstractExtent) = e.padval
 tspan(e::AbstractExtent) = e.tspan # Never type-stable, only access in `precalc` methods
 gridsize(extent::AbstractExtent) = gridsize(init(extent))
 
@@ -32,12 +33,14 @@ to `Output` constructors instead of `init`, `mask`, `aux` and `tspan`.
 """
 mutable struct Extent{I<:Union{AbstractArray,NamedTuple},
                       M<:Union{AbstractArray,Nothing},
-                      A<:Union{NamedTuple,Nothing}} <: AbstractExtent{I,M,A}
+                      A<:Union{NamedTuple,Nothing},
+                      PV} <: AbstractExtent{I,M,A,PV}
     init::I
     mask::M
     aux::A
+    padval::PV
     tspan::AbstractRange
-    function Extent(init::I, mask::M, aux::A, tspan::T) where {I,M,A,T}
+    function Extent(init::I, mask::M, aux::A, padval::PV, tspan::T) where {I,M,A,PV,T}
         # Check grid sizes match
         gridsize = if init isa NamedTuple
             size_ = size(first(init))
@@ -50,20 +53,25 @@ mutable struct Extent{I<:Union{AbstractArray,NamedTuple},
         if (mask !== nothing) && (size(mask) != size_) 
             throw(ArgumentError("`mask` size do not match `init`"))
         end
-        new{I,M,A}(init, mask, aux, tspan)
+        new{I,M,A,PV}(init, mask, aux, padval, tspan)
     end
 end
-Extent(; init, mask=nothing, aux=nothing, tspan, kw...) = Extent(init, mask, aux, tspan)
+Extent(; init, mask=nothing, aux=nothing, padval=_padval(init), tspan, kw...) = 
+    Extent(init, mask, aux, padval, tspan)
 
 settspan!(e::Extent, tspan) = e.tspan = tspan
+
+_padval(init::NamedTuple) = map(_padval, init)
+_padval(init::AbstractArray{T}) where T = zero(T)
 
 struct StaticExtent{I<:Union{AbstractArray,NamedTuple},
                     M<:Union{AbstractArray,Nothing},
                     A<:Union{NamedTuple,Nothing},
-                    T} <: AbstractExtent{I,M,A}
+                    PV,T} <: AbstractExtent{I,M,A,PV}
     init::I
     mask::M
     aux::A
+    padval::PV
     tspan::T
 end
-StaticExtent(e::Extent) = StaticExtent(init(e), mask(e), aux(e), tspan(e)) 
+StaticExtent(e::Extent) = StaticExtent(init(e), mask(e), aux(e), padval(e), tspan(e)) 

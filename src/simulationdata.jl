@@ -63,9 +63,9 @@ function SimData(extent::AbstractExtent{<:NamedTuple{Keys}}, ruleset::AbstractRu
     y, x = gridsize(extent)
     radii = NamedTuple{Keys}(get(radius(ruleset), key, 0) for key in Keys)
     # Construct the SimData for each grid
-    grids = map(init(extent), radii) do in, r
+    grids = map(init(extent), radii, padval(extent)) do in, r, pv
         ReadableGridData{y,x,r}(
-            in, mask(extent), proc(ruleset), opt(ruleset), boundary(ruleset), padval(ruleset)
+            in, mask(extent), proc(ruleset), opt(ruleset), boundary(ruleset), pv 
         )
     end
     SimData(grids, extent, ruleset)
@@ -107,7 +107,7 @@ currentframe(d::SimData) = d.currentframe
 currenttime(d::SimData) = tspan(d)[currentframe(d)]
 
 # Getters forwarded to data
-Base.getindex(d::SimData, i::Symbol) = getindex(grids(d), i)
+Base.getindex(d::SimData, key::Symbol) = getindex(grids(d), key)
 
 """
     Base.get(data::SimData, keyorval, I...)
@@ -134,7 +134,7 @@ gridsize(d::SimData) = gridsize(first(d))
 proc(d::SimData) = proc(ruleset(d))
 opt(d::SimData) = opt(ruleset(d))
 boundary(d::SimData) = boundary(ruleset(d))
-padval(d::SimData) = padval(ruleset(d))
+padval(d::SimData) = padval(extent(d))
 rules(d::SimData) = rules(ruleset(d))
 
 # Get the actual current timestep, e.g. seconds instead of variable periods like Month

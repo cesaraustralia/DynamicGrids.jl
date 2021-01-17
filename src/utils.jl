@@ -26,9 +26,7 @@ Type-stability can give orders of magnitude improvements in performance.
 isinferred(output::Output, rules::Rule...) = isinferred(output, rules)
 isinferred(output::Output, rules::Tuple) = isinferred(output, Ruleset(rules...))
 function isinferred(output::Output, ruleset::Ruleset)
-    ext = extent(output)
-    ext = @set ext.init = _asnamedtuple(init(output))
-    simdata = precalcrules(SimData(ext, ruleset), rules(ruleset))
+    simdata = precalcrules(SimData(output, ruleset), rules(ruleset))
     map(rules(simdata)) do rule
         isinferred(simdata, rule)
     end
@@ -85,7 +83,17 @@ _zerogrids(initgrids::NamedTuple, nframes) =
 
 @inline _asnamedtuple(x::NamedTuple) = x
 @inline _asnamedtuple(x::AbstractArray) = (_default_=x,)
-@inline _asnamedtuple(e::Extent) = Extent(_asnamedtuple(init(e)), mask(e), aux(e), tspan(e))
+@inline function _asnamedtuple(e::Extent) 
+    @set! e.init = _asnamedtuple(init(e))
+    @set e.padval = _samenamedtuple(init(e), padval(e))
+end
+
+@inline _samenamedtuple(init::NamedTuple{K}, padval::NamedTuple{K}) where K = x
+@noinline _samenamedtuple(init::NamedTuple{K}, padval::NamedTuple{J}) where {K,J} = 
+    error("Keys $K and $J do not match")
+@inline _samenamedtuple(init::NamedTuple{K}, x::Tuple) where K = NamedTuple{K}(x)
+@inline _samenamedtuple(init::NamedTuple, x) = map(_ -> x, init) 
+
 
 _unwrap(x) = x
 _unwrap(::Val{X}) where X = X
