@@ -93,7 +93,9 @@ end
 
 @testset "NeighborhoodRule, CellRule chain" begin
 
-    hoodrule = Neighbors{:a,:a}() do neighborhodhood, cell
+    buf = reshape(1:9, 3, 3)
+    hood = Moore{1}(buf)
+    hoodrule = Neighbors{:a,:a}(hood) do neighborhodhood, cell
         sum(neighborhodhood)
     end
 
@@ -121,6 +123,8 @@ end
 
     chain = Chain(hoodrule, rule)
     @test radius(chain) === 1
+    @test neighborhood(chain) == hood
+    @test Tuple(neighbors(chain)) === (1, 2, 3, 4, 6, 7, 8, 9) 
     @test neighborhoodkey(chain) === :a
     @test rules(Base.tail(chain)) === (rule,)
     @test chain[1] === first(chain) === hoodrule

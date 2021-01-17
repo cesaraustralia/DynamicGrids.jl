@@ -114,8 +114,6 @@ function showframe(o::GraphicOutput, data)
 end
 showframe(frame::NamedTuple, o::GraphicOutput, data) =
     showframe(first(frame), o, data)
-@noinline showframe(frame::AbstractArray, o::GraphicOutput, data) =
-    error("showframe not defined for $(nameof(typeof(o)))")
 
 function initialise!(o::GraphicOutput, data) 
     initalisegraphics(o, data)

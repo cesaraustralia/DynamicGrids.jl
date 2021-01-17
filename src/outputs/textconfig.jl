@@ -37,7 +37,7 @@ function TextConfig(;
         face = FreeTypeAbstraction.findfont(font)
         face isa Nothing && _fontnotfounderror(font)
     else
-        error("$font is not a font name String")
+        _fontnotstring(font)
     end
     TextConfig(face, namepixels, namepos, timepixels, timepos, fcolor, bcolor)
 end
@@ -53,18 +53,20 @@ function autofont()
     return font 
 end
 
+@noinline _fontnotstring(font) = throw(ArgumentError("font $font is not a String"))
+
 @noinline _fontnotfounderror(font) =
     throw(ArgumentError(
         """
-        Font $font can not be found in this system, specify an existing font name `String` 
-        with the `font` keyword, or specify `text=nothing` to display no text."
+        Font "$font" wasn't be found in this system. Specify an existing font name 
+        with the `font` keyword, or use `text=nothing` to display no text."
         """
     ))
 @noinline _nodefaultfonterror(font) =
     error(
         """
-        Your system does not contain the default font $font. Specify font by passing a font
-        name `String` to the keyword argument `font` for the `Output` or `ImageConfig`.
+        Your system does not contain the default font $font. Specify an existing font 
+        name `String` with the keyword-argument `font`, for the `Output` or `ImageConfig`.
         """
     )
 

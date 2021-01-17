@@ -2,31 +2,31 @@
 _auxval(data::AbstractSimData, key::Union{Aux,Symbol}, I...) = 
     _auxval(aux(data, key), data, key, I...)
 _auxval(A::AbstractMatrix, data::SimData, key::Union{Aux,Symbol}, y, x) = A[y, x]
-function _auxval(A::AbstractDimArray{<:Any,2}, data::SimData, key::Union{Aux,Symbol}, y, x)
+# function _auxval(A::AbstractDimArray{<:Any,2}, data::SimData, key::Union{Aux,Symbol}, y, x)
     # X = DD.basetypeof(dims(A, XDim))
     # Y = DD.basetypeof(dims(A, YDim))
-    A[y, x]
-end
+    # A[y, x]
+# end
 function _auxval(A::AbstractDimArray{<:Any,3}, data::SimData, key::Union{Aux,Symbol}, y, x)
     # X = DD.basetypeof(dims(A, XDim))
     # Y = DD.basetypeof(dims(A, YDim))
     A[y, x, auxframe(data, key)]
 end
 
-function _boundscheck_aux(data::SimData, auxkey::Aux{Key}) where Key
+function boundscheck_aux(data::SimData, auxkey::Aux{Key}) where Key
     a = aux(data)
-    (a isa NamedTuple && haskey(a, Key)) || _auxmissingerror(Key)
+    (a isa NamedTuple && haskey(a, Key)) || _auxmissingerror(Key, a)
     gsize = gridsize(data)
     asize = size(a[Key], 1), size(a[Key], 2)
     if asize != gsize
         _auxsizeerror(Key, asize, gsize)
     end
+    return true
 end
 
-@noinline _auxmissingerror(key, asize, gsize) =
-    error("Aux grid $key is not present in aux")
+@noinline _auxmissingerror(key, aux) = error("Aux data $key is not present in aux")
 @noinline _auxsizeerror(key, asize, gsize) =
-    error("Aux grid $key is size $asize does not match grid size $gsize")
+    error("Aux data $key is size $asize does not match grid size $gsize")
 
 _calc_auxframe(data) = _calc_auxframe(aux(data), data)
 _calc_auxframe(aux::NamedTuple, data) = map(A -> _calc_auxframe(A, data), aux)

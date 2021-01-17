@@ -4,9 +4,8 @@ init(e::AbstractExtent) = e.init
 mask(e::AbstractExtent) = e.mask
 aux(e::AbstractExtent) = e.aux
 @inline aux(e::AbstractExtent, key) = aux(aux(e), key)
-@inline aux(nt::NamedTuple, key::Symbol) = nt[key] # Should not be used in rules
 @inline aux(nt::NamedTuple, ::Aux{Key}) where Key = nt[Key] # Fast compile-time version
-@noinline aux(::Nothing, val) = 
+@noinline aux(::Nothing, key) = 
     throw(ArgumentError("No aux data available. Pass a NamedTuple to the `aux=` keyword of the Output"))
 tspan(e::AbstractExtent) = e.tspan # Never type-stable, only access in `precalc` methods
 gridsize(extent::AbstractExtent) = gridsize(init(extent))
@@ -38,24 +37,23 @@ mutable struct Extent{I<:Union{AbstractArray,NamedTuple},
     mask::M
     aux::A
     tspan::AbstractRange
-end
-Extent(init::I, mask::M, aux::A, tspan::T) where {I,M,A,T} = begin
-    # Check grid sizes match
-    gridsize = if init isa NamedTuple
-        size_ = size(first(init))
-        if !all(map(i -> size(i) == size_, init))
-            throw(ArgumentError("`init` grid sizes do not match"))
+    function Extent(init::I, mask::M, aux::A, tspan::T) where {I,M,A,T}
+        # Check grid sizes match
+        gridsize = if init isa NamedTuple
+            size_ = size(first(init))
+            if !all(map(i -> size(i) == size_, init))
+                throw(ArgumentError("`init` grid sizes do not match"))
+            end
+        else
+            size_ = size(init)
         end
-    else
-        size_ = size(init)
+        if (mask !== nothing) && (size(mask) != size_) 
+            throw(ArgumentError("`mask` size do not match `init`"))
+        end
+        new{I,M,A}(init, mask, aux, tspan)
     end
-    if (mask !== nothing) && (size(mask) != size_) 
-        throw(ArgumentError("`mask` size do not match `init`"))
-    end
-    Extent{I,M,A}(init, mask, aux, tspan)
 end
-Extent(; init, mask=nothing, aux=nothing, tspan, kwargs...) =
-    Extent(init, mask, aux, tspan)
+Extent(; init, mask=nothing, aux=nothing, tspan, kw...) = Extent(init, mask, aux, tspan)
 
 settspan!(e::Extent, tspan) = e.tspan = tspan
 

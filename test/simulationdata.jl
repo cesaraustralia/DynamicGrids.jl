@@ -1,7 +1,7 @@
 using DynamicGrids, OffsetArrays, Test, Dates
 using DynamicGrids: _initdata!, data, init, mask, boundary, source, dest, 
     sourcestatus, deststatus, gridsize, ruleset, grids, SimData, Extent,
-    _updatetime, ismasked, WritableGridData, tspan
+    _updatetime, WritableGridData, tspan
 
 inita = [0 1 1
          0 1 1]
@@ -19,6 +19,7 @@ tspan_ = DateTime(2001):Day(1):DateTime(2001, 2)
     simdata = SimData(ext, rs)
     @test simdata isa SimData
     @test init(simdata) == initab
+    @test mask(simdata) === nothing
     @test ruleset(simdata) === StaticRuleset(rs)
     @test tspan(simdata) === tspan_
     @test currentframe(simdata) === 1
@@ -63,10 +64,9 @@ tspan_ = DateTime(2001):Day(1):DateTime(2001, 2)
     @test axes(grida) == (0:5, 0:4)
     @test ndims(grida) == 2
     @test eltype(grida) == Int
-    @test ismasked(grida, 1, 1) == false
 
     ext = Extent(; init=initab, tspan=tspan_)
-    _initdata!(simdata, ext, rs, nothing)
+    _initdata!(simdata, ext, rs)
 end
 
 @testset "initdata! with :_default_" begin
@@ -74,7 +74,7 @@ end
     rs = Ruleset(Life())
     ext = Extent(; init=(_default_=initx,), tspan=tspan_)
     simdata = SimData(ext, rs)
-    simdata2 = _initdata!(simdata, ext, rs, nothing)
+    simdata2 = _initdata!(simdata, ext, rs)
     @test keys(simdata2) == (:_default_,)
     @test DynamicGrids.ruleset(simdata2) == DynamicGrids.StaticRuleset(rs)
     @test DynamicGrids.init(simdata2[:_default_]) == [1 0]
@@ -85,18 +85,3 @@ end
                      0 0 0 0
                      0 0 0 0], (0:4, 0:3))
 end
-
-@testset "initdata! with replicates" begin
-    rs = Ruleset(life, timestep=Day(1));
-    nreps = 2
-    extent = Extent(; init=initab, tspan=tspan_)
-    simdata = _initdata!(nothing, extent, rs, nreps)
-    @test simdata isa Vector{<:SimData}
-    @test all(DynamicGrids.ruleset.(simdata) .== Ref(StaticRuleset(rs)))
-    @test all(map(tspan, simdata) .== Ref(tspan_))
-    @test all(keys.(DynamicGrids.grids.(simdata)) .== Ref(keys(initab)))
-    simdata2 = _initdata!(simdata, extent, rs, nreps)
-end
-
-# TODO more comprehensively unit test? a lot of this is
-# relying on integration testing.

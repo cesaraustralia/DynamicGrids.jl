@@ -43,6 +43,7 @@ import DynamicGrids: SimData, Extent, WritableGridData,
         @test sum(Moore{1}(buf3)) == 5
     end
     @testset "Window" begin
+        @test Window{1}() == Window(1) == Window(zeros(3, 3))
         window = Window{1}(init[1:3, 1:3])
         @test _buffer(window) == init[1:3, 1:3]
         @test hoodsize(window) == 3
@@ -124,8 +125,21 @@ end
 @testset "Kernel" begin
     buf = reshape(1:9, 3, 3)
     @testset "Window" begin
+        mat = zeros(3, 3)
+        @test Kernel(mat) == Kernel(Window(1), mat)
+        @test_throws ArgumentError Kernel(Window(2), mat)
         k = Kernel(Window{1,9,typeof(buf)}(buf), SMatrix{3,3}(reshape(1:9, 3, 3)))
         @test dot(k) == sum((1:9).^2)
+        @test neighbors(k) == reshape(1:9, 3, 3)
+        @test collect(offsets(k)) ==
+            [(-1, -1) (0, -1) (1, -1)
+             (-1, 0)  (0, 0)  (1, 0)
+             (-1, 1)  (0, 1)  (1, 1)]
+        @test collect(positions(k, (2, 2))) ==
+             [(1, 1) (2, 1) (3, 1)
+              (1, 2) (2, 2) (3, 2)
+              (1, 3) (2, 3) (3, 3)]
+
     end
     @testset "Moore" begin
         k = Kernel(Moore{1,8,typeof(buf)}(buf), (1:4..., 6:9...))
@@ -197,14 +211,28 @@ end
 end
 
 @testset "Positional" begin
-    hood = Positional(((-1, -1), (1, 1)))
+    buf = reshape(2:10, 3, 3)
+    hood = Positional(((-1, -1), (1, 1)), buf)
+    @test Tuple(neighbors(hood)) == (2, 10)
+    @test offsets(hood) == ((-1, -1), (1, 1))
+    @test Tuple(positions(hood, (2, 2))) == ((1, 1), (3, 3))
     @set! hood.offsets = ((-5, -5), (5, 5))
     @test offsets(hood) == hood.offsets == ((-5, -5), (5, 5))
+end
 
-    hood = LayeredPositional(
-        (Positional(((-1, -1), (1, 1))), Positional(((-2, -2), (2, 2)))),
-        nothing,
+@testset "LayeredPositional" begin
+    lhood = LayeredPositional(
+        Positional(((-1, -1), (1, 1)), ), Positional(((-2, -2), (2, 2)), )
     )
-    @set! hood.layers = (Positional(((-3, -3), (3, 3))),)
-    @test hood.layers == (Positional(((-3, -3), (3, 3))),)
+    @test offsets(lhood) == (((-1, -1), (1, 1)), ((-2, -2), (2, 2)))
+    @test collect.(collect(positions(lhood, (1, 1)))) == 
+        [[(0, 0), (2, 2)],
+         [(-1, -1), (3, 3)]]
+
+    buf = reshape(1:25, 5, 5)
+    lhood_buf = DynamicGrids._setbuffer(lhood, buf)
+    @test lhood_buf._buffer == lhood_buf.layers[1]._buffer === 
+          lhood_buf.layers[2]._buffer === buf
+    @test map(radius, lhood_buf.layers) == (2, 2)
+    @test map(Tuple, neighbors(lhood_buf)) == ((7, 19), (1, 25))
 end

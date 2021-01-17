@@ -1,7 +1,6 @@
 # We have to keep the original rulset pointer as it may be modified 
 # elsewhere like in an Interact.jl interface. `Ruleset` is mutable,
 # and rules has an abstract field type.
-precalcrules(simdata::Vector, rules::Tuple) = map(sd -> precalcrules(sd, rules), simdata)
 function precalcrules(sd::SimData, rules::Tuple)
     @set sd.ruleset = ModelParameters.setparent(
         ruleset(sd),

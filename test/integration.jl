@@ -247,16 +247,18 @@ end
         end
     end
 
-    @testset "A large sim wors" begin
+    @testset "A large sim, threaded" begin
         init = rand(Bool, 100, 100)
         rule = Life(neighborhood=Moore(1))
         sparse_opt = Ruleset(rule;
             boundary=Wrap(),
             opt=SparseOpt(),
+            proc=ThreadedCPU(),
         )
         no_opt = Ruleset(rule;
             boundary=Wrap(),
             opt=NoOpt(),
+            proc=ThreadedCPU(),
         )
         sparseopt_output = ArrayOutput(init; tspan=1:100)
         sim!(sparseopt_output, sparse_opt)
@@ -337,5 +339,44 @@ end
     @test DynamicGrids.tspan(output) == Date(2010, 4):Month(1):Date(2010, 10)
     @test output[1] == test6_7[:test7]
 
+end
+
+@testset "GifOutput saves" begin
+    @testset "ColorProcessor" begin
+        ruleset = Ruleset(;
+            rules=(Life(),),
+            boundary=Wrap(),
+            timestep=5u"s",
+            opt=NoOpt(),
+        )
+        output = GifOutput(test6_7[:init]; 
+            filename="test.gif",               
+            tspan=0u"s":5u"s":30u"s", fps=10, store=true
+        )
+        @test DynamicGrids.isstored(output) == true
+        sim!(output, ruleset)
+        @test output[Ti(5u"s")] == test6_7[:test2]
+        @test output[Ti(10u"s")] == test6_7[:test3]
+        @test output[Ti(20u"s")] == test6_7[:test5]
+        @test output[Ti(30u"s")] == test6_7[:test7]
+        @test isfile("test.gif")
+        rm("test.gif")
+    end
+    @testset "LayoutProcessor" begin
+        zeroed = test6_7[:init]
+        ruleset = Ruleset(Life{:a}(); boundary=Wrap())
+        output = GifOutput((a=test6_7[:init], b=zeroed); 
+            filename="test2.gif",               
+            tspan=0u"s":5u"s":30u"s", fps=10, store=true
+        )
+        @test DynamicGrids.isstored(output) == true
+        sim!(output, ruleset)
+        @test all(map(==, output[Ti(5u"s")], (a=test6_7[:test2], b=zeroed)))
+        @test all(map(==, output[Ti(10u"s")], (a=test6_7[:test3], b=zeroed)))
+        @test all(map(==, output[Ti(20u"s")], (a=test6_7[:test5], b=zeroed)))
+        @test all(map(==, output[Ti(30u"s")], (a=test6_7[:test7], b=zeroed)))
+        @test isfile("test2.gif")
+        rm("test2.gif")
+    end
 end
 

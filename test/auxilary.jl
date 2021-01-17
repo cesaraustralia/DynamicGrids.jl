@@ -26,14 +26,25 @@ end
         dimz = X(1:2), Y(1:2), Ti(15d:5d:25d)
         seq = DimensionalArray(a, dimz)
         init = zero(seq[Ti(1)])
-        data = SimData(Extent(init=init, aux=(seq=seq,), tspan=1d:1d:100d), Ruleset())
+        sd = SimData(Extent(init=init, aux=(seq=seq,), tspan=1d:1d:100d), Ruleset())
+        @test DynamicGrids.boundscheck_aux(sd, Aux{:seq}()) == true
         tests = (1, 1), (4, 1), (5, 2), (6, 2), (9, 2), (10, 3), (11, 3), (14, 3), (15, 1), 
                 (19, 1), (20, 2), (25, 3), (29, 3), (30, 1), (34, 1), (35, 2)
         for (f, ref_af) in tests
-            @set! data.currentframe = f
-            af = _calc_auxframe(data).seq
+            @set! sd.currentframe = f
+            af = _calc_auxframe(sd).seq
             @test af == ref_af 
         end
+    end
+
+    @testset "boundscheck_aux" begin
+        seq = DimensionalArray(a, (X(1:2), Y(1:2), Ti(15d:5d:25d)))
+        bigseq = DimensionalArray(zeros(5, 2, 3), (X(1:5), Y(1:2), Ti(15d:5d:25d)))
+        init = zero(seq[Ti(1)])
+        sd = SimData(Extent(init=init, aux=(seq=seq, bigseq=bigseq), tspan=1d:1d:100d), Ruleset())
+        @test DynamicGrids.boundscheck_aux(sd, Aux{:seq}()) == true
+        @test_throws ErrorException DynamicGrids.boundscheck_aux(sd, Aux{:bigseq}())
+        @test_throws ErrorException DynamicGrids.boundscheck_aux(sd, Aux{:missingseq}())
     end
 
     @testset "correct values are returned by get" begin
@@ -54,9 +65,14 @@ end
         @test data4.auxframe == (seq = 1,)
         @test get(data4, Aux(:seq), 1, 1) == 0.1
     end
+
+    @testset "errors" begin
+        output = ArrayOutput(zeros(3, 3); tspan=1:3)
+        @test_throws ArgumentError  DynamicGrids.aux(output, Aux{:somekey}())
+    end
 end
 
-@testset "Copy" begin
+@testset "CopyTo" begin
     init = [0 0]
     ruleset = Ruleset(CopyTo(7))
     output = ArrayOutput(init; tspan=1d:1d:3d)
@@ -86,4 +102,10 @@ end
     @test output == [(s=[1 3], d1=[0 0], d2=[-1 -1]), 
                      (s=[2 4], d1=[2 4], d2=[2 4]), 
                      (s=[3 5], d1=[3 5], d2=[3 5])]
+
+    @testset "Copy construction" begin
+        rule = CopyTo(7)
+        rule2 = @set rule.from = Aux{:a}()
+        @test rule2.from == Aux{:a}()
+    end
 end

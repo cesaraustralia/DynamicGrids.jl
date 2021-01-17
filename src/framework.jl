@@ -6,8 +6,7 @@
          tstpan=tspan(output),
          aux=aux(output),
          fps=fps(output),
-         simdata=nothing,
-         nreplicates=nothing)
+         simdata=nothing)
 
 Runs the simulation, passing the destination aray to
 the passed in output for each time-step.
@@ -26,7 +25,6 @@ Theses are the taken from the output argument by default.
 - `aux`: a `NamedTuple` of auxilary data to be used by rules.
 - `tspan`: a tuple holding the start and end of the timespan the simulaiton will run for.
 - `fps`: the frames per second to display. Will be taken from the output if not passed in.
-- `nreplicates`: the number of replicates to combine in stochastic simulations
 - `simdata`: a [`SimData`](@ref) object. Keeping it between simulations can reduce memory
   allocation when that is important.
 """
@@ -37,7 +35,6 @@ function sim!(
      tspan=tspan(output),
      aux=aux(output),
      fps=fps(output),
-     nreplicates=nothing,
      simdata=nothing,
      kwargs...
 )
@@ -54,7 +51,7 @@ function sim!(
     # Set up output
     settspan!(output, tspan)
     # Create or update the combined data object for the simulation
-    simdata = _initdata!(simdata, extent, ruleset, nreplicates)
+    simdata = _initdata!(simdata, extent, ruleset)
     init_output_grids!(output, init)
     # Set run speed for GraphicOutputs
     setfps!(output, fps)
@@ -76,6 +73,7 @@ Run a simulation passing in rules without defining a `Ruleset`.
 sim!(output::Output, rules::Tuple; kwargs...) = sim!(output::Output, rules...; kwargs...)
 function sim!(output::Output, rules::Rule...;
     boundary=Remove(),
+    proc=SingleCPU(),
     opt=NoOpt(),
     cellsize=1,
     timestep=nothing,
@@ -83,7 +81,7 @@ function sim!(output::Output, rules::Rule...;
     kwargs...
 )
     ruleset = Ruleset(rules...;
-        boundary=boundary, opt=opt, cellsize=cellsize, timestep=timestep, padval=padval
+        boundary=boundary, proc=proc, opt=opt, cellsize=cellsize, timestep=timestep, padval=padval
     )
     return sim!(output::Output, ruleset; kwargs...)
 end
@@ -92,8 +90,7 @@ end
     resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
             tstop=last(tspan(output)),
             fps=fps(output),
-            simdata=nothing,
-            nreplicates=nothing)
+            simdata=nothing)
 
 Restart the simulation from where you stopped last time. For arguments see [`sim!`](@ref).
 The keyword arg `tstop` can be used to extend the length of the simulation.
@@ -107,7 +104,6 @@ The keyword arg `tstop` can be used to extend the length of the simulation.
 - `init`: an optional initialisation array
 - `tstop`: the new stop time for the simulation. Taken from the output length by default.
 - `fps`: the frames per second to display. Taken from the output by default.
-- `nreplicates`: the number of replicates to combine in stochastic simulations
 - `simdata`: a [`SimData`](@ref) object. Keeping it between simulations can improve performance
   when that is important
 """
@@ -115,7 +111,6 @@ function resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
         tstop=last(tspan(output)),
         fps=fps(output),
         simdata=nothing,
-        nreplicates=nothing
 )
     # Check status and arguments
     isrunning(output) && error("A simulation is already running in this output")
@@ -135,8 +130,9 @@ function resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
 
     setfps!(output, fps)
     extent = Extent(; init=_asnamedtuple(init), mask=mask(output), aux=aux(output), tspan=new_tspan)
-    simdata = _initdata!(simdata, extent, ruleset, nreplicates)
+    simdata = _initdata!(simdata, extent, ruleset)
     initialise!(output, simdata)
+    initialisegraphics(output, simdata)
     setrunning!(output, true) || error("Could not start the simulation with this output")
     return runsim!(output, simdata, ruleset, fspan)
 end
@@ -192,6 +188,7 @@ function simloop!(output::Output, simdata, ruleset, fspan)
             showframe(output, simdata)
             setstoppedframe!(output, f)
             finalise!(output, simdata)
+            finalisegraphics(output, simdata)
             break
         end
     end

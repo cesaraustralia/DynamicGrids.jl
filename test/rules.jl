@@ -53,8 +53,14 @@ end
     rs1 = Ruleset((rule1, rule2); opt=NoOpt()) 
     rs2 = Ruleset(rule1, rule2; opt=NoOpt())
     @test rules(rs1) == rules(rs2)
+    @test typeof(Ruleset(StaticRuleset(rs1))) == typeof(rs1)
+    for fn in fieldnames(typeof(rs1))
+        @test getfield(Ruleset(StaticRuleset(rs1)), fn) == getfield(rs1, fn)
+    end
+    @test typeof(Ruleset(StaticRuleset(rs1))) == typeof(rs1)
+    ModelParameters.setparent!(rs2, (rule1,))
+    @test rs2.rules == (rule1,)
 end
-
 
 @testset "Cell" begin
     rule = Cell(x -> 2x)
@@ -71,16 +77,18 @@ end
         sum(hood)
     end
     @test applyrule(nothing, rule, 0, (3, 3)) == 3
+    @test DynamicGrids._buffer(rule) === buf
 end
 
 @testset "Convolution" begin
     k = SA[1 0 1; 0 0 0; 1 0 1]
+    @test Convolution{:a}(k) == Convolution{:a,:a}(; neighborhood=Kernel(Window(1), k)) 
     buf = SA[1 0 0; 0 0 1; 0 0 1]
     hood = Window{1,9,typeof(buf)}(buf)
     rule = Convolution{:a,:a}(; neighborhood=Kernel(hood, k))
     @test DynamicGrids.kernel(rule) === k 
     @test applyrule(nothing, rule, 0, (3, 3)) == k ⋅ buf
-    output = ArrayOutput((;a=init); tspan=1:2)
+    output = ArrayOutput((a=init,); tspan=1:2)
     sim!(output, rule)
 end
 
@@ -99,15 +107,21 @@ end
         end
     end
     output = ArrayOutput(init; tspan=1:2)
-    data = SimData(extent(output), Ruleset(rule)) 
+    data = SimData(output, Ruleset(rule)) 
     # Cant use applyrule! without a lot of work on SimData
     # so just trun the whole thing
+    refoutput = [1 1 1 0
+                 0 1 0 0
+                 0 1 0 0
+                 1 1 2 0
+                 0 2 1 1]
+
     sim!(output, rule)
-    @test output[2] == [1 1 1 0
-                        0 1 0 0
-                        0 1 0 0
-                        1 1 2 0
-                        0 2 1 1]
+    @test output[2] == refoutput
+    sim!(output, rule; proc=ThreadedCPU())
+    @test output[2] == refoutput
+    sim!(output, rule; opt=SparseOpt())
+    @test_broken output[2] == refoutput
 end
 
 @testset "SetCell" begin
@@ -116,22 +130,49 @@ end
              0 0 0 0
              0 1 0 0
              0 0 1 0]
-    rule = SetCell() do data, I, state
-        if state > 0
-            pos = I[1] - 2, I[2]
-            isinbounds(pos, data) && add!(first(data), 1, pos...)
-        end
-    end
     output = ArrayOutput(init; tspan=1:2)
-    data = SimData(extent(output), Ruleset(rule)) 
-    # Cant use applyrule! without a lot of work on SimData
-    # so just trun the whole thing
-    sim!(output, rule)
-    @test output[2] == [0 1 0 0
-                        0 1 0 0
-                        0 0 1 0
-                        0 1 0 0
-                        0 0 1 0]
+
+    @testset "add!" begin
+        rule = SetCell() do data, I, state
+            if state > 0
+                pos = I[1] - 2, I[2]
+                isinbounds(pos, data) && add!(first(data), 1, pos...)
+            end
+        end
+        data = SimData(output, Ruleset(rule)) 
+        sim!(output, rule)
+        @test output[2] == [0 1 0 0
+                            0 1 0 0
+                            0 0 1 0
+                            0 1 0 0
+                            0 0 1 0]
+        sim!(output, rule; proc=ThreadedCPU())
+        @test output[2] == [0 1 0 0
+                            0 1 0 0
+                            0 0 1 0
+                            0 1 0 0
+                            0 0 1 0]
+        sim!(output, rule; opt=SparseOpt())
+        @test output[2] == [0 1 0 0
+                            0 1 0 0
+                            0 0 1 0
+                            0 1 0 0
+                            0 0 1 0]
+    end
+    @testset "setindex!" begin
+        rule = SetCell() do data, I, state
+            if state > 0
+                pos = I[1] - 2, I[2]
+                isinbounds(pos, data) && (data[pos...] = 5)
+            end
+        end
+        sim!(output, rule)
+        @test output[2] == [0 1 0 0
+                            0 5 0 0
+                            0 0 5 0
+                            0 1 0 0
+                            0 0 1 0]
+    end
 end
 
 @testset "SetGrid" begin
@@ -145,7 +186,7 @@ end
              0 1 0 0
              0 0 1 0]
     output = ArrayOutput(init; tspan=1:2)
-    data = SimData(extent(output), Ruleset(rule)) 
+    data = SimData(output, Ruleset(rule)) 
     # Cant use applyrule! without a lot of work on SimData
     # so just trun the whole thing
     sim!(output, rule)
@@ -371,12 +412,11 @@ end
 
 @testset "Multi-grid rules work" begin
     init = (prey=[10. 10.], predator=[1. 0.])
-    ruleset1 = Ruleset(DoubleY{Tuple{:predator,:prey},:prey}(), predation; opt=NoOpt())
-    ruleset2 = Ruleset(DoubleY{Tuple{:predator,:prey},:prey}(), predation; opt=SparseOpt())
+    rules = DoubleY{Tuple{:predator,:prey},:prey}(), predation
     output1 = ArrayOutput(init; tspan=1:3)
     output2 = ArrayOutput(init; tspan=1:3)
-    sim!(output1, ruleset1)
-    sim!(output2, ruleset2)
+    sim!(output1, rules; opt=NoOpt())
+    sim!(output2, rules; opt=SparseOpt())
     @test output1[2] == (prey=[18. 20.], predator=[2. 0.])
     @test output2[2] == (prey=[18. 20.], predator=[2. 0.])
     @test output1[3] == (prey=[32. 40.], predator=[4. 0.])
