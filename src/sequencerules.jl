@@ -12,13 +12,6 @@ TODO: use the new threading method.
 function sequencerules!(simdata::AbstractSimData)
     sequencerules!(simdata, rules(simdata))
 end
-function sequencerules!(data::AbstractVector{T}) where T<:AbstractSimData
-    newdata = copy(data)
-    Threads.@threads for i in 1:length(data)
-        newdata[i] = sequencerules!(data[i])
-    end
-    newdata
-end
 function sequencerules!(simdata::AbstractSimData, rules::Tuple)
     # Run the first rules
     simdata = maprule!(simdata, rules[1])

@@ -68,7 +68,7 @@ end
 
 
 _allocgif(i::ImageConfig, e::Extent) = _allocgif(processor(i), i::ImageConfig, e::Extent) 
-function _allocgif(::Processor, i::ImageConfig, e::Extent)
+function _allocgif(::GridProcessor, i::ImageConfig, e::Extent)
     zeros(ARGB32, gridsize(e)..., length(tspan(e)))
 end
 function _allocgif(p::LayoutProcessor, i::ImageConfig, e::Extent)

@@ -75,9 +75,6 @@ end
 _to_readonly(data::Tuple) = map(ReadableGridData, data)
 _to_readonly(data::WritableGridData) = ReadableGridData(data)
 
-_hassparseopt(wgrids::Tuple) = any(o -> o isa SparseOpt, map(opt, wgrids))
-_hassparseopt(wgrid) = opt(wgrid) isa SparseOpt
-
 const NeedsBuffer = Union{NeighborhoodRule,Chain{<:Any,<:Any,<:Tuple{<:NeighborhoodRule,Vararg}}}
 
 function maprule!(
@@ -336,6 +333,9 @@ end
 ) where R
     @inbounds buffer[R + 1, R + 1]
 end
+
+@inline _keys2vals(keys::Tuple) = map(Val, keys)
+@inline _keys2vals(key::Symbol) = Val(key)
 
 # Generate an SArray from the main array and the last SArray
 @generated function _update_buffers(

@@ -44,7 +44,7 @@ isrunning(o::Output) = o.running
 extent(o::Output) = o.extent
 init(o::Output) = init(extent(o))
 mask(o::Output) = mask(extent(o))
-aux(o::Output) = aux(extent(o))
+aux(o::Output, key...) = aux(extent(o), key...)
 tspan(o::Output) = tspan(extent(o))
 timestep(o::Output) = step(tspan(o))
 
@@ -91,35 +91,6 @@ function _copyto_output!(outgrid, grid, proc::CPU)
     copyto!(outgrid, CartesianIndices(outgrid), source(grid), CartesianIndices(outgrid))
 end
 
-# Replicated frames
-function storeframe!(output::Output{<:AbstractArray}, data::AbstractVector)
-    f = frameindex(output, data[1])
-    outgrid = output[f]
-    for I in CartesianIndices(outgrid)
-        replicatesum = zero(eltype(outgrid))
-        for g in grids.(data)
-            @inbounds replicatesum += first(g)[I]
-        end
-        @inbounds outgrid[I] = replicatesum / length(data)
-    end
-    return nothing
-end
-function storeframe!(output::Output{<:NamedTuple}, data::AbstractVector)
-    f = frameindex(output, data[1])
-    outgrids = output[f]
-    gridsreps = NamedTuple{keys(first(data))}(map(d -> d[key], data) for key in keys(first(data)))
-    map(outgrids, gridsreps) do outgrid, gridreps
-        for I in CartesianIndices(outgrid)
-            replicatesum = zero(eltype(outgrid))
-            for gr in gridreps
-                @inbounds replicatesum += gr[I]
-            end
-            @inbounds outgrid[I] = replicatesum / length(data)
-        end
-    end
-    return nothing
-end
-
 # Grids are preallocated and reused.
 init_output_grids!(o::Output, init) = init_output_grids!(o[1], o::Output, init)
 # Array grids are copied
@@ -127,9 +98,6 @@ function init_output_grids!(grid::AbstractArray, o::Output, init::AbstractArray)
     grid .= init
     return o
 end
-# The first grid in a named tuple is used if the output is a single Array
-init_output_grids!(grid::AbstractArray, o::Output, init::NamedTuple) =
-    init_output_grids!(grid, o, first(init))
 # All arrays are copied if both are named tuples
 function init_output_grids!(grids::NamedTuple, o::Output, inits::NamedTuple)
     map(grids, inits) do grid, init

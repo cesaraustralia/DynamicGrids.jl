@@ -26,7 +26,6 @@ Base.lastindex(d::GridData) = lastindex(source(d))
 init(d::GridData) = d.init
 mask(d::GridData) = d.mask
 radius(d::GridData{<:Any,<:Any,R}) where R = R
-radius(d::Tuple{<:GridData,Vararg}) = map(radius, d)
 proc(d::GridData) = d.proc
 opt(d::GridData) = d.opt
 boundary(d::GridData) = d.boundary
@@ -39,8 +38,6 @@ gridsize(d::GridData) = size(init(d))
 gridsize(A::AbstractArray) = size(A)
 gridsize(nt::NamedTuple) = gridsize(first(nt))
 gridsize(nt::NamedTuple{(),Tuple{}}) = 0, 0
-gridsize(t::Tuple) = gridsize(first(t))
-gridsize(t::Tuple{}) = 0, 0
 
 
 """

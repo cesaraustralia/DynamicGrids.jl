@@ -246,7 +246,7 @@ _valn(vals, n) = vals[n]
 @noinline _grididnotinkeyserror(grid_id, grids) =
     throw(ArgumentError("$grid_id is not in $(keys(grids))"))
 @noinline _wronglengtherror(f, ngrids, n) =
-    throw(ArgumentError("Number of grids ($ngrids) and legtn of $f ($n) must be the same"))
+    throw(ArgumentError("Number of grids ($ngrids) and length of $f ($n) must be the same"))
 
 
 # Automatically choose a processor
@@ -263,7 +263,7 @@ function autoprocessor(init::NamedTuple, scheme, textconfig)
 end
 
 _iterableschemes(::Nothing) = (Greyscale(),)
-_iterableschemes(schemes::Union{Tuple,NamedTuple,AbstractVector}) = schemes
+_iterableschemes(schemes::Union{Tuple,NamedTuple,AbstractArray}) = schemes
 _iterableschemes(scheme) = (scheme,)
 
 

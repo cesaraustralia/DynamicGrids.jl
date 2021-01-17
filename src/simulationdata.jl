@@ -53,8 +53,11 @@ struct SimData{Y,X,G<:NamedTuple,E,RS,F,A} <: AbstractSimData{Y,X}
     currentframe::F
     auxframe::A
 end
+# Get the extent, usually from an Output
+SimData(x, ruleset::AbstractRuleset) = SimData(extent(x), ruleset)
 # Convert grids in extent to NamedTuple
-SimData(extent, ruleset::AbstractRuleset) = SimData(_asnamedtuple(extent), ruleset)
+SimData(extent::AbstractExtent, ruleset::AbstractRuleset) = 
+    SimData(_asnamedtuple(extent), ruleset)
 function SimData(extent::AbstractExtent{<:NamedTuple{Keys}}, ruleset::AbstractRuleset) where Keys
     # Calculate the neighborhood radus (and grid padding) for each grid
     y, x = gridsize(extent)
@@ -67,7 +70,9 @@ function SimData(extent::AbstractExtent{<:NamedTuple{Keys}}, ruleset::AbstractRu
     end
     SimData(grids, extent, ruleset)
 end
-function SimData(grids::G, extent::E, ruleset::AbstractRuleset) where {G,E}
+function SimData(
+    grids::G, extent::AbstractExtent, ruleset::AbstractRuleset
+) where {G<:Union{NamedTuple{<:Any,<:Tuple{GridData,Vararg}},GridData}}
     currentframe = 1; auxframe = nothing
     Y, X = gridsize(extent)
     # SimData is isbits-only
@@ -100,12 +105,23 @@ tspan(d::SimData) = tspan(extent(d))
 timestep(d::SimData) = step(tspan(d))
 currentframe(d::SimData) = d.currentframe
 currenttime(d::SimData) = tspan(d)[currentframe(d)]
-currenttime(d::Vector{<:SimData}) = currenttime(d[1])
-@inline add(d::SimData, x, I...) = add(firs(d), x, I...)
-
 
 # Getters forwarded to data
 Base.getindex(d::SimData, i::Symbol) = getindex(grids(d), i)
+
+"""
+    Base.get(data::SimData, keyorval, I...)
+
+Allows parameters to be taken from a single value, another grid or an aux array.
+
+If aux arrays are a `DimArray` time sequence (with a `Ti` dim) the currect date will be 
+calculated automatically.
+
+Currently this is cycled by default, but will use Cyclic mode in DiensionalData.jl in future.
+"""
+@inline Base.get(data::SimData, val, I...) = val
+@inline Base.get(data::SimData, key::Grid{K}, I...) where K = data[K][I...]
+@inline Base.get(data::SimData, key::Aux, I...) = _auxval(data, key, I...)
 
 @propagate_inbounds Base.setindex!(d::SimData, x, I...) = setindex!(first(grids(d)), x, I...)
 @propagate_inbounds Base.getindex(d::SimData, I...) = getindex(first(grids(d)), I...)
@@ -120,36 +136,24 @@ opt(d::SimData) = opt(ruleset(d))
 boundary(d::SimData) = boundary(ruleset(d))
 padval(d::SimData) = padval(ruleset(d))
 rules(d::SimData) = rules(ruleset(d))
-cellsize(d::SimData) = cellsize(ruleset(d))
 
 # Get the actual current timestep, e.g. seconds instead of variable periods like Month
 currenttimestep(d::SimData) = currenttime(d) + timestep(d) - currenttime(d)
 
 
 # Uptate timestamp
-_updatetime(simdata::AbstractVector{<:SimData}, f) = _updatetime.(simdata, f)
 function _updatetime(simdata::SimData, f::Integer) 
     @set! simdata.currentframe = f
     @set simdata.auxframe = _calc_auxframe(simdata)
 end
 
-# When replicates are an Integer, construct a vector of SimData
-function _initdata!(::Nothing, extent, ruleset::AbstractRuleset, nreplicates::Integer)
-    [SimData(extent, ruleset) for r in 1:nreplicates]
-end
-# When simdata is a Vector, the existing SimData arrays are re-initialised
-function _initdata!(
-    simdata::AbstractVector{<:AbstractSimData}, extent, ruleset, nreplicates::Integer
-)
-    map(d -> _initdata!(d, extent, ruleset, nothing), simdata)
-end
 # When no simdata is passed in, create new SimData
-function _initdata!(::Nothing, extent, ruleset::AbstractRuleset, nreplicates::Nothing)
+function _initdata!(::Nothing, extent::AbstractExtent, ruleset::AbstractRuleset)
     SimData(extent, ruleset)
 end
 # Initialise a SimData object with a new `Extent` and `Ruleset`.
 function _initdata!(
-    simdata::AbstractSimData, extent::AbstractExtent, ruleset::AbstractRuleset, nreplicates::Nothing
+    simdata::AbstractSimData, extent::AbstractExtent, ruleset::AbstractRuleset
 )
     map(_copygrid!, values(simdata), values(init(extent)))
     @set! simdata.extent = StaticExtent(extent)

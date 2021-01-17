@@ -1,19 +1,5 @@
 
 """
-    Base.get(data::SimData, keyorval, I...)
-
-Allows parameters to be taken from a single value, another grid or an aux array.
-
-If aux arrays are a `DimArray` time sequence (with a `Ti` dim) the currect date will be 
-calculated automatically.
-
-Currently this is cycled by default, but will use Cyclic mode in DiensionalData.jl in future.
-"""
-@inline Base.get(data::SimData, val, I...) = val
-@inline Base.get(data::SimData, key::Grid{K}, I...) where K = data[K][I...]
-@inline Base.get(data::SimData, key::Aux, I...) = _auxval(data, key, I...)
-
-"""
     ismasked(data, I...)
 
 Check if a cell is masked, using the `mask` array.
@@ -37,8 +23,8 @@ Test if a custom rule is inferred and the return type is correct when
 
 Type-stability can give orders of magnitude improvements in performance.
 """
-isinferred(output::Output, rules::Tuple) = isinferred(output, rules...)
-isinferred(output::Output, rules::Rule...) = isinferred(output, Ruleset(rules...))
+isinferred(output::Output, rules::Rule...) = isinferred(output, rules)
+isinferred(output::Output, rules::Tuple) = isinferred(output, Ruleset(rules...))
 function isinferred(output::Output, ruleset::Ruleset)
     ext = extent(output)
     ext = @set ext.init = _asnamedtuple(init(output))
@@ -48,8 +34,8 @@ function isinferred(output::Output, ruleset::Ruleset)
     end
     return true
 end
-isinferred(simdata::SimData, rule::Rule) = _isinferred(simdata, rule)
-function isinferred(simdata::SimData, 
+isinferred(simdata::AbstractSimData, rule::Rule) = _isinferred(simdata, rule)
+function isinferred(simdata::AbstractSimData, 
     rule::Union{NeighborhoodRule,Chain{<:Any,<:Any,<:Tuple{<:NeighborhoodRule,Vararg}}}
 )
     grid = simdata[neighborhoodkey(rule)]
@@ -60,7 +46,7 @@ function isinferred(simdata::SimData,
     rule = _setbuffer(rule, buffer)
     return _isinferred(simdata, rule)
 end
-function isinferred(simdata::SimData, rule::SetCellRule)
+function isinferred(simdata::AbstractSimData, rule::SetCellRule)
     rkeys, rgrids = _getreadgrids(rule, simdata)
     wkeys, wgrids = _getwritegrids(rule, simdata)
     simdata = @set simdata.grids = _combinegrids(rkeys, rgrids, wkeys, wgrids)
@@ -101,12 +87,10 @@ _zerogrids(initgrids::NamedTuple, nframes) =
 @inline _asnamedtuple(x::AbstractArray) = (_default_=x,)
 @inline _asnamedtuple(e::Extent) = Extent(_asnamedtuple(init(e)), mask(e), aux(e), tspan(e))
 
-@inline _keys2vals(keys::Tuple) = map(Val, keys)
-@inline _keys2vals(key::Symbol) = Val(key)
-
-
 _unwrap(x) = x
 _unwrap(::Val{X}) where X = X
 _unwrap(::Aux{X}) where X = X
+_unwrap(::Grid{X}) where X = X
 _unwrap(::Type{<:Aux{X}}) where X = X
+_unwrap(::Type{<:Grid{X}}) where X = X
 _unwrap(::Type{<:Val{X}}) where X = X

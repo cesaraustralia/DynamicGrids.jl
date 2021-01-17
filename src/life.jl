@@ -47,7 +47,7 @@ nothing
 ```
 
 ![REPL Life](https://raw.githubusercontent.com/cesaraustralia/DynamicGrids.jl/media/life.gif)
-"""
+""" 
 struct Life{R,W,N,B,S,L} <: NeighborhoodRule{R,W}
     "A Neighborhood, usually Moore(1)"
     neighborhood::N
@@ -57,28 +57,26 @@ struct Life{R,W,N,B,S,L} <: NeighborhoodRule{R,W}
     survive::S
     lookup::L
 end
-Life{R,W}(neighborhood::N, born::B, survive::S, lookup_) where {R,W,N,B,S} = begin
+function Life{R,W}(neighborhood::N, born::B, survive::S, lookup_) where {R,W,N,B,S}
     lookup = Tuple(i in born for i in 0:8), Tuple(i in survive for i in 0:8)
     Life{R,W,N,B,S,typeof(lookup)}(neighborhood, born, survive, lookup)
 end
-Life{R,W}(neighborhood, born, survive) where {R,W} =
+function Life{R,W}(neighborhood, born, survive) where {R,W}
     Life{R,W}(neighborhood, born, survive, nothing)
-Life{R,W}(; neighborhood=Moore(1),
-          born=Param(3, bounds=(0, 8)),
-          survive=(Param(2, bounds=(0, 8)), Param(3, bounds=(0, 8))),
-         ) where {R,W} =
+end
+function Life{R,W}(; 
+    neighborhood=Moore(1),
+    born=Param(3, bounds=(0, 8)),
+    survive=(Param(2, bounds=(0, 8)), Param(3, bounds=(0, 8))),
+) where {R,W}
     Life{R,W}(neighborhood, born, survive, nothing)
+end
 
-function setbuffer(r::Life{R,W,N,B,S,L}, buffer) where {R,W,N,B,S,L} 
-    hood = setbuffer(r.neighborhood, buffer)
+function _setbuffer(r::Life{R,W,N,B,S,L}, buffer) where {R,W,N,B,S,L} 
+    hood = _setbuffer(r.neighborhood, buffer)
     Life{R,W,typeof(hood),B,S,L}(hood, r.born, r.survive, r.lookup)
 end
 
-"""
-    applyrule(data::SimData, rule::Life, state, I)
-
-Applies game of life rule to current cell, returning `Bool`.
-"""
 function applyrule(data::SimData, rule::Life, state, I)
     rule.lookup[state + 1][sum(neighbors(rule)) + 1]
 end

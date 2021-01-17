@@ -1,5 +1,5 @@
 using DynamicGrids, Test
-using DynamicGrids: inbounds, isinbounds, _cyclic_index
+using DynamicGrids: inbounds, isinbounds, _cyclic_index, SimData, _unwrap, ismasked
 
 @testset "boundary boundary checks are working" begin
     @testset "inbounds with Remove() returns index and false for an boundaryed index" begin
@@ -22,6 +22,17 @@ using DynamicGrids: inbounds, isinbounds, _cyclic_index
         @test isinbounds((4, 5), (4, 5)) == true
         @test isinbounds((200, 300), (2, 3)) == false
         @test isinbounds((-22,0), (10, 10)) == false
+    end
+    @testset "boundscheck objects" begin
+        output = ArrayOutput(zeros(Int, 10, 10); tspan=1:10)
+        sd = SimData(output.extent, Ruleset())
+        @test inbounds((5, 5), sd) == ((5, 5), true)
+        @test inbounds((5, 5), first(sd)) == ((5, 5), true)
+        @test inbounds((12, 5), sd) == ((12, 5), false)
+        sd_wrap = SimData(output.extent, Ruleset(; boundary=Wrap()))
+        @test inbounds((5, 5), sd_wrap) == ((5, 5), true)
+        @test inbounds((12, 5), sd_wrap) == ((2, 5), true)
+        @test inbounds((12, 5), first(sd_wrap)) == ((2, 5), true)
     end
 end
 
@@ -63,4 +74,24 @@ end
         @test isinferred(output, Ruleset(rule))
     end
 
+end
+
+@testset "ismasked" begin
+    output = ArrayOutput(zeros(2, 2); mask=Bool[1 0; 0 1], tspan=1:10)
+    sd = SimData(output.extent, Ruleset())
+    @test ismasked(sd, 1, 2) == true
+    @test ismasked(sd, 2, 2) == false
+    output_nomask = ArrayOutput(zeros(2, 2); tspan=1:10)
+    sd = SimData(output_nomask.extent, Ruleset())
+    @test ismasked(sd, 1, 2) == false
+end
+
+@testset "unwrap" begin
+    @test _unwrap(1) == 1
+    @test _unwrap(Val(:a)) == :a
+    @test _unwrap(Aux(:a)) == :a
+    @test _unwrap(Grid(:a)) == :a
+    @test _unwrap(Aux{:x}) == :x
+    @test _unwrap(Grid{:x}) == :x
+    @test _unwrap(Val{:x}) == :x
 end

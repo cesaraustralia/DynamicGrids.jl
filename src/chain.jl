@@ -3,10 +3,10 @@
     Chain(rules::Tuple)
 
 `Chain`s allow chaining rules together to be completed in a single processing step,
-without intermediate reads or writes from grids. 
+without intermediate reads or writes from grids.
 
-They are potentially compiled together into a single function call, especially if you 
-use `@inline` on all `applyrule` methods. `Chain` can hold either all [`CellRule`](@ref) 
+They are potentially compiled together into a single function call, especially if you
+use `@inline` on all `applyrule` methods. `Chain` can hold either all [`CellRule`](@ref)
 or [`NeighborhoodRule`](@ref) followed by [`CellRule`](@ref).
 
 [``](@ref) can't be used in `Chain`, as it doesn't have a return value.
@@ -16,7 +16,7 @@ or [`NeighborhoodRule`](@ref) followed by [`CellRule`](@ref).
 struct Chain{R,W,T<:Union{Tuple{},Tuple{Union{<:NeighborhoodRule,<:CellRule},Vararg{<:CellRule}}}} <: Rule{R,W}
     rules::T
 end
-Chain(rules...) = Chain(rules) 
+Chain(rules...) = Chain(rules)
 Chain(rules::Tuple) = begin
     rkeys = Tuple{union(map(k -> _asiterable(_readkeys(k)), rules)...)...}
     wkeys = Tuple{union(map(k -> _asiterable(_writekeys(k)), rules)...)...}
@@ -28,7 +28,8 @@ rules(chain::Chain) = chain.rules
 radius(chain::Chain) = radius(chain[1])
 neighborhoodkey(chain::Chain) = neighborhoodkey(chain[1])
 neighborhood(chain::Chain) = neighborhood(chain[1])
-@inline function _setbuffer(chain::Chain{R,W}, buf) where {R,W} 
+neighbors(chain::Chain) = neighbors(chain[1])
+@inline function _setbuffer(chain::Chain{R,W}, buf) where {R,W}
     rules = (_setbuffer(chain[1], buf), tail(chain.rules)...)
     Chain{R,W,typeof(rules)}(rules)
 end
@@ -81,7 +82,7 @@ end
 
 Get the state to write for the specific rule
 """
-@generated function _filter_writestate(::Rule{R,W}, state::NamedTuple) where {R<:Tuple,W}
+@generated function _filter_writestate(::Rule{R,W}, state::NamedTuple) where {R<:Tuple,W<:Tuple}
     expr = Expr(:tuple)
     keys = Tuple(W.parameters)
     for k in keys
@@ -89,7 +90,6 @@ Get the state to write for the specific rule
     end
     expr
 end
-@inline _filter_writestate(rule::Rule{R,W}, state::NamedTuple) where {R,W} = state[W]
 
 """
     update_chainstate(rule::Rule, state::NamedTuple, writestate)

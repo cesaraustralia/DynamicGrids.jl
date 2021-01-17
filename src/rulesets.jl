@@ -15,7 +15,6 @@ padval(rs::AbstractRuleset) = rs.padval
 radius(set::AbstractRuleset) = radius(rules(set))
 
 Base.step(rs::AbstractRuleset) = timestep(rs)
-Base.copy(rs::T) where T<:AbstractRuleset = T(rules(rs), boundary(rs), opt(rs), cellsize(rs), timestep(rs))
 
 # ModelParameters interface
 Base.parent(rs::AbstractRuleset) = rules(rs)
@@ -49,12 +48,13 @@ Base.@kwdef mutable struct Ruleset{B<:Boundary,P<:Processor,Op<:PerformanceOpt,C
     timestep::T                  = nothing
     padval::PV                   = 0
 end
-Ruleset(rules::Vararg{<:Rule}; kwargs...) = Ruleset(; rules=rules, kwargs...)
-Ruleset(rules::Tuple; kwargs...) = Ruleset(; rules=rules, kwargs...)
-Ruleset(rs::AbstractRuleset) =
+Ruleset(rules::Rule...; kw...) = Ruleset(; rules=rules, kw...)
+Ruleset(rules::Tuple; kw...) = Ruleset(; rules=rules, kw...)
+function Ruleset(rs::AbstractRuleset)
     Ruleset(
         rules(rs), boundary(rs), proc(rs), opt(rs), cellsize(rs), timestep(rs), padval(rs)
     )
+end
 
 struct StaticRuleset{R<:Tuple,B<:Boundary,P<:Processor,Op<:PerformanceOpt,C,T,PV} <: AbstractRuleset
     # Rules are intentionally not type stable. This allows `precalc` and Interact.jl
@@ -67,7 +67,8 @@ struct StaticRuleset{R<:Tuple,B<:Boundary,P<:Processor,Op<:PerformanceOpt,C,T,PV
     timestep::T
     padval::PV
 end
-StaticRuleset(rs::AbstractRuleset) =
+function StaticRuleset(rs::AbstractRuleset)
     StaticRuleset(
         rules(rs), boundary(rs), proc(rs), opt(rs), cellsize(rs), timestep(rs), padval(rs)
     )
+end

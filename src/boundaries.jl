@@ -1,6 +1,6 @@
 # See interface docs
-@inline inbounds(xs::Tuple, data::SimData) = inbounds(xs, first(data))
-@inline inbounds(xs::Tuple, data::GridData) = inbounds(xs, gridsize(data), boundary(data))
+@inline inbounds(xs::Tuple, data::Union{GridData,SimData}) = 
+    inbounds(xs, gridsize(data), boundary(data))
 @inline function inbounds(xs::Tuple, maxs::Tuple, boundary)
     a, inbounds_a = inbounds(xs[1], maxs[1], boundary)
     b, inbounds_b = inbounds(xs[2], maxs[2], boundary)
@@ -19,10 +19,10 @@ end
     end
 end
 
-# See interface docs
 @inline isinbounds(x::Tuple, data::Union{SimData,GridData}) =
     isinbounds(x::Tuple, gridsize(data))
 @inline isinbounds(xs::Tuple, maxs::Tuple) = all(isinbounds.(xs, maxs))
+
 @inline isinbounds(x::Number, max::Number) = x >= one(x) && x <= max
 
 

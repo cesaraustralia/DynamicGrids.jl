@@ -452,9 +452,8 @@ struct SetNeighbors{R,W,F,N} <: SetNeighborhoodRule{R,W}
     "The neighborhood of cells around the central cell"
     neighborhood::N
 end
-SetNeighbors{R,W}(; kwargs...) where {R,W} = _nofunctionerror(SetNeighbors)
-SetNeighbors{R,W}(f; neighborhood=Moore(1)) where {R,W} =
-    SetNeighbors{R,W}(f, neighborhood)
+SetNeighbors{R,W}(; kw...) where {R,W} = _nofunctionerror(SetNeighbors)
+SetNeighbors{R,W}(f; neighborhood=Moore(1)) where {R,W} = SetNeighbors{R,W}(f, neighborhood)
 
 @inline function applyrule!(data, rule::SetNeighbors, read, I)
     let data=data, hood=neighborhood(rule), I=I, rule=rule, read=_astuple(rule, read)
@@ -493,19 +492,10 @@ struct Convolution{R,W,N} <: NeighborhoodRule{R,W}
 end
 Convolution{R,W}(A::AbstractArray) where {R,W} = Convolution{R,W}(Kernel(SMatrix{size(A)...}(A)))
 Convolution{R,W}(; neighborhood) where {R,W} = Convolution{R,W}(neighborhood)
-ConstructionBase.constructorof(::Type{Convolution{R,W}}) where {R,W} = Convolution{R,W}
 
 @inline function applyrule(data, rule::Convolution, read, I)
     @inbounds neighbors(rule) ⋅ kernel(neighborhood(rule))
 end
-
-"""
-    method(rule)
-
-Get the method of a `Cell`, `Neighbors`, or `SetCell` rule.
-"""
-method(rule::Union{Cell,Neighbors,SetCell,SetNeighbors,SetGrid}) = rule.f
-
 
 # Utils
 
@@ -514,10 +504,10 @@ method(rule::Union{Cell,Neighbors,SetCell,SetNeighbors,SetGrid}) = rule.f
 
 # Check number of args passed in as we don't get a normal method
 # error because of the splatted args in the default constructor.
-@generated function _checkfields(::Type{T}, args::A) where {T,A<:Tuple}
-    length(fieldnames(T)) == length(fieldnames(A)) ? :(nothing) : :(_fielderror(T, args))
-end
+# @generated function _checkfields(::Type{T}, args::A) where {T,A<:Tuple}
+    # length(fieldnames(T)) == length(fieldnames(A)) ? :(nothing) : :(_fielderror(T, args))
+# end
 
-@noinline function _fielderror(T, args)
-    throw(ArgumentError("$T has $(length(fieldnames(T))) fields: $(fieldnames(T)), you have used $(length(args))"))
-end
+# @noinline function _fielderror(T, args)
+    # throw(ArgumentError("$T has $(length(fieldnames(T))) fields: $(fieldnames(T)), you have used $(length(args))"))
+# end
