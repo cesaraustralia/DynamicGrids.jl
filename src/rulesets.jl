@@ -11,7 +11,6 @@ proc(rs::AbstractRuleset) = rs.proc
 opt(rs::AbstractRuleset) = rs.opt
 cellsize(rs::AbstractRuleset) = rs.cellsize
 timestep(rs::AbstractRuleset) = rs.timestep
-padval(rs::AbstractRuleset) = rs.padval
 radius(set::AbstractRuleset) = radius(rules(set))
 
 Base.step(rs::AbstractRuleset) = timestep(rs)
@@ -37,7 +36,7 @@ Rules will be run in the order they are passed, ie. `Ruleset(rule1, rule2, rule3
 - `timestep`: fixed timestep where this is reuired for some rules.
   eg. `Month(1)` or `1u"s"`.
 """
-Base.@kwdef mutable struct Ruleset{B<:Boundary,P<:Processor,Op<:PerformanceOpt,C,T,PV} <: AbstractRuleset
+Base.@kwdef mutable struct Ruleset{B<:Boundary,P<:Processor,Op<:PerformanceOpt,C,T} <: AbstractRuleset
     # Rules are intentionally not type stable. This allows `precalc` and Interact.jl
     # updates to change the rule type. Function barriers remove most performance overheads.
     rules::Tuple{Vararg{<:Rule}} = ()
@@ -46,17 +45,16 @@ Base.@kwdef mutable struct Ruleset{B<:Boundary,P<:Processor,Op<:PerformanceOpt,C
     opt::Op                      = NoOpt()
     cellsize::C                  = 1
     timestep::T                  = nothing
-    padval::PV                   = 0
 end
 Ruleset(rules::Rule...; kw...) = Ruleset(; rules=rules, kw...)
 Ruleset(rules::Tuple; kw...) = Ruleset(; rules=rules, kw...)
 function Ruleset(rs::AbstractRuleset)
     Ruleset(
-        rules(rs), boundary(rs), proc(rs), opt(rs), cellsize(rs), timestep(rs), padval(rs)
+        rules(rs), boundary(rs), proc(rs), opt(rs), cellsize(rs), timestep(rs),
     )
 end
 
-struct StaticRuleset{R<:Tuple,B<:Boundary,P<:Processor,Op<:PerformanceOpt,C,T,PV} <: AbstractRuleset
+struct StaticRuleset{R<:Tuple,B<:Boundary,P<:Processor,Op<:PerformanceOpt,C,T} <: AbstractRuleset
     # Rules are intentionally not type stable. This allows `precalc` and Interact.jl
     # updates to change the rule type. Function barriers remove most performance overheads.
     rules::R
@@ -65,10 +63,9 @@ struct StaticRuleset{R<:Tuple,B<:Boundary,P<:Processor,Op<:PerformanceOpt,C,T,PV
     opt::Op
     cellsize::C
     timestep::T
-    padval::PV
 end
 function StaticRuleset(rs::AbstractRuleset)
     StaticRuleset(
-        rules(rs), boundary(rs), proc(rs), opt(rs), cellsize(rs), timestep(rs), padval(rs)
+        rules(rs), boundary(rs), proc(rs), opt(rs), cellsize(rs), timestep(rs),
     )
 end

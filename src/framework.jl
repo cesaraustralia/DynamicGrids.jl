@@ -77,11 +77,10 @@ function sim!(output::Output, rules::Rule...;
     opt=NoOpt(),
     cellsize=1,
     timestep=nothing,
-    padval=0,
     kwargs...
 )
     ruleset = Ruleset(rules...;
-        boundary=boundary, proc=proc, opt=opt, cellsize=cellsize, timestep=timestep, padval=padval
+        boundary=boundary, proc=proc, opt=opt, cellsize=cellsize, timestep=timestep, 
     )
     return sim!(output::Output, ruleset; kwargs...)
 end

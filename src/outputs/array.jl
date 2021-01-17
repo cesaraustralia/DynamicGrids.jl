@@ -1,5 +1,5 @@
 """
-    ArrayOutput(init; tspan::AbstractRange) 
+    ArrayOutput(init; tspan::AbstractRange, [aux, mask, padval]) 
 
 A simple output that stores each step of the simulation in a vector of arrays.
 
@@ -8,6 +8,10 @@ A simple output that stores each step of the simulation in a vector of arrays.
 
 ## Keyword Argument:
 - `tspan`: `AbstractRange` timespan for the simulation
+- `aux`: NamedTuple of arbitrary input data. Use `get(data, Aux(:key), I...)` 
+  to access from a `Rule` in a type-stable way.
+- `mask`: `BitArray` for defining cells that will/will not be run.
+- `padval`: padding value for grids with neighborhood rules. The default is `zero(eltype(init))`.
 """
 mutable struct ArrayOutput{T,F<:AbstractVector{T},E} <: Output{T,F} 
     frames::F
@@ -20,7 +24,7 @@ function ArrayOutput(; frames, running, extent, kwargs...)
 end
 
 """
-    ResultOutput(init; tspan::AbstractRange) 
+    ResultOutput(init; tspan::AbstractRange, [aux, mask, padval]) 
 
 A simple output that only stores the final result, not intermediate frames.
 
@@ -29,6 +33,10 @@ A simple output that only stores the final result, not intermediate frames.
 
 ## Keyword Argument:
 - `tspan`: `AbstractRange` timespan for the simulation
+- `mask`: `BitArray` for defining cells that will/will not be run.
+- `aux`: NamedTuple of arbitrary input data. Use `get(data, Aux(:key), I...)` 
+  to access from a `Rule` in a type-stable way.
+- `padval`: padding value for grids with neighborhood rules. The default is `zero(eltype(init))`.
 """
 mutable struct ResultOutput{T,F<:AbstractVector{T},E} <: Output{T,F} 
     frames::F

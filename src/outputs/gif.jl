@@ -29,8 +29,9 @@ end
 
 
 """
-    GifOutput(init; 
-        filename, tspan, fps=25.0, store=false, 
+    GifOutput(init; filename, tspan::AbstractRange, 
+        aux=nothing, mask=nothing, padval=zero(eltype(init)),
+        fps=25.0, store=false, 
         font=autofont(),
         scheme=Greyscale()
         text=TextConfig(; font=font),
@@ -39,6 +40,22 @@ end
     )
 
 Output that stores the simulation as images and saves a Gif file on completion.
+
+## Arguments:
+- `init`: initialisation `Array` or `NamedTuple` of `Array`
+
+## Keyword Argument:
+- `tspan`: `AbstractRange` timespan for the simulation
+- `aux`: NamedTuple of arbitrary input data. Use `get(data, Aux(:key), I...)` 
+  to access from a `Rule` in a type-stable way.
+- `mask`: `BitArray` for defining cells that will/will not be run.
+- `padval`: padding value for grids with neighborhood rules. The default is `zero(eltype(init))`.
+- `font`: `String` font name
+- `scheme`: ColorSchemes.jl scheme, or `Greyscale()`
+- `text`: [`TextConfig`](@ref) object or `nothing`.
+- `processor`: [`GridProcessor`](@ref)
+- `minval`: minimum value(s) to set colour maximum
+- `maxval`: maximum values(s) to set colour minimum
 """
 mutable struct GifOutput{T,F<:AbstractVector{T},E,GC,IC,G,N} <: ImageOutput{T,F}
     frames::F
