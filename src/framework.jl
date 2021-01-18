@@ -1,12 +1,21 @@
 
 """
+
+    sim!(output, rules::Rule...; kw...)
+    sim!(output, rules::Tuple{<:Rule,Vararg}; kw...)
     sim!(output, [ruleset::Ruleset=ruleset(output)];
          init=init(output),
          mask=mask(output),
          tstpan=tspan(output),
          aux=aux(output),
          fps=fps(output),
-         simdata=nothing)
+         proc=opt(ruleset)
+         opt=opt(ruleset),
+         boundary=opt(ruleset),
+         cellsize=opt(ruleset),
+         timestep=opt(ruleset),
+         simdata=nothing
+    )
 
 Runs the simulation, passing the destination aray to
 the passed in output for each time-step.
@@ -18,36 +27,56 @@ the passed in output for each time-step.
 
 ### Keyword Arguments
 
-Theses are the taken from the output argument by default.
+Theses are the taken from the `output` argument by default:
 
 - `init`: optional array or NamedTuple of arrays.
 - `mask`: a `Bool` array matching the init array size. `false` cells do not run.
 - `aux`: a `NamedTuple` of auxilary data to be used by rules.
 - `tspan`: a tuple holding the start and end of the timespan the simulaiton will run for.
 - `fps`: the frames per second to display. Will be taken from the output if not passed in.
+
+Theses are the taken from the `ruleset` argument by default:
+- `proc`: a [`Processor`](@ref) to specificy the hardware to run simulations on, 
+  like [`SingleCPU`](@ref), [`ThreadedCPU`](@ref) or [`CuGPU`](@ref) when 
+  KernelAbstractions.jl and a CUDA gpu is available. 
+- `opt`: a [`PerformanceOpt`](@ref) to specificy optimisations like
+  [`SparseOpt`](@ref) or [`NoOpt`](@ref). Defaults to `NoOpt()`.
+- `boundary`: what to do with boundary of grid edges.
+  Options are [`Remove`](@ref) or [`Wrap`](@ref), defaulting to `Remove()`.
+- `cellsize`: the size of cells, which may be accessed by rules.
+- `timestep`: fixed timestep where this is required for some rules.
+  eg. `Month(1)` or `1u"s"`.
+
+Other:
 - `simdata`: a [`SimData`](@ref) object. Keeping it between simulations can reduce memory
-  allocation when that is important.
+  allocation a little, when that is important.
 """
-function sim!(
-     output::Output, ruleset=ruleset(output);
-     init=init(output),
-     mask=mask(output),
-     tspan=tspan(output),
-     aux=aux(output),
-     fps=fps(output),
-     simdata=nothing,
-     kwargs...
+function sim!(output::Output, ruleset=ruleset(output);
+    init=init(output),
+    mask=mask(output),
+    tspan=tspan(output),
+    aux=aux(output),
+    fps=fps(output),
+    boundary=boundary(ruleset),
+    proc=proc(ruleset),
+    opt=opt(ruleset),
+    cellsize=cellsize(ruleset),
+    timestep=timestep(ruleset),
+    simdata=nothing,
 )
-    isrunning(output) && error("A simulation is already running in this output")
+    isrunning(output) && error("Either a simulation is already running in this output, or an error occurred")
     setrunning!(output, true) || error("Could not start the simulation with this output")
 
     gridsize(init) == gridsize(DG.init(output)) || throw(ArgumentError("init size does not match output init"))
-    # Some rules are only valid for a set time-step size.
-    step(ruleset) !== nothing && step(ruleset) != step(tspan) &&
-        throw(ArgumentError("tspan step $(step(tspan)) must equal rule step $(step(ruleset))"))
 
     # Rebuild Extent to allow kwarg alterations
     extent = Extent(; init=_asnamedtuple(init), mask=mask, aux=aux, tspan=tspan)
+    ruleset = Ruleset(rules(ruleset);
+        boundary=boundary, proc=proc, opt=opt, cellsize=cellsize, timestep=timestep,
+    )
+    # Some rules are only valid for a set time-step size.
+    step(ruleset) !== nothing && step(ruleset) != step(tspan) &&
+        throw(ArgumentError("tspan step $(step(tspan)) must equal rule step $(step(ruleset))"))
     # Set up output
     settspan!(output, tspan)
     # Create or update the combined data object for the simulation
@@ -64,26 +93,8 @@ function sim!(
     # Run the simulation over simdata and a unitrange
     return runsim!(output, simdata, ruleset, 1:lastindex(tspan))
 end
-
-"""
-    sim!(output, rules::Rule...; kwargs...)
-
-Run a simulation passing in rules without defining a `Ruleset`.
-"""
-sim!(output::Output, rules::Tuple; kwargs...) = sim!(output::Output, rules...; kwargs...)
-function sim!(output::Output, rules::Rule...;
-    boundary=Remove(),
-    proc=SingleCPU(),
-    opt=NoOpt(),
-    cellsize=1,
-    timestep=nothing,
-    kwargs...
-)
-    ruleset = Ruleset(rules...;
-        boundary=boundary, proc=proc, opt=opt, cellsize=cellsize, timestep=timestep, 
-    )
-    return sim!(output::Output, ruleset; kwargs...)
-end
+sim!(output::Output, rules::Tuple; kw...) = sim!(output, rules...; kw...)
+sim!(output::Output, rules::Rule...; kw...) = sim!(output, Ruleset(rules...); kw...)
 
 """
     resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
@@ -143,8 +154,7 @@ Simulation runner. Runs a simulation synchonously or asynchonously
 depending on the return value of `isasync(output)` - which may be a
 fixed trait or a field value depending on the output type.
 
-This allows interfaces with interactive components to update during
-the simulations.
+This allows interfaces with interactive components to update during the simulations.
 """
 function runsim!(output, simdata, ruleset, fspan)
     if isasync(output)
@@ -155,7 +165,7 @@ function runsim!(output, simdata, ruleset, fspan)
 end
 
 """
-    simloop!(output::Output, simdata::SimData, fspan::UnitRange)
+    simloop!(output::Output, simdata, ruleset, fspan::UnitRange)
 
 Loop over the frames in `fspan`, running the ruleset and displaying the output.
 
