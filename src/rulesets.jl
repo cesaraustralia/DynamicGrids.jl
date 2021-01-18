@@ -28,6 +28,9 @@ details like boundary handing and optimisation.
 Rules will be run in the order they are passed, ie. `Ruleset(rule1, rule2, rule3)`.
 
 ## Keyword Arguments
+- `proc`: a [`Processor`](@ref) to specificy the hardware to run simulations on, 
+  like [`SingleCPU`](@ref), [`ThreadedCPU`](@ref) or [`CuGPU`](@ref) when 
+  KernelAbstractions.jl and a CUDA gpu is available. 
 - `opt`: a [`PerformanceOpt`](@ref) to specificy optimisations like
   [`SparseOpt`](@ref). Defaults to [`NoOpt`](@ref).
 - `boundary`: what to do with boundary of grid edges.
