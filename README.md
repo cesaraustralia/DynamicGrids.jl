@@ -1,4 +1,4 @@
-![Banner](https://repository-images.githubusercontent.com/136250713/956b0c00-5cc7-11eb-9814-eed48441d013))
+![Banner](https://repository-images.githubusercontent.com/136250713/956b0c00-5cc7-11eb-9814-eed48441d013)
 
 # DynamicGrids
 
