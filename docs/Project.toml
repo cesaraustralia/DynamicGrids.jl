@@ -1,4 +1,7 @@
 [deps]
+Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 DynamicGrids = "a5dba43e-3abc-5203-bfc5-584ca68d3f5b"
+Flatten = "4c728ea3-d9ee-5c9a-9642-b6f7d7dc04fa"
+KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"

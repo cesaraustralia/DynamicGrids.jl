@@ -8,17 +8,17 @@ Rules can be chained together sequentially into [`Ruleset`](@ref)s.
 Rules are applied to the grid using the [`applyrule`](@ref) method:
 
 ```julia
-@inline applyrule(data::SimData, rule::YourRule, state, cellindex) =
+@inline applyrule(data::SimData, rule::YourRule, state, index) =
 ```
 
-Where cellindex is a `Tuple` of `Int`, and `state` is a single value, or a `NamedTuple`
+Where `index` is a `Tuple` of `Int`, and `state` is a single value, or a `NamedTuple`
 if multiple grids are requested. The `NamedTuple` keys will match the
 keys in `R`, which is a type like `Tuple{:key1,:key1}` - note the names are user
-specified, and should never be fixed by a Rule - they can be retrieved from the type
+specified, and should never be fixed by a `Rule` - they can be retrieved from the type
 here as `A` and `B` :
 
 ```julia
-applyrule(data::SimData, rule::YourCellRule{Tuple{R1,R2},Tuple{W1,W2}}, state, cellindex) where {R1,R2,W1,W2}
+applyrule(data::SimData, rule::YourCellRule{Tuple{R1,R2},Tuple{W1,W2}}, state, index) where {R1,R2,W1,W2}
 ```
 
 By default the output is written to the current cell in the specified `W` write grid/s.
@@ -125,13 +125,13 @@ struct YourCellRule{R,W} <: CellRule{R,W} end
 And applied as:
 
 ```julia
-function applyrule(data::SimData, rule::YourCellRule{R,W}, state, cellindex) where {R,W}
+function applyrule(data::SimData, rule::YourCellRule{R,W}, state, index) where {R,W}
     state * 2
 end
 ```
 
-As the `cellindex` is provided in `applyrule`, you can look up an [`aux`](@ref) array
-using `aux(data, Val{:auxname}())[cellindex...]` to access cell-specific variables for
+As the `index` is provided in `applyrule`, you can look up an [`aux`](@ref) array
+using `aux(data, Val{:auxname}())[index...]` to access cell-specific variables for
 your rule.
 
 It's good to add a struct field to hold the `Val{:auxname}()` object instead of
@@ -141,41 +141,48 @@ scripting context.
 """
 abstract type CellRule{R,W} <: Rule{R,W} end
 
+
 """
-`SetCellRule` is the supertype for rules that manually write to whichever cells of the
-grid that they choose, instead of automatically updating every cell with their output.
+Abstract supertype for rules that manually write to the grid in any way.
+
+Adds methods to [`applyrule!`](@ref).
+"""
+abstract type SetRule{R,W} <: Rule{R,W} end
+
+"""
+Abstract supertype for rules that can manually write to any cells of the
+grid that they need to.
 
 `SetCellRule` is applied with a method like:
 
 ```julia
-function applyrule!(data::SimData, rule::YourSetCellRule{R,W}, state, cellindex) where {R,W}
+function applyrule!(data::SimData, rule::YourSetCellRule, state, index)
      inc = 1
-     add!(data[W], inc, cellindex...)
+     add!(data, inc, index...)
      return nothing
 end
 ```
 
-Note the `!` bang - this method alters the state of `data`. We also use the type
-parameter `W` (write) to index into the `data` object. You could also just use
-`first(dat)` when there is only one `W` write grid.
+Note the `!` bang - this method alters the state of `data`.
 
-To update the grid, you can use: [`add!`](@ref), [`sub!`](@ref) for `Number`,
-and [`and!`](@ref), [`or!`](@ref) for `Bool`. These methods safely combined
-writes from all grid cells - directly using `setindex!` would cause bugs.
+To update the grid, you can use atomic operators [`add!`](@ref), [`sub!`](@ref), 
+[`min!`](@ref), [`max!`](@ref), and [`and!`](@ref), [`or!`](@ref) for `Bool`. 
+These methods safely combined writes from all grid cells - directly using `setindex!` 
+would cause bugs.
 
 It there are multiple write grids, you will need to get the grid keys from
 type parameters, here `W1` and `W2`:
 
 ```julia
-function applyrule(data, rule::YourManRule{R,Tuple{W1,W2}}, state, cellindex) where {R,W1,W2}
+function applyrule(data, rule::YourSetCellRule{R,Tuple{W1,W2}}, state, index) where {R,W1,W2}
      inc = 1
-     add!(data[W1], inc, cellindex...)
-     add!(data[W2], 2inc, cellindex...)
+     add!(data[W1], inc, index...)
+     add!(data[W2], 2inc, index...)
      return nothing
 end
 ```
 """
-abstract type SetCellRule{R,W} <: Rule{R,W} end
+abstract type SetCellRule{R,W} <: SetRule{R,W} end
 
 """
 A Rule that only accesses a neighborhood centered around the current cell.
@@ -219,13 +226,13 @@ radius(rule::NeighborhoodRule, args...) = radius(neighborhood(rule))
 A Rule that only writes to its neighborhood.
 
 [`positions`](@ref) and [`offsets`](@ref) are useful iterators for modifying
-neighborhood values.
+neighborhood values. Atomic 
 
-SetNeighborhood rules must return a `Neighborhood` object from `neighborhood(rule)`.
+`SetNeighborhood` rules must return a `Neighborhood` object from `neighborhood(rule)`.
 By default this is `rule.neighborhood`. If this property exists, no interface methods 
 are required.
 """
-abstract type SetNeighborhoodRule{R,W} <: SetCellRule{R,W} end
+abstract type SetNeighborhoodRule{R,W} <: SetRule{R,W} end
 
 neighborhood(rule::SetNeighborhoodRule) = rule.neighborhood
 offsets(rule::SetNeighborhoodRule) = offsets(neighborhood(rule))
@@ -259,12 +266,13 @@ end
 """
 abstract type SetGridRule{R,W} <: Rule{R,W} end
 
+
 """
     SetGrid{R,W}(f)
 
 Apply a function `f` to fill whole grid/s.
 
-```jldoctest
+```julia
 rule = SetGrid{:a,:b}() do a, b
     b .= a
 end
@@ -376,8 +384,8 @@ Neighbors{R,W}(f; neighborhood=Moore(1)) where {R,W} =
 end
 
 """
-    Set(f)
-    Set{R,W}(f)
+    SetCell(f)
+    SetCell{R,W}(f)
 
 A [`SetCellRule`](@ref) to manually write to the array where you need to.
 `f` is passed an indexable `data` object, and the index of the current cell,
@@ -428,23 +436,21 @@ writes from all grid cells.
 
 Directly using `setindex!` is possible, but may cause bugs as multiple cells
 may write to the same location in an unpredicatble order. As a rule, directly
-setting a neighborhood index should only be done for a single value - then it can 
-be guaranteed that any writes from othe grid cells reach the same result.
+setting a neighborhood index should only be done if it always sets the samevalue - 
+then it can be guaranteed that any writes from othe grid cells reach the same result.
 
-[`neighbors`], [`offsets`] and [`positions`](@ref) are useful methods
+[`neighbors`](@ref), [`offsets`](@ref) and [`positions`](@ref) are useful methods for
+`SetNeighbors` rules.
 
 ## Example
 
 ```julia
-rule = let x = 10
-    SetNeighbors{Tuple{:a,:b},:b}() do data, hood, I, a, b
-        for pos in positions(hood)
-            add!(data[:b], a^x, pos...)
-        end
+SetNeighbors{Tuple{:a,:b},:b}() do data, hood, I, a, b
+    for pos in positions(hood)
+        add!(data[:b], a^2, pos...)
     end
 end
 ```
-The `let` block greatly improves performance.
 """
 struct SetNeighbors{R,W,F,N} <: SetNeighborhoodRule{R,W}
     "Function to apply to the data, index and read values"

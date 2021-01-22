@@ -40,8 +40,8 @@ imgbuffer(ic::ImageConfig) = ic.imgbuffer
 """
 Graphic outputs that display the simulation frames as RGB images.
 
-`ImageOutput`s must have a [`Extent`](@ref), [`GraphicConfig`](@ref) 
-and [`ImageConfig`](@ref) component, and define a [`showimage`](@ref) method.
+`ImageOutput`s must have [`Extent`](@ref), [`GraphicConfig`](@ref) 
+and [`ImageConfig`](@ref) components, and define a [`showimage`](@ref) method.
 
 See [`GifOutput`](@ref) for an example.
 

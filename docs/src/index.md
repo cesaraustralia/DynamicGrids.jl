@@ -1,4 +1,3 @@
-# DynamicGrids.jl
 
 ```@docs
 DynamicGrids
@@ -11,32 +10,68 @@ sim!
 resume! 
 ```
 
-## Rules
-
-Rules define simulation behaviour. They hold data relevant to the simulation,
-and trigger dispatch of particular [`applyrule`](@ref) or [`applyrule!`](@ref) methods.
-Rules can be chained together arbitrarily to make composite simulations across
-any number of grids.
+## Rulesets
 
 ```@docs
+AbstractRuleset
 Ruleset
+```
+
+### Boundary conditions
+
+```@docs
+Boundary
+Wrap
+Remove
+```
+
+### Hardware selection
+
+```@docs
+DynamicGrids.Processor
+DynamicGrids.CPU
+SingleCPU
+ThreadedCPU
+CuGPU
+```
+
+### Performance optimisation
+
+```@docs
+PerformanceOpt
+NoOpt
+SparseOpt
+```
+
+## Rules
+
+```@docs
 Rule
 CellRule
 Cell
+CopyTo
 NeighborhoodRule
 Neighbors
 Convolution
 Life
+DynamicGrids.SetRule
 SetCellRule
-Manual
+SetCell
 SetNeighborhoodRule
 SetNeighbors
-GridRule
-Grid
+SetGridRule
+SetGrid
 Chain
 ```
 
-### Rule methods and helpers
+### Rules parameter sources
+
+```@docs
+Aux
+Grid
+```
+
+### Custom Rule interface and helpers
 
 ```@docs
 DynamicGrids.applyrule
@@ -45,10 +80,16 @@ DynamicGrids.precalcrule
 isinferred 
 ```
 
-### Data objects and methods for use in `applyrule`
+### Objects and methods for use in `applyrule` and/or `precalcrule`
 
 ```@docs
-SimData
+DynamicGrids.SimData
+DynamicGrids.GridData
+DynamicGrids.ReadableGridData
+DynamicGrids.WritableGridData
+DynamicGrids.ismasked
+DynamicGrids.inbounds
+DynamicGrids.isinbounds
 DynamicGrids.init
 DynamicGrids.aux
 DynamicGrids.mask
@@ -57,26 +98,21 @@ DynamicGrids.timestep
 DynamicGrids.currenttimestep
 DynamicGrids.currenttime
 DynamicGrids.currentframe
-DynamicGrids.frameindex
-DynamicGrids.inbounds
-DynamicGrids.isinbounds
 ```
 
 ## Neighborhoods
 
-Neighborhoods define a pattern of cells surrounding the current cell,
-and how they are combined to update the value of the current cell.
-
 ```@docs
 Neighborhood
 RadialNeighborhood
-AbstractKernel
-Kernel
 Moore
 VonNeumann
+Window
 AbstractPositional
 Positional
 LayeredPositional
+AbstractKernel
+Kernel
 ```
 
 ### Methods for use with neighborhood rules and neighborhoods
@@ -86,19 +122,22 @@ DynamicGrids.radius
 DynamicGrids.neighbors
 DynamicGrids.positions
 DynamicGrids.offsets
-DynamicGrids.sumneighbors
 ```
 
-## Manual Rules
+## Atomic methods
+
+Using these methods to modify grid values ensures cell independence, 
+and also prevent race conditions with [`ThreadedCPU`](@ref) or [`CuGPU`].
 
 ```@docs
 add!
 sub!
+min!
+max!
 and!
 or!
 xor!
 ```
-
 
 ## Output
 
@@ -119,91 +158,64 @@ GifOutput
 ### Grid processors
 
 ```@docs
-GridProcessor
-SingleGridProcessor
-SparseOptInspector
-ColorProcessor
-MultiGridProcessor
-ThreeColorProcessor
-LayoutProcessor
 Greyscale
 Grayscale
+GridProcessor
+SingleGridProcessor
+ColorProcessor
+MultiGridProcessor
+LayoutProcessor
+SparseOptInspector
 TextConfig
 ```
 
-### Gifs
+### Saving gifs
 
 ```@docs
 savegif
 ```
 
-### Internal components and methods for outputs
+
+## `Output` interface
 
 These are used for defining your own outputs and `GridProcessors`, 
 not for general scripting.
 
 ```@docs
+DynamicGrids.AbstractExtent
 DynamicGrids.Extent
-DynamicGrids.GraphicConfig
-DynamicGrids.ImageConfig
-DynamicGrids.storeframe!
-DynamicGrids.showframe
-DynamicGrids.showimage
+DynamicGrids.extent
 DynamicGrids.isasync
+DynamicGrids.storeframe!
+DynamicGrids.isrunning
 DynamicGrids.isshowable
 DynamicGrids.isstored
-DynamicGrids.initialise
+DynamicGrids.initialise!
+DynamicGrids.finalise!
+```
+
+### `GraphicOutput` interface
+
+Also includes `Output` interface.
+
+```@docs
+DynamicGrids.GraphicConfig
+DynamicGrids.graphicconfig
+DynamicGrids.fps
+DynamicGrids.setfps!
+DynamicGrids.showframe
 DynamicGrids.delay
-DynamicGrids.finalise
-DynamicGrids.grid2image
-DynamicGrids.rendertext!
-DynamicGrids.rendertime!
-DynamicGrids.rendername!
-DynamicGrids.normalise
-DynamicGrids.rgb
+DynamicGrids.initialisegraphics
+DynamicGrids.finalisegraphics
 ```
 
-## Ruleset config
+### `ImageOutput` interface
 
-### Boundary conditions
-
-```@docs
-Boundary
-Wrap
-Remove
-```
-
-### Optimisation
+Also includes `Output` and `GraphicOutput` interfaces.
 
 ```@docs
-PerformanceOpt
-NoOpt
-SparseOpt
-```
-
-## Internal data handling
-
-[`SimData`](@ref) and [`GridData`](@ref) objects are used to 
-manage the simulation and provide rules with any data they need.
-
-These methods and objects are all subject to change until version 1.0.
-
-```@docs
-DynamicGrids.GridData
-DynamicGrids.ReadableGridData
-DynamicGrids.WritableGridData
-DynamicGrids.runsim!
-DynamicGrids.simloop!
-DynamicGrids.sequencerules!
-DynamicGrids.maprule!
-DynamicGrids.optmap
-DynamicGrids.readgrids
-DynamicGrids.writegrids
-DynamicGrids.ismasked
-DynamicGrids.getreadgrids
-DynamicGrids.combinegrids
-DynamicGrids.replacegrids
-DynamicGrids.filter_readstate
-DynamicGrids.filter_writestate
-DynamicGrids.update_chainstate
+DynamicGrids.ImageConfig
+DynamicGrids.imageconfig
+DynamicGrids.showimage
+DynamicGrids.grid2image!
 ```
