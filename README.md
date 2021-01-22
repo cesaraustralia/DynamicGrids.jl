@@ -1,3 +1,5 @@
+![Banner](https://repository-images.githubusercontent.com/136250713/926f1c00-5cc5-11eb-94ab-121b80eb1eda)
+
 # DynamicGrids
 
 [![](https://img.shields.io/badge/docs-stable-blue.svg)](https://cesaraustralia.github.io/DynamicGrids.jl/stable)
