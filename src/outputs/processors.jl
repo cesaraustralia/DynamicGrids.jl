@@ -298,7 +298,8 @@ scale(x, ::Nothing, ::Nothing) = x
 """
     rgb(val)
 
-Convert a number, tuple or color to an ARGB32 value.
+Convert a number, tuple, color or colorscheme and value to `ARGB32` for displaying as an image,
+usually called in [`cell2rgb`](@ref).
 """
 rgb(vals::Tuple) = ARGB32(vals...)
 rgb(vals...) = ARGB32(vals...)
@@ -306,9 +307,4 @@ rgb(val::Number) = ARGB32(RGB(val))
 rgb(val::Color) = ARGB32(val)
 rgb(val::ARGB32) = val
 rgb(val::Bool) = (ARGB32(0), ARGB32(1))[val+1]
-"""
-    rgb(scheme, val)
-
-Convert a color scheme and value to an RGB value.
-"""
 rgb(scheme, val) = rgb(get(scheme, val))

@@ -21,10 +21,10 @@ function applyrule end
     applyrule!(data::SimData, rule::{R,W}, state, index::Tuple{Int,Int}) => Nothing
 
 Apply a rule to the cell state and manually write to the grid data array.
-Used in all rules inheriting from [``](@ref).
+Used in all rules inheriting from [`SetCellRule`](@ref).
 
 This is called in internal `maprule!` methods during the simulation, not by
-the user. Custom [``](@ref) implementations must define this method.
+the user. Custom [`SetCellRule`](@ref) implementations must define this method.
 
 Only grids specified with the `W` type parameter will be writable from `data`.
 
@@ -148,7 +148,7 @@ function xor! end
 """
     inbounds(I::Tuple, data::SimData) => Tuple{NTuple{2,Int},Bool}
 
-Check grid boundaries for a coordinate before writing in [``](@ref).
+Check grid boundaries for a coordinate before writing in [`SetCellRule`](@ref).
 
 Returns a `Tuple` containing a coordinates `Tuple` and a `Bool` - `true`
 if the cell is in bounds, `false` if not.
@@ -164,7 +164,7 @@ function inbounds end
 """
     isinbounds(I::Tuple, data)
 
-Check that a coordinate is within the grid, usually in [``](@ref).
+Check that a coordinate is within the grid, usually in [`SetCellRule`](@ref).
 
 Unlike [`inbounds`](@ref), [`Boundary`](@ref) status is ignored.
 """

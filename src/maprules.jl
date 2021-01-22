@@ -50,7 +50,7 @@ end
 
 _maybeupdatedest!(ds::Tuple, rule) = map(d -> _maybeupdatedest!(d, rule), ds)
 _maybeupdatedest!(d::WritableGridData, rule::Rule) = nothing
-function _maybeupdatedest!(d::WritableGridData, rule::SetCellRule)
+function _maybeupdatedest!(d::WritableGridData, rule::SetRule)
     copyto!(parent(dest(d)), parent(source(d)))
 end
 
@@ -150,7 +150,7 @@ end
     _writegrids!(wgrids, writeval, i, j)
     nothing
 end
-@inline function rule_kernel!(wgrids, simdata, rule::SetCellRule, rkeys, rgrids, wkeys, i, j)
+@inline function rule_kernel!(wgrids, simdata, rule::SetRule, rkeys, rgrids, wkeys, i, j)
     readval = _readgrids(rkeys, rgrids, i, j)
     applyrule!(simdata, rule, readval, (i, j))
     nothing

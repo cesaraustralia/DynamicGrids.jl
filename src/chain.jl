@@ -9,7 +9,7 @@ They are potentially compiled together into a single function call, especially i
 use `@inline` on all `applyrule` methods. `Chain` can hold either all [`CellRule`](@ref)
 or [`NeighborhoodRule`](@ref) followed by [`CellRule`](@ref).
 
-[``](@ref) can't be used in `Chain`, as it doesn't have a return value.
+[`SetRule`](@ref) can't be used in `Chain`, as it doesn't have a return value.
 
 ![Chain rule diagram](https://raw.githubusercontent.com/cesaraustralia/DynamicGrids.jl/media/Chain.png)
 """

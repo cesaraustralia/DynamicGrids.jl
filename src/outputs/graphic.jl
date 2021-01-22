@@ -28,19 +28,10 @@ end
 setstoppedframe!(gc::GraphicConfig, frame::Int) = gc.stoppedframe = frame
 
 """
-Outputs that display the simulation frames live.
+Abstract supertype for [`Output`](@ref)s that display the simulation frames.
 
-All `GraphicOutputs` have a [`GraphicConfig`](@ref) object
-and provide a [`showframe`](@ref) method.
-
-## Interface Methods
-
-- `extent(output) => Extent`
-- `graphicconfig(output) => GraphicConfig`
-- `isasync(output) => Bool`: does the output need to run asynchronously, 
-  in a separate thread.
-- `showframe(grid::Union{Array,NamedTuple}, o::ThisOutput, data)` :
-  in which the output generally show the frame graphically in some way.
+All `GraphicOutputs` must have a [`GraphicConfig`](@ref) object
+and define a [`showframe`](@ref) method.
 
 See [`REPLOutput`](@ref) for an example.
 
@@ -49,8 +40,8 @@ See [`REPLOutput`](@ref) for an example.
 The default constructor will generate these objects from keyword arguments and pass 
 them to the object constructor, which must accept the following
 
-- `frames`: a Vector of simulation frames (`NamedTuple` or `Array`). 
-- `running`: A Bool.
+- `frames`: a `Vector` of simulation frames (`NamedTuple` or `Array`). 
+- `running`: A `Bool`.
 - `extent` an [`Extent`](@ref) object.
 - `graphicconfig` a [`GraphicConfig`](@ref)object.
 

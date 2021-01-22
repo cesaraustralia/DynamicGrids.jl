@@ -1,6 +1,4 @@
-using Documenter, DynamicGrids
-using DynamicGrids: AbstractSimData, SimData, GridData, ReadableGridData, WritableGridData,
-      applyrule, applyrule!, inbounds
+using Documenter, DynamicGrids, KernelAbstractions
 
 makedocs(
     modules = [DynamicGrids],

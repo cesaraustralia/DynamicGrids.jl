@@ -5,6 +5,17 @@ using Adapt,
 
 export CuGPU
 
+
+"""
+    CuGPU()
+    CuGPU{threads_per_block}()
+
+```julia
+ruleset = Ruleset(rule; proc=ThreadedCPU())
+# or
+output = sim!(output, rule; proc=ThreadedCPU())
+```
+"""
 struct CuGPU{X} <: Processor end
 CuGPU() = CuGPU{32}()
 

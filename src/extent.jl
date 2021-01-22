@@ -1,3 +1,7 @@
+"""
+Abstract supertype for `Extent` objects, that hold all variables related 
+to space and time in a simulation. Usually the field of an output.
+"""
 abstract type AbstractExtent{I,M,A,PV} end
 
 init(e::AbstractExtent) = e.init

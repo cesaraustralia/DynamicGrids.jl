@@ -75,6 +75,8 @@ end
 
 Render time `name` and `t` as text onto the image, following config settings.
 """
+function _rendertime! end
+
 function _rendertext!(img, config::TextConfig, name, t)
     _rendername!(img, config::TextConfig, name)
     _rendertime!(img, config::TextConfig, t)
