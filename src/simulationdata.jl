@@ -119,9 +119,9 @@ calculated automatically.
 
 Currently this is cycled by default, but will use Cyclic mode in DiensionalData.jl in future.
 """
-@inline Base.get(data::SimData, val, I...) = val
-@inline Base.get(data::SimData, key::Grid{K}, I...) where K = data[K][I...]
-@inline Base.get(data::SimData, key::Aux, I...) = _auxval(data, key, I...)
+@propagate_inbounds Base.get(data::SimData, val, I...) = val
+@propagate_inbounds Base.get(data::SimData, key::Grid{K}, I...) where K = data[K][I...]
+@propagate_inbounds Base.get(data::SimData, key::Aux, I...) = _auxval(data, key, I...)
 
 @propagate_inbounds Base.setindex!(d::SimData, x, I...) = setindex!(first(grids(d)), x, I...)
 @propagate_inbounds Base.getindex(d::SimData, I...) = getindex(first(grids(d)), I...)

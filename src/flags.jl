@@ -46,7 +46,7 @@ for all rules.
 struct NoOpt <: PerformanceOpt end
 
 """
-Abstract supertype for selecting hardware processor, such as ia CPU or GPU.
+Abstract supertype for selecting a hardware processor, such as ia CPU or GPU.
 """
 abstract type Processor end
 
@@ -91,6 +91,10 @@ ThreadedCPU() = ThreadedCPU(Base.Threads.SpinLock())
 Base.Threads.lock(opt::ThreadedCPU) = lock(opt.spinlock)
 Base.Threads.unlock(opt::ThreadedCPU) = unlock(opt.spinlock)
 
+"""
+Abstract supertype for GPU processors.
+"""
+abstract type GPU <: Processor end
 
 """
 Abstract supertype for flags that specify the boundary conditions used in the simulation,
@@ -158,6 +162,9 @@ precalculated for each timestep so it has no significant overhead.
 struct Aux{K} end
 Aux(key::Symbol) = Aux{key}()
 
+_unwrap(::Aux{X}) where X = X
+_unwrap(::Type{<:Aux{X}}) where X = X
+
 """
     Grid{K}()
     Grid(K::Symbol)
@@ -178,3 +185,6 @@ SomeRule(; myparam=Grid{:somegrid})
 """
 struct Grid{K} end
 Grid(key::Symbol) = Grid{key}()
+
+_unwrap(::Grid{X}) where X = X
+_unwrap(::Type{<:Grid{X}}) where X = X

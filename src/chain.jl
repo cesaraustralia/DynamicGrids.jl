@@ -44,21 +44,32 @@ Base.length(chain::Chain) = length(rules(chain))
 Base.firstindex(chain::Chain) = firstindex(rules(chain))
 Base.lastindex(chain::Chain) = lastindex(rules(chain))
 
-@generated function applyrule(data::SimData, chain::Chain{R,W,T}, state, index) where {R,W,T}
+@generated function applyrule(data::SimData, chain1::Chain{R,W,T}, state1, index) where {R,W,T}
     expr = Expr(:block)
-    for i in 1:length(T.parameters)
+    nrules = length(T.parameters)
+    for i in 1:nrules
+        # Variables are numbered to make debugging type stability easier
+        state = Symbol("state$i")
+        nextstate = Symbol("state$(i+1)") 
+        rule = Symbol("rule$i") 
+        read = Symbol("read$i") 
+        write = Symbol("write$i") 
+        chain = Symbol("chain$i") 
+        nextchain = Symbol("chain$(i+1)") 
         rule_expr = quote
-            rule = chain[$i]
+            $rule = $chain[1]
             # Get the state needed by this rule
-            read = _filter_readstate(rule, state)
+            $read = _filter_readstate($rule, $state)
             # Run the rule
-            write = applyrule(data, rule, read, index)
+            $write = applyrule(data, $rule, $read, index)
             # Create new state with the result and state from other rules
-            state = _update_chainstate(rule, state, write)
+            $nextstate = _update_chainstate($rule, $state, $write)
+            $nextchain = tail($chain)
         end
         push!(expr.args, rule_expr)
     end
-    push!(expr.args, :(_filter_writestate(chain, state)))
+    laststate = Symbol("state$(nrules+1)")
+    push!(expr.args, :(_filter_writestate(chain1, $laststate)))
     expr
 end
 
@@ -73,7 +84,7 @@ Get the state to pass to the specific rule as a `NamedTuple` or single value
     for k in keys
         push!(expr.args, :(state[$(QuoteNode(k))]))
     end
-    :(NamedTuple{$keys,typeof($expr)}($expr))
+    :(NamedTuple{$keys}($expr))
 end
 @inline _filter_readstate(::Rule{R,W}, state::NamedTuple) where {R,W} = state[R]
 
@@ -114,8 +125,5 @@ Returns a new `NamedTuple` with all keys having the most recent state
             push!(expr.args, :(state[$i]))
         end
     end
-    quote
-        newstate = $expr
-        NamedTuple{$keys,typeof(newstate)}(newstate)
-    end
+    :(NamedTuple{$keys}($expr))
 end

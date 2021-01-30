@@ -1,10 +1,15 @@
-using Adapt,
-      CUDA,
-      Flatten,
-      KernelAbstractions
+using KernelAbstractions
 
-export CuGPU
+using KernelAbstractions.Adapt
+using KernelAbstractions.CUDA
+import ModelParameters.Flatten
 
+export GPU, CuGPU, CPUGPU
+
+"""
+A CPU that uses the CUDA GPU code, to test it.
+"""
+struct CPUGPU <: GPU end
 
 """
     CuGPU()
@@ -16,47 +21,59 @@ ruleset = Ruleset(rule; proc=ThreadedCPU())
 output = sim!(output, rule; proc=ThreadedCPU())
 ```
 """
-struct CuGPU{X} <: Processor end
+struct CuGPU{X} <: GPU end
 CuGPU() = CuGPU{32}()
 
-Adapt.adapt_structure(to, x::Union{SimData,GridData,Rule}) =
+kernel_setup(::CPUGPU) where N = KernelAbstractions.CPU(), 1
+kernel_setup(::CuGPU{N}) where N = KernelAbstractions.CUDADevice(), N
+
+function Adapt.adapt_structure(to, x::Union{AbstractSimData,GridData,Rule})
     Flatten.modify(A -> adapt(to, A), x, Union{CuArray,Array,AbstractDimArray}, SArray)
+end
 
-_proc_setup(::CuGPU, obj) = Flatten.modify(CuArray, obj, Union{Array,BitArray}, SArray)
+function Adapt.adapt_structure(to, o::Output)
+    frames = map(o.frames) do f
+        if f isa NamedTuple
+            a = map(g -> adapt(to, g), f)
+        else
+            adapt(to, f)
+        end
+    end
+    @set o.extent = adapt(to, o.extent)
+    @set o.frames = frames
+end
 
-function _copyto_output!(outgrid, grid, proc::CuGPU)
+function _proc_setup(::CuGPU, obj) 
+    Flatten.modify(CuArray, obj, Union{Array,BitArray}, Union{SArray,Dict})
+end
+
+function _copyto_output!(outgrid, grid, proc::GPU)
     src = adapt(Array, source(grid))
     copyto!(outgrid, CartesianIndices(outgrid), src, CartesianIndices(outgrid))
     return nothing
 end
-
-function maprule!(
-    wgrids::Union{<:GridData{Y,X,R},Tuple{<:GridData{Y,X,R},Vararg}},
-    simdata, ::CuGPU{N}, opt, args...
-) where {Y,X,R,N}
-    kernel! = cu_rule_kernel!(CUDADevice(),N)
-    # kernel! = cu_rule_kernel!(KernelAbstractions.CPU(),1)
-    kernel!(wgrids, simdata, args...; ndrange=gridsize(simdata)) |> wait
-end
-# For method ambiguity
-function maprule!(
-    wgrids::Union{<:GridData{Y,X,R},Tuple{<:GridData{Y,X,R},Vararg}},
-    simdata, proc::CuGPU, opt, rule::NeedsBuffer, args...
-) where {Y,X,R}
-    grid = simdata[neighborhoodkey(rule)]
-    _maybecopystatus!(grid, opt)
-    mapneighborhoodrule!(wgrids, simdata, grid, proc, opt, rule, args...)
+function _copyto_output!(outgrid::CuArray, grid, proc::CuGPU)
+    gridindices = CartesianIndices(map(a -> a .+ radius(grid), axes(outgrid)))
+    copyto!(outgrid, CartesianIndices(outgrid), parent(source(grid)), gridindices)
     return nothing
 end
 
-@inline function mapneighborhoodrule!(
-    wgrids, simdata, grid::GridData{Y,X,R}, proc::CuGPU{N}, opt, args...
-) where {Y,X,R,N}
-    kernel! = cu_neighborhood_kernel!(CUDADevice(),N)
-    # kernel! = cu_neighborhood_kernel!(KernelAbstractions.CPU(),1)
+function maprule!(
+    wgrids::Union{<:GridData{Y,X,R},Tuple{<:GridData{Y,X,R},Vararg}},
+    simdata, proc::GPU, opt, rule, args...
+) where {Y,X,R}
+    kernel! = cu_rule_kernel!(kernel_setup(proc)...)
+    kernel!(wgrids, simdata, rule, args...; ndrange=gridsize(simdata)) |> wait
+end
+function maprule!(
+    wgrids::Union{<:GridData{Y,X,R},Tuple{<:GridData{Y,X,R},Vararg}},
+    simdata, proc::GPU, opt, rule::NeedsBuffer, args...
+) where {Y,X,R}
+    grid = simdata[neighborhoodkey(rule)]
+    kernel! = cu_neighborhood_kernel!(kernel_setup(proc)...)
     # n = _indtoblock.(gridsize(simdata), 8) .- 1
-    n = gridsize(simdata) .- 1
-    kernel!(wgrids, simdata, grid, opt, args..., ndrange=n) |> wait
+    n = gridsize(simdata)
+    kernel!(wgrids, simdata, grid, opt, rule, args..., ndrange=n) |> wait
     return nothing
 end
 
@@ -72,7 +89,7 @@ end
 end
 
 # Kernels that run for every cell
-@kernel function cu_rule_kernel!(wgrids, simdata, rule::CellRule, rkeys, rgrids, wkeys)
+@kernel function cu_rule_kernel!(wgrids, simdata, rule::Rule, rkeys, rgrids, wkeys)
     i, j = @index(Global, NTuple)
     readval = _readgrids(rkeys, rgrids, i, j)
     writeval = applyrule(simdata, rule, readval, (i, j))
@@ -80,25 +97,12 @@ end
     nothing
 end
 # Kernels that run for every cell
-@kernel function cu_rule_kernel!(wgrids, simdata, rule::SetCellRule, rkeys, rgrids, wkeys)
+@kernel function cu_rule_kernel!(wgrids, simdata, rule::SetRule, rkeys, rgrids, wkeys)
     i, j = @index(Global, NTuple)
     readval = _readgrids(rkeys, rgrids, i, j)
     applyrule!(simdata, rule, readval, (i, j))
     nothing
 end
-
-function _maybemask!(wgrid::WritableGridData{Y,X,R}, proc::CuGPU, mask::AbstractArray) where {Y,X,R}
-    # dst = dest(wgrid)
-    # len = X * Y
-    # @cuda threads=len _mask(dst, mask, Val{R})  
-end
-
-# function _mask(A, mask, ::Val{R}) where R
-#     i = (blockIdx().x-1) * blockDim().x + threadIdx().x
-#     A[i] = A[i] * mask[i]
-#     nothing
-# end
-
 
 # @kernel function cu_rule_kernel!(
 #     simdata::SimData, grid::GridData{Y,X,1}, rule::NeighborhoodRule,

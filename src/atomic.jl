@@ -9,7 +9,7 @@ for (f, op) in atomic_ops
     @eval begin
         @propagate_inbounds ($f)(d::AbstractSimData, x, I...) = ($f)(first(d), x, I...)
         @propagate_inbounds ($f)(d::WritableGridData, x, I...) = ($f)(proc(d), d, x, I...)
-        @propagate_inbounds function ($f)(::SingleCPU, d::WritableGridData, x, I...)
+        @propagate_inbounds function ($f)(::Processor, d::WritableGridData, x, I...)
             @boundscheck checkbounds(dest(d), I...)
             @inbounds _setdeststatus!(d, x, I...)
             @inbounds dest(d)[I...] = ($op)(dest(d)[I...], x)
