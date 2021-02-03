@@ -91,7 +91,7 @@ Base.show(io::IO, m::MIME"image/svg+xml", p::Image) = show(io, m, scheme(p))
         to_rgb(maskcolor(p))
     else
         normval = normalise(val, minval, maxval)
-        if !(zerocolor(p) isa Nothing) && normval == zero(normval)
+        if !(zerocolor(p) isa Nothing) && normval == zero(typeof(normval))
             to_rgb(zerocolor(p))
         elseif normval isa Number && isnan(normval)
             zerocolor(p) isa Nothing ? to_rgb(scheme(p), 0) : to_rgb(zerocolor(p))
@@ -248,9 +248,9 @@ _iterableschemes(scheme) = (scheme,)
 Set a value to be between zero and one, before converting to Color.
 min and max of `nothing` are assumed to be 0 and 1.
 """
-normalise(x, minv, maxv) = max(min((x - minv) / (maxv - minv), oneunit(x)), zero(x))
-normalise(x, minv, maxv::Nothing) = max((x - minv) / (oneunit(x) - minv), zero(x))
-normalise(x, minv::Nothing, maxv) = min(x / maxv, oneunit(x), oneunit(x))
+normalise(x::X, minv, maxv) where X = max(min((x - minv) / (maxv - minv), oneunit(X)), zero(X))
+normalise(x::X, minv, maxv::Nothing) where X = max((x - minv) / (oneunit(X) - minv), zero(X))
+normalise(x::X, minv::Nothing, maxv) where X = min(x / maxv, oneunit(X), oneunit(X))
 normalise(x, minv::Nothing, maxv::Nothing) = x
 
 """
@@ -262,7 +262,7 @@ min and max of `nothing` are assumed to be 0 and 1.
 """
 scale(x, min, max) = x * (max - min) + min
 scale(x, ::Nothing, max) = x * max
-scale(x, min, ::Nothing) = x * (oneunit(min) - min) + min
+scale(x, min, ::Nothing) = x * (oneunit(typeof(min)) - min) + min
 scale(x, ::Nothing, ::Nothing) = x
 
 to_rgb(vals::Tuple) = ARGB32(vals...)
