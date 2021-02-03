@@ -1,4 +1,5 @@
-using DynamicGrids, DimensionalData, Test, Dates, Unitful, KernelAbstractions
+using DynamicGrids, DimensionalData, Test, Dates, Unitful, 
+      KernelAbstractions, FileIO, FixedPointNumbers, Colors
 
 # life glider sims
 
@@ -255,8 +256,8 @@ end
             end
         end
     end
-
 end
+
 
 @testset "REPLOutput" begin
     for proc in (SingleCPU(), ThreadedCPU(), CPUGPU()), opt in (NoOpt(), SparseOpt())
@@ -300,48 +301,48 @@ end
     end
 end
 
-# @testset "GifOutput saves" begin
-#     @testset "ColorProcessor" begin
-#         ruleset = Ruleset(;
-#             rules=(Life(),),
-#             boundary=Wrap(),
-#             timestep=5u"s",
-#             opt=NoOpt(),
-#         )
-#         output = GifOutput(test6_7[:init]; 
-#             filename="test.gif",               
-#             tspan=0u"s":5u"s":30u"s", fps=10, store=true,
-#             text=nothing,
-#         )
-#         @test output.imageconfig.processor isa ColorProcessor
-#         @test output.imageconfig.processor.textconfig == nothing
-#         @test DynamicGrids.isstored(output) == true
-#         sim!(output, ruleset)
-#         @test output[Ti(5u"s")] == test6_7[:test2]
-#         @test output[Ti(10u"s")] == test6_7[:test3]
-#         @test output[Ti(20u"s")] == test6_7[:test5]
-#         @test output[Ti(30u"s")] == test6_7[:test7]
-#         @test isfile("test.gif")
-#         rm("test.gif")
-#     end
-#     @testset "LayoutProcessor" begin
-#         zeroed = test6_7[:init]
-#         ruleset = Ruleset(Life{:a}(); boundary=Wrap())
-#         output = GifOutput((a=test6_7[:init], b=zeroed); 
-#             filename="test2.gif",               
-#             tspan=0u"s":5u"s":30u"s", fps=10, store=true,
-#             text=nothing,
-#         )
-#         @test DynamicGrids.isstored(output) == true
-#         @test output.imageconfig.processor isa LayoutProcessor
-#         @test output.imageconfig.processor.textconfig == nothing
-#         sim!(output, ruleset)
-#         @test all(map(==, output[Ti(5u"s")], (a=test6_7[:test2], b=zeroed)))
-#         @test all(map(==, output[Ti(10u"s")], (a=test6_7[:test3], b=zeroed)))
-#         @test all(map(==, output[Ti(20u"s")], (a=test6_7[:test5], b=zeroed)))
-#         @test all(map(==, output[Ti(30u"s")], (a=test6_7[:test7], b=zeroed)))
-#         @test isfile("test2.gif")
-#         rm("test2.gif")
-#     end
-# end
-
+@testset "GifOutput saves" begin
+    @testset "Image generator" begin
+        ruleset = Ruleset(;
+            rules=(Life(),),
+            boundary=Wrap(),
+            timestep=5u"s",
+            opt=NoOpt(),
+        )
+        output = GifOutput(test6_7[:init]; 
+            filename="test_gifoutput.gif", text=nothing,
+            tspan=0u"s":5u"s":30u"s", fps=10, store=true,
+        )
+        @test output.imageconfig.imagegen isa Image
+        @test output.imageconfig.textconfig == nothing
+        @test DynamicGrids.isstored(output) == true
+        sim!(output, ruleset)
+        @test output[Ti(5u"s")] == test6_7[:test2]
+        @test output[Ti(10u"s")] == test6_7[:test3]
+        @test output[Ti(20u"s")] == test6_7[:test5]
+        @test output[Ti(30u"s")] == test6_7[:test7]
+        gif = load("test_gifoutput.gif")
+        @test gif == RGB.(output.gif)
+        rm("test_gifoutput.gif")
+    end
+    @testset "Layout" begin
+        zeroed = test6_7[:init]
+        ruleset = Ruleset(Life{:a}(); boundary=Wrap())
+        output = GifOutput((a=test6_7[:init], b=zeroed); 
+            filename="test_gifoutput2.gif", text=nothing,               
+            tspan=0u"s":5u"s":30u"s", fps=10, store=true
+        )
+        @test DynamicGrids.isstored(output) == true
+        @test output.imageconfig.imagegen isa Layout
+        @test output.imageconfig.textconfig == nothing
+        sim!(output, ruleset)
+        @test all(map(==, output[Ti(5u"s")], (a=test6_7[:test2], b=zeroed)))
+        @test all(map(==, output[Ti(10u"s")], (a=test6_7[:test3], b=zeroed)))
+        @test all(map(==, output[Ti(20u"s")], (a=test6_7[:test5], b=zeroed)))
+        @test all(map(==, output[Ti(30u"s")], (a=test6_7[:test7], b=zeroed)))
+        gif = load("test_gifoutput2.gif")
+        @test gif == RGB.(output.gif)
+        @test gif[:, 1, 7] == RGB{N0f8}.([1.0, 1.0, 0.298, 0.298, 0.298, 1.0])
+        rm("test_gifoutput2.gif")
+    end
+end

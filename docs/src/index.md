@@ -153,22 +153,6 @@ ImageOutput
 GifOutput
 ```
 
-### Output methods
-
-### Grid processors
-
-```@docs
-Greyscale
-Grayscale
-GridProcessor
-SingleGridProcessor
-ColorProcessor
-MultiGridProcessor
-LayoutProcessor
-SparseOptInspector
-TextConfig
-```
-
 ### Saving gifs
 
 ```@docs
@@ -214,8 +198,35 @@ DynamicGrids.finalisegraphics
 Also includes `Output` and `GraphicOutput` interfaces.
 
 ```@docs
+DynamicGrids.showimage
+```
+
+`ImageConfig`/`GridProcessor` interface
+
+```@docs
 DynamicGrids.ImageConfig
 DynamicGrids.imageconfig
-DynamicGrids.showimage
-DynamicGrids.grid2image!
+DynamicGrids.ImageProcessor
+```
+
+## Grid processors
+
+```@docs
+Greyscale
+Grayscale
+ImageGenerator
+SingleGridImageGenerator
+Image
+MultiGridImageGenerator
+Layout
+SparseOptInspector
+TextConfig
+```
+
+## Interface methods
+
+```
+DynamicGrids.grid_to_image!
+DynamicGrids.cell_to_pixel
+DynamicGrids.to_rgb
 ```

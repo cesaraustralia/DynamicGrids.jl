@@ -1,6 +1,6 @@
 
 """
-    GraphicConfig(; fps=25.0, store=false, kwargs...) =
+    GraphicConfig(; fps=25.0, store=false, kw...) =
     GraphicConfig(fps, timestamp, stampframe, store)
 
 Config and variables for graphic outputs.
@@ -12,7 +12,7 @@ mutable struct GraphicConfig{FPS,TS}
     stoppedframe::Int
     store::Bool
 end
-GraphicConfig(; fps=25.0, store=false, kwargs...) = GraphicConfig(fps, 0.0, 1, 1, store)
+GraphicConfig(; fps=25.0, store=false, kw...) = GraphicConfig(fps, 0.0, 1, 1, store)
 
 fps(gc::GraphicConfig) = gc.fps
 timestamp(gc::GraphicConfig) = gc.timestamp
@@ -51,12 +51,12 @@ abstract type GraphicOutput{T,F} <: Output{T,F} end
 # Generic ImageOutput constructor. Converts an init array to vector of arrays.
 function (::Type{T})(
     init::Union{NamedTuple,AbstractMatrix}; 
-    extent=nothing, graphicconfig=nothing, kwargs...
+    extent=nothing, graphicconfig=nothing, kw...
 ) where T <: GraphicOutput
-    extent = extent isa Nothing ? Extent(; init=init, kwargs...) : extent
-    graphicconfig = graphicconfig isa Nothing ? GraphicConfig(; kwargs...) : graphicconfig
+    extent = extent isa Nothing ? Extent(; init=init, kw...) : extent
+    graphicconfig = graphicconfig isa Nothing ? GraphicConfig(; kw...) : graphicconfig
     T(; frames=[deepcopy(init)], running=false,
-      extent=extent, graphicconfig=graphicconfig, kwargs...)
+      extent=extent, graphicconfig=graphicconfig, kw...)
 end
 
 graphicconfig(o::Output) = GraphicConfig()
@@ -96,15 +96,10 @@ end
 _pushgrid!(::Type{<:NamedTuple}, o) = push!(o, map(grid -> similar(grid), o[1]))
 _pushgrid!(::Type{<:AbstractArray}, o) = push!(o, similar(o[1]))
 
-function showframe(o::GraphicOutput, data)
-    # Take a view over each grid, as it may be padded
-    frame = map(grids(data)) do grid
-        view(grid, Base.OneTo.(gridsize(grid))...) 
-    end
-    showframe(frame, o, data)
-end
-showframe(frame::NamedTuple, o::GraphicOutput, data) =
-    showframe(first(frame), o, data)
+showframe(o::GraphicOutput, data) = showframe(o, proc(data), data)
+showframe(o::GraphicOutput, ::Processor, data) = showframe(map(gridview, grids(data)), o, data)
+# Handle NamedTuple for outputs that only accept AbstractArray
+showframe(frame::NamedTuple, o::GraphicOutput, data) = showframe(first(frame), o, data)
 
 function initialise!(o::GraphicOutput, data) 
     initalisegraphics(o, data)

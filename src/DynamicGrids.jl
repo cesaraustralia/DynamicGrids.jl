@@ -64,12 +64,11 @@ export Aux, Grid
 
 export Output, GraphicOutput, ImageOutput, ArrayOutput, ResultOutput, REPLOutput, GifOutput
 
-export GridProcessor, SingleGridProcessor, ColorProcessor, SparseOptInspector,
-       MultiGridProcessor, LayoutProcessor
+export ImageGenerator, Image, Layout, SparseOptInspector
 
 export TextConfig
 
-export Greyscale, Grayscale
+export ObjectScheme, Greyscale, Grayscale
 
 export CharStyle, Block, Braile
 
@@ -103,7 +102,7 @@ include("outputs/output.jl")
 include("outputs/graphic.jl")
 include("outputs/image.jl")
 include("outputs/textconfig.jl")
-include("outputs/processors.jl")
+include("outputs/imagegenerators.jl")
 include("outputs/array.jl")
 include("outputs/repl.jl")
 include("outputs/gif.jl")

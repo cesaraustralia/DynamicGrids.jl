@@ -10,10 +10,10 @@ and in many cases can be used interchangeably.
 abstract type Output{T,A} <: AbstractDimArray{T,1,Tuple{Ti},A} end
 # Generic ImageOutput constructor. Converts an init array to vector of arrays.
 function (::Type{T})(
-    init::Union{NamedTuple,AbstractMatrix}; extent=nothing, kwargs...
+    init::Union{NamedTuple,AbstractMatrix}; extent=nothing, kw...
 ) where T <: Output
-    extent = extent isa Nothing ? Extent(; init=init, kwargs...) : extent
-    T(; frames=[deepcopy(init)], running=false, extent=extent, kwargs...)
+    extent = extent isa Nothing ? Extent(; init=init, kw...) : extent
+    T(; frames=[deepcopy(init)], running=false, extent=extent, kw...)
 end
 
 # Forward base methods to the frames array
@@ -87,21 +87,28 @@ function _storeframe!(::Type{<:AbstractArray}, output::Output, data)
     _copyto_output!(output[frameindex(output, data)], grid, proc(grid))
 end
 
-function _copyto_output!(outgrid, grid, proc::CPU)
+function _copyto_output!(outgrid, grid, proc)
     copyto!(outgrid, CartesianIndices(outgrid), source(grid), CartesianIndices(outgrid))
+end
+function _copyto_output!(outgrid, grid, proc::ThreadedCPU)
+    Threads.@threads for j in axes(outgrid, 2) 
+        for i in axes(outgrid, 1)
+            @inbounds outgrid[i, j] = grid[i, j]
+        end
+    end
 end
 
 # Grids are preallocated and reused.
 init_output_grids!(o::Output, init) = init_output_grids!(o[1], o::Output, init)
 # Array grids are copied
 function init_output_grids!(grid::AbstractArray, o::Output, init::AbstractArray)
-    grid .= init
+    copyto!(grid, init)
     return o
 end
 # All arrays are copied if both are named tuples
 function init_output_grids!(grids::NamedTuple, o::Output, inits::NamedTuple)
     map(grids, inits) do grid, init
-        grid .= init
+        copyto!(grid, init)
     end
     return o
 end

@@ -286,7 +286,7 @@ struct SetGrid{R,W,F} <: SetGridRule{R,W}
     "Function to apply to the read values"
     f::F
 end
-SetGrid{R,W}(; kwargs...) where {R,W} = _nofunctionerror(SetGrid)
+SetGrid{R,W}(; kw...) where {R,W} = _nofunctionerror(SetGrid)
 
 @inline function applyrule!(data, rule::SetGrid{R,W}) where {R,W}
     rule.f(
@@ -331,7 +331,7 @@ struct Cell{R,W,F} <: CellRule{R,W}
     "Function to apply to the read values"
     f::F
 end
-Cell{R,W}(; kwargs...) where {R,W} = _nofunctionerror(Cell)
+Cell{R,W}(; kw...) where {R,W} = _nofunctionerror(Cell)
 
 @inline function applyrule(data, rule::Cell, state, I)
     let rule=rule, state=state
@@ -373,7 +373,7 @@ struct Neighbors{R,W,F,N} <: NeighborhoodRule{R,W}
     "Defines the neighborhood of cells around the central cell"
     neighborhood::N
 end
-Neighbors{R,W}(; kwargs...) where {R,W} = _nofunctionerror(Neighbors)
+Neighbors{R,W}(; kw...) where {R,W} = _nofunctionerror(Neighbors)
 Neighbors{R,W}(f; neighborhood=Moore(1)) where {R,W} =
     Neighbors{R,W}(f, neighborhood)
 
@@ -410,7 +410,7 @@ struct SetCell{R,W,F} <: SetCellRule{R,W}
     "Function to apply to data, index and read state arguments"
     f::F
 end
-SetCell{R,W}(; kwargs...) where {R,W} = _nofunctionerror(Set)
+SetCell{R,W}(; kw...) where {R,W} = _nofunctionerror(Set)
 
 @inline function applyrule!(data, rule::SetCell, read, I)
     let data=data, I=I, rule=rule, read=_astuple(rule, read)

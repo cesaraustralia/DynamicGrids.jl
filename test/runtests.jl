@@ -23,5 +23,5 @@ end
 @time @safetestset "aux" begin include("auxilary.jl") end
 # ImageMagick breaks in windows travis for some reason
 if !Sys.iswindows() 
-    # @time @safetestset "image" begin include("image.jl") end
+    @time @safetestset "image" begin include("image.jl") end
 end

@@ -42,7 +42,7 @@ mutable struct REPLOutput{T,F<:AbstractVector{T},E,GC,Co,St,Cu} <: GraphicOutput
 end
 function REPLOutput(;
     frames, running, extent, graphicconfig,
-    color=:white, cutoff=0.5, style=Block(), kwargs...
+    color=:white, cutoff=0.5, style=Block(), kw...
 )
     REPLOutput(frames, running, extent, graphicconfig, color, style, cutoff)
 end
@@ -89,7 +89,8 @@ function _replframe(o, frame)
 
     yrange = max(1, ystep * yoffset):min(youtput, ystep * (dispy + yoffset - 1))
     xrange = max(1, xstep * xoffset):min(xoutput, xstep * (dispx + xoffset - 1))
-    f(view(Array(frame), yrange, xrange), o.cutoff)
+    window = view(adapt(Array, frame), yrange, xrange)
+    f(window, o.cutoff)
 end
 
 _chartype(o::REPLOutput) = _chartype(o.style)
