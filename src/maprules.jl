@@ -23,12 +23,12 @@ function maprule!(data::SimData, rule::Rule)
     _handleboundary!(wgrids)
     # Combine read and write grids to a temporary simdata object.
     # This means that grids not specified to write to are read-only.
-    allkeys = map(Val, keys(data)) 
+    allkeys = map(Val, keys(data))
     allgrids = values(data)
     tempdata = _combinegrids(data, allkeys, allgrids, wkeys, wgrids)
     # Run the rule loop
     maprule!(wgrids, tempdata, proc(data), opt(data), rule, rkeys, rgrids, wkeys)
-    # Mask writes to dest if a mask isprovided, except for 
+    # Mask writes to dest if a mask isprovided, except for
     # CellRule which doesn't move values into masked areas
     rule isa CellRule || _maybemask!(wgrids)
     # Copy the dest status to source status if it is in use
@@ -57,12 +57,15 @@ end
 _maybemask!(wgrids::Tuple) = map(_maybemask!, wgrids)
 _maybemask!(wgrid::WritableGridData) = _maybemask!(wgrid, proc(wgrid), mask(wgrid))
 _maybemask!(wgrid::WritableGridData, proc, mask::Nothing) = nothing
-function _maybemask!(wgrid::WritableGridData{Y,X}, proc, mask::AbstractArray) where {Y,X}
+function _maybemask!(wgrid::WritableGridData{Y,X}, proc::CPU, mask::AbstractArray) where {Y,X}
     procmap(proc, 1:X) do j
         for i in 1:Y
             dest(wgrid)[i, j] *= mask[i, j]
         end
     end
+end
+function _maybemask!(wgrid::WritableGridData{Y,X}, proc, mask::AbstractArray) where {Y,X}
+    gridview(wgrid) .*= mask
 end
 
 _maybecopystatus!(grids::Tuple{Vararg{<:GridData}}) = map(_maybecopystatus!, grids)
@@ -81,7 +84,7 @@ function maprule!(
     wgrids::Union{<:GridData{Y,X,R},Tuple{<:GridData{Y,X,R},Vararg}},
     simdata, proc::CPU, opt, rule, rkeys, rgrids, wkeys
 ) where {Y,X,R}
-    let simdata=simdata, proc=proc, opt=opt, rule=rule, 
+    let simdata=simdata, proc=proc, opt=opt, rule=rule,
         rkeys=rkeys, rgrids=rgrids, wkeys=wkeys, wgrids=wgrids
         optmap(proc, opt, rgrids, Tuple{Y,X,R}) do i, j
             rule_kernel!(wgrids, simdata, rule, rkeys, rgrids, wkeys, i, j)
@@ -93,7 +96,7 @@ function maprule!(
     simdata, proc::CPU, opt, rule::NeedsBuffer, args...
 ) where {Y,X,R}
     grid = simdata[neighborhoodkey(rule)]
-    _maybecopystatus!(grid, opt)
+    _mayberesetdest!(grid, opt)
     mapneighborhoodrule!(wgrids, simdata, grid, proc, opt, rule, args...)
     return nothing
 end
@@ -101,7 +104,7 @@ end
 ### Rules that don't need a neighborhood buffer ####################
 
 # Run kernels with SparseOpt
-@inline function optmap(f, proc, ::SparseOpt, rgrids, ::Type{Tuple{Y,X,R}}) where {Y,X,R}
+function optmap(f, proc, ::SparseOpt, rgrids, ::Type{Tuple{Y,X,R}}) where {Y,X,R}
     # Only use SparseOpt for single-grid rules with grid radii > 0
     if R == 0
         optmap(f, proc, NoOpt(), rgrids, Tuple{Y,X,R})
@@ -109,10 +112,12 @@ end
     end
     B = 2R
     grid = rgrids isa Tuple ? first(rgrids) : rgrids
+    status = sourcestatus(grid)
     let f=f, proc=proc, grid=grid
         procmap(proc, 1:_indtoblock(X, B)) do bj
             for  bi in 1:_indtoblock(Y, B)
-                # Convert from padded block to init dimensionn
+                status[bi, bj] || continue
+                # Convert from padded block to init dimensions
                 istart, jstart = _blocktoind(bi, B) - R, _blocktoind(bj, B) - R
                 # Stop at the init row/column size, not the padding or block multiple
                 istop, jstop = min(istart + B - 1, Y), min(jstart + B - 1, X)
@@ -127,30 +132,30 @@ end
     return nothing
 end
 # Run kernel over the whole grid, cell by cell
-@inline optmap(f, proc, ::NoOpt, g, ::Type{Tuple{Y,X,R}}) where {Y,X,R} = 
+optmap(f, proc, ::NoOpt, g, ::Type{Tuple{Y,X,R}}) where {Y,X,R} =
     procmap(proc, 1:X) do j
         for i in 1:Y
-            f(i, j)
+            f(i, j) # Run rule for each row in column j
         end
     end
 
 # Looping over cells or blocks on CPU
-@inline procmap(f, proc::SingleCPU, range) =
+procmap(f, proc::SingleCPU, range) =
     for n in range
-        f(n)
+        f(n) # Run rule over each column
     end
-@inline procmap(f, proc::ThreadedCPU, range) =
-    Threads.@threads for n in range 
-        f(n)
+procmap(f, proc::ThreadedCPU, range) =
+    Threads.@threads for n in range
+        f(n) # Run rule over each column, threaded
     end
 
-@inline function rule_kernel!(wgrids, simdata, rule::Rule, rkeys, rgrids, wkeys, i, j)
+function rule_kernel!(wgrids, simdata, rule::Rule, rkeys, rgrids, wkeys, i, j)
     readval = _readgrids(rkeys, rgrids, i, j)
     writeval = applyrule(simdata, rule, readval, (i, j))
     _writegrids!(wgrids, writeval, i, j)
     nothing
 end
-@inline function rule_kernel!(wgrids, simdata, rule::SetRule, rkeys, rgrids, wkeys, i, j)
+function rule_kernel!(wgrids, simdata, rule::SetRule, rkeys, rgrids, wkeys, i, j)
     readval = _readgrids(rkeys, rgrids, i, j)
     applyrule!(simdata, rule, readval, (i, j))
     nothing
@@ -160,39 +165,51 @@ end
 
 ## Rules that need a Neighorhood buffer #############################################
 
-@inline function mapneighborhoodrule!(
+function mapneighborhoodrule!(
     wgrids, simdata, grid::GridData{Y,X,R}, proc::CPU, args...
 ) where {Y,X,R}
     let wgrids=wgrids, simdata=simdata, grid=grid, proc=proc, args=args
-        procmap(proc, 1:_indtoblock(Y, 2R)) do bi
-            row_kernel!(wgrids, simdata, grid, args..., bi)
+        B = 2R
+        # Split the grid in 2 interleaved sets of rows, so that we never run adjacent 
+        # rows simultaneously - it could cause race conditions when setting status.
+        procmap(proc, 1:2:_indtoblock(Y, B)) do bi
+            row_kernel!(wgrids, simdata, grid, proc, args..., bi)
+        end
+        procmap(proc, 2:2:_indtoblock(Y, B)) do bi
+            if bi <=_indtoblock(Y, B)
+                row_kernel!(wgrids, simdata, grid, proc, args..., bi)
+            end
         end
     end
     return nothing
 end
 
-@inline function _maybecopystatus!(grid, opt::SparseOpt)
+function _maybecopystatus!(grid::GridData, opt::SparseOpt)
     # Copy src to dst - we don't run every block so this is necessary
-    src, dst = parent(source(grid)), parent(dest(grid))
-    srcstatus, dststatus = parent(source(grid)), parent(dest(grid))
-    dst .= src
-    dststatus .= srcstatus
+    deststatus(grid) .= sourcestatus(grid)
     return nothing
-end 
-@inline _maybecopystatus!(grid, opt::NoOpt) = nothing
+end
+_maybecopystatus!(grid, opt::NoOpt) = nothing
+
+function _mayberesetdest!(grid::GridData, opt::SparseOpt)
+    deststatus(grid) .= false
+    dest(grid) .= padval(grid)
+    return nothing
+end
+_mayberesetdest!(grid, opt::NoOpt) = nothing
 
 
 #= Run the rule row by row. When we move along a row by one cell, we access only
 a single new column of data with the height of 4R, and move the existing
 data in the neighborhood buffers array across by one column. This saves on reads
 from the main array. =#
-@inline function row_kernel!(
-    wgrids, simdata::SimData, grid::GridData{Y,X,R}, opt::NoOpt, rule, 
+function row_kernel!(
+    wgrids, simdata::SimData, grid::GridData{Y,X,R}, proc, opt::NoOpt, rule,
     rkeys, rgrids, wkeys, bi
 ) where {Y,X,R}
     B = 2R
     i = _blocktoind(bi, B)
-    # Loop along the block ROW. 
+    # Loop along the block ROW.
     src = parent(source(grid))
     buffers = _initialise_buffers(src, Val{R}(), i, 1)
     blocklen = min(Y, i + B - 1) - i + 1
@@ -209,8 +226,8 @@ from the main array. =#
         end
     end
 end
-@inline function row_kernel!(
-    wgrids, simdata::SimData, grid::GridData{Y,X,R}, opt::SparseOpt, rule, 
+function row_kernel!(
+    wgrids, simdata::SimData, grid::GridData{Y,X,R}, proc, opt::SparseOpt, rule,
     rkeys, rgrids, wkeys, bi
 ) where {Y,X,R}
     B = 2R
@@ -256,7 +273,8 @@ end
                 end
             end
             continue
-        end # Define area to loop over with the block.
+        end 
+        # Define area to loop over with the block.
         # It's variable because the last block may be partial
         jstart = _blocktoind(bj, B)
         jstop = min(jstart + B - 1, X)
@@ -266,7 +284,6 @@ end
             buffers = _initialise_buffers(src, Val{R}(), i, jstart)
             skippedlastblock = false
         end
-
         # Shuffle new buffer status
         newbs11 = newbs12
         newbs21 = newbs22
@@ -276,10 +293,8 @@ end
         for j in jstart:jstop
             # Update buffers unless feshly populated
             buffers = _update_buffers(buffers, src, Val{R}(), i, j)
-
             # Which block column are we in, 1 or 2
             curblockj = (j - jstart) ÷ R + 1
-
             # Loop over the COLUMN of buffers covering the block
             blocklen = min(Y, i + B - 1) - i + 1
             for b in 1:blocklen
@@ -307,8 +322,7 @@ end
             @inbounds dststatus[bi, bj] |= newbs11
             @inbounds dststatus[bi+1, bj] |= newbs21
             @inbounds dststatus[bi, bj+1] |= newbs12
-            # Start new block fresh to remove old status
-            @inbounds dststatus[bi+1, bj+1] = newbs22
+            @inbounds dststatus[bi+1, bj+1] |= newbs22
         end
     end
     return nothing
@@ -411,7 +425,7 @@ function _readgrids end
         NamedTuple{keys,typeof(vals)}(vals)
     end
 end
-function _readgrids(rkeys::Val, rgrids::ReadableGridData, I...)
+@inline function _readgrids(rkeys::Val, rgrids::ReadableGridData, I...)
     @inbounds rgrids[I...]
 end
 
@@ -432,7 +446,7 @@ function _writegrids end
     push!(expr.args, :(nothing))
     return expr
 end
-function _writegrids!(wdata::GridData, val, I...)
+@inline function _writegrids!(wdata::GridData, val, I...)
     @inbounds dest(wdata)[I...] = val
     return nothing
 end
@@ -462,6 +476,10 @@ end
 @generated function _getwritegrids(::Rule{R,W}, simdata::AbstractSimData) where {R,W}
     :((Val{$(QuoteNode(W))}(), WritableGridData(simdata[$(QuoteNode(W))])))
 end
+
+
+@inline _vals2syms(x::Type{<:Tuple}) = map(v -> _vals2syms(v), x.parameters)
+@inline _vals2syms(::Type{<:Val{X}}) where X = X
 
 """
     _combinegrids(rkey, rgrids, wkey, wgrids)
@@ -544,6 +562,3 @@ end
         NamedTuple{$allkeys,typeof(vals)}(vals)
     end
 end
-
-_vals2syms(x::Type{<:Tuple}) = map(v -> _vals2syms(v), x.parameters)
-_vals2syms(::Type{<:Val{X}}) where X = X

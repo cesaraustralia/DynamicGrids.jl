@@ -22,7 +22,7 @@ using DynamicGrids: isshowable, frameindex, storeframe!, SimData, stoppedframe
     @testset "DimensionalData interface" begin
         @test output isa AbstractDimArray{<:Array,1,<:Tuple{<:Ti}}
         @test dims(output) isa Tuple{<:Ti}
-        @test name(output) == NoName()
+        @test DimensionalData.name(output) == NoName()
         @test metadata(output) == NoMetadata()
         da = output[Ti(Between(Date(2002), Date(2003)))]
         @test da isa DimArray{<:Array,1,<:Tuple{<:Ti}}

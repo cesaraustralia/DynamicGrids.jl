@@ -97,8 +97,4 @@ end
 
 _unwrap(x) = x
 _unwrap(::Val{X}) where X = X
-_unwrap(::Aux{X}) where X = X
-_unwrap(::Grid{X}) where X = X
-_unwrap(::Type{<:Aux{X}}) where X = X
-_unwrap(::Type{<:Grid{X}}) where X = X
 _unwrap(::Type{<:Val{X}}) where X = X

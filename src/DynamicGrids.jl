@@ -7,7 +7,8 @@ module DynamicGrids
 end DynamicGrids
 
 
-using Colors,
+using Adapt,
+      Colors,
       ConstructionBase,
       Crayons,
       DimensionalData,

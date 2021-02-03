@@ -34,10 +34,13 @@ source(d::GridData) = d.source
 dest(d::GridData) = d.dest
 sourcestatus(d::GridData) = d.sourcestatus
 deststatus(d::GridData) = d.deststatus
+
 gridsize(d::GridData) = size(init(d))
 gridsize(A::AbstractArray) = size(A)
 gridsize(nt::NamedTuple) = gridsize(first(nt))
 gridsize(nt::NamedTuple{(),Tuple{}}) = 0, 0
+gridaxes(d::GridData) = map(Base.OneTo, gridsize(d))
+gridview(d::GridData) = view(parent(dest(d)), map(a -> a .+ radius(d), gridaxes(d))...)
 
 
 """

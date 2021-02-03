@@ -35,7 +35,7 @@ DimensionalData.refdims(o::Output) = ()
 DimensionalData.name(o::Output) = NoName()
 DimensionalData.metadata(o::Output) = NoMetadata()
 # Output bebuild just returns a DimArray
-DimensionalData.rebuild(o::Output, data, dims::Tuple, refdims, metadata) = 
+DimensionalData.rebuild(o::Output, data, dims::Tuple, refdims, name, metadata) = 
     DimArray(data, dims, refdims, name, metadata)
 
 # Getters and setters
