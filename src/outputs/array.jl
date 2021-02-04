@@ -1,15 +1,19 @@
 """
+    ArrayOutput <: Output
+
     ArrayOutput(init; tspan::AbstractRange, [aux, mask, padval]) 
 
 A simple output that stores each step of the simulation in a vector of arrays.
 
-## Arguments:
+# Arguments
+
 - `init`: initialisation `Array` or `NamedTuple` of `Array`
 
-## Keyword Argument:
+# Keywords
+
 - `tspan`: `AbstractRange` timespan for the simulation
 - `aux`: NamedTuple of arbitrary input data. Use `get(data, Aux(:key), I...)` 
-  to access from a `Rule` in a type-stable way.
+    to access from a `Rule` in a type-stable way.
 - `mask`: `BitArray` for defining cells that will/will not be run.
 - `padval`: padding value for grids with neighborhood rules. The default is `zero(eltype(init))`.
 """
@@ -24,18 +28,22 @@ function ArrayOutput(; frames, running, extent, kw...)
 end
 
 """
-    ResultOutput(init; tspan::AbstractRange, [aux, mask, padval]) 
+    ResultOutput <: Output
+
+    ResultOutput(init; tspan::AbstractRange, kw...) 
 
 A simple output that only stores the final result, not intermediate frames.
 
-## Arguments:
+# Arguments
+
 - `init`: initialisation `Array` or `NamedTuple` of `Array`
 
-## Keyword Argument:
+# Keywords
+
 - `tspan`: `AbstractRange` timespan for the simulation
-- `mask`: `BitArray` for defining cells that will/will not be run.
 - `aux`: NamedTuple of arbitrary input data. Use `get(data, Aux(:key), I...)` 
-  to access from a `Rule` in a type-stable way.
+    to access from a `Rule` in a type-stable way.
+- `mask`: `BitArray` for defining cells that will/will not be run.
 - `padval`: padding value for grids with neighborhood rules. The default is `zero(eltype(init))`.
 """
 mutable struct ResultOutput{T,F<:AbstractVector{T},E} <: Output{T,F} 
@@ -53,18 +61,20 @@ function finalise!(o::ResultOutput, data::AbstractSimData)
 end
 
 """
-    ResultOutput(init; tspan::AbstractRange, [aux, mask, padval]) 
+    ResultOutput(init; tspan::AbstractRange, kw...) 
 
 A simple output that only stores the final result, not intermediate frames.
 
-## Arguments:
+# Arguments
+
 - `init`: initialisation `Array` or `NamedTuple` of `Array`
 
-## Keyword Argument:
+# Keywords
+
 - `tspan`: `AbstractRange` timespan for the simulation
-- `mask`: `BitArray` for defining cells that will/will not be run.
 - `aux`: NamedTuple of arbitrary input data. Use `get(data, Aux(:key), I...)` 
-  to access from a `Rule` in a type-stable way.
+    to access from a `Rule` in a type-stable way.
+- `mask`: `BitArray` for defining cells that will/will not be run.
 - `padval`: padding value for grids with neighborhood rules. The default is `zero(eltype(init))`.
 """
 mutable struct XOutput{T,A<:AbstractVector{T},E,F} <: Output{T,A} 

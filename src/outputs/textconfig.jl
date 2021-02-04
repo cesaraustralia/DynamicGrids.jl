@@ -1,20 +1,15 @@
 """
-    TextConfig(; 
-        font::String=autofont(), 
-        namepixels=14, 
-        timepixels=14,
-        namepos=(timepixels+namepixels, timepixels),
-        timepos=(timepixels, timepixels),
-        fcolor=ARGB32(1.0), 
-        bcolor=ARGB32(0.3)
-    )
+    TextConfig
+
+    TextConfig(; kw...)
     TextConfig(face, namepixels, namepos, timepixels, timepos, fcolor, bcolor)
 
 Text configuration for printing timestep and grid name on the image.
 
-# Arguments
+# Arguments / Keywords
 
-- `namepixels` and `timepixels`: set the pixel size of the font.
+- `font`: `String` font name.
+- `namepixels` and `timepixels`: the pixel size of the font.
 - `timepos` and `namepos`: tuples that set the label positions, in pixels.
 - `fcolor` and `bcolor`: the foreground and background colors, as `ARGB32`.
 """

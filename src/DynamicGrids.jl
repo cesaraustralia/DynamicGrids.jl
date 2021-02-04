@@ -12,7 +12,6 @@ using Adapt,
       ConstructionBase,
       Crayons,
       DimensionalData,
-      DocStringExtensions,
       FreeTypeAbstraction,
       FileIO,
       LinearAlgebra,
@@ -79,13 +78,6 @@ function __init__()
     @require KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c" include("cuda.jl")
 end
 
-# Documentation templates
-@template TYPES =
-    """
-    $(TYPEDEF)
-    $(DOCSTRING)
-    """
-
 include("interface.jl")
 include("flags.jl")
 include("neighborhoods.jl")
@@ -102,6 +94,7 @@ include("outputs/output.jl")
 include("outputs/graphic.jl")
 include("outputs/image.jl")
 include("outputs/textconfig.jl")
+include("outputs/schemes.jl")
 include("outputs/imagegenerators.jl")
 include("outputs/array.jl")
 include("outputs/repl.jl")

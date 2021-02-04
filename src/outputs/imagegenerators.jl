@@ -2,44 +2,9 @@ const MASKCOL = ARGB32(0.5)
 const ZEROCOL = ARGB32(0.3)
 
 """
-    Greyscale(min=nothing, max=nothing)
+    ImageGenerator
 
-Better performance than using a Colorschemes.jl
-scheme as there is array access or interpolation.
-
-`min` and `max` are values between `0.0` and `1.0` that
-define the range of greys used.
-"""
-struct Greyscale{M1,M2}
-    min::M1
-    max::M2
-end
-Greyscale(; min=nothing, max=nothing) = Greyscale(min, max)
-
-Base.get(scheme::Greyscale, x::Real) = scale(x, scheme.min, scheme.max)
-
-const Grayscale = Greyscale
-
-"""
-    ObjectColor()
-
-Default colorscheme. Similar to `GreyScale` for `Number`.
-
-Other grid objects can define a custom method: 
-
-```julia
-DynamicGrids.to_rgb(::ObjectColor, obj::MyObjectType) = ...
-```
-
-Which must return an ARGB32 value.
-"""
-struct ObjectScheme end
-
-to_rgb(scheme::ObjectScheme, x::Real) = to_rgb(x)
-
-
-"""
-Abstract supertype converting a frame of the simulation into an `ARGB32`
+Abstract supertype for objects that convert a frame of the simulation into an `ARGB32`
 image for display. Frames may be a single grid or a `NamedTuple` of multiple grids.
 """
 abstract type ImageGenerator end
@@ -51,17 +16,23 @@ _allocimage(p::ImageGenerator, init) = fill(ARGB32(0), imagesize(p, init)...)
 
 """
     grid_to_image!(o::ImageOutput, data::SimData)
-    grid_to_image!(p::ImageGenerator, o::ImageOutput, data::SimData, grids; t=currenttime(data))
+    grid_to_image!(imbuf, imgen::ImageGenerator, o::ImageOutput, data::SimData, grids)
 
 Convert a grid or `NamedRuple` of grids to an `ARGB32` image, using an 
 [`ImageGenerator`](@ref).
+
+Generated pixels are written to the image buffer matrix.
 """
 function grid_to_image! end
-grid_to_image!(o::ImageOutput, data::SimData) = 
+function grid_to_image!(o::ImageOutput, data::SimData)
     grid_to_image!(imagebuffer(o), imagegen(o), o, data, grids(data))
+end
 
 """
-Abstract supertype for [`ImageGenerator`](@ref)s that convert one grid into an image array.
+    SingleGridImageGenerator <: ImageGenerator
+
+Abstract supertype for [`ImageGenerator`](@ref)s that convert a single grid 
+into an image array.
 
 The first grid will be displayed if a `SingleGridImageGenerator` is
 used with a `NamedTuple` of grids.
@@ -97,15 +68,18 @@ function grid_to_image!(
 end
 
 """
+    Image <: SingleGridImageGenerator
+
     Image(; scheme=ObjectColor(), zerocolor=nothing, maskcolor=nothing)
 
 Converts output grids to a colorsheme.
 
-## Arguments / Keyword Arguments
+# Keywords
+
 - `scheme`: a ColorSchemes.jl colorscheme, [`ObjectColor`](@ref) or object that defines
-  `Base.get(obj, val)` and returns a `Color` or a value that can be converted to `Color`
-  using `ARGB32(val)`.
-- `zerocolor`: a `Color` to use when values are zero, or `nothing` to ignore.
+    `Base.get(obj, val)` and returns a `Color` or a value that can be converted to `Color`
+    using `ARGB32(val)`.
+- `zerocolor`: a `Col` to use when values are zero, or `nothing` to ignore.
 - `maskcolor`: a `Color` to use when cells are masked, or `nothing` to ignore.
 """
 Base.@kwdef struct Image{S,Z,M} <: SingleGridImageGenerator
@@ -169,22 +143,28 @@ function cell_to_pixel(p::SparseOptInspector, mask, minval, maxval, data::SimDat
 end
 
 """
-ImageGenerators that convert a frame containing multiple grids into a single image.
+    MultiGridImageGenerator <: ImageGenerator
+
+Abstract type for `ImageGenerator`s that convert a frame containing multiple 
+grids into a single image.
 """
 abstract type MultiGridImageGenerator <: ImageGenerator end
 
 """
+    Layout <: MultiGridImageGenerator
+
     Layout(layout::Array, imagegens::Matrix)
 
 Layout allows displaying multiple grids in a block layout,
 by specifying a layout matrix and a list of [`SingleGridImageGenerator`](@ref)
 to be run for each.
 
-## Arguments
+# Arguments
+
 - `layout`: A Vector or Matrix containing the keys or numbers of grids in the locations to
-  display them. `nothing`, `missing` or `0` values will be skipped.
+    display them. `nothing`, `missing` or `0` values will be skipped.
 - `imagegens`: tuple of [`Image`](@ref), one for each grid in the simulation.
-  Can be `nothing` or any other value for grids not in layout.
+    Can be `nothing` or any other value for grids not in layout.
 """
 Base.@kwdef struct Layout{L<:AbstractMatrix,P} <: MultiGridImageGenerator
     layout::L
@@ -204,7 +184,6 @@ _asimagegen(x) = Image(x)
 
 layout(p::Layout) = p.layout
 imagegens(p::Layout) = p.imagegens
-
 imagesize(p::Layout, init::NamedTuple) = size(first(init)) .* size(p.layout)
 
 function grid_to_image!(
@@ -280,13 +259,10 @@ _iterableschemes(scheme) = (scheme,)
 Set a value to be between zero and one, before converting to Color.
 min and max of `nothing` are assumed to be 0 and 1.
 """
-normalise(x, minval::Number, maxval::Number) =
-    max(min((x - minval) / (maxval - minval), oneunit(x)), zero(x))
-normalise(x, minval::Number, maxval::Nothing) =
-    max((x - minval) / (oneunit(x) - minval), zero(x))
-normalise(x, minval::Nothing, maxval::Number) =
-    min(x / maxval, oneunit(x), oneunit(x))
-normalise(x, minval::Nothing, maxval::Nothing) = x
+normalise(x, minv, maxv) = max(min((x - minv) / (maxv - minv), oneunit(x)), zero(x))
+normalise(x, minv, maxv::Nothing) = max((x - minv) / (oneunit(x) - minv), zero(x))
+normalise(x, minv::Nothing, maxv) = min(x / maxv, oneunit(x), oneunit(x))
+normalise(x, minv::Nothing, maxv::Nothing) = x
 
 """
     scale(x, min, max)

@@ -1,24 +1,25 @@
 
 """
-    GraphicConfig(; fps=25.0, store=false, kw...) =
-    GraphicConfig(fps, timestamp, stampframe, store)
+    GraphicConfig
+
+    GraphicConfig(; fps=25.0, store=false)
 
 Config and variables for graphic outputs.
 """
 mutable struct GraphicConfig{FPS,TS}
     fps::FPS
+    store::Bool
     timestamp::TS
     stampframe::Int
     stoppedframe::Int
-    store::Bool
 end
-GraphicConfig(; fps=25.0, store=false, kw...) = GraphicConfig(fps, 0.0, 1, 1, store)
+GraphicConfig(; fps=25.0, store=false, kw...) = GraphicConfig(fps, store, 0.0, 1, 1)
 
 fps(gc::GraphicConfig) = gc.fps
+store(gc::GraphicConfig) = gc.store
 timestamp(gc::GraphicConfig) = gc.timestamp
 stampframe(gc::GraphicConfig) = gc.stampframe
 stoppedframe(gc::GraphicConfig) = gc.stoppedframe
-store(gc::GraphicConfig) = gc.store
 setfps!(gc::GraphicConfig, x) = gc.fps = x
 function settimestamp!(o::GraphicConfig, frame::Int)
     o.timestamp = time()
@@ -28,6 +29,8 @@ end
 setstoppedframe!(gc::GraphicConfig, frame::Int) = gc.stoppedframe = frame
 
 """
+    GraphicOutput <: Output
+
 Abstract supertype for [`Output`](@ref)s that display the simulation frames.
 
 All `GraphicOutputs` must have a [`GraphicConfig`](@ref) object
@@ -35,10 +38,10 @@ and define a [`showframe`](@ref) method.
 
 See [`REPLOutput`](@ref) for an example.
 
-## Constructor Keyword Arguments: 
+## Keywords: 
 
-The default constructor will generate these objects from keyword arguments and pass 
-them to the object constructor, which must accept the following
+The default constructor will generate these objects from other keyword arguments 
+and pass them to the object constructor, which must accept the following:
 
 - `frames`: a `Vector` of simulation frames (`NamedTuple` or `Array`). 
 - `running`: A `Bool`.

@@ -104,7 +104,7 @@ end
     mask_ = Bool[0 1;
                  1 1]
     imgen = Image(zerocolor=(1.0, 0.0, 0.0), maskcolor=(0.1, 0.1, 0.1))
-    ic = DynamicGrids.ImageConfig(init=init_, imagegen=imgen, textconfig=nothing)
+    ic = DynamicGrids.ImageConfig(init_; imagegen=imgen, textconfig=nothing)
     @test ic.imagegen === imgen
     output = NoDisplayImageOutput((a=init_,); 
         tspan=DateTime(2001):Year(1):DateTime(2010), mask=mask_,

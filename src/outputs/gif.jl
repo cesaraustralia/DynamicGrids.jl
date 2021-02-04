@@ -1,18 +1,28 @@
 """
-savegif(filename::String, o::Output, data; imagegen=imagegen(o), fps=fps(o), [kw...])
+    savegif(filename::String, o::Output; kw...)
 
-Write the output array to a gif. You must pass an `imagegen` keyword argument for any
-`Output` objects not in `ImageOutput` (which allready have a `imagegen` attached).
+Write the output array to a gif.
 
-Saving very large gifs may trigger a bug in Imagemagick.
+# Keywords
+
+- `fps`: `Real` frames persecond. Defaults to the `fps` of the output, or `25`.
+- `minval`: Minimum value in the grid(s) to normalise for conversion to an RGB pixel. 
+  Number or `Tuple` for multiple grids. 
+- `maxval`: Maximum value in the grid(s) to normalise for conversion to an RGB pixel. 
+  Number or `Tuple` for multiple grids. 
+- `font`: `String` name of font to search for. A default will be guessed.
+- `text`: `TextCongif()` or `nothing` for no text. Default is `TextCongif(; font=font)`.
+- `scheme`: ColorSchemes.jl scheme, `ObjectScheme()` or `Greyscale()`
+- `imagegen`: `ImageGenerator` like `Image` or `Layout`. Will be detected automatically
 """
 function savegif(filename::String, o::Output, ruleset=Ruleset(); 
-    minval=minval(o), maxval=maxval(o), imagegen=imagegen(o), 
+    minval=minval(o), maxval=maxval(o), 
+    scheme=ObjectScheme(), imagegen=autoimagegen(init(o), scheme), 
     font=autofont(), text=TextCongif(), textconfig=text, kw...
 )
     im_o = NoDisplayImageOutput(o; 
-        imageconfig=ImageConfig(; 
-            init=init(o), minval=minval, maxval=maxval, imagegen=imagegen, textconfig=textconfig
+        imageconfig=ImageConfig(init(o); 
+            minval=minval, maxval=maxval, imagegen=imagegen, textconfig=textconfig
         )
     )
     savegif(filename, im_o, ruleset; kw...) 
@@ -34,15 +44,9 @@ end
 
 
 """
-    GifOutput(init; filename, tspan::AbstractRange, 
-        aux=nothing, mask=nothing, padval=zero(eltype(init)),
-        fps=25.0, store=false, 
-        font=autofont(),
-        scheme=Greyscale()
-        text=TextConfig(; font=font),
-        imagegen=autoimagegen(init, text)
-        minval=nothing, maxval=nothing
-    )
+    GifOutput <: ImageOutput
+
+    GifOutput(init; filename, tspan, kw...)
 
 Output that stores the simulation as images and saves a Gif file on completion.
 
@@ -50,14 +54,15 @@ Output that stores the simulation as images and saves a Gif file on completion.
 - `init`: initialisation `Array` or `NamedTuple` of `Array`
 
 ## Keyword Argument:
+- `filename`: File path to save the gif file to.
 - `tspan`: `AbstractRange` timespan for the simulation
 - `aux`: NamedTuple of arbitrary input data. Use `get(data, Aux(:key), I...)` 
   to access from a `Rule` in a type-stable way.
 - `mask`: `BitArray` for defining cells that will/will not be run.
 - `padval`: padding value for grids with neighborhood rules. The default is `zero(eltype(init))`.
-- `font`: `String` font name
+- `font`: `String` font name, used in default `TextConfig`. A default will be guessed.
+- `text`: [`TextConfig`](@ref) object or `nothing` for no text.
 - `scheme`: ColorSchemes.jl scheme, or `Greyscale()`
-- `text`: [`TextConfig`](@ref) object or `nothing`.
 - `imagegen`: [`ImageGenerator`](@ref)
 - `minval`: minimum value(s) to set colour maximum
 - `maxval`: maximum values(s) to set colour minimum
@@ -71,12 +76,13 @@ mutable struct GifOutput{T,F<:AbstractVector{T},E,GC,IC,G,N} <: ImageOutput{T,F}
     gif::G
     filename::N
 end
-GifOutput(; frames, running, extent, graphicconfig, imageconfig, filename, kw...) =
-    GifOutput(frames, running, extent, graphicconfig, imageconfig, _allocgif(imageconfig, extent), filename)
+function GifOutput(; frames, running, extent, graphicconfig, imageconfig, filename, kw...)
+    gif = _allocgif(imageconfig, extent)
+    GifOutput(frames, running, extent, graphicconfig, imageconfig, gif, filename)
+end
 
 filename(o::GifOutput) = o.filename
 gif(o::GifOutput) = o.gif
-
 
 showimage(image, o::GifOutput, data::SimData) = gif(o)[:, :, currentframe(data)] .= image 
 

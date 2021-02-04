@@ -1,22 +1,22 @@
 """
-    ImageConfig(imagegen, minval, maxval) 
-    ImageConfig(; 
-        init=nothing, 
-        font=autofont(), 
-        scheme=ObjectScheme(), 
-        text=TextConfig(; font=font)
-        textconfig=text, # long form keyword
-        imagegen=autoimagegen(init),
-        minval=nothing, 
-        maxval=nothing
-    ) 
+    ImageConfig
+
+    ImageConfig(init; kw...) 
 
 Common configuration component for all [`ImageOutput`](@ref).
 
-- `imagegen` is any [`ImageGenerator`](@ref). 
-- `minval` and `maxval` fields normalise grid values between zero and one, for use 
-  with Colorshemes.jl. `nothing` values are considered to represent zero or one 
-  respectively for `minval` and `maxval`, and will not be normalised.
+# Keywords
+
+- `init` output init object, used to generate other arguments automatically.
+- `minval`: Minimum value in the grid(s) to normalise for conversion to an RGB pixel. 
+    Number or `Tuple` for multiple grids. 
+- `maxval`: Maximum value in the grid(s) to normalise for conversion to an RGB pixel. 
+    Number or `Tuple` for multiple grids. 
+- `font`: `String` name of font to search for. A default will be guessed.
+- `text`: `TextCongif()` or `nothing` for no text. Default is `TextCongif(; font=font)`.
+- `scheme`: ColorSchemes.jl scheme, or `Greyscale()`. ObjectScheme() by default.
+- `imagegen`: [`ImageGenerator`](@ref) like [`Image`](@ref) or [`Layout`](@ref) Will 
+    be detected automatically
 """
 struct ImageConfig{P,Min,Max,IB,TC}
     imagegen::P
@@ -25,8 +25,8 @@ struct ImageConfig{P,Min,Max,IB,TC}
     imagebuffer::IB
     textconfig::TC
 end
-function ImageConfig(; 
-    init=nothing, font=autofont(), text=TextConfig(; font=font), textconfig=text, 
+function ImageConfig(init; 
+    font=autofont(), text=TextConfig(; font=font), textconfig=text, 
     scheme=ObjectScheme(), imagegen=autoimagegen(init, scheme), 
     minval=nothing, maxval=nothing, kw...
 ) 
@@ -41,7 +41,9 @@ imagebuffer(ic::ImageConfig) = ic.imagebuffer
 textconfig(ic::ImageConfig) = ic.textconfig
 
 """
-Graphic outputs that display the simulation frames as RGB images.
+    ImageOutput <: GraphicOutput
+
+Abstract supertype for Graphic outputs that display the simulation frames as RGB images.
 
 `ImageOutput`s must have [`Extent`](@ref), [`GraphicConfig`](@ref) 
 and [`ImageConfig`](@ref) components, and define a [`showimage`](@ref) method.
@@ -58,15 +60,16 @@ for implementations.
 abstract type ImageOutput{T,F} <: GraphicOutput{T,F} end
 
 """
-    (::Type{<:ImageOutput}(o::Output; 
-        frames=frames(o), 
-        extent=extent(o), 
-        graphicconfig=graphicconfig(o), 
-        imageconfig=imageconfig(o), 
-        kw...)
+    (::Type{<:ImageOutput})(o::Output; kw...) -> ImageOutput
 
 Generic `ImageOutput` constructor that construct an `ImageOutput` from another `Output`.
 
+# Keywords
+
+- `frames`: replacement `Vector` of grid frames.
+- `extent`: replacement [`Extent`](@ref) object.
+- `graphicconfig`: replacement [`GraphicConfig`](@ref) object.
+- `imageconfig`: replacement [`ImageConfig`](@ref) object.
 """
 function (::Type{F})(o::T; 
     frames=frames(o), extent=extent(o), graphicconfig=graphicconfig(o),
@@ -79,19 +82,14 @@ function (::Type{F})(o::T;
 end
 
 """
-    (::Type{<:ImageOutput})(init::Union{NamedTuple,AbstractMatrix}; 
-        extent=nothing, 
-        graphicconfig=nothing, 
-        imageconfig=nothing, 
-        kw...)
+    (::Type{<:ImageOutput})(init::Union{NamedTuple,AbstractMatrix}; kw...) -> ImageOutput
 
-Generic `ImageOutput` constructor. Converts an init `AbstractArray` 
+Generic `ImageOutput` constructor. Converts an init `AbstractArray` or `NamedTuple` 
 to a vector of `AbstractArray`s, uses `kw` to constructs required 
 [`Extent`](@ref), [`GraphicConfig`](@ref) and [`ImageConfig`](@ref) objects unless
 they are specifically passed in using `extent`, `graphicconfig`, `imageconfig`.
 
 All other keyword arguments are passed to these constructors. 
-
 Unused or mis-spelled keyword arguments are ignored.
 """
 function (::Type{T})(init::Union{NamedTuple,AbstractMatrix}; 
@@ -99,14 +97,14 @@ function (::Type{T})(init::Union{NamedTuple,AbstractMatrix};
 ) where T <: ImageOutput
     extent = extent isa Nothing ? Extent(; init=init, kw...) : extent
     graphicconfig = graphicconfig isa Nothing ? GraphicConfig(; kw...) : extent
-    imageconfig = imageconfig isa Nothing ? ImageConfig(; init=init, kw...) : imageconfig
+    imageconfig = imageconfig isa Nothing ? ImageConfig(init; kw...) : imageconfig
     T(; 
         frames=[deepcopy(init)], running=false, extent=extent, 
         graphicconfig=graphicconfig, imageconfig=imageconfig, kw...
     )
 end
 
-imageconfig(o::Output) = ImageConfig(; init=init(o))
+imageconfig(o::Output) = ImageConfig(init(o))
 imageconfig(o::ImageOutput) = o.imageconfig
 
 imagegen(o::Output) = imagegen(imageconfig(o))
