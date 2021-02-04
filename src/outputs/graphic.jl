@@ -1,24 +1,25 @@
 
 """
-    GraphicConfig(; fps=25.0, store=false, kwargs...) =
-    GraphicConfig(fps, timestamp, stampframe, store)
+    GraphicConfig
+
+    GraphicConfig(; fps=25.0, store=false)
 
 Config and variables for graphic outputs.
 """
 mutable struct GraphicConfig{FPS,TS}
     fps::FPS
+    store::Bool
     timestamp::TS
     stampframe::Int
     stoppedframe::Int
-    store::Bool
 end
-GraphicConfig(; fps=25.0, store=false, kwargs...) = GraphicConfig(fps, 0.0, 1, 1, store)
+GraphicConfig(; fps=25.0, store=false, kw...) = GraphicConfig(fps, store, 0.0, 1, 1)
 
 fps(gc::GraphicConfig) = gc.fps
+store(gc::GraphicConfig) = gc.store
 timestamp(gc::GraphicConfig) = gc.timestamp
 stampframe(gc::GraphicConfig) = gc.stampframe
 stoppedframe(gc::GraphicConfig) = gc.stoppedframe
-store(gc::GraphicConfig) = gc.store
 setfps!(gc::GraphicConfig, x) = gc.fps = x
 function settimestamp!(o::GraphicConfig, frame::Int)
     o.timestamp = time()
@@ -28,6 +29,8 @@ end
 setstoppedframe!(gc::GraphicConfig, frame::Int) = gc.stoppedframe = frame
 
 """
+    GraphicOutput <: Output
+
 Abstract supertype for [`Output`](@ref)s that display the simulation frames.
 
 All `GraphicOutputs` must have a [`GraphicConfig`](@ref) object
@@ -35,10 +38,10 @@ and define a [`showframe`](@ref) method.
 
 See [`REPLOutput`](@ref) for an example.
 
-## Constructor Keyword Arguments: 
+## Keywords: 
 
-The default constructor will generate these objects from keyword arguments and pass 
-them to the object constructor, which must accept the following
+The default constructor will generate these objects from other keyword arguments 
+and pass them to the object constructor, which must accept the following:
 
 - `frames`: a `Vector` of simulation frames (`NamedTuple` or `Array`). 
 - `running`: A `Bool`.
@@ -51,12 +54,12 @@ abstract type GraphicOutput{T,F} <: Output{T,F} end
 # Generic ImageOutput constructor. Converts an init array to vector of arrays.
 function (::Type{T})(
     init::Union{NamedTuple,AbstractMatrix}; 
-    extent=nothing, graphicconfig=nothing, kwargs...
+    extent=nothing, graphicconfig=nothing, kw...
 ) where T <: GraphicOutput
-    extent = extent isa Nothing ? Extent(; init=init, kwargs...) : extent
-    graphicconfig = graphicconfig isa Nothing ? GraphicConfig(; kwargs...) : graphicconfig
+    extent = extent isa Nothing ? Extent(; init=init, kw...) : extent
+    graphicconfig = graphicconfig isa Nothing ? GraphicConfig(; kw...) : graphicconfig
     T(; frames=[deepcopy(init)], running=false,
-      extent=extent, graphicconfig=graphicconfig, kwargs...)
+      extent=extent, graphicconfig=graphicconfig, kw...)
 end
 
 graphicconfig(o::Output) = GraphicConfig()
@@ -96,15 +99,10 @@ end
 _pushgrid!(::Type{<:NamedTuple}, o) = push!(o, map(grid -> similar(grid), o[1]))
 _pushgrid!(::Type{<:AbstractArray}, o) = push!(o, similar(o[1]))
 
-function showframe(o::GraphicOutput, data)
-    # Take a view over each grid, as it may be padded
-    frame = map(grids(data)) do grid
-        view(grid, Base.OneTo.(gridsize(grid))...) 
-    end
-    showframe(frame, o, data)
-end
-showframe(frame::NamedTuple, o::GraphicOutput, data) =
-    showframe(first(frame), o, data)
+showframe(o::GraphicOutput, data) = showframe(o, proc(data), data)
+showframe(o::GraphicOutput, ::Processor, data) = showframe(map(gridview, grids(data)), o, data)
+# Handle NamedTuple for outputs that only accept AbstractArray
+showframe(frame::NamedTuple, o::GraphicOutput, data) = showframe(first(frame), o, data)
 
 function initialise!(o::GraphicOutput, data) 
     initalisegraphics(o, data)

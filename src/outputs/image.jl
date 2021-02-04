@@ -1,44 +1,49 @@
 """
-    ImageConfig(processor, minval, maxval) 
-    ImageConfig(; 
-        init=nothing, 
-        font=autofont(), 
-        scheme=Greyscale(), 
-        text=TextConfig(; font=font)
-        processor=autoprocessor(init),
-        minval=nothing, 
-        maxval=nothing
-    ) 
+    ImageConfig
+
+    ImageConfig(init; kw...) 
 
 Common configuration component for all [`ImageOutput`](@ref).
 
-`processor` is any [`GridProcessor`](@ref). 
-`minval` and `maxval` fields normalise grid values between zero and one, for use 
-with Colorshemes.jl. `nothing` values are considered to represent zero or one 
-respectively for `minval` and `maxval`, and will not be normalised.
+# Keywords
+
+- `init` output init object, used to generate other arguments automatically.
+- `minval`: Minimum value in the grid(s) to normalise for conversion to an RGB pixel. 
+    Number or `Tuple` for multiple grids. 
+- `maxval`: Maximum value in the grid(s) to normalise for conversion to an RGB pixel. 
+    Number or `Tuple` for multiple grids. 
+- `font`: `String` name of font to search for. A default will be guessed.
+- `text`: `TextCongif()` or `nothing` for no text. Default is `TextCongif(; font=font)`.
+- `scheme`: ColorSchemes.jl scheme, or `Greyscale()`. ObjectScheme() by default.
+- `imagegen`: [`ImageGenerator`](@ref) like [`Image`](@ref) or [`Layout`](@ref) Will 
+    be detected automatically
 """
-struct ImageConfig{P,Min,Max,IB}
-    processor::P
+struct ImageConfig{P,Min,Max,IB,TC}
+    imagegen::P
     minval::Min
     maxval::Max
-    imgbuffer::IB
+    imagebuffer::IB
+    textconfig::TC
 end
-function ImageConfig(; 
-    init=nothing, font=autofont(), text=TextConfig(; font=font), 
-    scheme=Greyscale(), processor=autoprocessor(init, scheme, text), 
-    minval=nothing, maxval=nothing, kwargs...
+function ImageConfig(init; 
+    font=autofont(), text=TextConfig(; font=font), textconfig=text, 
+    scheme=ObjectScheme(), imagegen=autoimagegen(init, scheme), 
+    minval=nothing, maxval=nothing, kw...
 ) 
-    imgbuffer = _allocimage(processor, init)
-    ImageConfig(processor, minval, maxval, imgbuffer)
+    imagebuffer = _allocimage(imagegen, init)
+    ImageConfig(imagegen, minval, maxval, imagebuffer, textconfig)
 end
 
-processor(ic::ImageConfig) = ic.processor
+imagegen(ic::ImageConfig) = ic.imagegen
 minval(ic::ImageConfig) = ic.minval
 maxval(ic::ImageConfig) = ic.maxval
-imgbuffer(ic::ImageConfig) = ic.imgbuffer
+imagebuffer(ic::ImageConfig) = ic.imagebuffer
+textconfig(ic::ImageConfig) = ic.textconfig
 
 """
-Graphic outputs that display the simulation frames as RGB images.
+    ImageOutput <: GraphicOutput
+
+Abstract supertype for Graphic outputs that display the simulation frames as RGB images.
 
 `ImageOutput`s must have [`Extent`](@ref), [`GraphicConfig`](@ref) 
 and [`ImageConfig`](@ref) components, and define a [`showimage`](@ref) method.
@@ -55,76 +60,60 @@ for implementations.
 abstract type ImageOutput{T,F} <: GraphicOutput{T,F} end
 
 """
-    (::Type{<:ImageOutput}(o::Output; 
-        frames=frames(o), 
-        extent=extent(o), 
-        graphicconfig=graphicconfig(o), 
-        imageconfig=imageconfig(o), 
-        kwargs...)
+    (::Type{<:ImageOutput})(o::Output; kw...) -> ImageOutput
 
 Generic `ImageOutput` constructor that construct an `ImageOutput` from another `Output`.
 
+# Keywords
+
+- `frames`: replacement `Vector` of grid frames.
+- `extent`: replacement [`Extent`](@ref) object.
+- `graphicconfig`: replacement [`GraphicConfig`](@ref) object.
+- `imageconfig`: replacement [`ImageConfig`](@ref) object.
 """
 function (::Type{F})(o::T; 
     frames=frames(o), extent=extent(o), graphicconfig=graphicconfig(o),
-    imageconfig=imageconfig(o), kwargs...
+    imageconfig=imageconfig(o), textconfig=textconfig(o), kw...
 ) where F <: ImageOutput where T <: Output 
     F(; 
         frames=frames, running=false, extent=extent, graphicconfig=graphicconfig, 
-        imageconfig=imageconfig, kwargs...
+        imageconfig=imageconfig, textconfig=textconfig, kw...
     )
 end
 
 """
-    (::Type{<:ImageOutput})(init::Union{NamedTuple,AbstractMatrix}; 
-        extent=nothing, 
-        graphicconfig=nothing, 
-        imageconfig=nothing, 
-        kwargs...)
+    (::Type{<:ImageOutput})(init::Union{NamedTuple,AbstractMatrix}; kw...) -> ImageOutput
 
-Generic `ImageOutput` constructor. Converts an init `AbstractArray` 
-to a vector of `AbstractArray`s, uses `kwargs` to constructs required 
+Generic `ImageOutput` constructor. Converts an init `AbstractArray` or `NamedTuple` 
+to a vector of `AbstractArray`s, uses `kw` to constructs required 
 [`Extent`](@ref), [`GraphicConfig`](@ref) and [`ImageConfig`](@ref) objects unless
 they are specifically passed in using `extent`, `graphicconfig`, `imageconfig`.
 
 All other keyword arguments are passed to these constructors. 
-
 Unused or mis-spelled keyword arguments are ignored.
 """
 function (::Type{T})(init::Union{NamedTuple,AbstractMatrix}; 
-    extent=nothing, graphicconfig=nothing, imageconfig=nothing, kwargs...
+    extent=nothing, graphicconfig=nothing, imageconfig=nothing, kw...
 ) where T <: ImageOutput
-    extent = extent isa Nothing ? Extent(; init=init, kwargs...) : extent
-    graphicconfig = graphicconfig isa Nothing ? GraphicConfig(; kwargs...) : extent
-    imageconfig = imageconfig isa Nothing ? ImageConfig(; init=init, kwargs...) : imageconfig
+    extent = extent isa Nothing ? Extent(; init=init, kw...) : extent
+    graphicconfig = graphicconfig isa Nothing ? GraphicConfig(; kw...) : extent
+    imageconfig = imageconfig isa Nothing ? ImageConfig(init; kw...) : imageconfig
     T(; 
         frames=[deepcopy(init)], running=false, extent=extent, 
-        graphicconfig=graphicconfig, imageconfig=imageconfig, kwargs...
+        graphicconfig=graphicconfig, imageconfig=imageconfig, kw...
     )
 end
 
-imageconfig(o::Output) = ImageConfig(; init=init(o))
+imageconfig(o::Output) = ImageConfig(init(o))
 imageconfig(o::ImageOutput) = o.imageconfig
 
-processor(o::Output) = processor(imageconfig(o))
+imagegen(o::Output) = imagegen(imageconfig(o))
 minval(o::Output) = minval(imageconfig(o))
 maxval(o::Output) = maxval(imageconfig(o))
-imgbuffer(o::Output) = imgbuffer(imageconfig(o))
+imagebuffer(o::Output) = imagebuffer(imageconfig(o))
+textconfig(o::Output) = textconfig(imageconfig(o))
 
-function showframe(o::ImageOutput, data)
-    showimage(grid2image!(o, data), o, data)
-end
-
-"""
-    showimage(image::AbstractArray{AGRB32,2}, output::ImageOutput)
-
-Show image generated by and `GridProcessor` in an ImageOutput.
-
-# Arguments
-- `image`: An array of `Color`
-- `output`: the output to define the method for
-"""
-function showimage end
+showframe(o::ImageOutput, data) = showimage(grid_to_image!(o, data), o, data)
 showimage(image, o, data) = showimage(image, o)
 
 # Headless image output
@@ -136,7 +125,7 @@ mutable struct NoDisplayImageOutput{T,F<:AbstractVector{T},E,GC,IC} <: ImageOutp
     imageconfig::IC
 end
 function NoDisplayImageOutput(; 
-    frames, running, extent, graphicconfig, imageconfig, kwargs...
+    frames, running, extent, graphicconfig, imageconfig, kw...
 )
     NoDisplayImageOutput(frames, running, extent, graphicconfig, imageconfig)
 end

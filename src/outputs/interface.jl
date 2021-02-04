@@ -152,10 +152,33 @@ function finalisegraphics end
 function imageconfig end
 
 """
+    showimage(image::AbstractArray, o::ImageOutput)
     showimage(image::AbstractArray, o::ImageOutput, data::AbstractSimData)
 
 ImageOutput interface method.
 
-Display an image generated from the grid, required for all [`ImageOutput`](@ref).
+Display an image generated from the grid, a required method for all [`ImageOutput`](@ref).
 """
 function showimage end
+
+"""
+    to_rgb(val) => ARGB32
+    to_rgb(scheme, val) => ARGB32
+
+[`ImageOutput`](@ref) interface method.
+
+Display an image generated from the grid, a required method for all [`ImageOutput`](@ref).
+
+Custom grid object will need to add methods for converting the object to a color,
+```julia
+to_rgb(::ObjectScheme, obj::CustomObj) = ...`
+```
+
+For use with other colorschemes, a method that calls `get` with a `Real` value
+obtained from the object will be required:
+
+```julia
+to_rgb(scheme, obj::CustomObj) = ARGB32(get(scheme, real_from_obj(obj)))
+```
+"""
+function to_rgb end

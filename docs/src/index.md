@@ -47,31 +47,56 @@ SparseOpt
 
 ```@docs
 Rule
+DynamicGrids.SetRule
+```
+
+### CellRule
+
+```@docs
 CellRule
 Cell
 CopyTo
+Chain
+```
+
+### NeighborhoodRule
+
+```@docs
 NeighborhoodRule
 Neighbors
 Convolution
 Life
-DynamicGrids.SetRule
-SetCellRule
-SetCell
-SetNeighborhoodRule
-SetNeighbors
-SetGridRule
-SetGrid
-Chain
 ```
 
-### Rules parameter sources
+### SetCellRule
+
+```@docs
+SetCellRule
+SetCell
+```
+
+### SetNeighborhoodRule
+
+```@docs
+SetNeighborhoodRule
+SetNeighbors
+```
+
+### SetGridRule
+
+```@docs
+SetGridRule
+SetGrid
+```
+
+### Parameter sources
 
 ```@docs
 Aux
 Grid
 ```
 
-### Custom Rule interface and helpers
+## Custom Rule interface and helpers
 
 ```@docs
 DynamicGrids.applyrule
@@ -117,6 +142,8 @@ Kernel
 
 ### Methods for use with neighborhood rules and neighborhoods
 
+These are especially useful with [`SetNeighborhoodRule`](@ref).
+
 ```@docs
 DynamicGrids.radius
 DynamicGrids.neighbors
@@ -124,7 +151,7 @@ DynamicGrids.positions
 DynamicGrids.offsets
 ```
 
-## Atomic methods
+## Atomic methods for SetCellRule and SetNeighborhoodRule
 
 Using these methods to modify grid values ensures cell independence, 
 and also prevent race conditions with [`ThreadedCPU`](@ref) or [`CuGPU`].
@@ -153,20 +180,24 @@ ImageOutput
 GifOutput
 ```
 
-### Output methods
-
-### Grid processors
+### Image generators
 
 ```@docs
+ImageGenerator
+Image
+Layout
+```
+
+### Color schemes
+
+Schemes from Colorschemes.jl can be used for the `scheme` argument to `ImageOutput`, 
+`ImageGenerator`s. `Greyscale` control over the band of grey used, and is very fast. 
+`ObjectScheme` is the default.
+
+```@docs
+ObjectScheme
 Greyscale
 Grayscale
-GridProcessor
-SingleGridProcessor
-ColorProcessor
-MultiGridProcessor
-LayoutProcessor
-SparseOptInspector
-TextConfig
 ```
 
 ### Saving gifs
@@ -175,8 +206,7 @@ TextConfig
 savegif
 ```
 
-
-## `Output` interface
+### `Output` interface
 
 These are used for defining your own outputs and `GridProcessors`, 
 not for general scripting.
@@ -209,13 +239,15 @@ DynamicGrids.initialisegraphics
 DynamicGrids.finalisegraphics
 ```
 
-### `ImageOutput` interface
+### `ImageOutput` components and interface
 
-Also includes `Output` and `GraphicOutput` interfaces.
+Also uses `Output` and `GraphicOutput` interfaces.
 
 ```@docs
 DynamicGrids.ImageConfig
 DynamicGrids.imageconfig
 DynamicGrids.showimage
-DynamicGrids.grid2image!
+DynamicGrids.grid_to_image!
+DynamicGrids.cell_to_pixel
+DynamicGrids.to_rgb
 ```

@@ -1,18 +1,18 @@
-using DynamicGrids, Dates, Test, Colors, ColorSchemes
+using DynamicGrids, Dates, Test, Colors, ColorSchemes, FileIO
 using FreeTypeAbstraction
-using DynamicGrids: grid2image!, processor, minval, maxval, normalise, SimData, NoDisplayImageOutput,
-    isstored, isasync, initialise!, finalise!, delay, fps, settimestamp!, timestamp, imgbuffer,
-    tspan, setfps!, frames, isshowable, showframe, rgb, scale, Extent, extent
+using DynamicGrids: grid_to_image!, imagegen, minval, maxval, normalise, SimData, NoDisplayImageOutput,
+    isstored, isasync, initialise!, finalise!, delay, fps, settimestamp!, timestamp, textconfig,
+    tspan, setfps!, frames, isshowable, showframe, to_rgb, scale, Extent, extent
 using ColorSchemes: leonardo
 
-@testset "rgb" begin
-    @test rgb(0.5) === ARGB32(0.5, 0.5, 0.5, 1.0)
-    @test rgb(0.5, 0.5, 0.5) === ARGB32(0.5, 0.5, 0.5, 1.0)
-    @test rgb(0.5, 0.5, 0.5, 1.0) === ARGB32(0.5, 0.5, 0.5, 1.0)
-    @test rgb((0.5, 0.5, 0.5)) === ARGB32(0.5, 0.5, 0.5, 1.0)
-    @test rgb((0.5, 0.5, 0.5, 1.0)) === ARGB32(0.5, 0.5, 0.5, 1.0)
-    @test rgb(RGB(0.5, 0.5, 0.5)) === ARGB32(0.5, 0.5, 0.5, 1.0)
-    @test rgb(ARGB32(0.5, 0.5, 0.5)) === ARGB32(0.5, 0.5, 0.5, 1.0)
+@testset "to_rgb" begin
+    @test to_rgb(0.5) === ARGB32(0.5, 0.5, 0.5, 1.0)
+    @test to_rgb((0.5, 0.5, 0.5)) === ARGB32(0.5, 0.5, 0.5, 1.0)
+    @test to_rgb((0.5, 0.5, 0.5, 1.0)) === ARGB32(0.5, 0.5, 0.5, 1.0)
+    @test to_rgb(RGB(0.5, 0.5, 0.5)) === ARGB32(0.5, 0.5, 0.5, 1.0)
+    @test to_rgb(ARGB32(0.5, 0.5, 0.5)) === ARGB32(0.5, 0.5, 0.5, 1.0)
+    @test to_rgb(Greyscale(), 0.5) === ARGB32(0.5, 0.5, 0.5, 1.0)
+    @test to_rgb(ObjectScheme(), 0.5) === ARGB32(0.5, 0.5, 0.5, 1.0)
 end
 
 @testset "normalise" begin
@@ -47,12 +47,13 @@ end
 @testset "basic ImageOutput" begin
     init_ = [8.0 10.0;
              NaN  5.0]
-    output = NoDisplayImageOutput(init_; tspan=1:1, maxval=40.0)
+    output = NoDisplayImageOutput(init_; tspan=1:1, maxval=40.0, text=nothing)
 
     @test all(parent(output)[1] .=== init_)
     @test minval(output) === nothing
     @test maxval(output) === 40.0
-    @test processor(output).scheme == Greyscale()
+    @test textconfig(output) === nothing
+    @test imagegen(output).scheme == ObjectScheme()
     @test isasync(output) == false
     @test isstored(output) == false
     @test delay(output, 1.0) === nothing
@@ -72,47 +73,49 @@ end
     @test all(frames(output)[1] .=== 5init_)
     @test isshowable(output, 1)
 
+    imgen = Image()
     output = NoDisplayImageOutput(init_; 
-        tspan=1:10, maxval=40.0,
-        processor=ColorProcessor(; textconfig=nothing),
+        tspan=1:10, maxval=40.0, imagegen=imgen, text=nothing
     )
-    simdata = SimData(extent(output), Ruleset(Life()))
+    simdata = SimData(output, Ruleset(Life()))
     z0 = DynamicGrids.ZEROCOL
-    @test showframe(output, simdata) ==
-        [ARGB32(0.2, 0.2, 0.2) ARGB32(0.25, 0.25, 0.25)
-         z0                    ARGB32(0.125, 0.125, 0.125)]
+    ref = [ARGB32(0.2, 0.2, 0.2) ARGB32(0.25, 0.25, 0.25)
+           z0                    ARGB32(0.125, 0.125, 0.125)]
+    @test showframe(output, simdata) == ref
     savegif("test.gif", output)
-    @test isfile("test.gif")
+    gif = load("test.gif")
+    @test gif == RGB.(ref)
     rm("test.gif")
 
-    arrayoutput = ArrayOutput((a=[0 0],); tspan=1:2)
+    arrayoutput = ArrayOutput(init_; tspan=1:1)
     @test minval(arrayoutput) == nothing
     @test maxval(arrayoutput) == nothing
-    @test processor(arrayoutput) isa LayoutProcessor
+    @test imagegen(arrayoutput) isa Image
     @test fps(arrayoutput) === nothing
-    savegif("test2.gif", arrayoutput)
-    @test isfile("test2.gif")
+    savegif("test2.gif", arrayoutput; maxval=40.0, imagegen=imgen, text=nothing)
+    gif = load("test2.gif")
+    @test gif == RGB.(ref)
     rm("test2.gif")
 end
 
-@testset "ColorProcessor" begin
+@testset "Image generator" begin
     init_ = [8.0 10.0;
              0.0  5.0]
     mask_ = Bool[0 1;
                  1 1]
-    proc = ColorProcessor(zerocolor=(1.0, 0.0, 0.0), maskcolor=(0.1, 0.1, 0.1), textconfig=nothing)
-    ic = DynamicGrids.ImageConfig(init=init_, processor=proc)
-    @test ic.processor === proc
+    imgen = Image(zerocolor=(1.0, 0.0, 0.0), maskcolor=(0.1, 0.1, 0.1))
+    ic = DynamicGrids.ImageConfig(init_; imagegen=imgen, textconfig=nothing)
+    @test ic.imagegen === imgen
     output = NoDisplayImageOutput((a=init_,); 
         tspan=DateTime(2001):Year(1):DateTime(2010), mask=mask_,
-        processor=proc, minval=0.0, maxval=10.0, store=true
+        imagegen=imgen, text=nothing, minval=0.0, maxval=10.0, store=true
     )
-    @test processor(output) === output.imageconfig.processor === proc
+    @test imagegen(output) === output.imageconfig.imagegen === imgen
     @test minval(output) === 0.0
     @test maxval(output) === 10.0
-    @test processor(output).zerocolor == ColorProcessor(zerocolor=(1.0, 0.0, 0.0)).zerocolor
+    @test imagegen(output).zerocolor == Image(zerocolor=(1.0, 0.0, 0.0)).zerocolor
     @test isstored(output) == true
-    simdata = SimData(extent(output), Ruleset(Life()))
+    simdata = SimData(output, Ruleset(Life()))
 
     # Test level normalisation
     normed = normalise.(output[1][:a], minval(output), maxval(output))
@@ -120,46 +123,55 @@ end
                      0.0 0.5]
 
     # Test greyscale Image conversion
-    img = grid2image!(imgbuffer(output), processor(output), output, simdata, (a=init_,))
+    img = grid_to_image!(output, simdata)
     @test img == [ARGB32(0.1, 0.1, 0.1, 1.0) ARGB32(1.0, 1.0, 1.0, 1.0)
                   ARGB32(1.0, 0.0, 0.0, 1.0) ARGB32(0.5, 0.5, 0.5, 1.0)]
 
-    proc = ColorProcessor(; scheme=leonardo, textconfig=nothing)
-    img = grid2image!(imgbuffer(output), proc, output, simdata, init_)
+    output = NoDisplayImageOutput((a=init_,); 
+        tspan=DateTime(2001):Year(1):DateTime(2010), mask=mask_,
+        imagegen=Image(; scheme=leonardo), text=nothing,
+        minval=0.0, maxval=10.0, store=true
+    )
+    img = grid_to_image!(output, simdata)
     @test img == [DynamicGrids.MASKCOL l1
                   DynamicGrids.ZEROCOL l05]
     z0 = ARGB32(1, 0, 0)
-    proc = ColorProcessor(scheme=leonardo, zerocolor=z0, textconfig=nothing)
-    img = grid2image!(imgbuffer(output), proc, output, simdata, init_)
+    output = NoDisplayImageOutput((a=init_,); 
+        tspan=DateTime(2001):Year(1):DateTime(2010), mask=mask_,
+        imagegen = Image(scheme=leonardo, zerocolor=z0), text=nothing,
+        minval=0.0, maxval=10.0, store=true
+    )
+    img = grid_to_image!(output, simdata)
     @test img == [DynamicGrids.MASKCOL l1
                   z0 l05]
 
-    # @testset "text captions" begin
-    #     pixelsize = 20
-    #     timepos = 2pixelsize, pixelsize
-    #     textinit = zeros(200, 200)
-    #     font = "arial"
-    #     face = findfont(font)
-    #     # Swap fonts on linux
-    #     if face === nothing
-    #         font = "cantarell"
-    #         face = findfont(font)
-    #     end
-    #     if face !== nothing
-    #         refimg = ARGB32.(map(x -> ARGB32(1.0, 0.0, 0.0, 1.0), textinit))
-    #         renderstring!(refimg, string(DateTime(2001)), face, pixelsize, timepos...;
-    #                       fcolor=ARGB32(1.0, 1.0, 1.0, 1.0), bcolor=ARGB32(0.0, 0.0, 0.0, 1.0))
-    #         textconfig=TextConfig(; font=font, timepixels=pixelsize, namepixels=pixelsize, bcolor=ARGB32(0))
-    #         proc = ColorProcessor(zerocolor=ARGB32(1.0, 0.0, 0.0, 1.0), textconfig=textconfig)
-    #         output = NoDisplayImageOutput(textinit; 
-    #             tspan=DateTime(2001):Year(1):DateTime(2001),
-    #             processor=proc, store=true
-    #         )
-    #         simdata = SimData(extent(output), Ruleset())
-    #         img = grid2image!(imgbuffer(output), proc, output, simdata, textinit);
-    #         @test img == refimg
-    #     end
-    # end
+    @testset "text captions" begin
+        pixelsize = 20
+        timepos = 2pixelsize, pixelsize
+        textinit = zeros(200, 200)
+        font = "arial"
+        face = findfont(font)
+        # Swap fonts on linux
+        if face === nothing
+            font = "sans-serif"
+            face = findfont(font)
+        end
+        if face !== nothing
+            refimg = ARGB32.(map(x -> ARGB32(1.0, 0.0, 0.0, 1.0), textinit))
+            renderstring!(refimg, string(DateTime(2001)), face, pixelsize, timepos...;
+                          fcolor=ARGB32(1.0, 1.0, 1.0, 1.0), bcolor=ARGB32(0.0, 0.0, 0.0, 1.0))
+            textconfig=TextConfig(; font=font, timepixels=pixelsize, namepixels=pixelsize, bcolor=ARGB32(0))
+            output = NoDisplayImageOutput(textinit; 
+                tspan=DateTime(2001):Year(1):DateTime(2001),
+                imagegen=Image(zerocolor=ARGB32(1.0, 0.0, 0.0, 1.0)), 
+                text=textconfig, store=true,
+            )
+            simdata = SimData(output, Ruleset())
+            img = grid_to_image!(output, simdata);
+            @test img == refimg
+        end
+
+    end
     
 end
 
@@ -177,15 +189,15 @@ end
         boundary=Wrap(),
         opt=SparseOpt(),
     )
-    proc = SparseOptInspector()
+    imgen = SparseOptInspector()
     output = NoDisplayImageOutput(init; 
         tspan=Date(2001, 1, 1):Day(1):Date(2001, 1, 5), 
-        processor=proc, minval=0.0, maxval=1.0, store=true
+        imagegen=imgen, minval=0.0, maxval=1.0, store=true
     )
 
     @test minval(output) === 0.0
     @test maxval(output) === 1.0
-    @test processor(output) == SparseOptInspector()
+    @test imagegen(output) == SparseOptInspector()
     @test isstored(output) == true
 
     global images = []
@@ -202,28 +214,26 @@ end
 
 end
 
-@testset "LayoutProcessor" begin
+@testset "Layout ImageGenerator" begin
     init = [8.0 10.0;
             0.0  5.0]
     z0 = DynamicGrids.ZEROCOL
     grey = Greyscale()
     multiinit = (a=init, b=2init)
-    proc = LayoutProcessor([:a, nothing, :b], (grey, leonardo), nothing)
+    imgen = Layout([:a, nothing, :b], (grey, leonardo))
     output = NoDisplayImageOutput(multiinit; 
         tspan=DateTime(2001):Year(1):DateTime(2002), 
-        processor=proc, 
-        minval=(0, 0), 
-        maxval=(10, 20), 
-        store=true
+        imagegen=imgen, text=nothing,
+        minval=(0, 0), maxval=(10, 20), store=true
     )
     @test minval(output) === (0, 0)
     @test maxval(output) === (10, 20)
-    @test processor(output) === proc
+    @test imagegen(output) === imgen
     @test isstored(output) == true
-    simdata = SimData(extent(output), Ruleset(Life()))
+    simdata = SimData(output, Ruleset(Life()))
 
     # Test image is joined from :a, nothing, :b
-    @test grid2image!(output, simdata) ==
+    @test grid_to_image!(output, simdata) ==
         [ARGB32(0.8, 0.8, 0.8, 1.0) ARGB32(1.0, 1.0, 1.0, 1.0)
          z0                         ARGB32(0.5, 0.5, 0.5, 1.0)
          ARGB32(0.0, 0.0, 0.0, 1.0) ARGB32(0.0, 0.0, 0.0, 1.0)
@@ -255,35 +265,35 @@ end
             renderstring!(refimg, "b", face, namepixels, nameposb...;
                           fcolor=ARGB32(RGB(1.0), 1.0), bcolor=ARGB32(RGB(0.0), 1.0))
             textconfig = TextConfig(; font=font, timepixels=timepixels, namepixels=namepixels, bcolor=ARGB32(0))
-            proc = LayoutProcessor([:a, nothing, :b], (grey, leonardo), textconfig)
-            output = NoDisplayImageOutput(
-                 textinit; tspan=DateTime(2001):Year(1):DateTime(2001), processor=proc, 
+            imgen = Layout([:a, nothing, :b], (grey, leonardo))
+            output = NoDisplayImageOutput(textinit; 
+                 tspan=DateTime(2001):Year(1):DateTime(2001), imagegen=imgen, text=textconfig,
                  store=true, minval=(0, 0), maxval=(1, 1)
             )
-            simdata = SimData(extent(output), Ruleset())
-            img = grid2image!(output, simdata);
+            simdata = SimData(output, Ruleset())
+            img = grid_to_image!(output, simdata);
             @test img == refimg
         end
     end
     @testset "errors" begin
-        output = NoDisplayImageOutput(multiinit; tspan=1:10, processor=proc, 
+        output = NoDisplayImageOutput(multiinit; tspan=1:10, imagegen=imgen, 
             minval=(0, 0, 0), 
             maxval=(10, 20), 
         )
-        simdata = SimData(extent(output), Ruleset(Life()))
-        @test_throws ArgumentError grid2image!(output, simdata)
-        broken_proc = LayoutProcessor([:d, :c], (grey, leonardo), nothing)
+        simdata = SimData(output, Ruleset(Life()))
+        @test_throws ArgumentError grid_to_image!(output, simdata)
+        broken_imgen = Layout([:d, :c], (grey, leonardo))
         output = NoDisplayImageOutput(multiinit; 
-            tspan=1:10, processor=broken_proc, minval=(0, 0), maxval=(10, 20),
+            tspan=1:10, imagegen=broken_imgen, text=nothing, minval=(0, 0), maxval=(10, 20),
         )
-        simdata = SimData(extent(output), Ruleset(Life()))
-        @test_throws ArgumentError grid2image!(output, simdata)
+        simdata = SimData(output, Ruleset(Life()))
+        @test_throws ArgumentError grid_to_image!(output, simdata)
         @test_throws ArgumentError TextConfig(; font="not_a_font")
         @test_throws ArgumentError TextConfig(; font=:not_a_string)
     end
-    @testset "LayoutProcessor is the default for NamedTuple of grids" begin
+    @testset "Layout is the default for NamedTuple of grids" begin
         output = NoDisplayImageOutput(multiinit; tspan=1:10)
-        @test processor(output) isa LayoutProcessor
-        @test DynamicGrids.imgsize(processor(output), multiinit) == (2, 4)
+        @test imagegen(output) isa Layout
+        @test DynamicGrids.imagesize(imagegen(output), multiinit) == (2, 4)
     end
 end

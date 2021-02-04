@@ -20,7 +20,7 @@ gridsize(extent::AbstractExtent) = gridsize(init(extent))
            mask::Union{AbstractArray,Nothing}, 
            aux::Union{NamedTuple,Nothing}, 
            tspan::AbstractRange)
-    Extent(; init, mask=nothing, aux=nothing, tspan, kwargs...)
+    Extent(; init, mask=nothing, aux=nothing, tspan, kw...)
 
 Container for extensive variables: spatial and timeseries data.
 These are kept separate from rules to allow application
