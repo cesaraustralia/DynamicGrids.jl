@@ -1,5 +1,7 @@
 
 """
+    Rule
+
 A `Rule` object contains the information required to apply some
 logical rule to every cell of every timestep of a simulation.
 
@@ -74,7 +76,6 @@ function (::Type{T})(args...; kw...) where T<:Rule{R} where R
     T{R}(args...; kw...)
 end
 
-
 @generated function Base.keys(rule::Rule{R,W}) where {R,W}
     Expr(:tuple, QuoteNode.(union(_asiterable(W), _asiterable(R)))...)
 end
@@ -109,6 +110,8 @@ radius(rule::Rule, args...) = 0
 
 
 """
+    Cellrule <: Rule
+
 A `Rule` that only writes and uses a state from single cell of the read grids,
 and has its return value written back to the same cell(s).
 
@@ -143,13 +146,17 @@ abstract type CellRule{R,W} <: Rule{R,W} end
 
 
 """
-Abstract supertype for rules that manually write to the grid in any way.
+    SetRule <: Rule
 
-Adds methods to [`applyrule!`](@ref).
+Abstract supertype for rules that manually write to the grid in some way.
+
+These must define methods of [`applyrule!`](@ref).
 """
 abstract type SetRule{R,W} <: Rule{R,W} end
 
 """
+    SetCellRule <: Rule
+
 Abstract supertype for rules that can manually write to any cells of the
 grid that they need to.
 
@@ -165,9 +172,9 @@ end
 
 Note the `!` bang - this method alters the state of `data`.
 
-To update the grid, you can use atomic operators [`add!`](@ref), [`sub!`](@ref), 
-[`min!`](@ref), [`max!`](@ref), and [`and!`](@ref), [`or!`](@ref) for `Bool`. 
-These methods safely combined writes from all grid cells - directly using `setindex!` 
+To update the grid, you can use atomic operators [`add!`](@ref), [`sub!`](@ref),
+[`min!`](@ref), [`max!`](@ref), and [`and!`](@ref), [`or!`](@ref) for `Bool`.
+These methods safely combined writes from all grid cells - directly using `setindex!`
 would cause bugs.
 
 It there are multiple write grids, you will need to get the grid keys from
@@ -185,6 +192,8 @@ end
 abstract type SetCellRule{R,W} <: SetRule{R,W} end
 
 """
+    NeighborhoodRule <: Rule
+
 A Rule that only accesses a neighborhood centered around the current cell.
 `NeighborhoodRule` is applied with the method:
 
@@ -223,13 +232,15 @@ _buffer(rule::NeighborhoodRule) = _buffer(neighborhood(rule))
 radius(rule::NeighborhoodRule, args...) = radius(neighborhood(rule))
 
 """
+    SetNeighborhoodRule <: SetRule
+
 A Rule that only writes to its neighborhood.
 
 [`positions`](@ref) and [`offsets`](@ref) are useful iterators for modifying
-neighborhood values. Atomic 
+neighborhood values. Atomic
 
 `SetNeighborhood` rules must return a `Neighborhood` object from `neighborhood(rule)`.
-By default this is `rule.neighborhood`. If this property exists, no interface methods 
+By default this is `rule.neighborhood`. If this property exists, no interface methods
 are required.
 """
 abstract type SetNeighborhoodRule{R,W} <: SetRule{R,W} end
@@ -244,6 +255,8 @@ neighborhoodkey(rule::SetNeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = 
 
 
 """
+    SetGridRule <: Rule
+
 A `Rule` applies to whole grids. This is used for operations that don't benefit from
 having neighborhood buffering or looping over the grid handled for them, or any specific
 optimisations. Best suited to simple functions like `rand`(write)` or using convolutions
@@ -297,6 +310,8 @@ end
 
 
 """
+    Call <: CellRule
+
     Cell(f)
     Cell{R,W}(f)
 
@@ -340,6 +355,8 @@ Cell{R,W}(; kw...) where {R,W} = _nofunctionerror(Cell)
 end
 
 """
+    Neighbors <: NeighborhoodRule
+
     Neighbors(f, neighborhood=Moor(1))
     Neighbors{R,W}(f, neighborhood=Moore())
 
@@ -384,6 +401,8 @@ Neighbors{R,W}(f; neighborhood=Moore(1)) where {R,W} =
 end
 
 """
+    SetCell <: SetCellRule
+
     SetCell(f)
     SetCell{R,W}(f)
 
@@ -420,23 +439,25 @@ end
 
 
 """
+    SetNeighbors <: SetNeighborhoodRule
+
     SetNeighbors(f, neighborhood=Moor(1))
     SetNeighbors{R,W}(f, neighborhood=Moor(1))
 
-A [`SetCellRule`](@ref) to manually write to the array with the specified 
+A [`SetCellRule`](@ref) to manually write to the array with the specified
 neighborhood. Indexing outside the neighborhood is undefined behaviour.
 
-Function `f` is passed an [`SimData`](@ref) object `data`, the specified 
-neighborhood object and the index of the current cell, followed by the required 
-grid values for the index. 
+Function `f` is passed an [`SimData`](@ref) object `data`, the specified
+neighborhood object and the index of the current cell, followed by the required
+grid values for the index.
 
 To update the grid, you can use: [`add!`](@ref), [`sub!`](@ref) for `Number`,
 and [`and!`](@ref), [`or!`](@ref) for `Bool`. These methods can be safely combined
-writes from all grid cells. 
+writes from all grid cells.
 
 Directly using `setindex!` is possible, but may cause bugs as multiple cells
 may write to the same location in an unpredicatble order. As a rule, directly
-setting a neighborhood index should only be done if it always sets the samevalue - 
+setting a neighborhood index should only be done if it always sets the samevalue -
 then it can be guaranteed that any writes from othe grid cells reach the same result.
 
 [`neighbors`](@ref), [`offsets`](@ref) and [`positions`](@ref) are useful methods for
@@ -469,6 +490,8 @@ end
 
 
 """
+    Convolution <: NeighborhoodRule
+
     Convolution(f, neighborhood=Moor(1))
     Convolution{R,W}(f, neighborhood=Moor(1))
 
@@ -482,8 +505,8 @@ Small radius convolutions in DynamicGrids.jl will be faster or comparable to usi
 DSP.jl or ImageConvolutions.jl. As the radius increases or grid size gets very large
 these packages will be a lot faster.
 
-But `Convolution` is convenient to chain into a simlulation, and combined with some other 
-rules. It should perform reasonably well in all but very large simulations or very large 
+But `Convolution` is convenient to chain into a simlulation, and combined with some other
+rules. It should perform reasonably well in all but very large simulations or very large
 kernels.
 
 ## Example

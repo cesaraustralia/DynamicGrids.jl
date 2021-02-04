@@ -1,9 +1,13 @@
 """
+    PerformanceOpt
+
 Abstract supertype for performance optimisation flags.
 """
 abstract type PerformanceOpt end
 
 """
+    SparseOpt <: PerformanceOpt
+
     SparseOpt()
 
 An optimisation flag that ignores all zero values in the grid.
@@ -35,6 +39,8 @@ SparseOpt() = SparseOpt(==(0))
 @inline can_skip(opt::SparseOpt{<:Function}, val) = opt.f(val)
 
 """
+    NoOpt <: PerformanceOpt
+
     NoOpt()
 
 Flag to run a simulation without performance optimisations besides basic high performance
@@ -46,16 +52,22 @@ for all rules.
 struct NoOpt <: PerformanceOpt end
 
 """
+    Processor
+
 Abstract supertype for selecting a hardware processor, such as ia CPU or GPU.
 """
 abstract type Processor end
 
 """
+    CPU <: Processor
+
 Abstract supertype for CPU processors.
 """
 abstract type CPU <: Processor end
 
 """
+    SingleCPU <: CPU
+
     SingleCPU()
 
 [`Processor`](@ref) flag that specifies to use a single thread on a single CPU.
@@ -72,6 +84,8 @@ struct SingleCPU <: CPU end
 
 
 """
+    ThreadedCPU <: CPU
+
     ThreadedCPU()
 
 [`Processor`](@ref) flag that specifies to use a `Threads.nthreads()` CPUs.
@@ -92,21 +106,20 @@ Base.Threads.lock(opt::ThreadedCPU) = lock(opt.spinlock)
 Base.Threads.unlock(opt::ThreadedCPU) = unlock(opt.spinlock)
 
 """
-Abstract supertype for GPU processors.
-"""
-abstract type GPU <: Processor end
+    BoundaryCondition
 
-"""
 Abstract supertype for flags that specify the boundary conditions used in the simulation,
 used in [`inbounds`](@ref) and to update [`NeighborhoodRule`](@ref) grid padding.
 These determine what happens when a neighborhood or jump extends outside of the grid.
 """
-abstract type Boundary end
+abstract type BoundaryCondition end
 
 """
+    Wrap <: BoundaryCondition
+
     Wrap()
 
-[`Boundary`](@ref) flag to wrap cordinates that boundary boundaries back to the
+[`BoundaryCondition`](@ref) flag to wrap cordinates that boundary boundaries back to the
 opposite side of the grid.
 
 Specifiy with:
@@ -117,13 +130,15 @@ ruleset = Ruleset(rule; boundary=Wrap())
 output = sim!(output, rule; boundary=Wrap())
 ```
 """
-struct Wrap <: Boundary end
+struct Wrap <: BoundaryCondition end
 
 """
+    Remove <: BoundaryCondition
+
     Remove()
 
-[`Boundary`](@ref) flag that specifies to assign `padval` to cells that overflow grid
-boundaries. `padval` defaults to `zero(eltype(grid))` but can be assigned as a keyword
+[`BoundaryCondition`](@ref) flag that specifies to assign `padval` to cells that overflow 
+grid boundaries. `padval` defaults to `zero(eltype(grid))` but can be assigned as a keyword
 argument to an [`Output`](@ref).
 
 Specifiy with:
@@ -134,9 +149,20 @@ ruleset = Ruleset(rule; boundary=Remove())
 output = sim!(output, rule; boundary=Remove())
 ```
 """
-struct Remove <: Boundary end
+struct Remove <: BoundaryCondition end
+
 
 """
+    ParameterSource
+
+Abstract supertypes for parameter source wrappers. These allow
+parameters to be retreived from auxilliary data or from other grids.
+"""
+abstract type ParameterSource end
+
+"""
+    Aux <: ParameterSource
+
     Aux{K}()
     Aux(K::Symbol)
 
@@ -166,6 +192,8 @@ _unwrap(::Aux{X}) where X = X
 _unwrap(::Type{<:Aux{X}}) where X = X
 
 """
+    Grid <: ParameterSource
+
     Grid{K}()
     Grid(K::Symbol)
 

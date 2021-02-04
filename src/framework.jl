@@ -1,31 +1,18 @@
 
 """
-
     sim!(output, rules::Rule...; kw...)
     sim!(output, rules::Tuple{<:Rule,Vararg}; kw...)
-    sim!(output, [ruleset::Ruleset=ruleset(output)];
-         init=init(output),
-         mask=mask(output),
-         tstpan=tspan(output),
-         aux=aux(output),
-         fps=fps(output),
-         proc=opt(ruleset)
-         opt=opt(ruleset),
-         boundary=opt(ruleset),
-         cellsize=opt(ruleset),
-         timestep=opt(ruleset),
-         simdata=nothing
-    )
+    sim!(output, [ruleset::Ruleset=ruleset(output)]; kw...)
 
 Runs the simulation, passing the destination aray to
 the passed in output for each time-step.
 
-### Arguments
+# Arguments
 - `output`: An [`Output`](@ref) to store grids or display them on the screen.
 - `ruleset`: A [`Ruleset`](@ref) containing one or more [`Rule`](@ref)s. If the output
   has a `Ruleset` attached, it will be used.
 
-### Keyword Arguments
+# Keywords
 
 Theses are the taken from the `output` argument by default:
 
@@ -36,18 +23,20 @@ Theses are the taken from the `output` argument by default:
 - `fps`: the frames per second to display. Will be taken from the output if not passed in.
 
 Theses are the taken from the `ruleset` argument by default:
+
 - `proc`: a [`Processor`](@ref) to specificy the hardware to run simulations on, 
-  like [`SingleCPU`](@ref), [`ThreadedCPU`](@ref) or [`CuGPU`](@ref) when 
-  KernelAbstractions.jl and a CUDA gpu is available. 
+    like [`SingleCPU`](@ref), [`ThreadedCPU`](@ref) or [`CuGPU`](@ref) when 
+    KernelAbstractions.jl and a CUDA gpu is available. 
 - `opt`: a [`PerformanceOpt`](@ref) to specificy optimisations like
-  [`SparseOpt`](@ref) or [`NoOpt`](@ref). Defaults to `NoOpt()`.
+    [`SparseOpt`](@ref) or [`NoOpt`](@ref). Defaults to `NoOpt()`.
 - `boundary`: what to do with boundary of grid edges.
-  Options are [`Remove`](@ref) or [`Wrap`](@ref), defaulting to `Remove()`.
+    Options are [`Remove`](@ref) or [`Wrap`](@ref), defaulting to `Remove()`.
 - `cellsize`: the size of cells, which may be accessed by rules.
 - `timestep`: fixed timestep where this is required for some rules.
-  eg. `Month(1)` or `1u"s"`.
+    eg. `Month(1)` or `1u"s"`.
 
 Other:
+
 - `simdata`: a [`SimData`](@ref) object. Keeping it between simulations can reduce memory
   allocation a little, when that is important.
 """
@@ -97,10 +86,7 @@ sim!(output::Output, rules::Tuple; kw...) = sim!(output, rules...; kw...)
 sim!(output::Output, rules::Rule...; kw...) = sim!(output, Ruleset(rules...); kw...)
 
 """
-    resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
-            tstop=last(tspan(output)),
-            fps=fps(output),
-            simdata=nothing)
+    resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output); tstop, kw...)
 
 Restart the simulation from where you stopped last time. For arguments see [`sim!`](@ref).
 The keyword arg `tstop` can be used to extend the length of the simulation.
@@ -115,7 +101,7 @@ The keyword arg `tstop` can be used to extend the length of the simulation.
 - `tstop`: the new stop time for the simulation. Taken from the output length by default.
 - `fps`: the frames per second to display. Taken from the output by default.
 - `simdata`: a [`SimData`](@ref) object. Keeping it between simulations can improve performance
-  when that is important
+    when that is important
 """
 function resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
         tstop=last(tspan(output)),

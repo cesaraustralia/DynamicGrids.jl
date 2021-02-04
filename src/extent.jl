@@ -1,5 +1,7 @@
 """
-Abstract supertype for `Extent` objects, that hold all variables related 
+    AbstractExtent
+
+Abstract supertype for `Extent` objects, that hold all variables related
 to space and time in a simulation. Usually the field of an output.
 """
 abstract type AbstractExtent{I,M,A,PV} end
@@ -9,16 +11,18 @@ mask(e::AbstractExtent) = e.mask
 aux(e::AbstractExtent) = e.aux
 @inline aux(e::AbstractExtent, key) = aux(aux(e), key)
 @inline aux(nt::NamedTuple, ::Aux{Key}) where Key = nt[Key] # Fast compile-time version
-@noinline aux(::Nothing, key) = 
+@noinline aux(::Nothing, key) =
     throw(ArgumentError("No aux data available. Pass a NamedTuple to the `aux=` keyword of the Output"))
 padval(e::AbstractExtent) = e.padval
 tspan(e::AbstractExtent) = e.tspan # Never type-stable, only access in `precalc` methods
 gridsize(extent::AbstractExtent) = gridsize(init(extent))
 
 """
-    Extent(init::Union{AbstractArray,NamedTuple}, 
-           mask::Union{AbstractArray,Nothing}, 
-           aux::Union{NamedTuple,Nothing}, 
+    Extent <: AbstractExtent
+
+    Extent(init::Union{AbstractArray,NamedTuple},
+           mask::Union{AbstractArray,Nothing},
+           aux::Union{NamedTuple,Nothing},
            tspan::AbstractRange)
     Extent(; init, mask=nothing, aux=nothing, tspan, kw...)
 
@@ -31,7 +35,7 @@ to `Output` constructors instead of `init`, `mask`, `aux` and `tspan`.
 
 - `init`: initialisation `Array`/`NamedTuple` for grid/s.
 - `mask`: `BitArray` for defining cells that will/will not be run.
-- `aux`: NamedTuple of arbitrary input data. Use `aux(data, Aux(:key))` to access from 
+- `aux`: NamedTuple of arbitrary input data. Use `aux(data, Aux(:key))` to access from
   a `Rule` in a type-stable way.
 - `padval`: padding value for grids with neighborhood rules. The default is `zero(eltype(init))`.
 - `tspan`: Time span range. Never type-stable, only access this in `precalc` methods
@@ -55,13 +59,13 @@ mutable struct Extent{I<:Union{AbstractArray,NamedTuple},
         else
             size_ = size(init)
         end
-        if (mask !== nothing) && (size(mask) != size_) 
+        if (mask !== nothing) && (size(mask) != size_)
             throw(ArgumentError("`mask` size do not match `init`"))
         end
         new{I,M,A,PV}(init, mask, aux, padval, tspan)
     end
 end
-Extent(; init, mask=nothing, aux=nothing, padval=_padval(init), tspan, kw...) = 
+Extent(; init, mask=nothing, aux=nothing, padval=_padval(init), tspan, kw...) =
     Extent(init, mask, aux, padval, tspan)
 
 settspan!(e::Extent, tspan) = e.tspan = tspan
@@ -69,6 +73,11 @@ settspan!(e::Extent, tspan) = e.tspan = tspan
 _padval(init::NamedTuple) = map(_padval, init)
 _padval(init::AbstractArray{T}) where T = zero(T)
 
+"""
+    StaticExtent <: AbstractExtent
+
+An immuatble `Extent` object, for internal use.
+"""
 struct StaticExtent{I<:Union{AbstractArray,NamedTuple},
                     M<:Union{AbstractArray,Nothing},
                     A<:Union{NamedTuple,Nothing},
@@ -79,4 +88,4 @@ struct StaticExtent{I<:Union{AbstractArray,NamedTuple},
     padval::PV
     tspan::T
 end
-StaticExtent(e::Extent) = StaticExtent(init(e), mask(e), aux(e), padval(e), tspan(e)) 
+StaticExtent(e::Extent) = StaticExtent(init(e), mask(e), aux(e), padval(e), tspan(e))

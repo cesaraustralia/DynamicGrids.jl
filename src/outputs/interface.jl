@@ -67,7 +67,6 @@ function finalise! end
 [`Output`](@ref) interface method.
 
 Get the index of the current frame in the output.
-
 Every frame has an index of 1 if the simulation isn't stored.
 """
 function frameindex end
@@ -160,6 +159,17 @@ ImageOutput interface method.
 Display an image generated from the grid, a required method for all [`ImageOutput`](@ref).
 """
 function showimage end
+
+"""
+    grid_to_image!(o::ImageOutput, data::SimData)
+    grid_to_image!(imbuf, imgen::ImageGenerator, o::ImageOutput, data::SimData, grids)
+
+Convert a grid or `NamedRuple` of grids to an `ARGB32` image, using an 
+[`ImageGenerator`](@ref).
+
+Generated pixels are written to the image buffer matrix.
+"""
+function grid_to_image! end
 
 """
     to_rgb(val) => ARGB32
