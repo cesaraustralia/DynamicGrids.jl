@@ -50,16 +50,16 @@ export Chain
 
 export AbstractRuleset, Ruleset, StaticRuleset
 
-export Neighborhood, RadialNeighborhood, AbstractWindow, Window, AbstractKernel, Kernel,
+export Neighborhood, RadialNeighborhood, Window, AbstractKernel, Kernel,
        Moore, AbstractPositional, Positional, VonNeumann, LayeredPositional
 
 export Processor, SingleCPU, ThreadedCPU
 
 export PerformanceOpt, NoOpt, SparseOpt
 
-export Boundary, Remove, Wrap
+export BoundaryCondition, Remove, Wrap
 
-export Aux, Grid
+export ParameterSource, Aux, Grid
 
 export Output, GraphicOutput, ImageOutput, ArrayOutput, ResultOutput, REPLOutput, GifOutput
 
@@ -105,6 +105,7 @@ include("sequencerules.jl")
 include("maprules.jl")
 include("boundaries.jl")
 include("utils.jl")
+include("copyto.jl")
 include("life.jl")
 include("show.jl")
 

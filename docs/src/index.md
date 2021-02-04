@@ -1,3 +1,4 @@
+# DynamicGrids
 
 ```@docs
 DynamicGrids
@@ -17,10 +18,12 @@ AbstractRuleset
 Ruleset
 ```
 
+## Options/Flags
+
 ### Boundary conditions
 
 ```@docs
-Boundary
+BoundaryCondition
 Wrap
 Remove
 ```
@@ -32,7 +35,9 @@ DynamicGrids.Processor
 DynamicGrids.CPU
 SingleCPU
 ThreadedCPU
+DynamicGrids.GPU
 CuGPU
+CPUGPU
 ```
 
 ### Performance optimisation
@@ -92,11 +97,12 @@ SetGrid
 ### Parameter sources
 
 ```@docs
+ParameterSource
 Aux
 Grid
 ```
 
-## Custom Rule interface and helpers
+### Custom Rule interface and helpers
 
 ```@docs
 DynamicGrids.applyrule
@@ -151,7 +157,7 @@ DynamicGrids.positions
 DynamicGrids.offsets
 ```
 
-## Atomic methods for SetCellRule and SetNeighborhoodRule
+### Atomic methods for SetCellRule and SetNeighborhoodRule
 
 Using these methods to modify grid values ensures cell independence, 
 and also prevent race conditions with [`ThreadedCPU`](@ref) or [`CuGPU`].
@@ -184,7 +190,9 @@ GifOutput
 
 ```@docs
 ImageGenerator
+DynamicGrids.SingleGridImageGenerator
 Image
+DynamicGrids.MultiGridImageGenerator
 Layout
 ```
 
@@ -197,8 +205,14 @@ Schemes from Colorschemes.jl can be used for the `scheme` argument to `ImageOutp
 ```@docs
 ObjectScheme
 Greyscale
-Grayscale
 ```
+
+### Text labels
+
+```@docs
+TextConfig
+```
+
 
 ### Saving gifs
 
@@ -248,6 +262,5 @@ DynamicGrids.ImageConfig
 DynamicGrids.imageconfig
 DynamicGrids.showimage
 DynamicGrids.grid_to_image!
-DynamicGrids.cell_to_pixel
 DynamicGrids.to_rgb
 ```

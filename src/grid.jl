@@ -1,5 +1,7 @@
 
 """
+    GridData <: AbstractArray
+
 Simulation data specific to a single grid.
 """
 abstract type GridData{Y,X,R,T,N,I} <: AbstractArray{T,N} end
@@ -44,6 +46,8 @@ gridview(d::GridData) = view(parent(dest(d)), map(a -> a .+ radius(d), gridaxes(
 
 
 """
+    ReadableGridData <: GridData
+
     ReadableGridData(grid::GridData)
     ReadableGridData{Y,X,R}(init::AbstractArray, mask, opt, boundary, padval)
 
@@ -171,6 +175,8 @@ _build_status(opt::PerformanceOpt, init, r) = nothing, nothing
 
 
 """
+    WritableGridData <: GridData
+
     WritableGridData(grid::GridData)
 
 Passed to rules `<: `, and can be written to directly as
@@ -192,7 +198,7 @@ struct WritableGridData{
     deststatus::DSt
 end
 function WritableGridData{Y,X,R}(
-    init::I, mask::M, proc::P, opt::Op, boundary::Ov, padval::PV, 
+    init::I, mask::M, proc::P, opt::Op, boundary::Ov, padval::PV,
     source::S, dest::D, sourcestatus::SSt, deststatus::DSt
 ) where {Y,X,R,I<:AbstractArray{T,N},M,P,Op,Ov,PV,S,D,SSt,DSt} where {T,N}
     WritableGridData{Y,X,R,T,N,I,M,P,Op,Ov,PV,S,D,SSt,DSt}(

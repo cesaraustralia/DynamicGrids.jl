@@ -1,5 +1,7 @@
 
 """
+    Neighborhood
+
 Neighborhoods define the pattern of surrounding cells in the "neighborhood"
 of the current cell. The `neighbors` function returns the surrounding
 cells as an iterable.
@@ -27,11 +29,15 @@ Base.iterate(hood::Neighborhood, args...) = iterate(neighbors(hood), args...)
 Base.getindex(hood::Neighborhood, I...) = getindex(_buffer(hood), I...)
 
 """
-Moore-style square neighborhoods
+    RadialNeighborhood <: Neighborhood
+
+Square neighborhoods with radius `R`, and side length `2R + 1`
 """
 abstract type RadialNeighborhood{R,L} <: Neighborhood{R,L} end
 
 """
+    Moore <: RadialNeighborhood
+
     Moore(radius::Int=1)
 
 Moore neighborhoods define the neighborhood as all cells within a horizontal or
@@ -41,10 +47,6 @@ struct Moore{R,L,B} <: RadialNeighborhood{R,L}
     _buffer::B
 end
 # Buffer is updated later during the simulation.
-# but can be passed in now to avoid the allocation.
-# This might be bad design. SimData could instead hold a list of
-# ruledata for the rule that holds this buffer, with
-# the neighborhood. So you can do neighbors(data)
 Moore(radius::Int=1) = Moore{radius}()
 Moore{R}(_buffer=nothing) where R = Moore{R,(2R+1)^2-1}(_buffer)
 Moore{R,L}(_buffer::B=nothing) where {R,L,B} = Moore{R,L,B}(_buffer)
@@ -65,26 +67,15 @@ Base.sum(hood::Moore) = sum(_buffer(hood)) - _centerval(hood)
 
 _centerval(hood::Neighborhood{R}) where R = _buffer(hood)[R + 1, R + 1]
 
-
 """
-Abstract supertype for window neighborhoods.
+    Window <: RadialNeighborhood
 
-These are radial neighborhoods that inlude the central cell.
-"""
-abstract type AbstractWindow{R,L} <: RadialNeighborhood{R,L} end
-
-neighbors(hood::AbstractWindow) = _buffer(hood)
-
-# The central cell is included
-@inline offsets(hood::AbstractWindow{R}) where R = ((i, j) for j in -R:R, i in -R:R)
-
-"""
     Window{R}()
 
 A neighboorhood of radius R that includes the central cell.
 `R = 1` gives a 3x3 matrix.
 """
-struct Window{R,L,B} <: AbstractWindow{R,L}
+struct Window{R,L,B} <: RadialNeighborhood{R,L}
     _buffer::B
 end
 @inline Window(R::Int) = Window{R}()
@@ -94,10 +85,17 @@ end
 
 @inline _setbuffer(::Window{R,L}, buf::B2) where {R,L,B2} = Window{R,L,B2}(buf)
 
+# The central cell is included
+@inline offsets(hood::Window{R}) where R = ((i, j) for j in -R:R, i in -R:R)
+
+neighbors(hood::Window) = _buffer(hood)
+
 """
+    AbstractKernel <: Neighborhood
+
 Abstract supertype for kernel neighborhoods.
 
-These can wrap any other neighborhood object, and include a kernel of 
+These can wrap any other neighborhood object, and include a kernel of
 the same length and positions as the neighborhood.
 """
 abstract type AbstractKernel{R,L} <: Neighborhood{R,L} end
@@ -108,7 +106,7 @@ offsets(hood::AbstractKernel) = offsets(neighborhood(hood))
 positions(hood::AbstractKernel, I) = positions(neighborhood(hood), I)
 kernel(hood::AbstractKernel) = hood.kernel
 
-# We override dot for AbstractKernel as we always mean the sum of the 
+# We override dot for AbstractKernel as we always mean the sum of the
 # products of the kernel and buffer values - never a nested dot product.
 LinearAlgebra.dot(hood::AbstractKernel) = _dot(neighborhood(hood), kernel(hood))
 
@@ -122,15 +120,17 @@ end
 function _dot(hood::Window{<:Any,L}, kernel) where L
     sum = zero(first(neighbors(hood)))
     @simd for i in 1:L
-        @inbounds sum += _buffer(hood)[i] * kernel[i] 
+        @inbounds sum += _buffer(hood)[i] * kernel[i]
     end
     sum
 end
 
 """
+    Kernel <: AbstractKernel
+
     Kernel(neighborhood, kernel)
 
-Wrap any other neighborhood object, and includes a kernel of 
+Wrap any other neighborhood object, and includes a kernel of
 the same length and positions as the neighborhood.
 
 `R = 1` gives 3x3 matrices.
@@ -154,6 +154,8 @@ end
 end
 
 """
+    AbstractPositional <: Neighborhood
+
 Neighborhoods are tuples or vectors of custom coordinates tuples
 that are specified in relation to the central point of the current cell.
 They can be any arbitrary shape or size, but should be listed in column-major
@@ -165,6 +167,8 @@ const CustomOffset = Tuple{Vararg{Int}}
 const CustomOffsets = Union{AbstractArray{<:CustomOffset},Tuple{Vararg{<:CustomOffset}}}
 
 """
+    Positional <: AbstractPositional
+
     Positional(coord::Tuple{Vararg{Int}}...)
     Positional(offsets::Tuple{Tuple{Vararg{Int}}})
 
@@ -191,7 +195,7 @@ Positional{R,L}(offsets::O, _buffer::B=nothing) where {R,L,O<:CustomOffsets,B} =
 # Calculate the maximum absolute value in the offsets to use as the radius
 _absmaxcoord(offsets::Union{AbstractArray,Tuple}) = maximum(map(x -> maximum(map(abs, x)), offsets))
 
-ConstructionBase.constructorof(::Type{Positional{R,L,C,B}}) where {R,L,C,B} = 
+ConstructionBase.constructorof(::Type{Positional{R,L,C,B}}) where {R,L,C,B} =
     Positional{R,L}
 
 Base.length(hood::Positional) = length(offsets(hood))
@@ -199,10 +203,12 @@ Base.length(hood::Positional) = length(offsets(hood))
 offsets(hood::Positional) = hood.offsets
 @inline neighbors(hood::Positional) =
     (_buffer(hood)[(offset .+ radius(hood) .+ 1)...] for offset in offsets(hood))
-@inline _setbuffer(n::Positional{R,L,O}, buf::B2) where {R,L,O,B2} = 
+@inline _setbuffer(n::Positional{R,L,O}, buf::B2) where {R,L,O,B2} =
     Positional{R,L,O,B2}(offsets(n), buf)
 
 """
+    LayeredPositional <: AbstractPositional
+
     LayeredPositional(layers::Positional...)
 
 Sets of [`Positional`](@ref) neighborhoods that can have separate rules for each set.
@@ -227,13 +233,13 @@ end
 @inline neighbors(hood::LayeredPositional) = map(l -> neighbors(l), hood.layers)
 @inline offsets(hood::LayeredPositional) = map(l -> offsets(l), hood.layers)
 @inline positions(hood::LayeredPositional, args...) = map(l -> positions(l, args...), hood.layers)
-@inline _setbuffer(n::LayeredPositional{R,L}, buf) where {R,L} = 
+@inline _setbuffer(n::LayeredPositional{R,L}, buf) where {R,L} =
     LayeredPositional{R,L}(n.layers, buf)
 
 @inline Base.sum(hood::LayeredPositional) = map(sum, neighbors(hood))
 
 """
-    VonNeumann(radius=1)
+    VonNeumann(radius=1) -> Positional
 
 A convenience wrapper to build Von-Neumann neighborhoods as
 a [`Positional`](@ref) neighborhood.
@@ -251,7 +257,7 @@ function VonNeumann(radius=1, _buffer=nothing)
 end
 
 """
-    hoodsize(radius)
+    hoodsize(radius) -> Int
 
 Get the size of a neighborhood dimension from its radius,
 which is always 2r + 1.

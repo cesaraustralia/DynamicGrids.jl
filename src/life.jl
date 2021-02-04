@@ -1,4 +1,6 @@
 """
+    Life <: NeighborhoodRule
+
     Life(neighborhood, born=3, survive=(2, 3))
 
 Rule for game-of-life style cellular automata. This is a demonstration of

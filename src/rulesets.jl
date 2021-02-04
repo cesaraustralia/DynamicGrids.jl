@@ -1,4 +1,6 @@
 """
+    AbstractRuleset <: ModelParameters.AbstractModel
+
 Abstract supertype for [`Ruleset`](@ref) objects and variants.
 """
 abstract type AbstractRuleset <: AbstractModel end
@@ -21,25 +23,28 @@ ModelParameters.setparent!(rs::AbstractRuleset, rules) = rs.rules = rules
 ModelParameters.setparent(rs::AbstractRuleset, rules) = @set rs.rules = rules
 
 """
-    Ruleset(rules...; boundary=Remove(), opt=NoOpt(), cellsize=1, timestep=nothing)
+    Rulseset <: AbstractRuleset
+
+    Ruleset(rules...; kw...)
 
 A container for holding a sequence of `Rule`s and simulation
 details like boundary handing and optimisation.
 Rules will be run in the order they are passed, ie. `Ruleset(rule1, rule2, rule3)`.
 
-## Keyword Arguments
+# Keywords
+
 - `proc`: a [`Processor`](@ref) to specificy the hardware to run simulations on, 
-  like [`SingleCPU`](@ref), [`ThreadedCPU`](@ref) or [`CuGPU`](@ref) when 
-  KernelAbstractions.jl and a CUDA gpu is available. 
+    like [`SingleCPU`](@ref), [`ThreadedCPU`](@ref) or [`CuGPU`](@ref) when 
+    KernelAbstractions.jl and a CUDA gpu is available. 
 - `opt`: a [`PerformanceOpt`](@ref) to specificy optimisations like
-  [`SparseOpt`](@ref). Defaults to [`NoOpt`](@ref).
+    [`SparseOpt`](@ref). Defaults to [`NoOpt`](@ref).
 - `boundary`: what to do with boundary of grid edges.
-  Options are `Remove()` or `Wrap()`, defaulting to [`Remove`](@ref).
+    Options are `Remove()` or `Wrap()`, defaulting to [`Remove`](@ref).
 - `cellsize`: size of cells.
-- `timestep`: fixed timestep where this is reuired for some rules.
-  eg. `Month(1)` or `1u"s"`.
+- `timestep`: fixed timestep where this is required for some rules. 
+    eg. `Month(1)` or `1u"s"`.
 """
-Base.@kwdef mutable struct Ruleset{B<:Boundary,P<:Processor,Op<:PerformanceOpt,C,T} <: AbstractRuleset
+Base.@kwdef mutable struct Ruleset{B<:BoundaryCondition,P<:Processor,Op<:PerformanceOpt,C,T} <: AbstractRuleset
     # Rules are intentionally not type stable. This allows `precalc` and Interact.jl
     # updates to change the rule type. Function barriers remove most performance overheads.
     rules::Tuple{Vararg{<:Rule}} = ()
@@ -57,7 +62,7 @@ function Ruleset(rs::AbstractRuleset)
     )
 end
 
-struct StaticRuleset{R<:Tuple,B<:Boundary,P<:Processor,Op<:PerformanceOpt,C,T} <: AbstractRuleset
+struct StaticRuleset{R<:Tuple,B<:BoundaryCondition,P<:Processor,Op<:PerformanceOpt,C,T} <: AbstractRuleset
     # Rules are intentionally not type stable. This allows `precalc` and Interact.jl
     # updates to change the rule type. Function barriers remove most performance overheads.
     rules::R

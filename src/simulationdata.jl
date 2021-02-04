@@ -2,6 +2,8 @@
 abstract type AbstractSimData{Y,X} end
 
 """
+    SimData <: AbstractSimData
+
     SimData(extent::AbstractExtent, ruleset::AbstractRuleset)
 
 Simulation dataset to hold all intermediate arrays, timesteps
@@ -31,7 +33,7 @@ In single grid simulations `SimData` can be indexed directly as if it is a `Matr
 - `timestep(d::SimData)`: get the simulaiton time step.
 - `radius(data::SimData)` : returns the `Int` radius used on the grid,
   which is also the amount of border padding.
-- `boundary(data::SimData)` : returns the [`Boundary`](@ref) - `Remove` or `Wrap`.
+- `boundary(data::SimData)` : returns the [`BoundaryCondition`](@ref) - `Remove` or `Wrap`.
 - `padval(data::SimData)` : returns the value to use as grid border padding.
 
 These are available, but you probably shouldn't use them and thier behaviour
@@ -110,7 +112,7 @@ currenttime(d::SimData) = tspan(d)[currentframe(d)]
 Base.getindex(d::SimData, key::Symbol) = getindex(grids(d), key)
 
 """
-    Base.get(data::SimData, keyorval, I...)
+    Base.get(data::SimData, key::Union{Symbol,Aux,Grid}, I...)
 
 Allows parameters to be taken from a single value, another grid or an aux array.
 

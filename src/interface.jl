@@ -1,5 +1,5 @@
 """
-    applyrule(data::SimData, rule::Rule{R,W}, state, index::Tuple{Int,Int}) => cell value(s)
+    applyrule(data::SimData, rule::Rule{R,W}, state, index::Tuple{Int,Int}) -> cell value(s)
 
 Apply a rule to the cell state and return values to write to the grid(s).
 
@@ -18,7 +18,7 @@ the grids specified by the `W` type parameter.
 function applyrule end
 
 """
-    applyrule!(data::SimData, rule::{R,W}, state, index::Tuple{Int,Int}) => Nothing
+    applyrule!(data::SimData, rule::{R,W}, state, index::Tuple{Int,Int}) -> Nothing
 
 Apply a rule to the cell state and manually write to the grid data array.
 Used in all rules inheriting from [`SetCellRule`](@ref).
@@ -37,7 +37,7 @@ Only grids specified with the `W` type parameter will be writable from `data`.
 function applyrule! end
 
 """
-    precalcrule(rule::Rule, data::SimData) => Rule
+    precalcrule(rule::Rule, data::SimData) -> Rule
 
 Precalculates rule fields at each timestep. Define this method if a [`Rule`](@ref)
 has fields that need to be updated over time.
@@ -54,7 +54,7 @@ original object passed in.
 function precalcrule end
 
 """
-    neighbors(x::Union{Neighborhood,NeighborhoodRule}}) => iterable
+    neighbors(x::Union{Neighborhood,NeighborhoodRule}}) -> iterable
 
 Returns an iteraterable generator over all cells in the neighborhood.
 
@@ -63,7 +63,7 @@ Custom `Neighborhood`s must define this method.
 function neighbors end
 
 """
-    offsets(x::Union{Neighborhood,NeighborhoodRule}}) => iterable
+    offsets(x::Union{Neighborhood,NeighborhoodRule}}) -> iterable
 
 Returns an iteraterable over all cells as a `Tuple` of the index 
 offset from the central cell.
@@ -73,7 +73,7 @@ Custom `Neighborhood`s must define this method.
 function offsets end
 
 """
-    positions(x::Union{Neighborhood,NeighborhoodRule}}, cellindex::Tuple) => iterable
+    positions(x::Union{Neighborhood,NeighborhoodRule}}, cellindex::Tuple) -> iterable
 
 Returns an iteraterable over all cells as a `Tuple` of the index 
 in the main array. Useful in [`SetNeighborhoodRule`](@ref) for 
@@ -146,15 +146,15 @@ Set the grid cell `c` to `xor(c, x)`. See `add!` for example usage.
 function xor! end
 
 """
-    inbounds(I::Tuple, data::SimData) => Tuple{NTuple{2,Int},Bool}
+    inbounds(I::Tuple, data::SimData) -> Tuple{NTuple{2,Int},Bool}
 
 Check grid boundaries for a coordinate before writing in [`SetCellRule`](@ref).
 
 Returns a `Tuple` containing a coordinates `Tuple` and a `Bool` - `true`
 if the cell is in bounds, `false` if not.
 
-Boundary of type [`Remove`](@ref) returns the coordinate and `false` to skip
-coordinates that boundary outside of the grid.
+[`BoundaryCondition`](@ref) of type [`Remove`](@ref) returns the coordinate and `false` 
+to skip coordinates that boundary outside of the grid.
 
 [`Wrap`](@ref) returns a tuple with the current position or it's
 wrapped equivalent, and `true` as it is allways in-bounds.
@@ -162,30 +162,30 @@ wrapped equivalent, and `true` as it is allways in-bounds.
 function inbounds end
 
 """
-    isinbounds(I::Tuple, data)
+    isinbounds(I::Tuple, data) -> Bool
 
 Check that a coordinate is within the grid, usually in [`SetCellRule`](@ref).
 
-Unlike [`inbounds`](@ref), [`Boundary`](@ref) status is ignored.
+Unlike [`inbounds`](@ref), [`BoundaryCondition`](@ref) status is ignored.
 """
 function isinbounds end
 
 """
-    radius(rule, [key]) => Int
+    radius(rule, [key]) -> Int
 
 Return the radius of a rule or ruleset if it has one, otherwise zero.
 """
 function radius end
 
 """
-    init(obj) => Union{AbstractArray,NamedTUple}
+    init(obj) -> Union{AbstractArray,NamedTUple}
 
 Retrieve the mask from an [`Output`](@ref), [`Extent`](@ref) or [`SimData`](@ref) object.
 """
 function init end
 
 """
-    mask(obj) => AbstractArray
+    mask(obj) -> AbstractArray
 
 Retrieve the mask from an [`Output`](@ref), [`Extent`](@ref) or [`SimData`](@ref) object.
 """
@@ -204,7 +204,7 @@ Given `key` specific data will be returned. `key` should be a
 function aux end
 
 """
-    tspan(obj) => AbstractRange
+    tspan(obj) -> AbstractRange
 
 Retrieve the time-span `AbstractRange` from an [`Output`](@ref),
 [`Extent`](@ref) or [`SimData`](@ref) object.
@@ -222,7 +222,7 @@ This will be in whatever type/units you specify in `tspan`.
 function timestep end
 
 """
-    currentframe(simdata::SimData) => Int
+    currentframe(simdata::SimData) -> Int
 
 Retrieve the current simulation frame a [`SimData`](@ref) object.
 """

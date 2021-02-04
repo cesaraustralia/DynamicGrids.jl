@@ -4,14 +4,27 @@ using KernelAbstractions.Adapt
 using KernelAbstractions.CUDA
 import ModelParameters.Flatten
 
+"""
+    GPU <: Processor
+
+Abstract supertype for GPU processors.
+"""
+abstract type GPU <: Processor end
+
 export GPU, CuGPU, CPUGPU
 
 """
-A CPU that uses the CUDA GPU code, to test it.
+    CPUGPU <: GPU
+
+    CPUGPU()
+
+Uses the CUDA GPU code on CPU using KernelAbstractions, to test it.
 """
 struct CPUGPU <: GPU end
 
 """
+    CuGPU <: GPU
+
     CuGPU()
     CuGPU{threads_per_block}()
 

@@ -14,16 +14,6 @@ imagesize(::ImageGenerator, init::AbstractArray) = size(init)
 
 _allocimage(p::ImageGenerator, init) = fill(ARGB32(0), imagesize(p, init)...)
 
-"""
-    grid_to_image!(o::ImageOutput, data::SimData)
-    grid_to_image!(imbuf, imgen::ImageGenerator, o::ImageOutput, data::SimData, grids)
-
-Convert a grid or `NamedRuple` of grids to an `ARGB32` image, using an 
-[`ImageGenerator`](@ref).
-
-Generated pixels are written to the image buffer matrix.
-"""
-function grid_to_image! end
 function grid_to_image!(o::ImageOutput, data::SimData)
     grid_to_image!(imagebuffer(o), imagegen(o), o, data, grids(data))
 end
@@ -70,13 +60,13 @@ end
 """
     Image <: SingleGridImageGenerator
 
-    Image(; scheme=ObjectColor(), zerocolor=nothing, maskcolor=nothing)
+    Image(; scheme=ObjectScheme(), zerocolor=nothing, maskcolor=nothing)
 
 Converts output grids to a colorsheme.
 
 # Keywords
 
-- `scheme`: a ColorSchemes.jl colorscheme, [`ObjectColor`](@ref) or object that defines
+- `scheme`: a ColorSchemes.jl colorscheme, [`ObjectScheme`](@ref) or object that defines
     `Base.get(obj, val)` and returns a `Color` or a value that can be converted to `Color`
     using `ARGB32(val)`.
 - `zerocolor`: a `Col` to use when values are zero, or `nothing` to ignore.
@@ -155,9 +145,8 @@ abstract type MultiGridImageGenerator <: ImageGenerator end
 
     Layout(layout::Array, imagegens::Matrix)
 
-Layout allows displaying multiple grids in a block layout,
-by specifying a layout matrix and a list of [`SingleGridImageGenerator`](@ref)
-to be run for each.
+Layout allows displaying multiple grids in a block layout, by specifying a 
+layout matrix and a list of [`Image`](@ref)s to be run for each.
 
 # Arguments
 
@@ -246,7 +235,7 @@ function autoimagegen(init::NamedTuple, scheme)
     Layout(layout, imagegen)
 end
 
-_iterableschemes(::Nothing) = (ObjectColor(),)
+_iterableschemes(::Nothing) = (ObjectScheme(),)
 _iterableschemes(schemes::Union{Tuple,NamedTuple,AbstractArray}) = schemes
 _iterableschemes(scheme) = (scheme,)
 
