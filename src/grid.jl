@@ -148,7 +148,7 @@ function _addpadding(init::AbstractArray{T,N}, r, padval) where {T,N}
     h, w = size(init)
     paddedsize = h + 4r, w + 2r
     paddedindices = -r + 1:h + 3r, -r + 1:w + r
-    sourceparent = fill(eltype(init)(padval), paddedsize)
+    sourceparent = fill(convert(eltype(init), padval), paddedsize)
     source = OffsetArray(sourceparent, paddedindices...)
     # Copy the init array to the middle section of the source array
     for j in 1:size(init, 2), i in 1:size(init, 1)
