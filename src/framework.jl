@@ -60,16 +60,16 @@ function sim!(output::Output, ruleset=ruleset(output);
 
     # Rebuild Extent to allow kwarg alterations
     extent = Extent(; init=_asnamedtuple(init), mask=mask, aux=aux, tspan=tspan)
-    ruleset = Ruleset(rules(ruleset);
+    simruleset = Ruleset(rules(ruleset);
         boundary=boundary, proc=proc, opt=opt, cellsize=cellsize, timestep=timestep,
     )
     # Some rules are only valid for a set time-step size.
-    step(ruleset) !== nothing && step(ruleset) != step(tspan) &&
-        throw(ArgumentError("tspan step $(step(tspan)) must equal rule step $(step(ruleset))"))
+    step(simruleset) !== nothing && step(simruleset) != step(tspan) &&
+        throw(ArgumentError("tspan step $(step(tspan)) must equal rule step $(step(simruleset))"))
     # Set up output
     settspan!(output, tspan)
     # Create or update the combined data object for the simulation
-    simdata = _initdata!(simdata, extent, ruleset)
+    simdata = _initdata!(simdata, extent, simruleset)
     init_output_grids!(output, init)
     # Set run speed for GraphicOutputs
     setfps!(output, fps)
@@ -79,7 +79,8 @@ function sim!(output::Output, ruleset=ruleset(output);
     showframe(output, simdata)
     # Let the init grid be displayed for as long as a normal grid
     delay(output, 1)
-    # Run the simulation over simdata and a unitrange
+    # Run the simulation over simdata and a unitrange we keep 
+    # the original ruleset to allow interactive updates to rules.
     return runsim!(output, simdata, ruleset, 1:lastindex(tspan))
 end
 sim!(output::Output, rules::Tuple; kw...) = sim!(output, rules...; kw...)
