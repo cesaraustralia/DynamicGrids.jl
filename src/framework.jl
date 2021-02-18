@@ -161,13 +161,10 @@ function simloop!(output::Output, simdata, ruleset, fspan)
     simdata = _updatetime(simdata, 1) |> _proc_setup
     # Loop over the simulation
     for f in fspan[2:end]
-        # Get a data object with updated timestep and precalculate rules
-        simdata = _updatetime(simdata, f) |>
-            sd -> precalcrules(sd, rules(ruleset)) |>
-            sequencerules!
-        # Save/do something with the the current grid
+        # Run the a timestep
+        simdata = _updatetime(simdata, f) |> sd -> _step!(sd, rules(ruleset))
         storeframe!(output, simdata)
-        # Let interface things happen
+        # Let output UI things happen
         isasync(output) && yield()
         # Stick to the FPS
         delay(output, f)
@@ -184,7 +181,37 @@ function simloop!(output::Output, simdata, ruleset, fspan)
     return output
 end
 
+_step!(sd::SimData, rules) = precalcrules(sd, rules) |> sequencerules!
+
+"""
+    step!(sd::SimData, rules=rules(sd))
+
+Allows stepping a simulation one frame at a time, for a more manual approach
+to simulation that `sim!`. This may be useful if other processes need to be run 
+between steps, or the simulation is of variable length. Step also removes the use
+of `Output`s, meaning storing of grid data must be handled manually, if it is 
+required.
+
+Instead the internal [`SimData`](@ref) objects are used directly, and can be defined 
+using a `Extent` object and a `Ruleset`.
+
+```
+ruleset = Ruleset(myrules) 
+extent = Extent(; init=(a=A, b=B), aux=aux, tspan=tspan)
+simdata = SimData(extent, ruleset) 
+# Run a single step
+step!(simdata)
+simdata[:a]
+```
+
+This example returns a `GridData` object for the `:a` grid, which is `<: AbstractAray`.
+"""
+function step!(sd::SimData)
+    _updatetime(sd, currentframe(sd) + 1) |> _proc_setup |> sd -> _step!(sd, rules(simdata))
+end
+
 # Allows different processors to modify the simdata object
 # GPU needs this to convert arrays to CuArray
 _proc_setup(simdata::SimData) = _proc_setup(proc(simdata), simdata)
 _proc_setup(proc, obj) = obj
+

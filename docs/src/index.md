@@ -9,6 +9,7 @@ DynamicGrids
 ```@docs
 sim!
 resume!
+step!
 ```
 
 ## Rulesets
