@@ -240,26 +240,18 @@ _iterableschemes(schemes::Union{Tuple,NamedTuple,AbstractArray}) = schemes
 _iterableschemes(scheme) = (scheme,)
 
 
-# Pre-rgb manipulation tools
+# Coll conversion tools
 
-"""
-    normalise(x, min, max)
-
-Set a value to be between zero and one, before converting to Color.
-min and max of `nothing` are assumed to be 0 and 1.
-"""
+# Set a value to be between zero and one, before converting to Color.
+# min and max of `nothing` are assumed to be 0 and 1.
 normalise(x::X, minv, maxv) where X = max(min((x - minv) / (maxv - minv), oneunit(X)), zero(X))
 normalise(x::X, minv, maxv::Nothing) where X = max((x - minv) / (oneunit(X) - minv), zero(X))
 normalise(x::X, minv::Nothing, maxv) where X = min(x / maxv, oneunit(X), oneunit(X))
 normalise(x, minv::Nothing, maxv::Nothing) = x
 
-"""
-    scale(x, min, max)
-
-Rescale a value between 0 and 1 to be between `min` and `max`.
-This can be used to shrink the range of a colorsheme that is displayed.
-min and max of `nothing` are assumed to be 0 and 1.
-"""
+# Rescale a value between 0 and 1 to be between `min` and `max`.
+# This can be used to shrink the range of a colorsheme that is displayed.
+# min and max of `nothing` are assumed to be 0 and 1.
 scale(x, min, max) = x * (max - min) + min
 scale(x, ::Nothing, max) = x * max
 scale(x, min, ::Nothing) = x * (oneunit(typeof(min)) - min) + min

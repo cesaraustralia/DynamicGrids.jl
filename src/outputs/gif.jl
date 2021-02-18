@@ -7,9 +7,9 @@ Write the output array to a gif.
 
 - `fps`: `Real` frames persecond. Defaults to the `fps` of the output, or `25`.
 - `minval`: Minimum value in the grid(s) to normalise for conversion to an RGB pixel. 
-  Number or `Tuple` for multiple grids. 
+    `Number` or `Tuple` for multiple grids. 
 - `maxval`: Maximum value in the grid(s) to normalise for conversion to an RGB pixel. 
-  Number or `Tuple` for multiple grids. 
+    `Number` or `Tuple` for multiple grids. 
 - `font`: `String` name of font to search for. A default will be guessed.
 - `text`: `TextCongif()` or `nothing` for no text. Default is `TextCongif(; font=font)`.
 - `scheme`: ColorSchemes.jl scheme, `ObjectScheme()` or `Greyscale()`
@@ -28,9 +28,7 @@ function savegif(filename::String, o::Output, ruleset=Ruleset();
     savegif(filename, im_o, ruleset; kw...) 
 end
 function savegif(filename::String, o::ImageOutput, ruleset=Ruleset();
-    imagegen=imagegen(o), fps=fps(o), kw...
-)
-    length(o) == 1 && @warn "The output has length 1: the saved gif will be a single image"
+    imagegen=imagegen(o), fps=fps(o), kw...) length(o) == 1 && @warn "The output has length 1: the saved gif will be a single image"
     ext = extent(o)
     simdata = SimData(ext, ruleset)
     println(tspan(ext))
@@ -50,14 +48,15 @@ end
 
 Output that stores the simulation as images and saves a Gif file on completion.
 
-## Arguments:
+# Arguments:
 - `init`: initialisation `Array` or `NamedTuple` of `Array`
 
-## Keyword Argument:
+# Keywords
+
 - `filename`: File path to save the gif file to.
 - `tspan`: `AbstractRange` timespan for the simulation
 - `aux`: NamedTuple of arbitrary input data. Use `get(data, Aux(:key), I...)` 
-  to access from a `Rule` in a type-stable way.
+    to access from a `Rule` in a type-stable way.
 - `mask`: `BitArray` for defining cells that will/will not be run.
 - `padval`: padding value for grids with neighborhood rules. The default is `zero(eltype(init))`.
 - `font`: `String` font name, used in default `TextConfig`. A default will be guessed.

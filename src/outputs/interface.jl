@@ -146,7 +146,7 @@ function finalisegraphics end
 """
     imageconfig(output::ImageOutput) => ImageConfig
 
-[`ImageOutput`](@ref) interface method. Return an [`ImageConfig`](@ref) object. 
+`ImageOutpu` interface method. Return an [`ImageConfig`](@ref) object. 
 """
 function imageconfig end
 
@@ -154,9 +154,9 @@ function imageconfig end
     showimage(image::AbstractArray, o::ImageOutput)
     showimage(image::AbstractArray, o::ImageOutput, data::AbstractSimData)
 
-ImageOutput interface method.
+[`ImageOutput`](@ref) interface method.
 
-Display an image generated from the grid, a required method for all [`ImageOutput`](@ref).
+Display an image generated from the grid, a required method for all `ImageOutput`.
 """
 function showimage end
 
@@ -175,7 +175,7 @@ function grid_to_image! end
     to_rgb(val) => ARGB32
     to_rgb(scheme, val) => ARGB32
 
-[`ImageOutput`](@ref) interface method.
+`ImageOutput` interface method.
 
 Display an image generated from the grid, a required method for all [`ImageOutput`](@ref).
 

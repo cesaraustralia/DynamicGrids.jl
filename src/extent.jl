@@ -20,11 +20,8 @@ gridsize(extent::AbstractExtent) = gridsize(init(extent))
 """
     Extent <: AbstractExtent
 
-    Extent(init::Union{AbstractArray,NamedTuple},
-           mask::Union{AbstractArray,Nothing},
-           aux::Union{NamedTuple,Nothing},
-           tspan::AbstractRange)
-    Extent(; init, mask=nothing, aux=nothing, tspan, kw...)
+    Extent(init, mask, aux, padval, tspan)
+    Extent(; init, tspan, mask=nothing, aux=nothing, padval=zero(eltype(init)), kw...)
 
 Container for extensive variables: spatial and timeseries data.
 These are kept separate from rules to allow application
@@ -33,11 +30,14 @@ of rules to alternate spatial and temporal contexts.
 Extent is not usually constructed directly by users, but it can be passed
 to `Output` constructors instead of `init`, `mask`, `aux` and `tspan`.
 
+# Arguments/Keywords
+
 - `init`: initialisation `Array`/`NamedTuple` for grid/s.
 - `mask`: `BitArray` for defining cells that will/will not be run.
 - `aux`: NamedTuple of arbitrary input data. Use `aux(data, Aux(:key))` to access from
-  a `Rule` in a type-stable way.
-- `padval`: padding value for grids with neighborhood rules. The default is `zero(eltype(init))`.
+    a `Rule` in a type-stable way.
+- `padval`: padding value for grids with neighborhood rules. The default is 
+    `zero(eltype(init))`.
 - `tspan`: Time span range. Never type-stable, only access this in `precalc` methods
 """
 mutable struct Extent{I<:Union{AbstractArray,NamedTuple},
@@ -73,11 +73,7 @@ settspan!(e::Extent, tspan) = e.tspan = tspan
 _padval(init::NamedTuple) = map(_padval, init)
 _padval(init::AbstractArray{T}) where T = zero(T)
 
-"""
-    StaticExtent <: AbstractExtent
-
-An immuatble `Extent` object, for internal use.
-"""
+# An immutable `Extent` object, for internal use.
 struct StaticExtent{I<:Union{AbstractArray,NamedTuple},
                     M<:Union{AbstractArray,Nothing},
                     A<:Union{NamedTuple,Nothing},

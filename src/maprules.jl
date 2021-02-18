@@ -1,14 +1,9 @@
 # Internal traits for sharing methodsbst
 const GridOrGridTuple = Union{<:GridData,Tuple{Vararg{<:GridData}}}
 
-"""
-    maprule!(simdata::SimData, rule::Rule)
-
-Map a rule over the grids it reads from and updating the grids it writes to.
-
-This is broken into a setup method and an application method
-to introduce a function barrier, for type stability.
-"""
+# Map a rule over the grids it reads from and updating the grids it writes to.
+# This is broken into a setup method and an application method
+# to introduce a function barrier, for type stability.
 function maprule!(data::SimData, rule::Rule)
     #= keys and grids are separated instead of in a NamedTuple as `rgrids` or `wgrids`
     may be a single grid, not a Tuple. But we still need to know what its key is.
@@ -405,14 +400,10 @@ end
 end
 
 
-"""
-    _readgrids(rkeys, rgrids, I...)
+# Read values from grid/s at index `I`. This occurs for every cell for every rule,
+# so has to be very fast.
 
-Read values from grid/s at index `I`. This occurs for every cell for every rule,
-so has to be very fast.
-
-Returns a single value or NamedTuple of values.
-"""
+# Returns a single value or NamedTuple of values.
 function _readgrids end
 @generated function _readgrids(rkeys::Tuple, rgrids::Tuple, I...)
     expr = Expr(:tuple)
@@ -429,14 +420,9 @@ end
     @inbounds rgrids[I...]
 end
 
-"""
-    _writegrids(rkeys, rgrids, I...)
-
-Write values to grid/s at index `I`. This occurs for every cell for every rule,
-so has to be very fast.
-
-Returns a single value or NamedTuple of values.
-"""
+# Write values to grid/s at index `I`. This occurs for every cell for every rule,
+# so has to be very fast.
+# Returns a single value or NamedTuple of values.
 function _writegrids end
 @generated function _writegrids!(wdata::Tuple, vals::Union{Tuple,NamedTuple}, I...)
     expr = Expr(:block)
@@ -451,13 +437,8 @@ end
     return nothing
 end
 
-"""
-    getredgrids(context, rule::Rule, simdata::AbstractSimData)
-
-Retrieves `GridData` from a `SimData` object to match the requirements of a `Rule`.
-
-Returns a `Tuple` holding the key or `Tuple` of keys, and grid or `Tuple` of grids.
-"""
+# Retrieves `GridData` from a `SimData` object to match the requirements of a `Rule`.
+# Returns a `Tuple` holding the key or `Tuple` of keys, and grid or `Tuple` of grids.
 @generated function _getreadgrids(::Rule{R,W}, simdata::AbstractSimData) where {R<:Tuple,W}
     Expr(:tuple,
         Expr(:tuple, (:(Val{$(QuoteNode(key))}()) for key in R.parameters)...),
@@ -481,12 +462,8 @@ end
 @inline _vals2syms(x::Type{<:Tuple}) = map(v -> _vals2syms(v), x.parameters)
 @inline _vals2syms(::Type{<:Val{X}}) where X = X
 
-"""
-    _combinegrids(rkey, rgrids, wkey, wgrids)
-
-Combine grids into a new NamedTuple of grids depending
-on the read and write keys required by a rule.
-"""
+# Combine grids into a new NamedTuple of grids depending
+# on the read and write keys required by a rule.
 @inline function _combinegrids(simdata::SimData, rkeys, rgrids, wkeys, wgrids)
     @set simdata.grids = _combinegrids(rkeys, rgrids, wkeys, wgrids)
 end
@@ -519,11 +496,7 @@ end
     end
 end
 
-"""
-    _replacegrids(simdata::AbstractSimData, newkeys, newgrids)
-
-Replace grids in a NamedTuple with new grids where required.
-"""
+# Replace grids in a NamedTuple with new grids where required.
 function _replacegrids(simdata::AbstractSimData, newkeys, newgrids)
     @set simdata.grids = _replacegrids(grids(simdata), newkeys, newgrids)
 end

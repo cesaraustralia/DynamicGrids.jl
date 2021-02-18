@@ -2,22 +2,44 @@
 """
     Rule
 
-A `Rule` object contains the information required to apply some
-logical rule to every cell of every timestep of a simulation.
-
-Rules can be chained together sequentially into [`Ruleset`](@ref)s.
+A `Rule` object contains the information required to apply an
+`applyrule` method to every cell of every timestep of a simulation.
 
 Rules are applied to the grid using the [`applyrule`](@ref) method:
 
 ```julia
-@inline applyrule(data::SimData, rule::YourRule, state, index) =
+@inline applyrule(data::SimData, rule::YourRule, state, index) = ...
 ```
 
 Where `index` is a `Tuple` of `Int`, and `state` is a single value, or a `NamedTuple`
-if multiple grids are requested. The `NamedTuple` keys will match the
-keys in `R`, which is a type like `Tuple{:key1,:key1}` - note the names are user
-specified, and should never be fixed by a `Rule` - they can be retrieved from the type
-here as `A` and `B` :
+if multiple grids are requested. the [`SimData`](@ref) object can be used to access current 
+timestep and other simulation data and metadata.
+
+Rules can be updated from the original rule before each timestep, in [`precalcrule`](@ref):
+
+```julia
+precalcrule(rule::YourRule, data::SimData) = ...
+```
+
+Rules can also be run in sequence, often wrapped in a `Tuple` or [`Ruleset`](@ref)s.
+
+DynamicGrids guarantees that:
+
+- `precalcrule` is run once for every rule for every timestep. 
+    The result is passed to `applyrule`, but not retained after that.
+- `applyrule` is run once for every rule, for every cell, for every timestep, unless an 
+    optimisation like `SparseOpt` is enable to skips empty cells.
+- the output of running a rule for any cell does not affect the input of the 
+    same rule running anywhere else in the grid.
+- rules later in the sequence are passed grid state updated by the earlier rules.
+- masked areas and wrapped or removed boundary regions are updated between all rules and timesteps
+
+## Multiple grids
+
+The `NamedTuple` keys will match the keys in `R`, which is a type like `Tuple{:key1,:key1}`.
+Note the names are user-specified, and should never be fixed by a `Rule`. 
+
+They can be retrieved from the type here as `A` and `B` :
 
 ```julia
 applyrule(data::SimData, rule::YourCellRule{Tuple{R1,R2},Tuple{W1,W2}}, state, index) where {R1,R2,W1,W2}
@@ -27,31 +49,20 @@ By default the output is written to the current cell in the specified `W` write 
 `Rule`s writing to multiple grids, simply return a `Tuple` in the order specified by
 the `W` type params.
 
-## Precalculation
-
-[`precalcrule`](@ref) can be used to precalculate any fields that depend on the
-timestep. Otherwise everything should be precalculated apon construction.
-
-Retreive required information from [`SimData`](@ref) such as [`currenttime`](@ref)
-or [`currentframe`](@ref). The return value is the updated rule.
-
-```julia
-precalcrule(rule::YourCellRule, data::SimData)
-```
-
 ## Rule Performance
 
-Rules may run many millions of times during a simulation. They need to be fast.
-
+Rules may run many millions of times during a simulation. They need to be fast. 
 Some basic guidlines for writing rules are:
+
 - Never allocate memory in a `Rule` if you can help it.
 - Type stability is essential. [`isinferred`](@ref) is useful to check
-  if your rule is type-stable.
+    if your rule is type-stable.
 - Using the `@inline` macro on `applyrule` can help force inlining your
-  code into the simulation.
+    code into the simulation.
 - Reading and writing from multiple grids is expensive due to additional load
-  on fast cahce memory. Try to limit the number of grids you use.
-
+    on fast cahce memory. Try to limit the number of grids you use.
+- Use a graphical profiler, like ProfileView.jl, to check your rules overall 
+    performance when run with `sim!`.
 
 """
 abstract type Rule{R,W} end
@@ -188,6 +199,15 @@ function applyrule(data, rule::YourSetCellRule{R,Tuple{W1,W2}}, state, index) wh
      return nothing
 end
 ```
+
+DynamicGrids guarantees that:
+
+- values written to anywhere on the grid do not affect other cells in
+    the same rule at the same timestep.
+- values written to anywhere on the grid are available to the next rule in the 
+    sequence, or the next timestep.
+- if atomic operators are always used, race conditions will not occur on any hardware.
+
 """
 abstract type SetCellRule{R,W} <: SetRule{R,W} end
 
@@ -208,9 +228,9 @@ over the surrounding cell pattern defined by the `Neighborhood`.
 For each cell in the grids the neighborhood buffer will be updated
 for use in the `applyrule` method, managed to minimise array reads.
 
-This allows memory optimisations and the use of BLAS routines on the
-neighborhood buffer for [`Moore`](@ref) neighborhoods. It also means
-that and no bounds checking is required in neighborhood code.
+This allows memory optimisations and the use of high perforance routines on the
+neighborhood buffer. It also means that and no bounds checking is required in 
+neighborhood code.
 
 For neighborhood rules with multiple read grids, the first is always
 the one used for the neighborhood, the others are passed in as additional
@@ -290,10 +310,6 @@ rule = SetGrid{:a,:b}() do a, b
     b .= a
 end
 ```
-
-Never use assignment broadcast `.*=`, as the write grids `W` are not guarantieed to
-have the same values as the read grids `R`. Always copy from a read
-grid to a write grid manually.
 """
 struct SetGrid{R,W,F} <: SetGridRule{R,W}
     "Function to apply to the read values"

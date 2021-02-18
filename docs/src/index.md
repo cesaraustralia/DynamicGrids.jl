@@ -114,6 +114,7 @@ isinferred
 ### Objects and methods for use in `applyrule` and/or `precalcrule`
 
 ```@docs
+get
 DynamicGrids.SimData
 DynamicGrids.GridData
 DynamicGrids.ReadableGridData
@@ -194,6 +195,7 @@ DynamicGrids.SingleGridImageGenerator
 Image
 DynamicGrids.MultiGridImageGenerator
 Layout
+SparseOptInspector
 ```
 
 ### Color schemes
@@ -236,6 +238,7 @@ DynamicGrids.isshowable
 DynamicGrids.isstored
 DynamicGrids.initialise!
 DynamicGrids.finalise!
+DynamicGrids.frameindex
 ```
 
 ### `GraphicOutput` interface
@@ -305,8 +308,8 @@ Base.:+(x1::MyStruct, x2::MyStruct) = MyStruct(x1.a + x2.a, x1.b + x2.b)
 Base.:-(x1::MyStruct, x2::MyStruct) = MyStruct(x1.a - x2.a, x1.b - x2.b)
 ```
 
-To generate rgb colors for an [`ImageOuput`](@ref), you must define [`to_rgb`](@ref), 
-at least for the default [`ObjectScheme`](@ref), but this can also be done for other 
+To generate rgb colors for an `ImageOuput`, you must define `to_rgb`, 
+at least for the default `ObjectScheme`, but this can also be done for other 
 schemes such as ColorSchemes.jl, or `GreyScale`, by calling `get` on the scheme and a 
 `Real` value. Note that the objects will be normalised to values between zero and one
 by `minval` and `maxval` scalars prior to this, using the division operators defined 
