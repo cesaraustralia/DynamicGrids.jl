@@ -1,38 +1,39 @@
 using DynamicGrids, Test
-using DynamicGrids: inbounds, isinbounds, _cyclic_index, SimData, _unwrap, ismasked
+using DynamicGrids: inbounds, isinbounds, _inbounds, _isinbounds, _cyclic_index, 
+    SimData, _unwrap, ismasked
 
 @testset "boundary boundary checks are working" begin
     @testset "inbounds with Remove() returns index and false for an boundaryed index" begin
-        @test inbounds((1, 1), (4, 5), Remove()) == ((1,1),true)
-        @test inbounds((2, 3), (4, 5), Remove()) == ((2,3),true)
-        @test inbounds((4, 5), (4, 5), Remove()) == ((4,5),true)
-        @test inbounds((-3, -100), (4, 5), Remove()) == ((-3,-100),false)
-        @test inbounds((0, 0), (4, 5), Remove()) == ((0,0),false)
-        @test inbounds((2, 3), (3, 2), Remove()) == ((2,3),false)
-        @test inbounds((2, 3), (1, 4), Remove()) == ((2,3),false)
-        @test inbounds((200, 300), (2, 3), Remove()) == ((200,300),false)
+        @test _inbounds(Remove(), (4, 5), 1, 1) == ((1,1), true)
+        @test _inbounds(Remove(), (4, 5), 2, 3) == ((2,3), true)
+        @test _inbounds(Remove(), (4, 5), 4, 5) == ((4,5), true)
+        @test _inbounds(Remove(), (4, 5), 0, 0) == ((0,0), false)
+        @test _inbounds(Remove(), (3, 2), 2, 3) == ((2,3), false)
+        @test _inbounds(Remove(), (1, 4), 2, 3) == ((2,3), false)
+        @test _inbounds(Remove(), (2, 3), 200, 300) == ((200,300), false)
+        @test _inbounds(Remove(), (4, 5), -3, -100) == ((-3,-100), false)
     end
     @testset "inbounds with Wrap() returns new index and true for an boundaryed index" begin
-        @test inbounds((-2,3), (10, 10), Wrap()) == ((8,3),true)
-        @test inbounds((2,0), (10, 10), Wrap()) == ((2,10),true)
-        @test inbounds((22,0), (10, 10), Wrap()) == ((2,10),true)
-        @test inbounds((-22,0), (10, 10), Wrap()) == ((8,10),true)
+        @test _inbounds(Wrap(), (10, 10),  -2, 3) == ((8,  3), true)
+        @test _inbounds(Wrap(), (10, 10),   2, 0) == ((2, 10), true)
+        @test _inbounds(Wrap(), (10, 10),  22, 0) == ((2, 10), true)
+        @test _inbounds(Wrap(), (10, 10), -22, 0) == ((8, 10), true)
     end
     @testset "isinbounds" begin
-        @test isinbounds((4, 5), (4, 5)) == true
-        @test isinbounds((200, 300), (2, 3)) == false
-        @test isinbounds((-22,0), (10, 10)) == false
+        @test _isinbounds((4, 5), 4, 5) == true
+        @test _isinbounds((2, 3), 200, 300) == false
+        @test _isinbounds((10, 10), -22, 0) == false
     end
     @testset "boundscheck objects" begin
         output = ArrayOutput(zeros(Int, 10, 10); tspan=1:10)
         sd = SimData(output.extent, Ruleset())
-        @test inbounds((5, 5), sd) == ((5, 5), true)
-        @test inbounds((5, 5), first(sd)) == ((5, 5), true)
-        @test inbounds((12, 5), sd) == ((12, 5), false)
+        @test inbounds(sd, 5, 5) == ((5, 5), true)
+        @test inbounds(first(sd),  5, 5) == ((5, 5), true)
+        @test inbounds(sd, 12, 5) == ((12, 5), false)
         sd_wrap = SimData(output.extent, Ruleset(; boundary=Wrap()))
-        @test inbounds((5, 5), sd_wrap) == ((5, 5), true)
-        @test inbounds((12, 5), sd_wrap) == ((2, 5), true)
-        @test inbounds((12, 5), first(sd_wrap)) == ((2, 5), true)
+        @test inbounds(sd_wrap, 5, 5) == ((5, 5), true)
+        @test inbounds(sd_wrap, 12, 5) == ((2, 5), true)
+        @test inbounds(first(sd_wrap), 12, 5) == ((2, 5), true)
     end
 end
 

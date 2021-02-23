@@ -1,29 +1,30 @@
 # See interface docs
-@inline inbounds(xs::Tuple, data::Union{GridData,SimData}) = 
-    inbounds(xs, gridsize(data), boundary(data))
-@inline function inbounds(xs::Tuple, maxs::Tuple, boundary)
-    a, inbounds_a = inbounds(xs[1], maxs[1], boundary)
-    b, inbounds_b = inbounds(xs[2], maxs[2], boundary)
-    (a, b), inbounds_a & inbounds_b
+@inline inbounds(data::Union{GridData,SimData}, I::Tuple) = inbounds(data, I...)
+@inline inbounds(data::Union{GridData,SimData}, I...) = 
+    _inbounds(boundary(data), gridsize(data), I...)
+
+@inline function _inbounds(boundary::BoundaryCondition, size::Tuple, I...)
+    reduce(zip(size, I); init=((), true)) do (I, inbounds_acc), (s, i)
+        ii, inbounds = _inbounds(boundary, s, i)
+        ((I..., ii), inbounds_acc & inbounds)
+    end
 end
-@inline function inbounds(x::Number, max::Number, boundary::Remove)
-    x, isinbounds(x, max)
-end
-@inline function inbounds(x::Number, max::Number, boundary::Wrap)
-    if x < oneunit(x)
-        max + rem(x, max), true
-    elseif x > max
-        rem(x, max), true
+@inline _inbounds(::Remove, size::Number, i::Number) = i, _isinbounds(size, i)
+@inline function _inbounds(::Wrap, size::Number, i::Number)
+    if i < oneunit(i)
+        size + rem(i, size), true
+    elseif i > size
+        rem(i, size), true
     else
-        x, true
+        i, true
     end
 end
 
-@inline isinbounds(x::Tuple, data::Union{SimData,GridData}) =
-    isinbounds(x::Tuple, gridsize(data))
-@inline isinbounds(xs::Tuple, maxs::Tuple) = all(isinbounds.(xs, maxs))
+@inline isinbounds(data::Union{SimData,GridData}, I::Tuple) = isinbounds(data, I...)
+@inline isinbounds(data::Union{SimData,GridData}, I...) = _isinbounds(gridsize(data), I...)
 
-@inline isinbounds(x::Number, max::Number) = x >= one(x) && x <= max
+@inline _isinbounds(size::Tuple, I...) = all(map(_isinbounds, size, I))
+@inline _isinbounds(size, i) = i >= one(i) && i <= size
 
 
 #= Wrap boundary where required. This optimisation allows us to ignore

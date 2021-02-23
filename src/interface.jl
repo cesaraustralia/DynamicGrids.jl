@@ -91,7 +91,7 @@ Add the value `x` to a grid cell.
 ```julia
 function applyrule!(data::SimData, rule::My{A,B}, state, cellindex) where {A,B}
 
-    dest, is_inbounds = inbounds(jump .+ cellindex, gridsize(data))
+    dest, is_inbounds = inbounds(data, (jump .+ cellindex)...)
 
     # Update spotted cell if it's on the grid
     is_inbounds && add!(data[W], state, dest...)
@@ -146,7 +146,8 @@ Set the grid cell `c` to `xor(c, x)`. See `add!` for example usage.
 function xor! end
 
 """
-    inbounds(I::Tuple, data::SimData) -> Tuple{NTuple{2,Int},Bool}
+    inbounds(data::SimData, I::Tuple) -> Tuple{NTuple{2,Int},Bool}
+    inbounds(data::SimData, I...) -> Tuple{NTuple{2,Int},Bool}
 
 Check grid boundaries for a coordinate before writing in [`SetCellRule`](@ref).
 
@@ -162,7 +163,8 @@ wrapped equivalent, and `true` as it is allways in-bounds.
 function inbounds end
 
 """
-    isinbounds(I::Tuple, data) -> Bool
+    isinbounds(data, I::Tuple) -> Bool
+    isinbounds(data, I...) -> Bool
 
 Check that a coordinate is within the grid, usually in [`SetCellRule`](@ref).
 
