@@ -1,14 +1,5 @@
-"""
-    sequencerules!(simdata::AbstractSimData)
-
-Sequence rules over the [`SimData`](@ref) object,
-calling [`maprule!`](@ref) for each individual `Rule`.
-
-If a Vector of `SimData` is used replicates will be run
-with `Threads.@threads`.
-
-TODO: use the new threading method.
-"""
+# Sequence rules over the [`SimData`](@ref) object,
+# calling [`maprule!`](@ref) for each individual `Rule`.
 function sequencerules!(simdata::AbstractSimData)
     sequencerules!(simdata, rules(simdata))
 end

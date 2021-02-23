@@ -3,6 +3,7 @@ using Documenter, DynamicGrids, KernelAbstractions
 makedocs(
     modules = [DynamicGrids],
     sitename = "DynamicGrids.jl",
+    strict = true,
 )
 
 deploydocs(

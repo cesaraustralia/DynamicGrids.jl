@@ -256,11 +256,7 @@ function VonNeumann(radius=1, _buffer=nothing)
     return Positional(Tuple(offsets), _buffer)
 end
 
-"""
-    hoodsize(radius) -> Int
-
-Get the size of a neighborhood dimension from its radius,
-which is always 2r + 1.
-"""
+# Get the size of a neighborhood dimension from its radius,
+# which is always 2r + 1.
 @inline hoodsize(hood::Neighborhood{R}) where R = hoodsize(R)
 @inline hoodsize(radius::Integer) = 2radius + 1

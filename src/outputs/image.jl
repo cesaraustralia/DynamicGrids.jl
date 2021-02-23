@@ -59,18 +59,8 @@ for implementations.
 """
 abstract type ImageOutput{T,F} <: GraphicOutput{T,F} end
 
-"""
-    (::Type{<:ImageOutput})(o::Output; kw...) -> ImageOutput
 
-Generic `ImageOutput` constructor that construct an `ImageOutput` from another `Output`.
-
-# Keywords
-
-- `frames`: replacement `Vector` of grid frames.
-- `extent`: replacement [`Extent`](@ref) object.
-- `graphicconfig`: replacement [`GraphicConfig`](@ref) object.
-- `imageconfig`: replacement [`ImageConfig`](@ref) object.
-"""
+# Generic `ImageOutput` constructor that construct an `ImageOutput` from another `Output`.
 function (::Type{F})(o::T; 
     frames=frames(o), extent=extent(o), graphicconfig=graphicconfig(o),
     imageconfig=imageconfig(o), textconfig=textconfig(o), kw...
@@ -81,17 +71,13 @@ function (::Type{F})(o::T;
     )
 end
 
-"""
-    (::Type{<:ImageOutput})(init::Union{NamedTuple,AbstractMatrix}; kw...) -> ImageOutput
+# Generic `ImageOutput` constructor. Converts an init `AbstractArray` or `NamedTuple` 
+# to a vector of `AbstractArray`s, uses `kw` to constructs required 
+# [`Extent`](@ref), [`GraphicConfig`](@ref) and [`ImageConfig`](@ref) objects unless
+# they are specifically passed in using `extent`, `graphicconfig`, `imageconfig`.
 
-Generic `ImageOutput` constructor. Converts an init `AbstractArray` or `NamedTuple` 
-to a vector of `AbstractArray`s, uses `kw` to constructs required 
-[`Extent`](@ref), [`GraphicConfig`](@ref) and [`ImageConfig`](@ref) objects unless
-they are specifically passed in using `extent`, `graphicconfig`, `imageconfig`.
-
-All other keyword arguments are passed to these constructors. 
-Unused or mis-spelled keyword arguments are ignored.
-"""
+# All other keyword arguments are passed to these constructors. 
+# Unused or mis-spelled keyword arguments are ignored.
 function (::Type{T})(init::Union{NamedTuple,AbstractMatrix}; 
     extent=nothing, graphicconfig=nothing, imageconfig=nothing, kw...
 ) where T <: ImageOutput

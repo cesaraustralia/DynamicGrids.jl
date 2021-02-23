@@ -10,7 +10,7 @@ Text configuration for printing timestep and grid name on the image.
 
 - `font`: `String` font name.
 - `namepixels` and `timepixels`: the pixel size of the font.
-- `timepos` and `namepos`: tuples that set the label positions, in pixels.
+- `timepos` and `namepos`: tuples that set the label positions, in `Int` pixels.
 - `fcolor` and `bcolor`: the foreground and background colors, as `ARGB32`.
 """
 struct TextConfig{F,NPi,NPo,TPi,TPo,FC,BC}
@@ -67,11 +67,7 @@ end
         """
     )
 
-"""
-    rendertext!(img, config::TextConfig, name, t)
-
-Render time `name` and `t` as text onto the image, following config settings.
-"""
+# Render time `name` and `t` as text onto the image, following config settings.
 function _rendertime! end
 
 function _rendertext!(img, config::TextConfig, name, t)
@@ -81,11 +77,7 @@ function _rendertext!(img, config::TextConfig, name, t)
 end
 _rendertext!(img, config::Nothing, name, t) = nothing
 
-"""
-    rendername!(img, config::TextConfig, name)
-
-Render `name` as text on the image following config settings.
-"""
+# Render `name` as text on the image following config settings.
 function _rendername!(img, config::TextConfig, name)
     renderstring!(img, name, config.face, config.namepixels, config.namepos...;
         fcolor=config.fcolor, bcolor=config.bcolor
@@ -96,11 +88,7 @@ _rendername!(img, config::TextConfig, name::Nothing) = img
 _rendername!(img, config::Nothing, name) = img
 _rendername!(img, config::Nothing, name::Nothing) = img
 
-"""
-    rendertime!(img, config::TextConfig, t)
-
-Render time `t` as text on the image following config settings.
-"""
+# Render time `t` as text on the image following config settings.
 function _rendertime!(img, config::TextConfig, t)
     renderstring!(img, string(t), config.face, config.timepixels, config.timepos...;
         fcolor=config.fcolor, bcolor=config.bcolor

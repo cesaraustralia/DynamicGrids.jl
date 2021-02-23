@@ -73,11 +73,7 @@ Base.lastindex(chain::Chain) = lastindex(rules(chain))
     expr
 end
 
-"""
-    _filter_readstate(rule, state::NamedTuple)
-
-Get the state to pass to the specific rule as a `NamedTuple` or single value
-"""
+# Get the state to pass to the specific rule as a `NamedTuple` or single value
 @generated function _filter_readstate(::Rule{R,W}, state::NamedTuple) where {R<:Tuple,W}
     expr = Expr(:tuple)
     keys = Tuple(R.parameters)
@@ -88,11 +84,7 @@ Get the state to pass to the specific rule as a `NamedTuple` or single value
 end
 @inline _filter_readstate(::Rule{R,W}, state::NamedTuple) where {R,W} = state[R]
 
-"""
-    _filter_writestate(rule, state::NamedTuple)
-
-Get the state to write for the specific rule
-"""
+# Get the state to write for the specific rule
 @generated function _filter_writestate(::Rule{R,W}, state::NamedTuple) where {R<:Tuple,W<:Tuple}
     expr = Expr(:tuple)
     keys = Tuple(W.parameters)
@@ -102,13 +94,8 @@ Get the state to write for the specific rule
     expr
 end
 
-"""
-    update_chainstate(rule::Rule, state::NamedTuple, writestate)
-
-Merge new state with previous state.
-
-Returns a new `NamedTuple` with all keys having the most recent state
-"""
+# Merge new state with previous state.
+# Returns a new `NamedTuple` with all keys having the most recent state
 @generated function _update_chainstate(rule::Rule{R,W}, state::NamedTuple{K,V}, writestate
                                      ) where {R,W,K,V}
     expr = Expr(:tuple)
