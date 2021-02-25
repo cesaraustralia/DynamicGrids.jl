@@ -508,8 +508,8 @@ end
 """
     Convolution <: NeighborhoodRule
 
-    Convolution(f, neighborhood=Moor(1))
-    Convolution{R,W}(f, neighborhood=Moor(1))
+    Convolution(f, neighborhood=Moore(1))
+    Convolution{R,W}(f, neighborhood=Moore(1))
 
 A `Rule` that runs a basic convolution kernel over the grid.
 
@@ -521,7 +521,7 @@ Small radius convolutions in DynamicGrids.jl will be faster or comparable to usi
 DSP.jl or ImageConvolutions.jl. As the radius increases or grid size gets very large
 these packages will be a lot faster.
 
-But `Convolution` is convenient to chain into a simlulation, and combined with some other
+But `Convolution` is convenient to chain into a simulation, and combined with some other
 rules. It should perform reasonably well in all but very large simulations or very large
 kernels.
 
