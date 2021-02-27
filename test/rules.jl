@@ -100,7 +100,7 @@ end
              0 1 0 0
              0 0 1 0]
     @test_throws ArgumentError SetNeighbors()
-    rule = SetNeighbors(VonNeumann(1)) do data, hood, I, state
+    rule = SetNeighbors(VonNeumann(1)) do data, hood, state, I
         if state > 0
             for pos in positions(hood, I)
                 add!(data, 1, pos...) 
@@ -132,7 +132,7 @@ end
              0 0 1 0]
     @testset "add!" begin
         output = ArrayOutput(init; tspan=1:2)
-        rule = SetCell() do data, I, state
+        rule = SetCell() do data, state, I
             if state > 0
                 pos = I[1] - 2, I[2]
                 isinbounds(pos, data) && add!(first(data), 1, pos...)
@@ -152,7 +152,7 @@ end
     end
     @testset "setindex!" begin
         output = ArrayOutput(init; tspan=1:2)
-        rule = SetCell() do data, I, state
+        rule = SetCell() do data, state, I
             if state > 0
                 pos = I[1] - 2, I[2]
                 isinbounds(pos, data) && (data[pos...] = 5)

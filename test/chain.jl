@@ -9,15 +9,15 @@ using DynamicGrids: SimData, radius, rules, _readkeys, _writekeys,
         2a
     end
 
-    rule2 = Cell{Tuple{:b,:d},:c}() do b, d
+    rule2 = Cell{Tuple{:b,:d},:c}() do (b, d)
         b + d
     end
 
-    rule3 = Cell{Tuple{:a,:c,:d},Tuple{:d,:e}}() do a, c, d
+    rule3 = Cell{Tuple{:a,:c,:d},Tuple{:d,:e}}() do (a, c, d)
         a + c + d, 3a
     end
 
-    rule4 = Cell{Tuple{:a,:b,:c,:d},Tuple{:a,:b,:c,:d}}() do a, b, c, d
+    rule4 = Cell{Tuple{:a,:b,:c,:d},Tuple{:a,:b,:c,:d}}() do (a, b, c, d)
         2a, 2b, 2c, 2d
     end
 
@@ -99,7 +99,7 @@ end
         sum(neighborhodhood)
     end
 
-    rule = Cell{Tuple{:a,:c},:b}() do b, c
+    rule = Cell{Tuple{:a,:c},:b}() do (b, c)
         b + c 
     end
 
