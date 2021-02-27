@@ -135,7 +135,7 @@ end
         rule = SetCell() do data, state, I
             if state > 0
                 pos = I[1] - 2, I[2]
-                isinbounds(pos, data) && add!(first(data), 1, pos...)
+                isinbounds(data, pos) && add!(first(data), 1, pos...)
             end
         end
         for proc in (SingleCPU(), CPUGPU(), ThreadedCPU()), opt in (NoOpt(), SparseOpt())
@@ -155,7 +155,7 @@ end
         rule = SetCell() do data, state, I
             if state > 0
                 pos = I[1] - 2, I[2]
-                isinbounds(pos, data) && (data[pos...] = 5)
+                isinbounds(data, pos) && (data[pos...] = 5)
             end
         end
         sim!(output, rule)
