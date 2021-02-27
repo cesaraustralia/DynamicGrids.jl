@@ -1,6 +1,6 @@
 using DynamicGrids, ModelParameters, Setfield, Test, StaticArrays, 
       LinearAlgebra, KernelAbstractions
-import DynamicGrids: applyrule, applyrule!, maprule!, extent, source, dest,
+import DynamicGrids: applyrule, applyrule!, maprule!, ruletype, extent, source, dest,
        _getreadgrids, _getwritegrids, _combinegrids, _readkeys, _writekeys,
        SimData, WritableGridData, Rule, Extent
 
@@ -253,7 +253,7 @@ applyrule(data, ::TestRule, state, index) = 0
             newsimdata = @set simdata.grids = _combinegrids(rkeys, rgrids, wkeys, wgrids)
             @test newsimdata.grids[1] isa WritableGridData
             # Test type stability
-            @inferred maprule!(wgrids, newsimdata, proc, opt, rule, rkeys, rgrids, wkeys)
+            @inferred maprule!(wgrids, newsimdata, proc, opt, ruletype(rule), rule, rkeys, rgrids, wkeys)
             
             resultdata = maprule!(simdata, rule)
             @test source(resultdata[:a]) == final
@@ -277,7 +277,7 @@ applyrule!(data, ::TestSetCell, state, index) = 0
             wkeys, wgrids = _getwritegrids(rule, simdata)
             newsimdata = @set simdata.grids = _combinegrids(wkeys, wgrids, rkeys, rgrids)
 
-            @inferred maprule!(wgrids, newsimdata, proc, opt, rule, rkeys, rgrids, wkeys)
+            @inferred maprule!(wgrids, newsimdata, proc, opt, ruletype(rule), rule, rkeys, rgrids, wkeys)
             resultdata = maprule!(simdata, rule)
             @test source(resultdata[:_default_]) == init
         end

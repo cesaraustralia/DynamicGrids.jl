@@ -61,7 +61,6 @@ DynamicGrids.SetRule
 CellRule
 Cell
 CopyTo
-Chain
 ```
 
 ### NeighborhoodRule
@@ -92,6 +91,14 @@ SetNeighbors
 ```@docs
 SetGridRule
 SetGrid
+```
+
+### Rule wrappers
+
+```@docs
+RuleWrapper
+Chain
+RunIf
 ```
 
 ### Parameter sources

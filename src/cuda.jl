@@ -73,51 +73,41 @@ end
 
 function maprule!(
     wgrids::Union{<:GridData{Y,X,R},Tuple{<:GridData{Y,X,R},Vararg}},
-    simdata, proc::GPU, opt, rule, args...
+    simdata, proc::GPU, opt, ruletype::Type{<:Rule}, rule, args...
 ) where {Y,X,R}
-    kernel! = cu_rule_kernel!(kernel_setup(proc)...)
-    kernel!(wgrids, simdata, rule, args...; ndrange=gridsize(simdata)) |> wait
+    kernel! = cu_cell_kernel!(kernel_setup(proc)...)
+    kernel!(wgrids, simdata, ruletype, rule, args...; ndrange=gridsize(simdata)) |> wait
 end
 function maprule!(
     wgrids::Union{<:GridData{Y,X,R},Tuple{<:GridData{Y,X,R},Vararg}},
-    simdata, proc::GPU, opt, rule::NeedsBuffer, args...
+    simdata, proc::GPU, opt, ruletype::Type{<:NeighborhoodRule}, rule, args...
 ) where {Y,X,R}
     grid = simdata[neighborhoodkey(rule)]
     kernel! = cu_neighborhood_kernel!(kernel_setup(proc)...)
     # n = _indtoblock.(gridsize(simdata), 8) .- 1
     n = gridsize(simdata)
-    kernel!(wgrids, simdata, grid, opt, rule, args..., ndrange=n) |> wait
+    kernel!(wgrids, simdata, grid, opt, ruletype, rule, args..., ndrange=n) |> wait
     return nothing
 end
 
 @kernel function cu_neighborhood_kernel!(
-    wgrids, data, grid::GridData{Y,X,R}, opt, rule::NeedsBuffer, args...
+    wgrids, data, grid::GridData{Y,X,R}, opt, ruletype::Type{<:NeighborhoodRule}, rule, args...
 ) where {Y,X,R}
     I, J = @index(Global, NTuple)
     src = parent(source(grid))
     @inbounds buf = view(src, I:I+2R, J:J+2R)
     bufrule = _setbuffer(rule, buf)
-    rule_kernel!(wgrids, data, bufrule, args..., I, J)
+    cell_kernel!(wgrids, data, ruletype, bufrule, args..., I, J)
     nothing
 end
 
-# Kernels that run for every cell
-@kernel function cu_rule_kernel!(wgrids, simdata, rule::Rule, rkeys, rgrids, wkeys)
+@kernel function cu_cell_kernel!(wgrids, simdata, ruletype, rule, rkeys, rgrids, wkeys)
     i, j = @index(Global, NTuple)
-    readval = _readgrids(rkeys, rgrids, i, j)
-    writeval = applyrule(simdata, rule, readval, (i, j))
-    _writegrids!(wgrids, writeval, i, j)
-    nothing
-end
-# Kernels that run for every cell
-@kernel function cu_rule_kernel!(wgrids, simdata, rule::SetRule, rkeys, rgrids, wkeys)
-    i, j = @index(Global, NTuple)
-    readval = _readgrids(rkeys, rgrids, i, j)
-    applyrule!(simdata, rule, readval, (i, j))
+    cell_kernel!(wgrids, simdata, ruletype, rule, rkeys, rgrids, wkeys, i, j)
     nothing
 end
 
-# @kernel function cu_rule_kernel!(
+# @kernel function cu_cell_kernel!(
 #     simdata::SimData, grid::GridData{Y,X,1}, rule::NeighborhoodRule,
 #     rkeys, rgrids, wkeys, wgrids
 # ) where {Y,X}

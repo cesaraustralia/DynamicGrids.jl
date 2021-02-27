@@ -44,6 +44,7 @@ gridsize(nt::NamedTuple{(),Tuple{}}) = 0, 0
 gridaxes(d::GridData) = map(Base.OneTo, gridsize(d))
 gridview(d::GridData) = view(parent(dest(d)), map(a -> a .+ radius(d), gridaxes(d))...)
 
+@propagate_inbounds Base.getindex(d::GridData, I...) = getindex(source(d), I...)
 
 """
     ReadableGridData <: GridData
@@ -159,10 +160,6 @@ end
 
 Base.parent(d::ReadableGridData) = parent(source(d))
 
-@propagate_inbounds function Base.getindex(d::ReadableGridData, I...)
-    getindex(source(d), I...)
-end
-
 function _build_status(opt::SparseOpt, source, r)
     hoodsize = 2r + 1
     blocksize = 2r
@@ -207,9 +204,6 @@ function WritableGridData{Y,X,R}(
 end
 
 Base.parent(d::WritableGridData) = parent(dest(d))
-@propagate_inbounds function Base.getindex(d::WritableGridData, I...)
-    getindex(source(d), I...)
-end
 @propagate_inbounds function Base.setindex!(d::WritableGridData, x, I...)
     _setdeststatus!(d, x, I...)
     dest(d)[I...] = x

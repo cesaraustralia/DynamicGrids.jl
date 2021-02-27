@@ -1,10 +1,9 @@
 # Internal traits for sharing methodsbst
-const GridOrGridTuple = Union{<:GridData,Tuple{Vararg{<:GridData}}}
-
 # Map a rule over the grids it reads from and updating the grids it writes to.
 # This is broken into a setup method and an application method
 # to introduce a function barrier, for type stability.
-function maprule!(data::SimData, rule::Rule)
+maprule!(data::SimData, rule) = maprule!(data, ruletype(rule), rule)
+function maprule!(data::SimData, ruletype::Type{<:Rule}, rule)
     #= keys and grids are separated instead of in a NamedTuple as `rgrids` or `wgrids`
     may be a single grid, not a Tuple. But we still need to know what its key is.
     The structure of rgrids and wgrids determines the values that are sent to the rule
@@ -13,7 +12,7 @@ function maprule!(data::SimData, rule::Rule)
     rkeys, rgrids = _getreadgrids(rule, data)
     wkeys, wgrids = _getwritegrids(rule, data)
     # Copy the source to dest for grids we are writing to, if needed
-    _maybeupdatedest!(wgrids, rule)
+    _maybeupdatedest!(wgrids, ruletype)
     # Copy or zero out boundary where needed
     _handleboundary!(wgrids)
     # Combine read and write grids to a temporary simdata object.
@@ -22,10 +21,10 @@ function maprule!(data::SimData, rule::Rule)
     allgrids = values(data)
     tempdata = _combinegrids(data, allkeys, allgrids, wkeys, wgrids)
     # Run the rule loop
-    maprule!(wgrids, tempdata, proc(data), opt(data), rule, rkeys, rgrids, wkeys)
+    maprule!(wgrids, tempdata, proc(data), opt(data), ruletype, rule, rkeys, rgrids, wkeys)
     # Mask writes to dest if a mask isprovided, except for
     # CellRule which doesn't move values into masked areas
-    rule isa CellRule || _maybemask!(wgrids)
+    ruletype <: CellRule || _maybemask!(wgrids)
     # Copy the dest status to source status if it is in use
     _maybecopystatus!(wgrids)
     # Swap the dest/source of grids that were written to
@@ -33,7 +32,7 @@ function maprule!(data::SimData, rule::Rule)
     # Combine the written grids with the original simdata
     _replacegrids(data, wkeys, readonly_wgrids)
 end
-function maprule!(simdata::SimData, rule::SetGridRule)
+function maprule!(simdata::SimData, ::Type{<:SetGridRule}, rule)
     rkeys, rgrids = _getreadgrids(rule, simdata)
     wkeys, wgrids = _getwritegrids(rule, simdata)
     tempsimdata = _combinegrids(simdata, rkeys, rgrids, wkeys, wgrids)
@@ -43,9 +42,9 @@ function maprule!(simdata::SimData, rule::SetGridRule)
     _replacegrids(simdata, wkeys, _to_readonly(wgrids))
 end
 
-_maybeupdatedest!(ds::Tuple, rule) = map(d -> _maybeupdatedest!(d, rule), ds)
-_maybeupdatedest!(d::WritableGridData, rule::Rule) = nothing
-function _maybeupdatedest!(d::WritableGridData, rule::SetRule)
+_maybeupdatedest!(ds::Tuple, ruletype) = map(d -> _maybeupdatedest!(d, ruletype), ds)
+_maybeupdatedest!(d::WritableGridData, ::Type{<:Rule}) = nothing
+function _maybeupdatedest!(d::WritableGridData, ::Type{<:SetRule})
     copyto!(parent(dest(d)), parent(source(d)))
 end
 
@@ -73,26 +72,24 @@ end
 _to_readonly(data::Tuple) = map(ReadableGridData, data)
 _to_readonly(data::WritableGridData) = ReadableGridData(data)
 
-const NeedsBuffer = Union{NeighborhoodRule,Chain{<:Any,<:Any,<:Tuple{<:NeighborhoodRule,Vararg}}}
-
 function maprule!(
     wgrids::Union{<:GridData{Y,X,R},Tuple{<:GridData{Y,X,R},Vararg}},
-    simdata, proc::CPU, opt, rule, rkeys, rgrids, wkeys
+    simdata, proc::CPU, opt, ruletype, rule, rkeys, rgrids, wkeys
 ) where {Y,X,R}
     let simdata=simdata, proc=proc, opt=opt, rule=rule,
         rkeys=rkeys, rgrids=rgrids, wkeys=wkeys, wgrids=wgrids
         optmap(proc, opt, rgrids, Tuple{Y,X,R}) do i, j
-            rule_kernel!(wgrids, simdata, rule, rkeys, rgrids, wkeys, i, j)
+            cell_kernel!(wgrids, simdata, ruletype, rule, rkeys, rgrids, wkeys, i, j)
         end
     end
 end
 function maprule!(
     wgrids::Union{<:GridData{Y,X,R},Tuple{<:GridData{Y,X,R},Vararg}},
-    simdata, proc::CPU, opt, rule::NeedsBuffer, args...
+    simdata, proc::CPU, opt, ruletype::Type{<:NeighborhoodRule}, rule, args...
 ) where {Y,X,R}
     grid = simdata[neighborhoodkey(rule)]
     _mayberesetdest!(grid, opt)
-    mapneighborhoodrule!(wgrids, simdata, grid, proc, opt, rule, args...)
+    mapneighborhoodrule!(wgrids, simdata, grid, proc, opt, ruletype, rule, args...)
     return nothing
 end
 
@@ -144,13 +141,13 @@ procmap(f, proc::ThreadedCPU, range) =
         f(n) # Run rule over each column, threaded
     end
 
-function rule_kernel!(wgrids, simdata, rule::Rule, rkeys, rgrids, wkeys, i, j)
+function cell_kernel!(wgrids, simdata, ::Type{<:Rule}, rule, rkeys, rgrids, wkeys, i, j)
     readval = _readgrids(rkeys, rgrids, i, j)
     writeval = applyrule(simdata, rule, readval, (i, j))
     _writegrids!(wgrids, writeval, i, j)
-    nothing
+    writeval
 end
-function rule_kernel!(wgrids, simdata, rule::SetRule, rkeys, rgrids, wkeys, i, j)
+function cell_kernel!(wgrids, simdata, ::Type{<:SetRule}, rule, rkeys, rgrids, wkeys, i, j)
     readval = _readgrids(rkeys, rgrids, i, j)
     applyrule!(simdata, rule, readval, (i, j))
     nothing
@@ -165,7 +162,7 @@ function mapneighborhoodrule!(
 ) where {Y,X,R}
     let wgrids=wgrids, simdata=simdata, grid=grid, proc=proc, args=args
         B = 2R
-        # Split the grid in 2 interleaved sets of rows, so that we never run adjacent 
+        # Split the grid in 2 interleaved sets of rows, so that we never run adjacent
         # rows simultaneously - it could cause race conditions when setting status.
         procmap(proc, 1:2:_indtoblock(Y, B)) do bi
             row_kernel!(wgrids, simdata, grid, proc, args..., bi)
@@ -199,8 +196,8 @@ a single new column of data with the height of 4R, and move the existing
 data in the neighborhood buffers array across by one column. This saves on reads
 from the main array. =#
 function row_kernel!(
-    wgrids, simdata::SimData, grid::GridData{Y,X,R}, proc, opt::NoOpt, rule,
-    rkeys, rgrids, wkeys, bi
+    wgrids, simdata::SimData, grid::GridData{Y,X,R}, proc, opt::NoOpt,
+    ruletype::Type, rule::Rule, rkeys, rgrids, wkeys, bi
 ) where {Y,X,R}
     B = 2R
     i = _blocktoind(bi, B)
@@ -213,17 +210,13 @@ function row_kernel!(
         # Loop over the COLUMN of buffers covering the block
         for b in 1:blocklen
             @inbounds bufrule = _setbuffer(rule, buffers[b])
-            I = i + b - 1, j
-            # Run the rule using buffer b
-            @inbounds readval = _readgridsorbuffer(rgrids, buffers[b], bufrule, I...)
-            writeval = applyrule(simdata, bufrule, readval, I)
-            _writegrids!(wgrids, writeval, I...)
+            cell_kernel!(wgrids, simdata, ruletype, bufrule, rkeys, rgrids, wkeys, i + b - 1, j)
         end
     end
 end
 function row_kernel!(
-    wgrids, simdata::SimData, grid::GridData{Y,X,R}, proc, opt::SparseOpt, rule,
-    rkeys, rgrids, wkeys, bi
+    wgrids, simdata::SimData, grid::GridData{Y,X,R}, proc, opt::SparseOpt,
+    ruletype::Type, rule::Rule, rkeys, rgrids, wkeys, bi
 ) where {Y,X,R}
     B = 2R
     S = 2R + 1
@@ -233,7 +226,7 @@ function row_kernel!(
 
     # Blocks ignore padding! the first block contains padding.
     i = _blocktoind(bi, B)
-    # Get current block
+    # Get current bloc
     skippedlastblock = true
 
     # Initialise block status for the start of the row
@@ -260,15 +253,12 @@ function row_kernel!(
                     # Loop over the grid ROWS inside the block
                     blocklen = min(Y, i + B - 1) - i + 1
                     for b in 1:blocklen
-                        I = i + b - 1, j
-                        readval = _readgrids(rkeys, rgrids, I...)
-                        writeval = applyrule(simdata, tail(rule), readval, I)
-                        _writegrids!(wgrids, writeval, I...)
+                        cell_kernel!(wgrids, simdata, ruletype, rule, rkeys, rgrids, wkeys, i + b - 1, j)
                     end
                 end
             end
             continue
-        end 
+        end
         # Define area to loop over with the block.
         # It's variable because the last block may be partial
         jstart = _blocktoind(bj, B)
@@ -293,16 +283,10 @@ function row_kernel!(
             # Loop over the COLUMN of buffers covering the block
             blocklen = min(Y, i + B - 1) - i + 1
             for b in 1:blocklen
-                # Get the current cell index
-                I = i + b - 1, j
                 # Set rule buffer
                 bufrule = _setbuffer(rule, buffers[b])
-                # Get value/s for the cell
-                readval = _readgridsorbuffer(rgrids, buffers[b], bufrule, I...)
-                # Run the rule
-                writeval = applyrule(simdata, bufrule, readval, I)
-                # Write to the grid
-                _writegrids!(wgrids, writeval, I...)
+                # Run the rule kernel for the cell
+                writeval = cell_kernel!(wgrids, simdata, ruletype, bufrule, rkeys, rgrids, wkeys, i + b - 1, j)
                 # Update the status for the current block
                 cs = _cellstatus(opt, wgrids, writeval)
                 curblocki = R == 1 ? b : (b - 1) ÷ R + 1
@@ -332,14 +316,6 @@ end
 
 # Reduces array reads for single grids, when we can just use
 # the center of the neighborhood buffer as the cell state
-@inline function _readgridsorbuffer(rgrids::Tuple, buffer, rule, I...)
-    _readgrids(_keys2vals(_readkeys(rule)), rgrids, I...)
-end
-@inline function _readgridsorbuffer(
-    rgrids::ReadableGridData{<:Any,<:Any,R}, buffer, rule, I...
-) where R
-    @inbounds buffer[R + 1, R + 1]
-end
 
 @inline _keys2vals(keys::Tuple) = map(Val, keys)
 @inline _keys2vals(key::Symbol) = Val(key)
@@ -416,7 +392,7 @@ function _readgrids end
         NamedTuple{keys,typeof(vals)}(vals)
     end
 end
-@inline function _readgrids(rkeys::Val, rgrids::ReadableGridData, I...)
+@inline function _readgrids(rkeys::Val, rgrids::GridData, I...)
     @inbounds rgrids[I...]
 end
 
