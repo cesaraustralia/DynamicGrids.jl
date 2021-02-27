@@ -18,7 +18,7 @@ cyclej!(arrays) = begin
         v = A[:, 1]
         @inbounds copyto!(A, CartesianIndices((1:size(A, 1), 1:size(A, 2)-1)),
                           A, CartesianIndices((1:size(A, 1), 2:size(A, 2))))
-        A[:, end] = v
+        A[:, end] = v 
     end
 end
 

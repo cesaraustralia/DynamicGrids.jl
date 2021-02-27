@@ -25,7 +25,7 @@ using DynamicGrids: SimData, grid_to_image!
 end
 
 @testset "Neighborhood Rule that sums a Neighborhood of StaticArrays" begin
-    rule = Neighbors{Tuple{:grid1,:grid2},:grid1}(Moore(1)) do neighborhood, state1, state2
+    rule = Neighbors{Tuple{:grid1,:grid2},:grid1}(Moore(1)) do neighborhood, (state1, state2)
         sum(neighborhood) .+ state2
     end
     init = (
@@ -44,7 +44,7 @@ end
 end
 
 @testset "SetCell randomly updates a StaticArray" begin
-    rule = SetCell{:grid1}() do data, I, state
+    rule = SetCell{:grid1}() do data, state, I
         if I == (2, 2) || I == (1, 3)
             data[:grid1][I...] = SA[99.0, 100.0]
         end
@@ -104,7 +104,7 @@ DynamicGrids.to_rgb(scheme, obj::TestStruct) = get(scheme, obj.a)
 end
 
 @testset "Neighborhood Rule that sums a Neighborhood of stucts" begin
-    rule = Neighbors{Tuple{:grid1,:grid2},:grid1}(Moore(1)) do neighborhood, state1, state2
+    rule = Neighbors{Tuple{:grid1,:grid2},:grid1}(Moore(1)) do neighborhood, (state1, state2)
         sum(neighborhood) * state2
     end
     init = (
@@ -123,7 +123,7 @@ end
 end
 
 @testset "SetCell rule randomly updates a struct" begin
-    rule = SetCell{:grid1,:grid1}() do data, I, state
+    rule = SetCell{:grid1,:grid1}() do data, state, I
         if I == (2, 2) || I == (1, 3)
             data[:grid1][I...] = TS(99.0, 100.0)
         end
@@ -144,7 +144,7 @@ end
         @test DynamicGrids.to_rgb(ObjectScheme(), TestStruct(00.0, 0.0) / 99) == ARGB32(0.0)
         @test DynamicGrids.to_rgb(ObjectScheme(), DynamicGrids.normalise(TestStruct(99.0, 1.0), nothing, 99)) == ARGB32(1.0)
     end
-    rule = SetCell{:grid1,:grid1}() do data, I, state
+    rule = SetCell{:grid1,:grid1}() do data, state, I
         if I == (2, 2) || I == (1, 3)
             data[:grid1][I...] = TS(99.0, 100.0)
         end

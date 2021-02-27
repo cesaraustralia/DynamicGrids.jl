@@ -364,9 +364,9 @@ struct Cell{R,W,F} <: CellRule{R,W}
 end
 Cell{R,W}(; kw...) where {R,W} = _nofunctionerror(Cell)
 
-@inline function applyrule(data, rule::Cell, state, I)
-    let rule=rule, state=state
-        rule.f(_astuple(rule, state)...)
+@inline function applyrule(data, rule::Cell, read, I)
+    let rule=rule, read=read
+        rule.f(read)
     end
 end
 
@@ -411,8 +411,8 @@ Neighbors{R,W}(f; neighborhood=Moore(1)) where {R,W} =
     Neighbors{R,W}(f, neighborhood)
 
 @inline function applyrule(data, rule::Neighbors, read, I)
-    let hood=neighborhood(rule), rule=rule, read=_astuple(rule, read)
-        rule.f(hood, read...)
+    let rule=rule, hood=neighborhood(rule), read=read
+        rule.f(hood, read)
     end
 end
 
@@ -448,8 +448,8 @@ end
 SetCell{R,W}(; kw...) where {R,W} = _nofunctionerror(Set)
 
 @inline function applyrule!(data, rule::SetCell, read, I)
-    let data=data, I=I, rule=rule, read=_astuple(rule, read)
-        rule.f(data, I, read...)
+    let data=data, rule=rule, read=read, I=I
+        rule.f(data, read, I)
     end
 end
 
@@ -499,8 +499,8 @@ SetNeighbors{R,W}(; kw...) where {R,W} = _nofunctionerror(SetNeighbors)
 SetNeighbors{R,W}(f; neighborhood=Moore(1)) where {R,W} = SetNeighbors{R,W}(f, neighborhood)
 
 @inline function applyrule!(data, rule::SetNeighbors, read, I)
-    let data=data, hood=neighborhood(rule), I=I, rule=rule, read=_astuple(rule, read)
-        rule.f(data, hood, I, read...)
+    let data=data, hood=neighborhood(rule), rule=rule, read=read, I=I
+        rule.f(data, hood, read, I)
     end
 end
 

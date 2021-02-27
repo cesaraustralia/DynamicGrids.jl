@@ -59,15 +59,15 @@ end
 
     @testset "let blocks" begin
         a = 0.7
-        rule = SetCell() do data, index, x
-            add!(first(data), round(Int, a + x), index...)
+        rule = SetCell() do data, x, I
+            add!(first(data), round(Int, a + x), I...)
         end
         output = ArrayOutput(zeros(Int, 10, 10); tspan=1:10)
         @test_throws ErrorException isinferred(output, Ruleset(rule))
         a = 0.7
         rule = let a = a
-            SetCell() do data, index, x
-                add!(first(data), round(Int, a), index...)
+            SetCell() do data, x, I
+                add!(first(data), round(Int, a), I...)
             end
         end
         output = ArrayOutput(zeros(Int, 10, 10); tspan=1:10)
