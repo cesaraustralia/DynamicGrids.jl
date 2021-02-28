@@ -14,7 +14,7 @@ function maprule!(data::SimData, ruletype::Type{<:Rule}, rule)
     # Copy the source to dest for grids we are writing to, if needed
     _maybeupdatedest!(wgrids, ruletype)
     # Copy or zero out boundary where needed
-    _handleboundary!(wgrids)
+    _updateboundary!(rgrids)
     # Combine read and write grids to a temporary simdata object.
     # This means that grids not specified to write to are read-only.
     allkeys = map(Val, keys(data))
@@ -88,7 +88,6 @@ function maprule!(
     simdata, proc::CPU, opt, ruletype::Type{<:NeighborhoodRule}, rule, args...
 ) where {Y,X,R}
     grid = simdata[neighborhoodkey(rule)]
-    _mayberesetdest!(grid, opt)
     mapneighborhoodrule!(wgrids, simdata, grid, proc, opt, ruletype, rule, args...)
     return nothing
 end
@@ -182,14 +181,6 @@ function _maybecopystatus!(grid::GridData, opt::SparseOpt)
     return nothing
 end
 _maybecopystatus!(grid, opt::NoOpt) = nothing
-
-function _mayberesetdest!(grid::GridData, opt::SparseOpt)
-    deststatus(grid) .= false
-    dest(grid) .= padval(grid)
-    return nothing
-end
-_mayberesetdest!(grid, opt::NoOpt) = nothing
-
 
 #= Run the rule row by row. When we move along a row by one cell, we access only
 a single new column of data with the height of 4R, and move the existing

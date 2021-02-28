@@ -157,7 +157,7 @@ end
 function _initdata!(
     simdata::AbstractSimData, extent::AbstractExtent, ruleset::AbstractRuleset
 )
-    map(_copygrid!, values(simdata), values(init(extent)))
+    map(copy!, values(simdata), values(init(extent)))
     @set! simdata.extent = StaticExtent(extent)
     @set! simdata.ruleset = StaticRuleset(ruleset)
     simdata
