@@ -45,8 +45,8 @@ Rules will be run in the order they are passed, ie. `Ruleset(rule1, rule2, rule3
     eg. `Month(1)` or `1u"s"`.
 """
 Base.@kwdef mutable struct Ruleset{B<:BoundaryCondition,P<:Processor,Op<:PerformanceOpt,C,T} <: AbstractRuleset
-    # Rules are intentionally not type stable. This allows `precalc` and Interact.jl
-    # updates to change the rule type. Function barriers remove most performance overheads.
+    # Rules in Ruleset are intentionally not type-stable.
+    # But they are when rebuilt in a StaticRuleset later
     rules::Tuple{Vararg{<:Rule}} = ()
     boundary::B                  = Remove()
     proc::P                      = SingleCPU()
@@ -63,8 +63,6 @@ function Ruleset(rs::AbstractRuleset)
 end
 
 struct StaticRuleset{R<:Tuple,B<:BoundaryCondition,P<:Processor,Op<:PerformanceOpt,C,T} <: AbstractRuleset
-    # Rules are intentionally not type stable. This allows `precalc` and Interact.jl
-    # updates to change the rule type. Function barriers remove most performance overheads.
     rules::R
     boundary::B
     proc::P

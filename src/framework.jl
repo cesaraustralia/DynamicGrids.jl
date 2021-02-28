@@ -163,6 +163,7 @@ function simloop!(output::Output, simdata, ruleset, fspan)
     for f in fspan[2:end]
         # Run the a timestep
         simdata = _updatetime(simdata, f) |> sd -> _step!(sd, rules(ruleset))
+        # Save/do something with the the current grid
         storeframe!(output, simdata)
         # Let output UI things happen
         isasync(output) && yield()
@@ -181,7 +182,7 @@ function simloop!(output::Output, simdata, ruleset, fspan)
     return output
 end
 
-_step!(sd::SimData, rules) = precalcrules(sd, rules) |> sequencerules!
+_step!(sd::SimData, rules) = _updaterules(rules, sd) |> sequencerules!
 
 """
     step!(sd::SimData, rules=rules(sd))

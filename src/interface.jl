@@ -37,7 +37,7 @@ Only grids specified with the `W` type parameter will be writable from `data`.
 function applyrule! end
 
 """
-    precalcrule(rule::Rule, data::SimData) -> Rule
+    modifyrule(rule::Rule, data::SimData) -> Rule
 
 Precalculates rule fields at each timestep. Define this method if a [`Rule`](@ref)
 has fields that need to be updated over time.
@@ -51,7 +51,7 @@ The default behaviour is to return the existing rule without change.
 Updated rules are be discarded, and the `rule` argument is always be the
 original object passed in.
 """
-function precalcrule end
+function modifyrule end
 
 """
     neighbors(x::Union{Neighborhood,NeighborhoodRule}}) -> iterable

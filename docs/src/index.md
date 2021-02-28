@@ -108,11 +108,11 @@ Grid
 ```@docs
 DynamicGrids.applyrule
 DynamicGrids.applyrule!
-DynamicGrids.precalcrule
+DynamicGrids.modifyrule
 isinferred
 ```
 
-### Objects and methods for use in `applyrule` and/or `precalcrule`
+### Objects and methods for use in `applyrule` and/or `modifyrule`
 
 ```@docs
 get
