@@ -22,7 +22,7 @@ function maprule!(data::SimData, ruletype::Type{<:Rule}, rule)
     tempdata = _combinegrids(data, allkeys, allgrids, wkeys, wgrids)
     # Run the rule loop
     maprule!(wgrids, tempdata, proc(data), opt(data), ruletype, rule, rkeys, rgrids, wkeys)
-    # Mask writes to dest if a mask isprovided, except for
+    # Mask writes to dest if a mask is provided, except for
     # CellRule which doesn't move values into masked areas
     ruletype <: CellRule || _maybemask!(wgrids)
     # Copy the dest status to source status if it is in use
@@ -59,7 +59,7 @@ function _maybemask!(wgrid::WritableGridData{Y,X}, proc::CPU, mask::AbstractArra
     end
 end
 function _maybemask!(wgrid::WritableGridData{Y,X}, proc, mask::AbstractArray) where {Y,X}
-    gridview(wgrid) .*= mask
+    destview(wgrid) .*= mask
 end
 
 _maybecopystatus!(grids::Tuple{Vararg{<:GridData}}) = map(_maybecopystatus!, grids)
