@@ -58,10 +58,9 @@ tspan_ = DateTime(2001):Day(1):DateTime(2001, 2)
     @test sourcestatus(gridb) == deststatus(gridb) == nothing
 
     @test firstindex(grida) == 1
-    @test lastindex(grida) == 30
-    @test gridsize(grida) == (2, 3)
-    @test size(grida) == (6, 5)
-    @test axes(grida) == (0:5, 0:4)
+    @test lastindex(grida) == 6
+    @test gridsize(grida) == (2, 3) == size(grida) == (2, 3)
+    @test axes(grida) == (1:2, 1:3)
     @test ndims(grida) == 2
     @test eltype(grida) == Int
 

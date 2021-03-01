@@ -1,4 +1,3 @@
-# Internal traits for sharing methodsbst
 # Map a rule over the grids it reads from and updating the grids it writes to.
 # This is broken into a setup method and an application method
 # to introduce a function barrier, for type stability.
@@ -365,7 +364,6 @@ end
         return $newbuffers
     end
 end
-
 
 # Read values from grid/s at index `I`. This occurs for every cell for every rule,
 # so has to be very fast.
