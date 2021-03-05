@@ -11,14 +11,14 @@ Write the output array to a gif.
 - `maxval`: Maximum value in the grid(s) to normalise for conversion to an RGB pixel. 
     `Number` or `Tuple` for multiple grids. 
 - `font`: `String` name of font to search for. A default will be guessed.
-- `text`: `TextCongif()` or `nothing` for no text. Default is `TextCongif(; font=font)`.
+- `text`: `TextConfig()` or `nothing` for no text. Default is `TextConfig(; font=font)`.
 - `scheme`: ColorSchemes.jl scheme, `ObjectScheme()` or `Greyscale()`
 - `imagegen`: `ImageGenerator` like `Image` or `Layout`. Will be detected automatically
 """
 function savegif(filename::String, o::Output, ruleset=Ruleset(); 
     minval=minval(o), maxval=maxval(o), 
     scheme=ObjectScheme(), imagegen=autoimagegen(init(o), scheme), 
-    font=autofont(), text=TextCongif(), textconfig=text, kw...
+    font=autofont(), text=TextConfig(), textconfig=text, kw...
 )
     im_o = NoDisplayImageOutput(o; 
         imageconfig=ImageConfig(init(o); 
