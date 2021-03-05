@@ -13,7 +13,7 @@ Common configuration component for all [`ImageOutput`](@ref).
 - `maxval`: Maximum value in the grid(s) to normalise for conversion to an RGB pixel. 
     Number or `Tuple` for multiple grids. 
 - `font`: `String` name of font to search for. A default will be guessed.
-- `text`: `TextCongif()` or `nothing` for no text. Default is `TextCongif(; font=font)`.
+- `text`: `TextConfig()` or `nothing` for no text. Default is `TextConfig(; font=font)`.
 - `scheme`: ColorSchemes.jl scheme, or `Greyscale()`. ObjectScheme() by default.
 - `imagegen`: [`ImageGenerator`](@ref) like [`Image`](@ref) or [`Layout`](@ref) Will 
     be detected automatically
