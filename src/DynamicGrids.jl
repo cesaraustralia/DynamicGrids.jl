@@ -46,7 +46,7 @@ export Rule, NeighborhoodRule, CellRule, SetCellRule, SetNeighborhoodRule, SetGr
 
 export Cell, Neighbors, SetNeighbors, SetCell, Convolution, SetGrid, Life, CopyTo
 
-export RuleWrapper, Chain, RunIf 
+export RuleWrapper, Chain, RunIf, RunAt
 
 export AbstractRuleset, Ruleset, StaticRuleset
 
