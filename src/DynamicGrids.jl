@@ -61,7 +61,11 @@ export BoundaryCondition, Remove, Wrap
 
 export ParameterSource, Aux, Grid
 
-export Output, GraphicOutput, ImageOutput, ArrayOutput, ResultOutput, REPLOutput, GifOutput
+export Output, ArrayOutput, ResultOutput, TransformedOutput
+
+export GraphicOutput, REPLOutput
+
+export ImageOutput, GifOutput
 
 export ImageGenerator, Image, Layout, SparseOptInspector
 
@@ -98,6 +102,7 @@ include("outputs/textconfig.jl")
 include("outputs/schemes.jl")
 include("outputs/imagegenerators.jl")
 include("outputs/array.jl")
+include("outputs/transformed.jl")
 include("outputs/repl.jl")
 include("outputs/gif.jl")
 include("framework.jl")

@@ -189,6 +189,7 @@ xor!
 Output
 ArrayOutput
 ResultOutput
+TransformedOutput
 GraphicOutput
 REPLOutput
 ImageOutput

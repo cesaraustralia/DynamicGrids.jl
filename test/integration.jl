@@ -258,10 +258,24 @@ end
     end
 end
 
-
-@testset "REPLOutput" begin
+@testset "sim! with other outputs" begin
     for proc in (SingleCPU(), ThreadedCPU(), CPUGPU()), opt in (NoOpt(), SparseOpt())
         @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
+            @testset "Transformed output" begin
+                ruleset = Ruleset(Life();
+                    timestep=Month(1),
+                    boundary=Wrap(),
+                    proc=proc,
+                    opt=opt,
+                )
+                tspan_ = Date(2010, 4):Month(1):Date(2010, 7)
+                output = TransformedOutput(sum, test6_7[:init]; tspan=tspan_)
+                sim!(output, ruleset)
+                @test output[1] == sum(test6_7[:init])
+                @test output[2] == sum(test6_7[:test2])
+                @test output[3] == sum(test6_7[:test3])
+                @test output[4] == sum(test6_7[:test4])
+            end
             @testset "REPLOutput block works, in Unitful.jl seconds" begin
                 ruleset = Ruleset(;
                     rules=(Life(),),
@@ -271,7 +285,7 @@ end
                     opt=opt,
                 )
                 output = REPLOutput(test6_7[:init]; 
-                    tspan=0u"s":5u"s":6u"s", style=Block(), fps=100, store=true
+                    tspan=0u"s":5u"s":6u"s", style=Block(), fps=1000, store=true
                 )
                 @test DynamicGrids.isstored(output) == true
                 sim!(output, ruleset)
@@ -289,7 +303,7 @@ end
                     opt=opt,
                 )
                 tspan_ = Date(2010, 4):Month(1):Date(2010, 7)
-                output = REPLOutput(test6_7[:init]; tspan=tspan_, style=Braile(), fps=100, store=false)
+                output = REPLOutput(test6_7[:init]; tspan=tspan_, style=Braile(), fps=1000, store=false)
                 sim!(output, ruleset)
                 @test output[Ti(Date(2010, 7))] == test6_7[:test4]
                 @test DynamicGrids.tspan(output) == Date(2010, 4):Month(1):Date(2010, 7)
