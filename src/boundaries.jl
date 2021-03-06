@@ -29,25 +29,37 @@ end
 
 #= Wrap boundary where required. This optimisation allows us to ignore
 bounds checks on neighborhoods and still use a wraparound grid. =#
-_handleboundary!(grids::Tuple) = map(_handleboundary!, grids)
-_handleboundary!(griddata::GridData) = _handleboundary!(griddata, boundary(griddata))
-_handleboundary!(griddata::GridData, ::Remove) = griddata
-function _handleboundary!(griddata::GridData, ::Wrap)
-    r = radius(griddata)
-    r < 1 && return griddata
-
+_updateboundary!(grids::Tuple) = map(_updateboundary!, grids)
+function _updateboundary!(g::GridData{Y,X,R}) where {Y,X,R}
+    R < 1 && return g
+    return _updateboundary!(g, boundary(g))
+end
+function _updateboundary!(g::GridData{Y,X,R,T}, ::Remove) where {Y,X,R,T}
+    src = parent(source(g))
+    # Left
+    @inbounds src[1:Y, 1:R] .= Ref(padval(g))
+    # Right
+    @inbounds src[1:Y, X+R+1:X+2R] .= Ref(padval(g))
+    # Top middle
+    @inbounds src[1:R, R+1:X+R] .= Ref(padval(g))
+    # Bottom middle
+    @inbounds src[Y+R+1:Y+2R, R+1:X+R] .= Ref(padval(g))
+    return g
+end
+function _updateboundary!(g::GridData{Y,X,R}, ::Wrap) where {Y,X,R}
     # TODO optimise this. Its mostly a placeholder so wrapping still works in GOL tests.
-    src = parent(source(griddata))
-    nrows, ncols = gridsize(griddata)
-    startpadrow = startpadcol = 1:r
-    endpadrow = nrows+r+1:nrows+2r
-    endpadcol = ncols+r+1:ncols+2r
-    startrow = startcol = 1+r:2r
-    endrow = nrows+1:nrows+r
-    endcol = ncols+1:ncols+r
-    rows = 1+r:nrows+r
-    cols = 1+r:ncols+r
+    src = parent(source(g))
+    nrows, ncols = gridsize(g)
+    startpadrow = startpadcol = 1:R
+    endpadrow = nrows+R+1:nrows+2R
+    endpadcol = ncols+R+1:ncols+2R
+    startrow = startcol = 1+R:2R
+    endrow = nrows+1:nrows+R
+    endcol = ncols+1:ncols+R
+    rows = 1+R:nrows+R
+    cols = 1+R:ncols+R
 
+    # Sides ---
     # Left
     @inbounds copyto!(src, CartesianIndices((rows, startpadcol)),
                       src, CartesianIndices((rows, endcol)))
@@ -60,8 +72,7 @@ function _handleboundary!(griddata::GridData, ::Wrap)
     # Bottom
     @inbounds copyto!(src, CartesianIndices((endpadrow, cols)),
                       src, CartesianIndices((startrow, cols)))
-
-    # Copy four corners
+    # Corners ---
     # Top Left
     @inbounds copyto!(src, CartesianIndices((startpadrow, startpadcol)),
                       src, CartesianIndices((endrow, endcol)))
@@ -75,7 +86,8 @@ function _handleboundary!(griddata::GridData, ::Wrap)
     @inbounds copyto!(src, CartesianIndices((endpadrow, endpadcol)),
                       src, CartesianIndices((startrow, startcol)))
 
-    _wrapstatus!(sourcestatus(griddata))
+    _wrapstatus!(sourcestatus(g))
+    return g
 end
 
 _wrapstatus!(status::Nothing) = nothing

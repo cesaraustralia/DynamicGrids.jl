@@ -1,4 +1,3 @@
-# Internal traits for sharing methodsbst
 # Map a rule over the grids it reads from and updating the grids it writes to.
 # This is broken into a setup method and an application method
 # to introduce a function barrier, for type stability.
@@ -14,7 +13,7 @@ function maprule!(data::SimData, ruletype::Type{<:Rule}, rule)
     # Copy the source to dest for grids we are writing to, if needed
     _maybeupdatedest!(wgrids, ruletype)
     # Copy or zero out boundary where needed
-    _handleboundary!(wgrids)
+    _updateboundary!(rgrids)
     # Combine read and write grids to a temporary simdata object.
     # This means that grids not specified to write to are read-only.
     allkeys = map(Val, keys(data))
@@ -22,7 +21,7 @@ function maprule!(data::SimData, ruletype::Type{<:Rule}, rule)
     tempdata = _combinegrids(data, allkeys, allgrids, wkeys, wgrids)
     # Run the rule loop
     maprule!(wgrids, tempdata, proc(data), opt(data), ruletype, rule, rkeys, rgrids, wkeys)
-    # Mask writes to dest if a mask isprovided, except for
+    # Mask writes to dest if a mask is provided, except for
     # CellRule which doesn't move values into masked areas
     ruletype <: CellRule || _maybemask!(wgrids)
     # Copy the dest status to source status if it is in use
@@ -59,7 +58,7 @@ function _maybemask!(wgrid::WritableGridData{Y,X}, proc::CPU, mask::AbstractArra
     end
 end
 function _maybemask!(wgrid::WritableGridData{Y,X}, proc, mask::AbstractArray) where {Y,X}
-    gridview(wgrid) .*= mask
+    destview(wgrid) .*= mask
 end
 
 _maybecopystatus!(grids::Tuple{Vararg{<:GridData}}) = map(_maybecopystatus!, grids)
@@ -88,7 +87,6 @@ function maprule!(
     simdata, proc::CPU, opt, ruletype::Type{<:NeighborhoodRule}, rule, args...
 ) where {Y,X,R}
     grid = simdata[neighborhoodkey(rule)]
-    _mayberesetdest!(grid, opt)
     mapneighborhoodrule!(wgrids, simdata, grid, proc, opt, ruletype, rule, args...)
     return nothing
 end
@@ -182,14 +180,6 @@ function _maybecopystatus!(grid::GridData, opt::SparseOpt)
     return nothing
 end
 _maybecopystatus!(grid, opt::NoOpt) = nothing
-
-function _mayberesetdest!(grid::GridData, opt::SparseOpt)
-    deststatus(grid) .= false
-    dest(grid) .= padval(grid)
-    return nothing
-end
-_mayberesetdest!(grid, opt::NoOpt) = nothing
-
 
 #= Run the rule row by row. When we move along a row by one cell, we access only
 a single new column of data with the height of 4R, and move the existing
@@ -374,7 +364,6 @@ end
         return $newbuffers
     end
 end
-
 
 # Read values from grid/s at index `I`. This occurs for every cell for every rule,
 # so has to be very fast.
