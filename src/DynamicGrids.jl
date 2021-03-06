@@ -34,7 +34,7 @@ using Base: tail, @propagate_inbounds
 import Base: show, getindex, setindex!, lastindex, size, length, push!, append!,
              broadcast, broadcast!, similar, eltype, iterate
 
-export sim!, resume!, savegif, isinferred
+export sim!, resume!, step!, savegif, isinferred
 
 export rules, neighbors, neighborhood, offsets, positions, radius, inbounds, isinbounds 
 
