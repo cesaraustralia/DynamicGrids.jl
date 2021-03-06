@@ -336,8 +336,7 @@ end
 struct PrecalcRule{R,W,P} <: Rule{R,W}
     precalc::P
 end
-DynamicGrids.precalcrules(rule::PrecalcRule, simdata) = 
-    PrecalcRule(currenttime(simdata))
+DynamicGrids.modifyrule(rule::PrecalcRule, simdata) = PrecalcRule(currenttime(simdata))
 applyrule(data, rule::PrecalcRule, state, index) = rule.precalc[]
 
 @testset "Rule precalculations work" begin

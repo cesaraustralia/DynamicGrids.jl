@@ -15,17 +15,17 @@ Where `index` is a `Tuple` of `Int`, and `state` is a single value, or a `NamedT
 if multiple grids are requested. the [`SimData`](@ref) object can be used to access current 
 timestep and other simulation data and metadata.
 
-Rules can be updated from the original rule before each timestep, in [`precalcrule`](@ref):
+Rules can be updated from the original rule before each timestep, in [`modifyrule`](@ref):
 
 ```julia
-precalcrule(rule::YourRule, data::SimData) = ...
+modifyrule(rule::YourRule, data::SimData) = ...
 ```
 
 Rules can also be run in sequence, often wrapped in a `Tuple` or [`Ruleset`](@ref)s.
 
 DynamicGrids guarantees that:
 
-- `precalcrule` is run once for every rule for every timestep. 
+- `modifyrule` is run once for every rule for every timestep. 
     The result is passed to `applyrule`, but not retained after that.
 - `applyrule` is run once for every rule, for every cell, for every timestep, unless an 
     optimisation like `SparseOpt` is enable to skips empty cells.

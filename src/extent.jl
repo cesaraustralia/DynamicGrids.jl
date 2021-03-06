@@ -14,7 +14,7 @@ aux(e::AbstractExtent) = e.aux
 @noinline aux(::Nothing, key) =
     throw(ArgumentError("No aux data available. Pass a NamedTuple to the `aux=` keyword of the Output"))
 padval(e::AbstractExtent) = e.padval
-tspan(e::AbstractExtent) = e.tspan # Never type-stable, only access in `precalc` methods
+tspan(e::AbstractExtent) = e.tspan # Never type-stable, only access in `modifyrule` methods
 gridsize(extent::AbstractExtent) = gridsize(init(extent))
 
 """
@@ -38,7 +38,7 @@ to `Output` constructors instead of `init`, `mask`, `aux` and `tspan`.
     a `Rule` in a type-stable way.
 - `padval`: padding value for grids with neighborhood rules. The default is 
     `zero(eltype(init))`.
-- `tspan`: Time span range. Never type-stable, only access this in `precalc` methods
+- `tspan`: Time span range. Never type-stable, only access this in `modifyrule` methods
 """
 mutable struct Extent{I<:Union{AbstractArray,NamedTuple},
                       M<:Union{AbstractArray,Nothing},

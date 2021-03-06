@@ -75,6 +75,10 @@ ruletype(chain::Chain) = ruletype(first(chain))
     expr
 end
 
+function modifyrule(chain::Chain{R,W}, simdata) where {R,W}
+    Chain{R,W}(_modifyrules(rules(chain), simdata))
+end
+
 # Get the state to pass to the specific rule as a `NamedTuple` or single value
 @generated function _filter_readstate(::Rule{R,W}, state::NamedTuple) where {R<:Tuple,W}
     expr = Expr(:tuple)

@@ -26,7 +26,7 @@ Type-stability can give orders of magnitude improvements in performance.
 isinferred(output::Output, rules::Rule...) = isinferred(output, rules)
 isinferred(output::Output, rules::Tuple) = isinferred(output, Ruleset(rules...))
 function isinferred(output::Output, ruleset::Ruleset)
-    simdata = precalcrules(SimData(output, ruleset), rules(ruleset))
+    simdata = _updaterules(rules(ruleset), SimData(output, ruleset))
     map(rules(simdata)) do rule
         isinferred(simdata, rule)
     end
