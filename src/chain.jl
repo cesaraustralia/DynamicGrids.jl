@@ -13,7 +13,7 @@ or [`NeighborhoodRule`](@ref) followed by [`CellRule`](@ref).
 
 ![Chain rule diagram](https://raw.githubusercontent.com/cesaraustralia/DynamicGrids.jl/media/Chain.png)
 """
-struct Chain{R,W,T<:Union{Tuple{},Tuple{Union{<:NeighborhoodRule,<:CellRule},Vararg{<:CellRule}}}} <: Rule{R,W}
+struct Chain{R,W,T<:Union{Tuple{},Tuple{Union{<:NeighborhoodRule,<:CellRule},Vararg{<:CellRule}}}} <: RuleWrapper{R,W}
     rules::T
 end
 Chain(rules...) = Chain(rules)
@@ -43,6 +43,8 @@ Base.iterate(chain::Chain) = iterate(rules(chain))
 Base.length(chain::Chain) = length(rules(chain))
 Base.firstindex(chain::Chain) = firstindex(rules(chain))
 Base.lastindex(chain::Chain) = lastindex(rules(chain))
+
+ruletype(chain::Chain) = ruletype(first(chain))
 
 @generated function applyrule(data::SimData, chain1::Chain{R,W,T}, state1, index) where {R,W,T}
     expr = Expr(:block)

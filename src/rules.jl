@@ -67,6 +67,9 @@ Some basic guidlines for writing rules are:
 """
 abstract type Rule{R,W} end
 
+# Rules are also traits - because we use wrapper rules
+ruletype(::Rule) = Rule
+
 #= Default constructors for all Rules.
 Sets both the read and write grids to `:_default`.
 
@@ -119,6 +122,12 @@ radius(rules::Tuple{Vararg{<:Rule}}, key::Symbol) =
 
 radius(rule::Rule, args...) = 0
 
+"""
+    RuleWrapper <: Rule
+
+A `Rule` that wraps other rules, altering their behaviour or how they are run.
+"""
+abstract type RuleWrapper{R,W} <: Rule{R,W} end
 
 """
     Cellrule <: Rule
@@ -155,6 +164,7 @@ scripting context.
 """
 abstract type CellRule{R,W} <: Rule{R,W} end
 
+ruletype(::CellRule) = CellRule
 
 """
     SetRule <: Rule
@@ -164,6 +174,8 @@ Abstract supertype for rules that manually write to the grid in some way.
 These must define methods of [`applyrule!`](@ref).
 """
 abstract type SetRule{R,W} <: Rule{R,W} end
+
+ruletype(::SetRule) = SetRule
 
 """
     SetCellRule <: Rule
@@ -211,6 +223,8 @@ DynamicGrids guarantees that:
 """
 abstract type SetCellRule{R,W} <: SetRule{R,W} end
 
+ruletype(::SetCellRule) = SetCellRule
+
 """
     NeighborhoodRule <: Rule
 
@@ -238,6 +252,8 @@ state for the cell. Any grids can be written to, but only for the current cell.
 """
 abstract type NeighborhoodRule{R,W} <: Rule{R,W} end
 
+ruletype(::NeighborhoodRule) = NeighborhoodRule
+
 neighbors(rule::NeighborhoodRule) = neighbors(neighborhood(rule))
 neighborhood(rule::NeighborhoodRule) = rule.neighborhood
 offsets(rule::NeighborhoodRule) = offsets(neighborhood(rule))
@@ -264,6 +280,8 @@ By default this is `rule.neighborhood`. If this property exists, no interface me
 are required.
 """
 abstract type SetNeighborhoodRule{R,W} <: SetRule{R,W} end
+
+ruletype(::SetNeighborhoodRule) = SetNeighborhoodRule
 
 neighborhood(rule::SetNeighborhoodRule) = rule.neighborhood
 offsets(rule::SetNeighborhoodRule) = offsets(neighborhood(rule))
@@ -299,6 +317,7 @@ end
 """
 abstract type SetGridRule{R,W} <: Rule{R,W} end
 
+ruletype(::SetGridRule) = SetGridRule
 
 """
     SetGrid{R,W}(f)

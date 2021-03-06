@@ -46,7 +46,7 @@ export Rule, NeighborhoodRule, CellRule, SetCellRule, SetNeighborhoodRule, SetGr
 
 export Cell, Neighbors, SetNeighbors, SetCell, Convolution, SetGrid, Life, CopyTo
 
-export Chain 
+export RuleWrapper, Chain, RunIf 
 
 export AbstractRuleset, Ruleset, StaticRuleset
 
@@ -89,6 +89,7 @@ include("simulationdata.jl")
 include("atomic.jl")
 include("auxilary.jl")
 include("chain.jl")
+include("condition.jl")
 include("outputs/interface.jl")
 include("outputs/output.jl")
 include("outputs/graphic.jl")
