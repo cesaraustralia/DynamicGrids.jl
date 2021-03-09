@@ -116,7 +116,7 @@ performance. Rules can be collected in a `Ruleset`, with some additional
 arguments to control the simulation:
 
 ```
-ruleset = Ruleset(Life(2, 3); opt=SparseOpt())
+ruleset = Ruleset(Life(2, 3); opt=SparseOpt(), proc=CuGPU())
 ```
 
 Multiple rules can be combined in a `Ruleset` or simply passed to `sim!`. Each rule 
@@ -124,19 +124,7 @@ will be run for the whole grid, in sequence, using appropriate optimisations dep
 on the parent types of each rule:
 
 ```julia
-ruleset = Ruleset(rule1, rule2; timestep=Day(1), opt=SparseOpt())
-```
-
-For better performance, models included in a `Chain` object
-will be combined into a single model, using only one array read and write. This
-optimisation is limited to `CellRule`, or a `NeighborhoodRule` followed by
-`CellRule`. If the `@inline` compiler macro is used on all `applyrule` methods,
-all rules in a `Chain` will be compiled together into a single, efficient
-function call. After improvements to `NeightborhoodRule` `Chain` may actually make
-things worse in some cases. Allways benchmark.
-
-```julia
-ruleset = Ruleset(rule1, Chain(rule2, rule3, rule4))
+ruleset = Ruleset(rule1, rule2; timestep=Day(1), opt=SparseOpt(), proc=ThreadedCPU())
 ```
 
 
@@ -167,7 +155,7 @@ composites or layouts, as shown above in the quarantine simulation.
 [DynamicGridsInteract.jl](https://github.com/cesaraustralia/DynamicGridsInteract.jl)
 provides simulation interfaces for use in Juno, Jupyter, web pages or electron
 apps, with live interactive control over parameters, using 
-[ModelParameters.jl]](https://github.com/rafaqz/ModelParameters.jl).
+[ModelParameters.jl](https://github.com/rafaqz/ModelParameters.jl).
 [DynamicGridsGtk.jl](https://github.com/cesaraustralia/DynamicGridsGtk.jl) is a
 simple graphical output for Gtk. These packages are kept separate to avoid
 dependencies when being used in non-graphical simulations. 
