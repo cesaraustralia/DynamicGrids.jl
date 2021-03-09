@@ -1,5 +1,6 @@
 using DynamicGrids, DimensionalData, Test, Dates, Unitful, 
       KernelAbstractions, FileIO, FixedPointNumbers, Colors
+using DynamicGrids: Extent, SimData, gridview
 
 # life glider sims
 
@@ -124,23 +125,39 @@ test5_6 = (
     for test in (test5_6, test6_7), i in 1:size(test[:init], 1)
         for j in 1:size(test[:init], 2)
             for proc in (SingleCPU(), ThreadedCPU(), CPUGPU()), opt in (NoOpt(), SparseOpt())
+                tspan = Date(2001, 1, 1):Day(2):Date(2001, 1, 14)
+                ruleset = Ruleset(;
+                    rules=(Life(),),
+                    timestep=Day(2),
+                    boundary=Wrap(),
+                    proc=proc,
+                    opt=opt,
+                )
                 @testset "$(nameof(typeof(proc))) $(nameof(typeof(opt))) results match glider behaviour" begin
                     bufs = (zeros(Int, 3, 3), zeros(Int, 3, 3))
                     rule = Life(neighborhood=Moore{1}(bufs))
-                    ruleset = Ruleset(;
-                        rules=(Life(),),
-                        timestep=Day(2),
-                        boundary=Wrap(),
-                        proc=proc,
-                        opt=opt,
-                    )
-                    output = ArrayOutput(test[:init], tspan=Date(2001, 1, 1):Day(2):Date(2001, 1, 14))
+                    output = ArrayOutput(test[:init], tspan=tspan)
                     sim!(output, ruleset)
                     @test output[2] == test[:test2]
                     @test output[3] == test[:test3]
                     @test output[4] == test[:test4]
                     @test output[5] == test[:test5]
                     @test output[7] == test[:test7]
+                end
+                @testset "$(nameof(typeof(proc))) $(nameof(typeof(opt))) using step!" begin
+                    simdata = SimData(Extent(; init=test[:init], tspan=tspan), ruleset)
+                    @test gridview(first(simdata)) == test[:init]
+                    simdata = step!(simdata)
+                    @test gridview(first(simdata)) == test[:test2]
+                    simdata = step!(simdata)
+                    @test gridview(first(simdata)) == test[:test3]
+                    simdata = step!(simdata)
+                    @test gridview(first(simdata)) == test[:test4]
+                    simdata = step!(simdata)
+                    @test gridview(first(simdata)) == test[:test5]
+                    simdata = step!(simdata)
+                    simdata = step!(simdata)
+                    @test gridview(first(simdata)) == test[:test7]
                 end
             end
             cyclej!(test)

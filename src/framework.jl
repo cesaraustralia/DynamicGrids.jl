@@ -189,30 +189,38 @@ _step!(sd::SimData, rules) = _updaterules(rules, sd) |> sequencerules!
 
 Allows stepping a simulation one frame at a time, for a more manual approach
 to simulation that `sim!`. This may be useful if other processes need to be run 
-between steps, or the simulation is of variable length. Step also removes the use
-of `Output`s, meaning storing of grid data must be handled manually, if it is 
-required.
+between steps, or the simulation is of variable length. `step!` also removes the use
+of `Output`s, meaning storing of grid data must be handled manually, if that is 
+required. Of course, an output can also be updated manually, using:
 
-Instead the internal [`SimData`](@ref) objects are used directly, and can be defined 
-using a `Extent` object and a `Ruleset`.
-
+```julia
+DynmicGrids.storeframe!(output, simdata)
 ```
-ruleset = Ruleset(myrules) 
+
+Instead of an `Output`, the internal [`SimData`](@ref) objects are used directly, 
+and can be defined using a [`Extent`](@ref) object and a [`Ruleset`](@ref).
+
+# Example
+
+```julia
+ruleset = Ruleset(myrules; proc=ThreadedCPU())
 extent = Extent(; init=(a=A, b=B), aux=aux, tspan=tspan)
-simdata = SimData(extent, ruleset) 
-# Run a single step
-step!(simdata)
-simdata[:a]
+simdata = SimData(extent, ruleset)
+# Run a single step, which returns an updated SimData object
+simdata = step!(simdata)
+# Get a view of the grid without padding, for NeighborhoodRule/SetNeighborhoodRule
+DynmicGrids.gridview(simdata[:a])
 ```
 
 This example returns a `GridData` object for the `:a` grid, which is `<: AbstractAray`.
 """
 function step!(sd::SimData)
-    _updatetime(sd, currentframe(sd) + 1) |> _proc_setup |> sd -> _step!(sd, rules(sd))
+    _updatetime(sd, currentframe(sd) + 1) |> 
+    _proc_setup |> 
+    sd -> _step!(sd, rules(sd))
 end
 
 # Allows different processors to modify the simdata object
 # GPU needs this to convert arrays to CuArray
 _proc_setup(simdata::SimData) = _proc_setup(proc(simdata), simdata)
 _proc_setup(proc, obj) = obj
-
