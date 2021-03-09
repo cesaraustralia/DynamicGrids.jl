@@ -25,7 +25,7 @@ end
 
 # We have to hook into cell_kernel! to handle the option of no return value
 @inline function cell_kernel!(
-    wgrids, simdata, ::Type{<:Rule}, condition::RunIf, rkeys, rgrids, wkeys, I...
+    wgrids, simdata, ::Val{<:Rule}, condition::RunIf, rkeys, rgrids, wkeys, I...
 )
     readval = _readgrids(rkeys, rgrids, I...)
     if condition.f(data, readval, I)

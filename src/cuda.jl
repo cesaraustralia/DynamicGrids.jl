@@ -73,14 +73,14 @@ end
 
 function maprule!(
     wgrids::Union{<:GridData{Y,X,R},Tuple{<:GridData{Y,X,R},Vararg}},
-    simdata, proc::GPU, opt, ruletype::Type{<:Rule}, rule, args...
+    simdata, proc::GPU, opt, ruletype::Val{<:Rule}, rule, args...
 ) where {Y,X,R}
     kernel! = cu_cell_kernel!(kernel_setup(proc)...)
     kernel!(wgrids, simdata, ruletype, rule, args...; ndrange=gridsize(simdata)) |> wait
 end
 function maprule!(
     wgrids::Union{<:GridData{Y,X,R},Tuple{<:GridData{Y,X,R},Vararg}},
-    simdata, proc::GPU, opt, ruletype::Type{<:NeighborhoodRule}, rule, args...
+    simdata, proc::GPU, opt, ruletype::Val{<:NeighborhoodRule}, rule, args...
 ) where {Y,X,R}
     grid = simdata[neighborhoodkey(rule)]
     kernel! = cu_neighborhood_kernel!(kernel_setup(proc)...)
@@ -91,7 +91,7 @@ function maprule!(
 end
 
 @kernel function cu_neighborhood_kernel!(
-    wgrids, data, grid::GridData{Y,X,R}, opt, ruletype::Type{<:NeighborhoodRule}, rule, args...
+    wgrids, data, grid::GridData{Y,X,R}, opt, ruletype::Val{<:NeighborhoodRule}, rule, args...
 ) where {Y,X,R}
     I, J = @index(Global, NTuple)
     src = parent(source(grid))
@@ -101,7 +101,7 @@ end
     nothing
 end
 
-@kernel function cu_cell_kernel!(wgrids, simdata, ruletype, rule, rkeys, rgrids, wkeys)
+@kernel function cu_cell_kernel!(wgrids, simdata, ruletype::Val, rule, rkeys, rgrids, wkeys)
     i, j = @index(Global, NTuple)
     cell_kernel!(wgrids, simdata, ruletype, rule, rkeys, rgrids, wkeys, i, j)
     nothing

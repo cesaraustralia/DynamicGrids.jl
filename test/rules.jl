@@ -253,7 +253,8 @@ applyrule(data, ::TestRule, state, index) = 0
             newsimdata = @set simdata.grids = _combinegrids(rkeys, rgrids, wkeys, wgrids)
             @test newsimdata.grids[1] isa WritableGridData
             # Test type stability
-            @inferred maprule!(wgrids, newsimdata, proc, opt, ruletype(rule), rule, rkeys, rgrids, wkeys)
+            T = Val{DynamicGrids.ruletype(rule)}()
+            @inferred maprule!(wgrids, newsimdata, proc, opt, T, rule, rkeys, rgrids, wkeys)
             
             resultdata = maprule!(simdata, rule)
             @test source(resultdata[:a]) == final
@@ -277,7 +278,8 @@ applyrule!(data, ::TestSetCell, state, index) = 0
             wkeys, wgrids = _getwritegrids(rule, simdata)
             newsimdata = @set simdata.grids = _combinegrids(wkeys, wgrids, rkeys, rgrids)
 
-            @inferred maprule!(wgrids, newsimdata, proc, opt, ruletype(rule), rule, rkeys, rgrids, wkeys)
+            T = Val{DynamicGrids.ruletype(rule)}()
+            @inferred maprule!(wgrids, newsimdata, proc, opt, T, rule, rkeys, rgrids, wkeys)
             resultdata = maprule!(simdata, rule)
             @test source(resultdata[:_default_]) == init
         end
