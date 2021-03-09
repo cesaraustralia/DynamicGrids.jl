@@ -83,11 +83,10 @@ init = (predator=rand(100, 100), prey=(rand(100, 100))
 
 Handling and passing of the correct grids to a `Rule` is automated by
 DynamicGrids.jl. `Rule`s specify which grids they require in what order using
-the first two (`R` and `W`) type parameters, or `read` and `write` keyword
-arguments. 
+the first two (`R` and `W`) type parameters.
 
 Dimensional or spatial `init` grids from
-[DimensionalData.jl](https://github.com/rafaqz/DimensionalData.jl) of
+[DimensionalData.jl](https://github.com/rafaqz/DimensionalData.jl) or
 [GeoData.jl](https://github.com/rafaqz/GeoData.jl) will propagate through the
 model to return output with explicit dimensions. This will plot correctly as a
 map using [Plots.jl](https://github.com/JuliaPlots/Plots.jl), to which shape
@@ -102,8 +101,9 @@ Tuple does not define `zero`. `Array` is not a bitstype, and does not define `ze
 Custom structs that defne `zero` should also work. 
 
 However, for any multi-values grid element type, you will need to define a method of 
-`DynamicGrids.rgb` that returns an `ARGB32` for them to work in `ImageOutput`s, and 
-`isless` for the `REPLoutput` to work.
+`DynamicGrids.to_rgb` that returns an `ARGB32` for them to work in `ImageOutput`s, and 
+`isless` for the `REPLoutput` to work. A definition for multiplication by a scalar `Real` 
+and addition are required to use `Convolution` kernels.
 
 ## Rules
 
@@ -119,20 +119,21 @@ arguments to control the simulation:
 ruleset = Ruleset(Life(2, 3); opt=SparseOpt())
 ```
 
-Multiple rules can be combined in a `Ruleset`. Each rule will be run for the
-whole grid, in sequence, using appropriate optimisations depending on the parent
-types of each rule:
+Multiple rules can be combined in a `Ruleset` or simply passed to `sim!`. Each rule 
+will be run for the whole grid, in sequence, using appropriate optimisations depending 
+on the parent types of each rule:
 
 ```julia
 ruleset = Ruleset(rule1, rule2; timestep=Day(1), opt=SparseOpt())
 ```
 
-For better performance (often ~2x or more), models included in a `Chain` object
+For better performance, models included in a `Chain` object
 will be combined into a single model, using only one array read and write. This
 optimisation is limited to `CellRule`, or a `NeighborhoodRule` followed by
 `CellRule`. If the `@inline` compiler macro is used on all `applyrule` methods,
 all rules in a `Chain` will be compiled together into a single, efficient
-function call.
+function call. After improvements to `NeightborhoodRule` `Chain` may actually make
+things worse in some cases. Allways benchmark.
 
 ```julia
 ruleset = Ruleset(rule1, Chain(rule2, rule3, rule4))
@@ -165,20 +166,20 @@ composites or layouts, as shown above in the quarantine simulation.
 
 [DynamicGridsInteract.jl](https://github.com/cesaraustralia/DynamicGridsInteract.jl)
 provides simulation interfaces for use in Juno, Jupyter, web pages or electron
-apps, with live interactive control over parameters.
+apps, with live interactive control over parameters, using 
+[ModelParameters.jl]](https://github.com/rafaqz/ModelParameters.jl).
 [DynamicGridsGtk.jl](https://github.com/cesaraustralia/DynamicGridsGtk.jl) is a
 simple graphical output for Gtk. These packages are kept separate to avoid
 dependencies when being used in non-graphical simulations. 
 
 Outputs are also easy to write, and high performance applications may benefit
-from writing a custom output to reduce memory use. Performance of
-DynamicGrids.jl is dominated by cache interactions, so reducing memory use has
-positive effects.
+from writing a custom output to reduce memory use, or using `TransformedOuput`. 
+Performance of DynamicGrids.jl is dominated by cache interactions, so reducing 
+memory use has positive effects.
 
 ## Example
 
 This example implements a very simple forest fire model:
-
 
 ```julia
 using DynamicGrids, DynamicGridsGtk, ColorSchemes, Colors
@@ -228,4 +229,4 @@ output = ArrayOutput(init; tspan=1:200)
 
 [Agents.jl](https://github.com/JuliaDynamics/Agents.jl) can also do cellular-automata style simulations. The design of Agents.jl is to iterate over a list of agents, instead of broadcasting over an array of cells. This approach is well suited to when you need to track the movement and details about individual agents throughout the simulation. 
 
-However, for simple grid models where you don't need to track individuals, like the forest fire model above, DynamicGrids.jl is two orders of magnitude faster than Agents.jl, and provides better visualisation tools. If you are doing grid-based simulation and you don't need to track individual agents, DynamicGrids.jl is probably the best tool. For other use cases, try Agents.jl.
+However, for simple grid models where you don't need to track individuals, DynamicGrids.jl is orders of magnitude faster than Agents.jl, and usually requires much less code to define a model. For low density simulations like the forest fire model above (especially with some optimisations and threading turned on), it can be an order of magnitude faster, while for higher activity rules like the game of life on a randomised grid, it is two to three, even four order of magnitude faster, increasing with grid size. If you are doing grid-based simulation and you don't need to track individual agents, DynamicGrids.jl is probably the best tool. For other use cases where you need to track individuals, try Agents.jl.
