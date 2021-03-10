@@ -14,6 +14,7 @@ end
 @time @safetestset "rules" begin include("rules.jl") end
 @time @safetestset "neighborhoods" begin include("neighborhoods.jl") end
 @time @safetestset "simulationdata" begin include("simulationdata.jl") end
+@time @safetestset "auxiliary" begin include("auxiliary.jl") end
 @time @safetestset "utils" begin include("utils.jl") end
 @time @safetestset "chain" begin include("chain.jl") end
 @time @safetestset "condition" begin include("condition.jl") end
