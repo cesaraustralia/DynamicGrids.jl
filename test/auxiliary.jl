@@ -20,7 +20,7 @@ end
 
 
 @testset "aux sequence" begin
-   a = cat([0.1 0.2; 0.3 0.4], [1.1 1.2; 1.3 1.4], [2.1 2.2; 2.3 2.4]; dims=3)
+    a = cat([0.1 0.2; 0.3 0.4], [1.1 1.2; 1.3 1.4], [2.1 2.2; 2.3 2.4]; dims=3)
 
     @testset "the correct frame is calculated for aux data" begin
         dimz = X(1:2), Y(1:2), Ti(15d:5d:25d)

@@ -15,12 +15,13 @@ struct RunIf{R,W,F,T<:Rule{R,W}} <: RuleWrapper{R,W}
 end
 
 rule(runif::RunIf) = runif.rule
+ruletype(runif::RunIf) = ruletype(rule(runif))
 radius(runif::RunIf) = radius(rule(runif))
 neighborhoodkey(runif::RunIf) = neighborhoodkey(rule(runif))
 
 @inline function _setbuffer(runif::RunIf{R,W}, buf) where {R,W}
     r = _setbuffer(rule(runif), buf)
-    RunIf{R,W,typeof(r)}(r)
+    RunIf{R,W,typeof(runif.f),typeof(r)}(runif.f, r)
 end
 
 # We have to hook into cell_kernel! to handle the option of no return value
@@ -72,7 +73,8 @@ end
 rules(runat::RunAt) = runat.rules
 # Only the first rule in runat can be a NeighborhoodRule, but this seems annoying...
 radius(runat::RunAt) = radius(first(rules(runat)))
-neighborhoodkey(runat::RunAt) = neighborhoodkey(runat[1])
+ruletype(runat::RunAt) = ruletype(first(rules(runat)))
+neighborhoodkey(runat::RunAt) = neighborhoodkey(first(rules(runat)))
 
 function sequencerules!(simdata::AbstractSimData, rules::Tuple{<:RunAt,Vararg})
     runat = rules[1]
@@ -85,11 +87,12 @@ function sequencerules!(simdata::AbstractSimData, rules::Tuple{<:RunAt,Vararg})
 end
 
 function Base.tail(runat::RunAt{R,W}) where {R,W}
-    runat = tail(rules(runat))
-    RunAt{R,W,typeof(runat)}(runat)
+    rulestail = tail(rules(runat))
+    RunAt{R,W,typeof(rulestail),typeof(runat.times)}(rulestail, runat.times)
 end
 Base.getindex(runat::RunAt, i) = getindex(rules(runat), i)
 Base.iterate(runat::RunAt) = iterate(rules(runat))
+Base.iterate(runat::RunAt, nothing) = iterate(rules(runat), nothing)
 Base.length(runat::RunAt) = length(rules(runat))
 Base.firstindex(runat::RunAt) = firstindex(rules(runat))
 Base.lastindex(runat::RunAt) = lastindex(rules(runat))

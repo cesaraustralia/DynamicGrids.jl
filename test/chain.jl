@@ -1,7 +1,7 @@
 using DynamicGrids, Test, BenchmarkTools
 
 using DynamicGrids: SimData, radius, rules, _readkeys, _writekeys, 
-    applyrule, neighborhood, neighborhoodkey, Extent
+    applyrule, neighborhood, neighborhoodkey, Extent, ruletype
 
 @testset "CellRule chain" begin
 
@@ -38,6 +38,7 @@ using DynamicGrids: SimData, radius, rules, _readkeys, _writekeys,
              0 0 0]
 
     chain = Chain(rule1, rule2, rule3, rule4)
+    @test ruletype(chain) == CellRule
     @test _readkeys(chain) == (:a, :b, :d, :c)
     @test _writekeys(chain) == (:b, :c, :d, :e, :a)
 
@@ -123,6 +124,7 @@ end
 
     chain = Chain(hoodrule, rule)
     @test radius(chain) === 1
+    @test ruletype(chain) == NeighborhoodRule
     @test neighborhood(chain) == hood
     @test Tuple(neighbors(chain)) === (1, 2, 3, 4, 6, 7, 8, 9) 
     @test neighborhoodkey(chain) === :a
