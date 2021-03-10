@@ -182,7 +182,7 @@ rule = let prob_combustion=0.0001, prob_regrowth=0.01
             else
                 rand() <= prob_combustion ? BURNING : ALIVE
             end
-        elseif cell in BURNING
+        elseif cell == BURNING
             DEAD
         else
             rand() <= prob_regrowth ? ALIVE : DEAD
