@@ -557,9 +557,7 @@ end
 Convolution{R,W}(A::AbstractArray) where {R,W} = Convolution{R,W}(Kernel(SMatrix{size(A)...}(A)))
 Convolution{R,W}(; neighborhood) where {R,W} = Convolution{R,W}(neighborhood)
 
-@inline function applyrule(data, rule::Convolution, read, I)
-    @inbounds neighbors(rule) ⋅ kernel(neighborhood(rule))
-end
+@inline applyrule(data, rule::Convolution, read, I) = dot(neighborhood(rule))
 
 # Utils
 
