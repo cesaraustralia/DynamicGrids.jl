@@ -56,8 +56,8 @@ function Adapt.adapt_structure(to, o::Output)
     @set o.frames = frames
 end
 
-function _proc_setup(::CuGPU, obj) 
-    Flatten.modify(CuArray, obj, Union{Array,BitArray}, Union{SArray,Dict})
+@noinline function _proc_setup(::CuGPU, obj) 
+    Flatten.modify(CuArray, obj, Union{Array,BitArray}, Union{CuArray,SArray,Dict})
 end
 
 function _copyto_output!(outgrid, grid, proc::GPU)
