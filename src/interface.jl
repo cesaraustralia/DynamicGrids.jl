@@ -63,6 +63,32 @@ Custom `Neighborhood`s must define this method.
 function neighbors end
 
 """
+    neighborhood(x::Union{NeighborhoodRule,SetNeighborhoodRule}}) -> Neighborhood
+
+Returns a rules neighborhood object
+"""
+function neighborhood end
+
+"""
+    kernel(hood::AbstractKernelNeighborhood) => iterable
+
+Returns the kernel object, an array or iterable matching the length
+of the neighborhood.
+"""
+function kernel end
+
+"""
+    kernelproduct(rule::NeighborhoodRule})
+    kernelproduct(hood::AbstractKernelNeighborhood)
+    kernelproduct(hood::Neighborhood, kernel)
+
+Returns the vector dot product of the neighborhood and the kernel,
+although differing from `dot` in that the dot product is not take for 
+vector members of the neighborhood - they are treated as scalars.
+"""
+function kernelproduct end
+
+"""
     offsets(x::Union{Neighborhood,NeighborhoodRule}}) -> iterable
 
 Returns an iteraterable over all cells as a `Tuple` of the index 
@@ -146,13 +172,13 @@ Set the grid cell `c` to `xor(c, x)`. See `add!` for example usage.
 function xor! end
 
 """
-    inbounds(data::SimData, I::Tuple) -> Tuple{NTuple{2,Int},Bool}
-    inbounds(data::SimData, I...) -> Tuple{NTuple{2,Int},Bool}
+    inbounds(data::SimData, I::Tuple) -> Tuple{NTuple{2,Int}, Bool}
+    inbounds(data::SimData, I...) -> Tuple{NTuple{2,Int}, Bool}
 
 Check grid boundaries for a coordinate before writing in [`SetCellRule`](@ref).
 
 Returns a `Tuple` containing a coordinates `Tuple` and a `Bool` - `true`
-if the cell is in bounds, `false` if not.
+if the cell is inside the grid bounds, `false` if not.
 
 [`BoundaryCondition`](@ref) of type [`Remove`](@ref) returns the coordinate and `false` 
 to skip coordinates that boundary outside of the grid.

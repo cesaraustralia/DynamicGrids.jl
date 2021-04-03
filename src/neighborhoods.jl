@@ -91,34 +91,32 @@ end
 neighbors(hood::Window) = _buffer(hood)
 
 """
-    AbstractKernel <: Neighborhood
+    AbstractKernelNeighborhood <: Neighborhood
 
 Abstract supertype for kernel neighborhoods.
 
 These can wrap any other neighborhood object, and include a kernel of
 the same length and positions as the neighborhood.
 """
-abstract type AbstractKernel{R,L} <: Neighborhood{R,L} end
+abstract type AbstractKernelNeighborhood{R,L} <: Neighborhood{R,L} end
 
-neighborhood(hood::AbstractKernel) = hood.neighborhood
-neighbors(hood::AbstractKernel) = neighbors(neighborhood(hood))
-offsets(hood::AbstractKernel) = offsets(neighborhood(hood))
-positions(hood::AbstractKernel, I) = positions(neighborhood(hood), I)
-kernel(hood::AbstractKernel) = hood.kernel
+neighborhood(hood::AbstractKernelNeighborhood) = hood.neighborhood
+neighbors(hood::AbstractKernelNeighborhood) = neighbors(neighborhood(hood))
+offsets(hood::AbstractKernelNeighborhood) = offsets(neighborhood(hood))
+positions(hood::AbstractKernelNeighborhood, I) = positions(neighborhood(hood), I)
+kernel(hood::AbstractKernelNeighborhood) = hood.kernel
 
-# We override dot for AbstractKernel as we always mean the sum of the
-# products of the kernel and buffer values - never a nested dot product.
-LinearAlgebra.dot(hood::AbstractKernel) = _dot(neighborhood(hood), kernel(hood))
-
-function _dot(hood, kernel)
-    sum = zero(first(neighbors(hood)))
-    for (n, k) in zip(neighbors(hood), kernel)
+kernelproduct(hood::AbstractKernelNeighborhood) = 
+    kernelproduct(neighborhood(hood), kernel(hood))
+function kernelproduct(hood::Neighborhood, kernel)
+    sum = zero(first(hood))
+    for (n, k) in zip(hood, kernel)
         sum += n * k
     end
     sum
 end
-function _dot(hood::Window{<:Any,L}, kernel) where L
-    sum = zero(first(neighbors(hood)))
+function kernelproduct(hood::Window{<:Any,L}, kernel) where L
+    sum = zero(first(hood))
     @simd for i in 1:L
         @inbounds sum += _buffer(hood)[i] * kernel[i]
     end
@@ -126,7 +124,7 @@ function _dot(hood::Window{<:Any,L}, kernel) where L
 end
 
 """
-    Kernel <: AbstractKernel
+    Kernel <: AbstractKernelNeighborhood
 
     Kernel(neighborhood, kernel)
 
@@ -135,7 +133,7 @@ the same length and positions as the neighborhood.
 
 `R = 1` gives 3x3 matrices.
 """
-struct Kernel{R,L,N,K} <: AbstractKernel{R,L}
+struct Kernel{R,L,N,K} <: AbstractKernelNeighborhood{R,L}
     neighborhood::N
     kernel::K
 end
@@ -154,20 +152,20 @@ end
 end
 
 """
-    AbstractPositional <: Neighborhood
+    AbstractPositionalNeighborhood <: Neighborhood
 
 Neighborhoods are tuples or vectors of custom coordinates tuples
 that are specified in relation to the central point of the current cell.
 They can be any arbitrary shape or size, but should be listed in column-major
 order for performance.
 """
-abstract type AbstractPositional{R,L} <: Neighborhood{R,L} end
+abstract type AbstractPositionalNeighborhood{R,L} <: Neighborhood{R,L} end
 
 const CustomOffset = Tuple{Vararg{Int}}
 const CustomOffsets = Union{AbstractArray{<:CustomOffset},Tuple{Vararg{<:CustomOffset}}}
 
 """
-    Positional <: AbstractPositional
+    Positional <: AbstractPositionalNeighborhood
 
     Positional(coord::Tuple{Vararg{Int}}...)
     Positional(offsets::Tuple{Tuple{Vararg{Int}}})
@@ -181,7 +179,7 @@ For simplicity the buffer read from the main grid is a square with sides
 `2r + 1` around the central point, and is not shrunk or offset to match the
 coordinates if they are not symmetrical.
 """
-struct Positional{R,L,O<:CustomOffsets,B} <: AbstractPositional{R,L}
+struct Positional{R,L,O<:CustomOffsets,B} <: AbstractPositionalNeighborhood{R,L}
     "A tuple of tuples of Int, containing 2-D coordinates relative to the central point"
     offsets::O
     _buffer::B
@@ -216,7 +214,7 @@ Sets of [`Positional`](@ref) neighborhoods that can have separate rules for each
 `neighbors` for `LayeredPositional` returns a tuple of iterators
 for each neighborhood layer.
 """
-struct LayeredPositional{R,L,La,B} <: AbstractPositional{R,L}
+struct LayeredPositional{R,L,La,B} <: AbstractPositionalNeighborhood{R,L}
     "A tuple of custom neighborhoods"
     layers::La
     _buffer::B

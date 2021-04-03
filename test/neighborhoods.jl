@@ -129,7 +129,7 @@ end
         @test Kernel(mat) == Kernel(Window(1), mat)
         @test_throws ArgumentError Kernel(Window(2), mat)
         k = Kernel(Window{1,9,typeof(buf)}(buf), SMatrix{3,3}(reshape(1:9, 3, 3)))
-        @test dot(k) == sum((1:9).^2)
+        @test kernelproduct(k) == sum((1:9).^2)
         @test neighbors(k) == reshape(1:9, 3, 3)
         @test collect(offsets(k)) ==
             [(-1, -1) (0, -1) (1, -1)
@@ -143,13 +143,13 @@ end
     end
     @testset "Moore" begin
         k = Kernel(Moore{1,8,typeof(buf)}(buf), (1:4..., 6:9...))
-        @test dot(k) == sum((1:4).^2) + sum((6:9).^2)
+        @test kernelproduct(k) == sum((1:4).^2) + sum((6:9).^2)
     end
     @testset "Positional" begin
         off = ((0,-1),(-1,0),(1,0),(0,1))
         hood = Positional{1,4,typeof(off),typeof(buf)}(off, buf)
         k = Kernel(hood, 1:4)
-        @test dot(k) == 1 * 2 + 2 * 4 + 3 * 6 + 4 * 8
+        @test kernelproduct(k) == 1 * 2 + 2 * 4 + 3 * 6 + 4 * 8
     end
 end
 
