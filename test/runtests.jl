@@ -22,7 +22,10 @@ end
 @time @safetestset "chain" begin include("chain.jl") end
 @time @safetestset "integration" begin include("integration.jl") end
 @time @safetestset "objectgrids" begin include("objectgrids.jl") end
-@time @safetestset "show" begin include("show.jl") end
+# TODO move these tests to 1.6 syntax, or test both?
+if VERSION >= v"1.5.0" && VERSION < v"1.6.0"
+    @time @safetestset "show" begin include("show.jl") end
+end
 # ImageMagick breaks in windows travis for some reason
 if !Sys.iswindows() 
     @time @safetestset "image" begin include("image.jl") end

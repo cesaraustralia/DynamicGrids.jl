@@ -79,7 +79,7 @@ function __init__()
     global terminal
     terminal = REPL.Terminals.TTYTerminal(get(ENV, "TERM", Base.Sys.iswindows() ? "" : "dumb"), stdin, stdout, stderr)
 
-    @require KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c" include("cuda.jl")
+    @require CUDAKernels = "72cfdca4-0801-4ab0-bf6a-d52aa10adc57" include("cuda.jl")
 end
 
 include("interface.jl")

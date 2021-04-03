@@ -1,6 +1,13 @@
 using DynamicGrids, DimensionalData, Test, Dates, Unitful, 
-      KernelAbstractions, FileIO, FixedPointNumbers, Colors
+      CUDAKernels, FileIO, FixedPointNumbers, Colors
 using DynamicGrids: Extent, SimData, gridview
+
+if CUDAKernels.CUDA.has_cuda_gpu()
+    CUDAKernels.CUDA.allowscalar(false)
+    hardware = (SingleCPU(), ThreadedCPU(), CuGPU())
+else
+    hardware = (SingleCPU(), ThreadedCPU(), CPUGPU())
+end
 
 # life glider sims
 
@@ -75,13 +82,13 @@ test6_7 = (
 )
 
 test5_6 = (
-    init =  Bool[
+    init =  DimArray(Bool[
              0 0 0 0 0 0
              0 0 0 1 1 1
              0 0 0 0 0 1
              0 0 0 0 1 0
              0 0 0 0 0 0
-            ],
+            ], (Y, X)),
     test2 = Bool[
              0 0 0 0 1 0
              0 0 0 0 1 1
@@ -124,7 +131,7 @@ test5_6 = (
     # Loop over shifing init arrays to make sure they all work
     for test in (test5_6, test6_7), i in 1:size(test[:init], 1)
         for j in 1:size(test[:init], 2)
-            for proc in (SingleCPU(), ThreadedCPU(), CPUGPU()), opt in (NoOpt(), SparseOpt())
+            for proc in hardware, opt in (NoOpt(), SparseOpt())
                 tspan = Date(2001, 1, 1):Day(2):Date(2001, 1, 14)
                 ruleset = Ruleset(;
                     rules=(Life(),),
@@ -145,19 +152,20 @@ test5_6 = (
                     @test output[7] == test[:test7]
                 end
                 @testset "$(nameof(typeof(proc))) $(nameof(typeof(opt))) using step!" begin
-                    simdata = SimData(Extent(; init=test[:init], tspan=tspan), ruleset)
-                    @test gridview(first(simdata)) == test[:init]
+                    simdata = DynamicGrids._proc_setup(SimData(Extent(; init=test[:init], tspan=tspan), ruleset))
+                    # Need Array here to copy from GPU to CPU
+                    @test Array(gridview(first(simdata))) == test[:init]
                     simdata = step!(simdata)
-                    @test gridview(first(simdata)) == test[:test2]
+                    @test Array(gridview(first(simdata))) == test[:test2]
                     simdata = step!(simdata)
-                    @test gridview(first(simdata)) == test[:test3]
+                    @test Array(gridview(first(simdata))) == test[:test3]
                     simdata = step!(simdata)
-                    @test gridview(first(simdata)) == test[:test4]
+                    @test Array(gridview(first(simdata))) == test[:test4]
                     simdata = step!(simdata)
-                    @test gridview(first(simdata)) == test[:test5]
+                    @test Array(gridview(first(simdata))) == test[:test5]
                     simdata = step!(simdata)
                     simdata = step!(simdata)
-                    @test gridview(first(simdata)) == test[:test7]
+                    @test Array(gridview(first(simdata))) == test[:test7]
                 end
             end
             cyclej!(test)
@@ -166,15 +174,15 @@ test5_6 = (
     end
 end
 
-@testset "Life simulation with Remove boudary and replicates" begin
-    init_ =     Bool[
+@testset "Life simulation with Remove boudary" begin
+    init_ =     DimArray(Bool[
                  0 0 0 0 0 0 0
                  0 0 0 0 1 1 1
                  0 0 0 0 0 0 1
                  0 0 0 0 0 1 0
                  0 0 0 0 0 0 0
                  0 0 0 0 0 0 0
-                ]
+                ], (X, Y))
     test2_rem = Bool[
                  0 0 0 0 0 1 0
                  0 0 0 0 0 1 1
@@ -226,7 +234,7 @@ end
 
     @testset "Results match glider behaviour" begin
         output = ArrayOutput((a=init_,); tspan=1:7)
-        for proc in (SingleCPU(), ThreadedCPU(), CPUGPU()), opt in (NoOpt(), SparseOpt())
+        for proc in hardware, opt in (NoOpt(), SparseOpt())
             sim!(output, rule; boundary=Remove(), proc=proc, opt=opt)
             @test output[2][:a] == test2_rem
             @test output[3][:a] == test3_rem
@@ -247,8 +255,7 @@ end
         remove_output_ref = ArrayOutput(init; tspan=1:100, mask=mask)
         sim!(remove_output_ref, remove_rs_ref)
         sim!(wrap_output_ref, wrap_rs_ref)
-        for proc in (SingleCPU(), ThreadedCPU(), CPUGPU()),
-            opt in (NoOpt(), SparseOpt())
+        for proc in hardware, opt in (NoOpt(), SparseOpt())
             @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
                 @testset "Wrap" begin
                     wrap_rs = Ruleset(rule; boundary=Wrap(), proc=proc, opt=opt)
@@ -273,10 +280,11 @@ end
             end
         end
     end
+
 end
 
 @testset "sim! with other outputs" begin
-    for proc in (SingleCPU(), ThreadedCPU(), CPUGPU()), opt in (NoOpt(), SparseOpt())
+    for proc in hardware, opt in (NoOpt(), SparseOpt())
         @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
             @testset "Transformed output" begin
                 ruleset = Ruleset(Life();
@@ -334,6 +342,7 @@ end
 
 @testset "GifOutput saves" begin
     @testset "Image generator" begin
+        # TODO fix on CUDA: cell_to_rgb indexes a CuArray
         ruleset = Ruleset(;
             rules=(Life(),),
             boundary=Wrap(),
@@ -357,6 +366,7 @@ end
         rm("test_gifoutput.gif")
     end
     @testset "Layout" begin
+        # TODO fix on CUDA
         zeroed = test6_7[:init]
         ruleset = Ruleset(Life{:a}(); boundary=Wrap())
         output = GifOutput((a=test6_7[:init], b=zeroed); 

@@ -91,10 +91,10 @@ function _storeframe!(::Type{<:AbstractArray}, output::Output, data)
     _copyto_output!(output[frameindex(output, data)], grid, proc(grid))
 end
 
-function _copyto_output!(outgrid, grid, proc)
+function _copyto_output!(outgrid, grid::GridData, proc)
     copyto!(outgrid, CartesianIndices(outgrid), source(grid), CartesianIndices(outgrid))
 end
-function _copyto_output!(outgrid, grid, proc::ThreadedCPU)
+function _copyto_output!(outgrid, grid::GridData, proc::ThreadedCPU)
     Threads.@threads for j in axes(outgrid, 2) 
         for i in axes(outgrid, 1)
             @inbounds outgrid[i, j] = grid[i, j]
