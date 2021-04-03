@@ -120,17 +120,13 @@ DynamicGrids.modifyrule
 isinferred
 ```
 
-### Objects and methods for use in `applyrule` and/or `modifyrule`
+### Methods and objects for use in `applyrule` and/or `modifyrule`
 
 ```@docs
 get
-DynamicGrids.SimData
-DynamicGrids.GridData
-DynamicGrids.ReadableGridData
-DynamicGrids.WritableGridData
-DynamicGrids.ismasked
-DynamicGrids.inbounds
 DynamicGrids.isinbounds
+DynamicGrids.inbounds
+DynamicGrids.ismasked
 DynamicGrids.init
 DynamicGrids.aux
 DynamicGrids.mask
@@ -139,6 +135,10 @@ DynamicGrids.timestep
 DynamicGrids.currenttimestep
 DynamicGrids.currenttime
 DynamicGrids.currentframe
+DynamicGrids.SimData
+DynamicGrids.GridData
+DynamicGrids.ReadableGridData
+DynamicGrids.WritableGridData
 ```
 
 ## Neighborhoods
@@ -152,8 +152,14 @@ Window
 AbstractPositional
 Positional
 LayeredPositional
+```
+
+### Convolution kernel neighborhoods
+
+```
 AbstractKernel
 Kernel
+kernelproduct
 ```
 
 ### Methods for use with neighborhood rules and neighborhoods

@@ -12,7 +12,7 @@ Rules are applied to the grid using the [`applyrule`](@ref) method:
 ```
 
 Where `index` is a `Tuple` of `Int`, and `state` is a single value, or a `NamedTuple`
-if multiple grids are requested. the [`SimData`](@ref) object can be used to access current 
+if multiple grids are requested. the [`SimData`](@ref) object can be used to access current
 timestep and other simulation data and metadata.
 
 Rules can be updated from the original rule before each timestep, in [`modifyrule`](@ref):
@@ -25,11 +25,11 @@ Rules can also be run in sequence, often wrapped in a `Tuple` or [`Ruleset`](@re
 
 DynamicGrids guarantees that:
 
-- `modifyrule` is run once for every rule for every timestep. 
+- `modifyrule` is run once for every rule for every timestep.
     The result is passed to `applyrule`, but not retained after that.
-- `applyrule` is run once for every rule, for every cell, for every timestep, unless an 
+- `applyrule` is run once for every rule, for every cell, for every timestep, unless an
     optimisation like `SparseOpt` is enable to skips empty cells.
-- the output of running a rule for any cell does not affect the input of the 
+- the output of running a rule for any cell does not affect the input of the
     same rule running anywhere else in the grid.
 - rules later in the sequence are passed grid state updated by the earlier rules.
 - masked areas and wrapped or removed boundary regions are updated between all rules and timesteps
@@ -37,7 +37,7 @@ DynamicGrids guarantees that:
 ## Multiple grids
 
 The `NamedTuple` keys will match the keys in `R`, which is a type like `Tuple{:key1,:key1}`.
-Note the names are user-specified, and should never be fixed by a `Rule`. 
+Note the names are user-specified, and should never be fixed by a `Rule`.
 
 They can be retrieved from the type here as `A` and `B` :
 
@@ -51,7 +51,7 @@ the `W` type params.
 
 ## Rule Performance
 
-Rules may run many millions of times during a simulation. They need to be fast. 
+Rules may run many millions of times during a simulation. They need to be fast.
 Some basic guidlines for writing rules are:
 
 - Never allocate memory in a `Rule` if you can help it.
@@ -61,7 +61,7 @@ Some basic guidlines for writing rules are:
     code into the simulation.
 - Reading and writing from multiple grids is expensive due to additional load
     on fast cahce memory. Try to limit the number of grids you use.
-- Use a graphical profiler, like ProfileView.jl, to check your rules overall 
+- Use a graphical profiler, like ProfileView.jl, to check your rules overall
     performance when run with `sim!`.
 
 """
@@ -216,10 +216,9 @@ DynamicGrids guarantees that:
 
 - values written to anywhere on the grid do not affect other cells in
     the same rule at the same timestep.
-- values written to anywhere on the grid are available to the next rule in the 
+- values written to anywhere on the grid are available to the next rule in the
     sequence, or the next timestep.
 - if atomic operators are always used, race conditions will not occur on any hardware.
-
 """
 abstract type SetCellRule{R,W} <: SetRule{R,W} end
 
@@ -243,7 +242,7 @@ For each cell in the grids the neighborhood buffer will be updated
 for use in the `applyrule` method, managed to minimise array reads.
 
 This allows memory optimisations and the use of high perforance routines on the
-neighborhood buffer. It also means that and no bounds checking is required in 
+neighborhood buffer. It also means that and no bounds checking is required in
 neighborhood code.
 
 For neighborhood rules with multiple read grids, the first is always
@@ -258,6 +257,7 @@ neighbors(rule::NeighborhoodRule) = neighbors(neighborhood(rule))
 neighborhood(rule::NeighborhoodRule) = rule.neighborhood
 offsets(rule::NeighborhoodRule) = offsets(neighborhood(rule))
 kernel(rule::NeighborhoodRule) = kernel(neighborhood(rule))
+kernelproduct(rule::NeighborhoodRule) = kernelproduct(neighborhood(rule))
 positions(rule::NeighborhoodRule, args...) = positions(neighborhood(rule), args...)
 neighborhoodkey(rule::NeighborhoodRule{R,W}) where {R,W} = R
 # The first argument is for the neighborhood grid
@@ -270,12 +270,12 @@ radius(rule::NeighborhoodRule, args...) = radius(neighborhood(rule))
 """
     SetNeighborhoodRule <: SetRule
 
-A Rule that only writes to its neighborhood.
+A `SetRule` that only writes to its neighborhood.
 
 [`positions`](@ref) and [`offsets`](@ref) are useful iterators for modifying
-neighborhood values. Atomic
+neighborhood values. 
 
-`SetNeighborhood` rules must return a `Neighborhood` object from `neighborhood(rule)`.
+`SetNeighborhoodRule` rules must return a `Neighborhood` object from `neighborhood(rule)`.
 By default this is `rule.neighborhood`. If this property exists, no interface methods
 are required.
 """
@@ -531,24 +531,20 @@ end
     Convolution(f, neighborhood=Moore(1))
     Convolution{R,W}(f, neighborhood=Moore(1))
 
-A `Rule` that runs a basic convolution kernel over the grid.
+A `NeighborhoodRule` that runs a basic convolution kernel over the grid.
 
 # Performance
 
 _Always_ use StaticArrays.jl to define the kernel matrix.
 
-Small radius convolutions in DynamicGrids.jl will be faster or comparable to using
-DSP.jl or ImageConvolutions.jl. As the radius increases or grid size gets very large
-these packages will be a lot faster.
+Small radius convolutions in DynamicGrids.jl will be comparable or even faster than using
+DSP.jl or ImageConvolutions.jl. As the radius increases these packages will be a lot faster.
 
 But `Convolution` is convenient to chain into a simulation, and combined with some other
-rules. It should perform reasonably well in all but very large simulations or very large
-kernels.
+rules. It should perform reasonably well with all but very large kernels.
 
 ## Example
-
-```julia
-rule = Convolution(Kernel(SA[0.05 0.1 0.05; 0.1 0.4 0.1; 0.05 0.1 0.05]))
+```julia rule = Convolution(Kernel(SA[0.05 0.1 0.05; 0.1 0.4 0.1; 0.05 0.1 0.05]))
 ```
 """
 struct Convolution{R,W,N} <: NeighborhoodRule{R,W}
@@ -558,7 +554,7 @@ end
 Convolution{R,W}(A::AbstractArray) where {R,W} = Convolution{R,W}(Kernel(SMatrix{size(A)...}(A)))
 Convolution{R,W}(; neighborhood) where {R,W} = Convolution{R,W}(neighborhood)
 
-@inline applyrule(data, rule::Convolution, read, I) = dot(neighborhood(rule))
+@inline applyrule(data, rule::Convolution, read, I) = kernelproduct(neighborhood(rule))
 
 # Utils
 

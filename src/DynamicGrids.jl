@@ -36,7 +36,9 @@ import Base: show, getindex, setindex!, lastindex, size, length, push!, append!,
 
 export sim!, resume!, step!, savegif, isinferred
 
-export rules, neighbors, neighborhood, offsets, positions, radius, inbounds, isinbounds 
+export rules, neighbors, neighborhood, kernel, kernelproduct, offsets, positions, radius 
+
+export inbounds, isinbounds 
 
 export gridsize, currentframe, currenttime, currenttimestep, timestep
 
@@ -50,8 +52,8 @@ export RuleWrapper, Chain, RunIf, RunAt
 
 export AbstractRuleset, Ruleset, StaticRuleset
 
-export Neighborhood, RadialNeighborhood, Window, AbstractKernel, Kernel,
-       Moore, AbstractPositional, Positional, VonNeumann, LayeredPositional
+export Neighborhood, RadialNeighborhood, Window, AbstractKernelNeighborhood, Kernel,
+       Moore, AbstractPositionalNeighborhood, Positional, VonNeumann, LayeredPositional
 
 export Processor, SingleCPU, ThreadedCPU
 
