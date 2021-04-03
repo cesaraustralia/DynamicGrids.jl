@@ -1,4 +1,4 @@
-using Documenter, DynamicGrids, KernelAbstractions
+using Documenter, DynamicGrids, CUDAKernels
 
 makedocs(
     modules = [DynamicGrids],
