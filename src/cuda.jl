@@ -1,7 +1,4 @@
-using KernelAbstractions
-
-using KernelAbstractions.Adapt
-using KernelAbstractions.CUDA
+using KernelAbstractions, .CUDAKernels, .CUDAKernels.CUDA
 import ModelParameters.Flatten
 
 """
@@ -37,8 +34,8 @@ output = sim!(output, rule; proc=ThreadedCPU())
 struct CuGPU{X} <: GPU end
 CuGPU() = CuGPU{32}()
 
-kernel_setup(::CPUGPU) where N = KernelAbstractions.CPU(), 1
-kernel_setup(::CuGPU{N}) where N = KernelAbstractions.CUDADevice(), N
+kernel_setup(::CPUGPU) = KernelAbstractions.CPU(), 1
+kernel_setup(::CuGPU{N}) where N = CUDAKernels.CUDADevice(), N
 
 function Adapt.adapt_structure(to, x::Union{AbstractSimData,GridData,Rule})
     Flatten.modify(A -> adapt(to, A), x, Union{CuArray,Array,AbstractDimArray}, SArray)
@@ -60,16 +57,7 @@ end
     Flatten.modify(CuArray, obj, Union{Array,BitArray}, Union{CuArray,SArray,Dict})
 end
 
-function _copyto_output!(outgrid, grid, proc::GPU)
-    src = adapt(Array, source(grid))
-    copyto!(outgrid, CartesianIndices(outgrid), src, CartesianIndices(outgrid))
-    return nothing
-end
-function _copyto_output!(outgrid::CuArray, grid, proc::CuGPU)
-    gridindices = CartesianIndices(map(a -> a .+ radius(grid), axes(outgrid)))
-    copyto!(outgrid, CartesianIndices(outgrid), parent(source(grid)), gridindices)
-    return nothing
-end
+_copyto_output!(outgrid, grid::GridData, proc::GPU) = copyto!(outgrid, gridview(grid))
 
 function maprule!(
     wgrids::Union{<:GridData{Y,X,R},Tuple{<:GridData{Y,X,R},Vararg}},

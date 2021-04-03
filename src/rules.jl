@@ -337,10 +337,11 @@ end
 SetGrid{R,W}(; kw...) where {R,W} = _nofunctionerror(SetGrid)
 
 @inline function applyrule!(data, rule::SetGrid{R,W}) where {R,W}
-    rule.f(
-        map(r -> source(getindex(data, r)), _asiterable(R))...,
-        map(w -> source(getindex(data, w)), _asiterable(W))...,
-    )
+    let data = data, rule=rule
+        read = map(r -> source(getindex(data, r)), _asiterable(R))
+        write = map(w -> source(getindex(data, w)), _asiterable(W))
+        rule.f(read..., write...)
+    end
 end
 
 

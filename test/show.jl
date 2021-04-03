@@ -4,7 +4,6 @@ import DynamicGrids: Remove, NoOpt
 life = Life() 
 @test occursin("Life{:_default_,:_default_}", sprint((io, s) -> show(io, MIME"text/plain"(), s), life))
 
-
 rs = Ruleset(; 
     rules=(Life(),), 
     timestep=Day(1), 
@@ -24,7 +23,7 @@ end
 rule2 = Cell{Tuple{:b,:d},:c}() do b, d
     b + d
 end
-@test occursin("Cell{Tuple{:b,:d},:c}", sprint((io, s) -> show(io, MIME"text/plain"(), s), rule2))
+@test occursin("Cell{Tuple{:b, :d},:c}", sprint((io, s) -> show(io, MIME"text/plain"(), s), rule2))
 
 chain = Chain(rule1, rule2)
 

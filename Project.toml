@@ -35,7 +35,7 @@ DimensionalData = "0.14, 0.15, 0.16"
 DocStringExtensions = "0.8"
 FileIO = "1"
 FreeTypeAbstraction = "^0.6.5, 0.8"
-KernelAbstractions = "0.5"
+KernelAbstractions = "0.6"
 ModelParameters = "0.3"
 OffsetArrays = "0.11, 1.0"
 Reexport = "0.2, 1.0"
@@ -48,6 +48,7 @@ julia = "1.2, 1.3, 1.4, 1.5"
 [extras]
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+CUDAKernels = "72cfdca4-0801-4ab0-bf6a-d52aa10adc57"
 ColorSchemes = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
 FixedPointNumbers = "53c48c17-4a7d-5ca2-90c5-79b7896eea93"
 ImageMagick = "6218d12a-5da1-5696-b52f-db25d2ecc6d1"
@@ -56,4 +57,4 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [targets]
-test = ["Aqua", "BenchmarkTools", "ColorSchemes", "FixedPointNumbers", "ImageMagick", "SafeTestsets", "StaticArrays", "Unitful"]
+test = ["Aqua", "BenchmarkTools", "ColorSchemes", "CUDAKernels", "FixedPointNumbers", "ImageMagick", "SafeTestsets", "StaticArrays", "Unitful"]

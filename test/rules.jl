@@ -1,8 +1,15 @@
 using DynamicGrids, ModelParameters, Setfield, Test, StaticArrays, 
-      LinearAlgebra, KernelAbstractions
+      LinearAlgebra, CUDAKernels
 import DynamicGrids: applyrule, applyrule!, maprule!, ruletype, extent, source, dest,
        _getreadgrids, _getwritegrids, _combinegrids, _readkeys, _writekeys,
        SimData, WritableGridData, Rule, Extent
+
+if CUDAKernels.CUDA.has_cuda_gpu()
+    CUDAKernels.CUDA.allowscalar(false)
+    hardware = (SingleCPU(), ThreadedCPU(), CuGPU())
+else
+    hardware = (SingleCPU(), ThreadedCPU(), CPUGPU())
+end
 
 init  = [0 1 1 0
          0 1 1 0
@@ -109,7 +116,7 @@ end
     end
     output = ArrayOutput(init; tspan=1:2)
     data = SimData(output, Ruleset(rule)) 
-    for proc in (SingleCPU(), CPUGPU(), ThreadedCPU()), opt in (NoOpt(), SparseOpt())
+    for proc in hardware, opt in (NoOpt(), SparseOpt())
         @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
             # Cant use applyrule! without a lot of work on SimData
             # so just trun the whole thing
@@ -138,7 +145,7 @@ end
                 isinbounds(data, pos) && add!(first(data), 1, pos...)
             end
         end
-        for proc in (SingleCPU(), CPUGPU(), ThreadedCPU()), opt in (NoOpt(), SparseOpt())
+        for proc in hardware, opt in (NoOpt(), SparseOpt())
             @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
                 sim!(output, rule; proc=proc, opt=opt)
                 ref_out = [0 1 0 0
@@ -178,7 +185,7 @@ end
              0 1 0 0
              0 0 1 0]
     output = ArrayOutput(init; tspan=1:2)
-    for proc in (SingleCPU(), CPUGPU(), ThreadedCPU()), opt in (NoOpt(), SparseOpt())
+    for proc in hardware, opt in (NoOpt(), SparseOpt())
         @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
             sim!(output, rule; proc=proc, opt=opt)
             @test output[2] == [0 2 0 0
@@ -300,14 +307,14 @@ applyrule!(data, ::TestSetCellWrite{R,W}, state, index) where {R,W} = add!(data[
              0 5 1 0;
              0 5 1 0;
              0 5 1 0]
-    for proc in (SingleCPU(), CPUGPU(), ThreadedCPU()), opt in (NoOpt(), SparseOpt())
+    for proc in hardware, opt in (NoOpt(), SparseOpt())
         @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
             rule = TestSetCellWrite()
             ruleset = Ruleset(rule; opt=opt, proc=proc)
             ext = Extent(; init=(_default_=init,), tspan=1:1)
-            simdata = SimData(ext, ruleset)
-            resultdata = maprule!(simdata, rule)
-            @test source(first(resultdata)) == final
+            simdata = DynamicGrids._proc_setup(SimData(ext, ruleset));
+            resultdata = maprule!(simdata, rule);
+            @test Array(source(first(resultdata))) == final
         end
     end
 end
@@ -323,14 +330,14 @@ applyrule(data, ::TestCellSquare, (state,), index) = state^2
              4 5 6 7]
     final = [0 9 36 81;
              144 225 324 441]
-    for proc in (SingleCPU(), CPUGPU(), ThreadedCPU()), opt in (NoOpt(), SparseOpt())
+    for proc in hardware, opt in (NoOpt(), SparseOpt())
         @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
             rule = Chain(TestCellTriple(), TestCellSquare())
             ruleset = Ruleset(rule; opt=opt, proc=proc)
             ext = Extent(; init=(_default_=init,), tspan=1:1)
-            simdata = SimData(ext, ruleset)
+            simdata = DynamicGrids._proc_setup(SimData(ext, ruleset))
             resultdata = maprule!(simdata, rule);
-            @test source(first(resultdata)) == final
+            @test Array(source(first(resultdata))) == final
         end
     end
 end
@@ -348,7 +355,7 @@ applyrule(data, rule::PrecalcRule, state, index) = rule.precalc[]
              2 2]
     out3  = [3 3;
              3 3]
-    for proc in (SingleCPU(), CPUGPU(), ThreadedCPU()), opt in (NoOpt(), SparseOpt())
+    for proc in hardware, opt in (NoOpt(), SparseOpt())
         @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
             rule = PrecalcRule(1)
             ruleset = Ruleset(rule; proc=proc, opt=opt)
@@ -393,7 +400,7 @@ end
     init = (prey=[10. 10.], predator=[1. 0.])
     rules = DoubleY{Tuple{:predator,:prey},:prey}(), predation
     output = ArrayOutput(init; tspan=1:3)
-    for proc in (SingleCPU(), CPUGPU(), ThreadedCPU()), opt in (NoOpt(), SparseOpt())
+    for proc in hardware, opt in (NoOpt(), SparseOpt())
         @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
             sim!(output, rules; opt=opt, proc=proc)
             @test output[2] == (prey=[18. 20.], predator=[2. 0.])
@@ -405,7 +412,7 @@ end
 @testset "Multi-grid rules work" begin
     init = (prey=[10. 10.], predator=[0. 0.])
     output = ArrayOutput(init; tspan=1:3)
-    for proc in (SingleCPU(), CPUGPU(), ThreadedCPU()), opt in (NoOpt(), SparseOpt())
+    for proc in hardware, opt in (NoOpt(), SparseOpt())
         @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
             ruleset = Ruleset((HalfX{:prey,Tuple{:prey,:predator}}(),); opt=opt, proc=proc)
             sim!(output, ruleset)

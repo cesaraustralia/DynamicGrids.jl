@@ -3,11 +3,10 @@
 @inline inbounds(data::Union{GridData,SimData}, I...) = 
     _inbounds(boundary(data), gridsize(data), I...)
 
-@inline function _inbounds(boundary::BoundaryCondition, size::Tuple, I...)
-    reduce(zip(size, I); init=((), true)) do (I, inbounds_acc), (s, i)
-        ii, inbounds = _inbounds(boundary, s, i)
-        ((I..., ii), inbounds_acc & inbounds)
-    end
+@inline function _inbounds(boundary::BoundaryCondition, size::Tuple, i1, i2)
+    a, inbounds_a = _inbounds(boundary, size[1], i1)
+    b, inbounds_b = _inbounds(boundary, size[2], i2)
+    (a, b), inbounds_a & inbounds_b
 end
 @inline _inbounds(::Remove, size::Number, i::Number) = i, _isinbounds(size, i)
 @inline function _inbounds(::Wrap, size::Number, i::Number)

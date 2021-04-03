@@ -57,6 +57,14 @@ end
 function Base.copy!(A::AbstractArray, grid::GridData{<:Any,<:Any,R}) where R
     pad_axes = map(ax -> ax .+ R, axes(A))
     copyto!(A, CartesianIndices(A), parent(source(grid)), CartesianIndices(pad_axes))
+    return A
+end
+function Base.copy!(A::AbstractDimArray{T,N}, grid::GridData{<:Any,<:Any,R}) where {T,N,R}
+    copy!(parent(A), grid)
+    return A
+end
+function Base.copy!(grid::GridData{<:Any,<:Any,R}, A::AbstractDimArray{T,N}) where {R,T,N}
+    copy!(grid, parent(A))
     return grid
 end
 function Base.copy!(dst::GridData{<:Any,<:Any,RD}, src::GridData{<:Any,<:Any,RS}) where {RD,RS}
@@ -65,7 +73,7 @@ function Base.copy!(dst::GridData{<:Any,<:Any,RD}, src::GridData{<:Any,<:Any,RS}
     copyto!(parent(source(dst)), CartesianIndices(dst_axes), 
             parent(source(src)), CartesianIndices(src_axes)
     )
-    return grid
+    return dst
 end
 
 @propagate_inbounds Base.getindex(d::GridData, I...) = getindex(source(d), I...)
