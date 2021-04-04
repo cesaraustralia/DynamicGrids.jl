@@ -147,19 +147,11 @@ DynamicGrids.WritableGridData
 Neighborhood
 RadialNeighborhood
 Moore
-VonNeumann
 Window
-AbstractPositional
+AbstractPositionalNeighborhood
 Positional
+VonNeumann
 LayeredPositional
-```
-
-### Convolution kernel neighborhoods
-
-```
-AbstractKernel
-Kernel
-kernelproduct
 ```
 
 ### Methods for use with neighborhood rules and neighborhoods
@@ -167,10 +159,20 @@ kernelproduct
 These are especially useful with [`SetNeighborhoodRule`](@ref).
 
 ```@docs
-DynamicGrids.radius
-DynamicGrids.neighbors
-DynamicGrids.positions
-DynamicGrids.offsets
+neighborhood
+neighbors
+positions
+offsets
+radius
+```
+
+### Convolution kernel neighborhoods
+
+```@docs
+AbstractKernelNeighborhood
+Kernel
+kernel
+kernelproduct
 ```
 
 ### Atomic methods for SetCellRule and SetNeighborhoodRule
