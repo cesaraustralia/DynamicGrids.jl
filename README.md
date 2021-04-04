@@ -12,6 +12,9 @@ range of behaviours like random jumps and interactions between multiple grids.
 It is extended by [Dispersal.jl](https://github.com/cesaraustralia/Dispersal.jl)
 for modelling organism dispersal processes.
 
+DynamicGrids can run rules on single CPUs, threaded CPUs, and on CUDA GPUs. 
+Simulation run-time is usually measured in fractions of a second.
+
 ![Dispersal quarantine](https://raw.githubusercontent.com/cesaraustralia/DynamicGrids.jl/media/dispersal_quarantine.gif)
 
 *A dispersal simulation with quarantine interactions, using Dispersal.jl, custom rules and the 
