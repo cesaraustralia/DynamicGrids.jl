@@ -35,7 +35,7 @@ struct CuGPU{X} <: GPU end
 CuGPU() = CuGPU{32}()
 
 kernel_setup(::CPUGPU) = KernelAbstractions.CPU(), 1
-kernel_setup(::CuGPU{N}) where N = CUDAKernels.CUDADevice(), N
+kernel_setup(::CuGPU{N}) where N = CUDAKernels.CUDADevice(), (N, N)
 
 function Adapt.adapt_structure(to, x::Union{AbstractSimData,GridData,Rule})
     Flatten.modify(A -> adapt(to, A), x, Union{CuArray,Array,AbstractDimArray}, SArray)
@@ -72,7 +72,6 @@ function maprule!(
 ) where {Y,X,R}
     grid = simdata[neighborhoodkey(rule)]
     kernel! = cu_neighborhood_kernel!(kernel_setup(proc)...)
-    # n = _indtoblock.(gridsize(simdata), 8) .- 1
     n = gridsize(simdata)
     kernel!(wgrids, simdata, grid, opt, ruletype, rule, args..., ndrange=n) |> wait
     return nothing
@@ -83,10 +82,20 @@ end
 ) where {Y,X,R}
     I, J = @index(Global, NTuple)
     src = parent(source(grid))
-    @inbounds buf = view(src, I:I+2R, J:J+2R)
+    buf = _getwindow(src, Val{R}(), I, J)
     bufrule = _setbuffer(rule, buf)
     cell_kernel!(wgrids, data, ruletype, bufrule, args..., I, J)
     nothing
+end
+
+@generated function _getwindow(tile::AbstractArray{T}, ::Val{R}, i, j) where {T,R}
+    S = 2R+1
+    L = S^2
+    vals = Expr(:tuple)
+    for jj in 1:S, ii in 1:S 
+        push!(vals.args, :(@inbounds tile[$ii + i - 1, $jj + j - 1]))
+    end
+    return :(SMatrix{$S,$S,$T,$L}($vals))
 end
 
 @kernel function cu_cell_kernel!(wgrids, simdata, ruletype::Val, rule, rkeys, rgrids, wkeys)
@@ -94,34 +103,6 @@ end
     cell_kernel!(wgrids, simdata, ruletype, rule, rkeys, rgrids, wkeys, i, j)
     nothing
 end
-
-# @kernel function cu_cell_kernel!(
-#     simdata::SimData, grid::GridData{Y,X,1}, rule::NeighborhoodRule,
-#     rkeys, rgrids, wkeys, wgrids
-# ) where {Y,X}
-#     gi, gj = @index(Group, NTuple)
-#     i, j = @index(Local,  NTuple)
-#     N = @uniform groupsize()[1]
-#     M = @uniform groupsize()[2]
-#     # +1 to avoid bank conflicts on shared memory
-#     tile = @localmem eltype(src) 8, 8
-#     for n in 1:4 
-#         b = ((i - 1) & 1)
-#         k = 4b + n
-#         l = 2j + b - 1
-#         @inbounds tile[k, l] = src[(gi-1) * N + k, (gi-1) * N + l]
-#     end
-#     @synchronize
-#     # Manually calculate global indexes
-#     I = (gi-1) * N + i
-#     J = (gj-1) * M + j
-#     @inbounds buf = view(tile, i:i+2, j:j+2)
-#     bufrule = setbuffer(rule, buf)
-#     readval = _readgrids(rkeys, rgrids, I, J)
-#     writeval = applyrule(simdata, bufrule, readval, (I, J))
-#     _writegrids!(wgrids, writeval, I, J)
-#     nothing
-# end
 
 for (f, op) in atomic_ops
     atomic_f = Symbol(:atomic_, f)
