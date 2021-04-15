@@ -38,7 +38,7 @@ kernel_setup(::CPUGPU) = KernelAbstractions.CPU(), 1
 kernel_setup(::CuGPU{N}) where N = CUDAKernels.CUDADevice(), (N, N)
 
 function Adapt.adapt_structure(to, x::Union{AbstractSimData,GridData,Rule})
-    Flatten.modify(A -> adapt(to, A), x, Union{CuArray,Array,AbstractDimArray}, SArray)
+    Flatten.modify(A -> adapt(to, A), x, Union{CuArray,Array,AbstractDimArray}, Union{SArray,Function})
 end
 
 function Adapt.adapt_structure(to, o::Output)
@@ -54,7 +54,7 @@ function Adapt.adapt_structure(to, o::Output)
 end
 
 @noinline function _proc_setup(::CuGPU, obj) 
-    Flatten.modify(CuArray, obj, Union{Array,BitArray}, Union{CuArray,SArray,Dict})
+    Flatten.modify(CuArray, obj, Union{Array,BitArray}, Union{CuArray,SArray,Dict,Function})
 end
 
 _copyto_output!(outgrid, grid::GridData, proc::GPU) = copyto!(outgrid, gridview(grid))
