@@ -15,7 +15,10 @@ imagesize(::ImageGenerator, init::AbstractArray) = size(init)
 _allocimage(p::ImageGenerator, init) = fill(ARGB32(0), imagesize(p, init)...)
 
 function grid_to_image!(o::ImageOutput, data::SimData)
-    grid_to_image!(imagebuffer(o), imagegen(o), o, data, grids(data))
+    grid_to_image!(o, data, grids(data))
+end
+function grid_to_image!(o::ImageOutput, data::SimData, grids)
+    grid_to_image!(imagebuffer(o), imagegen(o), o, data, grids)
 end
 
 """
@@ -30,27 +33,27 @@ used with a `NamedTuple` of grids.
 abstract type SingleGridImageGenerator <: ImageGenerator end
 
 function grid_to_image!(
-    imagebuffer, p::SingleGridImageGenerator, o::ImageOutput, data::SimData, 
+    imagebuffer, ig::SingleGridImageGenerator, o::ImageOutput, data::SimData, 
     grids::NamedTuple;
     name=string(first(keys(grids))), time=currenttime(data)
 )
-    grid_to_image!(imagebuffer, p, o, data, first(grids); name=name, time=time)
+    grid_to_image!(imagebuffer, ig, o, data, first(grids); name=name, time=time)
 end
 function grid_to_image!(
-    imagebuffer, p::SingleGridImageGenerator, o::ImageOutput, data::SimData, 
+    imagebuffer, ig::SingleGridImageGenerator, o::ImageOutput, data::SimData, 
     grids::NamedTuple{(:_default_,)};
     name=nothing, time=currenttime(data)
 )
-    grid_to_image!(imagebuffer, p, o, data, first(grids); name=name, time=time)
+    grid_to_image!(imagebuffer, ig, o, data, first(grids); name=name, time=time)
 end
 function grid_to_image!(
-    imagebuffer, p::SingleGridImageGenerator, o::ImageOutput, 
+    imagebuffer, ig::SingleGridImageGenerator, o::ImageOutput, 
     data::SimData{Y,X}, grid::AbstractArray; 
     name=nothing, time=currenttime(data), minval=minval(o), maxval=maxval(o),
 ) where {Y,X}
     for j in 1:X, i in 1:Y
         @inbounds val = grid[i, j]
-        pixel = to_rgb(cell_to_pixel(p, mask(o), minval, maxval, data, val, (i, j)))
+        pixel = to_rgb(cell_to_pixel(ig, mask(o), minval, maxval, data, val, (i, j)))
         @inbounds imagebuffer[i, j] = pixel
     end
     _rendertext!(imagebuffer, textconfig(o), name, time)
@@ -78,6 +81,7 @@ Base.@kwdef struct Image{S,Z,M} <: SingleGridImageGenerator
     maskcolor::M   = MASKCOL
 end
 Image(scheme, zerocolor=ZEROCOL) = Image(scheme, zerocolor, MASKCOL)
+#Image(scheme; zerocolor=ZEROCOL, maskcolor=MASKCOL) = Image(scheme, zerocolor, maskcolor)
 
 scheme(p::Image) = p.scheme
 zerocolor(p::Image) = p.zerocolor
@@ -86,17 +90,17 @@ maskcolor(p::Image) = p.maskcolor
 # Show colorscheme in Atom etc
 Base.show(io::IO, m::MIME"image/svg+xml", p::Image) = show(io, m, scheme(p))
 
-@inline function cell_to_pixel(p::Image, mask, minval, maxval, data::SimData, val, I)
-    if !(maskcolor(p) isa Nothing) && ismasked(mask, I...)
-        to_rgb(maskcolor(p))
+@inline function cell_to_pixel(ig::Image, mask, minval, maxval, data::SimData, val, I)
+    if !(maskcolor(ig) isa Nothing) && ismasked(mask, I...)
+        to_rgb(maskcolor(ig))
     else
         normval = normalise(val, minval, maxval)
-        if !(zerocolor(p) isa Nothing) && normval == zero(typeof(normval))
-            to_rgb(zerocolor(p))
+        if !(zerocolor(ig) isa Nothing) && normval == zero(typeof(normval))
+            to_rgb(zerocolor(ig))
         elseif normval isa Number && isnan(normval)
-            zerocolor(p) isa Nothing ? to_rgb(scheme(p), 0) : to_rgb(zerocolor(p))
+            zerocolor(ig) isa Nothing ? to_rgb(scheme(ig), 0) : to_rgb(zerocolor(ig))
         else
-            to_rgb(scheme(p), normval)
+            to_rgb(scheme(ig), normval)
         end
     end
 end
@@ -176,7 +180,7 @@ imagegens(p::Layout) = p.imagegens
 imagesize(p::Layout, init::NamedTuple) = size(first(init)) .* size(p.layout)
 
 function grid_to_image!(
-    imagebuffer, p::Layout, o::ImageOutput, data::SimData, grids::NamedTuple
+    imagebuffer, l::Layout, o::ImageOutput, data::SimData, grids::NamedTuple
 )
     ngrids = length(grids)
     if !(minval(o) isa Nothing)
@@ -186,7 +190,7 @@ function grid_to_image!(
         length(maxval(o)) == ngrids || _wronglengtherror(maxval, ngrids, length(maxval(o)))
     end
 
-    grid_ids = layout(p)
+    grid_ids = layout(l)
     # Loop over the layout matrix
     for i in 1:size(grid_ids, 1), j in 1:size(grid_ids, 2)
         grid_id = grid_ids[i, j]
@@ -204,7 +208,7 @@ function grid_to_image!(
         end
         # Run image generators for section
         grid_to_image!(
-            view(imagebuffer, I, J), imagegens(p)[n], o, data, grids[n];
+            view(imagebuffer, I, J), imagegens(l)[n], o, data, grids[n];
             name=string(keys(grids)[n]), time=nothing,
             minval=_valn(minval(o), n), maxval=_valn(maxval(o), n), 
         )

@@ -86,16 +86,6 @@ end
     gif = load("test.gif")
     @test gif == RGB.(ref)
     rm("test.gif")
-
-    arrayoutput = ArrayOutput(init_; tspan=1:1)
-    @test minval(arrayoutput) == nothing
-    @test maxval(arrayoutput) == nothing
-    @test imagegen(arrayoutput) isa Image
-    @test fps(arrayoutput) === nothing
-    savegif("test2.gif", arrayoutput; maxval=40.0, imagegen=imgen, text=nothing)
-    gif = load("test2.gif")
-    @test gif == RGB.(ref)
-    rm("test2.gif")
 end
 
 @testset "Image generator" begin
@@ -297,3 +287,24 @@ end
         @test DynamicGrids.imagesize(imagegen(output), multiinit) == (2, 4)
     end
 end
+
+@testset "simulation savegif from ArrayOutput" begin
+    init_ = Bool[
+        0 0 0 0 0
+        0 0 1 1 1
+        0 0 0 0 1
+        0 0 0 1 0
+    ]
+    ig = Image(zerocolor=RGB(0.0))
+    output = ArrayOutput(init_; tspan=1:10)
+    @test minval(output) == nothing
+    @test maxval(output) == nothing
+    @test imagegen(output) isa Image
+    @test fps(output) === nothing
+    sim!(output, Life())
+    savegif("test2.gif", output; imagegen=Image(zerocolor=RGB(0.0)), text=nothing)
+    gif = load("test2.gif")
+    @test gif[:, :, 1] == RGB.(cat(output...; dims=3))[:, :, 1]
+    rm("test2.gif")
+end
+
