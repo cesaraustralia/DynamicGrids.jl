@@ -10,9 +10,15 @@ The main kinds of neighborhood are demonstrated below:
 
 ![Neighborhoods](https://raw.githubusercontent.com/cesaraustralia/DynamicGrids.jl/media/Neighborhoods.png)
 
-```julia
-Moore{3}()
-```
+Neighborhoods can be used in [`NeighborhoodRule`](@ref) and [`SetNeighborhoodRule`](@ref) -
+the same shapes with different purposes. In a `NeighborhoodRule` the neighborhood specifies
+which cells around the current cell are returned as an iterable from the `neighbors` function. 
+These can be counted, summed, compared, or multiplied with a kernel in an 
+`AbstractKernelNeighborhood`, using [`kernelproduct`](@ref).
+
+In `SetNeighborhoodRule` neighborhoods give the locations of cells around the central cell,
+as [`offsets`] and absolute [`positions`](@ref) around the index of each neighbor. These
+can then be written to manually.
 """
 abstract type Neighborhood{R,L} end
 
@@ -176,8 +182,7 @@ from the central point.
 
 The neighborhood radius is calculated from the most distance coordinate.
 For simplicity the buffer read from the main grid is a square with sides
-`2r + 1` around the central point, and is not shrunk or offset to match the
-coordinates if they are not symmetrical.
+`2r + 1` around the central point.
 """
 struct Positional{R,L,O<:CustomOffsets,B} <: AbstractPositionalNeighborhood{R,L}
     "A tuple of tuples of Int, containing 2-D coordinates relative to the central point"

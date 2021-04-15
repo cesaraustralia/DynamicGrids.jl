@@ -156,14 +156,22 @@ LayeredPositional
 
 ### Methods for use with neighborhood rules and neighborhoods
 
-These are especially useful with [`SetNeighborhoodRule`](@ref).
-
 ```@docs
 neighborhood
+radius
+```
+
+Useful with [`NeighborhoodRule`](@ref):
+
+```@docs
 neighbors
+```
+
+Useful with [`SetNeighborhoodRule`](@ref):
+
+```@docs
 positions
 offsets
-radius
 ```
 
 ### Convolution kernel neighborhoods

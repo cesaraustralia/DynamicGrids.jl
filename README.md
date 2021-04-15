@@ -168,16 +168,22 @@ from writing a custom output to reduce memory use, or using `TransformedOuput`.
 Performance of DynamicGrids.jl is dominated by cache interactions, so reducing 
 memory use has positive effects.
 
+
 ## Example
 
-This example implements a very simple forest fire model:
+This example implements the classic stochastic forest fire model in a few
+different ways, and benchmarks them.
+
+First we will define a Forest Fire algorithm that sets the current cell to
+burning, if a neighbor is burning. Dead cells can come back to life, and living
+cells can spontaneously catch fire:
 
 ```julia
-using DynamicGrids, DynamicGridsGtk, ColorSchemes, Colors
+using DynamicGrids, ColorSchemes, Colors, BenchmarkTools
 
 const DEAD, ALIVE, BURNING = 1, 2, 3
 
-rule = let prob_combustion=0.0001, prob_regrowth=0.01
+neighbors_rule = let prob_combustion=0.0001, prob_regrowth=0.01
     Neighbors(Moore(1)) do neighborhood, cell
         if cell == ALIVE
             if BURNING in neighborhood
@@ -195,29 +201,165 @@ end
 
 # Set up the init array and output (using a Gtk window)
 init = fill(ALIVE, 400, 400)
-processor = ColorProcessor(scheme=ColorSchemes.rainbow, zerocolor=RGB24(0.0))
-output = GtkOutput(init; tspan=1:200, fps=25, minval=DEAD, maxval=BURNING, processor=processor)
+output = GifOutput(init; 
+    filename="forestfire.gif", tspan=1:200, fps=25, 
+    minval=DEAD, maxval=BURNING, 
+    imagegen=Image(scheme=ColorSchemes.rainbow, zerocolor=RGB24(0.0))
+)
 
-# Run the simulation
-sim!(output, rule)
-
-# Save the output as a gif
-savegif("forestfire.gif", output)
+# Run the simulation, which will save a gif when it completes
+sim!(output, neighbors_rule)
 ```
 
 ![forestfire](https://user-images.githubusercontent.com/2534009/72052469-5450c580-3319-11ea-8948-5196d1c6fd33.gif)
 
-
-Timing the simulation for 200 steps, the performance is quite good:
+Timing the simulation for 200 steps, the performance is quite good. This
+particular CPU has six cores, and we get a 5.25x speedup by using all of them,
+which indicates good scaling:
 
 ```julia
-output = ArrayOutput(init; tspan=1:200)
-@time sim!(output, ruleset)
- 1.384755 seconds (640 allocations: 2.569 MiB)
+bench_output = ResultOutput(init; tspan=1:200)
+
+julia> @btime sim!($bench_output, $neighbors_rule);
+  477.183 ms (903 allocations: 2.57 MiB)
+
+julia> @btime sim!($bench_output, $neighbors_rule; proc=ThreadedCPU());
+  91.321 ms (15188 allocations: 4.07 MiB)
 ```
+
+We can also _invert_ the algorithm, setting cells in the neighborhood to burning
+if the current cell is burning, by using the `SetNeighbors` rule:
+
+```julia
+setneighbors_rule = let prob_combustion=0.0001, prob_regrowth=0.01
+    SetNeighbors(Moore(1)) do data, neighborhood, cell, I
+        if cell == DEAD
+            if rand() <= prob_regrowth
+                data[I...] = ALIVE
+            end
+        elseif cell == BURNING
+            for pos in positions(neighborhood, I)
+                if data[pos...] == ALIVE
+                    data[pos...] = BURNING
+                end
+            end
+            data[I...] = DEAD
+        elseif cell == ALIVE
+            if rand() <= prob_combustion 
+                data[I...] = BURNING
+            end
+        end
+    end
+end
+```
+
+_Note: we are not using `add!`, instead we just set the grid value directly.
+This usually risks errors if multiple cells set different values. Here they
+only ever set a currently dead cell to burning in the next timestep. It doesn't
+matter if this happens multiple times, the result is the same._
+
+And in this case (a fairly sparse simulation), this rule is faster:
+
+```julia
+julia> @btime sim!($bench_output, $setneighbors_rule);
+  261.969 ms (903 allocations: 2.57 MiB)
+
+julia> @btime sim!($bench_output, $setneighbors_rule; proc=ThreadedCPU());
+  65.489 ms (7154 allocations: 3.17 MiB)
+```
+
+But the scaling is not quite as good, at 3.9x for 6 cores. The first
+method may be better on a machine with a lot of cores.
+
+Last, we can slightly rewrite these rules for GPU, as `rand` is not available
+within a GPU kernel. Instead we call `CUDA.rand!` on the entire parent array
+of the `:rand` grid, using a `SetGrid` rule:
+
+```julia
+using CUDAKernels, CUDA
+
+randomiser = SetGrid{Tuple{},:rand}() do randgrid
+    CUDA.rand!(parent(randgrid))
+end
+```
+
+Now we define a Neighbors version for GPU, using the `:rand` grid values
+instead of `rand()`:
+
+```julia
+neighbors_gpu = let prob_combustion=0.0001, prob_regrowth=0.01
+    Neighbors{Tuple{:ff,:rand},:ff}(Moore(1)) do neighborhood, (cell, rand)
+        if cell == ALIVE
+            if BURNING in neighborhood
+                BURNING
+            else
+                rand <= prob_combustion ? BURNING : ALIVE
+            end
+        elseif cell == BURNING
+            DEAD
+        else
+            rand <= prob_regrowth ? ALIVE : DEAD
+        end
+    end
+end
+```
+
+And a SetNeighbors version for GPU:
+
+```julia
+setneighbors_gpu = let prob_combustion=0.0001, prob_regrowth=0.01
+    SetNeighbors{Tuple{:ff,:rand},:ff}(Moore(1)) do data, neighborhood, (cell, rand), I
+        if cell == DEAD
+            if rand <= prob_regrowth
+                data[:ff][I...] = ALIVE
+            end
+        elseif cell == BURNING
+            for pos in positions(neighborhood, I)
+                if data[:ff][pos...] == ALIVE
+                    data[:ff][pos...] = BURNING
+                end
+            end
+            data[:ff][I...] = DEAD
+        elseif cell == ALIVE
+            if rand <= prob_combustion 
+                data[:ff][I...] = BURNING
+            end
+        end
+    end
+end
+```
+
+Now we benchmark both version on a GTX 1080. Despite the overhead of reading and
+writing two grids, this turns out to be even faster again:
+
+```julia
+bench_output_rand = ResultOutput((ff=init, rand=zeros(size(init))); tspan=1:200)
+
+julia> @btime sim!($bench_output_rand, $randomiser, $neighbors_gpu; proc=CuGPU());
+  30.621 ms (186284 allocations: 17.19 MiB)
+
+julia> @btime sim!($bench_output_rand, $randomiser, $setneighbors_gpu; proc=CuGPU());
+  22.685 ms (147339 allocations: 15.61 MiB)
+```
+
+That is, we are running the rule at a rate of _1.4 billion times per second_.
+These timings could be improved (maybe 10-20%) by using grids of `Int32` or
+`Int16` to use less memory and cache. But we will stop here!
 
 ## Alternatives
 
-[Agents.jl](https://github.com/JuliaDynamics/Agents.jl) can also do cellular-automata style simulations. The design of Agents.jl is to iterate over a list of agents, instead of broadcasting over an array of cells. This approach is well suited to when you need to track the movement and details about individual agents throughout the simulation. 
+[Agents.jl](https://github.com/JuliaDynamics/Agents.jl) can also do
+cellular-automata style simulations. The design of Agents.jl is to iterate over
+a list of agents, instead of broadcasting over an array of cells. This approach
+is well suited to when you need to track the movement and details about
+individual agents throughout the simulation. 
 
-However, for simple grid models where you don't need to track individuals, DynamicGrids.jl is orders of magnitude faster than Agents.jl, and usually requires much less code to define a model. For low density simulations like the forest fire model above (especially with some optimisations and threading turned on), it can be an order of magnitude faster, while for higher activity rules like the game of life on a randomised grid, it is two to three, even four order of magnitude faster, increasing with grid size. If you are doing grid-based simulation and you don't need to track individual agents, DynamicGrids.jl is probably the best tool. For other use cases where you need to track individuals, try Agents.jl.
+However, for simple grid models where you don't need to track individuals,
+DynamicGrids.jl is orders of magnitude faster than Agents.jl, and usually
+requires less code to define a model. For low-density simulations like the
+forest fire model above, it can be one or two orders of magnitudes faster, while
+for higher activity rules like the game of life on a randomised grid, it is two
+to three, even four order of magnitude faster, increasing with grid size. If you
+are doing grid-based simulation and you don't need to track individual agents,
+DynamicGrids.jl is probably the best tool. For other use cases where you need to
+track individuals, try Agents.jl.
