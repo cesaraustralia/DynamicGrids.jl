@@ -255,7 +255,7 @@ end
 
 _Note: we are not using `add!`, instead we just set the grid value directly.
 This usually risks errors if multiple cells set different values. Here they
-only ever set a currently dead cell to burning in the next timestep. It doesn't
+only ever set a currently living cell to burning in the next timestep. It doesn't
 matter if this happens multiple times, the result is the same._
 
 And in this case (a fairly sparse simulation), this rule is faster:
