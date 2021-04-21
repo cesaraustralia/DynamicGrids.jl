@@ -76,7 +76,7 @@ end
     simdata2 = _initdata!(simdata, ext, rs)
     @test keys(simdata2) == (:_default_,)
     @test DynamicGrids.ruleset(simdata2) == DynamicGrids.StaticRuleset(rs)
-    @test DynamicGrids.init(simdata2[:_default_]) == [1 0]
+    @test DynamicGrids.init(simdata2)[:_default_] == [1 0]
     @test DynamicGrids.source(simdata2[:_default_]) == 
         OffsetArray([0 0 0 0
                      0 1 0 0

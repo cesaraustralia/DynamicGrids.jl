@@ -2,17 +2,18 @@
     AbstractRuleset <: ModelParameters.AbstractModel
 
 Abstract supertype for [`Ruleset`](@ref) objects and variants.
-"""
+""" 
 abstract type AbstractRuleset <: AbstractModel end
 
 # Getters
 ruleset(rs::AbstractRuleset) = rs
 rules(rs::AbstractRuleset) = rs.rules
-boundary(rs::AbstractRuleset) = rs.boundary
-proc(rs::AbstractRuleset) = rs.proc
-opt(rs::AbstractRuleset) = rs.opt
-cellsize(rs::AbstractRuleset) = rs.cellsize
-timestep(rs::AbstractRuleset) = rs.timestep
+settings(rs::AbstractRuleset) = rs.settings
+boundary(rs::AbstractRuleset) = boundary(settings(rs))
+proc(rs::AbstractRuleset) = proc(settings(rs))
+opt(rs::AbstractRuleset) = opt(settings(rs))
+cellsize(rs::AbstractRuleset) = cellsize(settings(rs))
+timestep(rs::AbstractRuleset) = timestep(settings(rs))
 radius(set::AbstractRuleset) = radius(rules(set))
 
 Base.step(rs::AbstractRuleset) = timestep(rs)
@@ -26,6 +27,7 @@ ModelParameters.setparent(rs::AbstractRuleset, rules) = @set rs.rules = rules
     Rulseset <: AbstractRuleset
 
     Ruleset(rules...; kw...)
+    Ruleset(rules, settings)
 
 A container for holding a sequence of `Rule`s and simulation
 details like boundary handing and optimisation.
@@ -44,34 +46,22 @@ Rules will be run in the order they are passed, ie. `Ruleset(rule1, rule2, rule3
 - `timestep`: fixed timestep where this is required for some rules. 
     eg. `Month(1)` or `1u"s"`.
 """
-Base.@kwdef mutable struct Ruleset{B<:BoundaryCondition,P<:Processor,Op<:PerformanceOpt,C,T} <: AbstractRuleset
+mutable struct Ruleset{S} <: AbstractRuleset
     # Rules in Ruleset are intentionally not type-stable.
     # But they are when rebuilt in a StaticRuleset later
-    rules::Tuple{Vararg{<:Rule}} = ()
-    boundary::B                  = Remove()
-    proc::P                      = SingleCPU()
-    opt::Op                      = NoOpt()
-    cellsize::C                  = 1
-    timestep::T                  = nothing
+    rules::Tuple{Vararg{<:Rule}}
+    settings::S
 end
-Ruleset(rules::Rule...; kw...) = Ruleset(; rules=rules, kw...)
-Ruleset(rules::Tuple; kw...) = Ruleset(; rules=rules, kw...)
-function Ruleset(rs::AbstractRuleset)
-    Ruleset(
-        rules(rs), boundary(rs), proc(rs), opt(rs), cellsize(rs), timestep(rs),
-    )
+Ruleset(rule1, rules::Rule...; kw...) = Ruleset((rule1, rules...); kw...)
+Ruleset(rules::Tuple; kw...) = Ruleset(rules, SimSettings(; kw...))
+Ruleset(rs::AbstractRuleset) = Ruleset(rules(rs), settings(rs))
+function Ruleset(; rules=(), settings=nothing, kw...) 
+    settings1 = settings isa Nothing ? SimSettings(; kw...) : settings
+    Ruleset(rules, settings1)
 end
 
-struct StaticRuleset{R<:Tuple,B<:BoundaryCondition,P<:Processor,Op<:PerformanceOpt,C,T} <: AbstractRuleset
+struct StaticRuleset{R<:Tuple,S} <: AbstractRuleset
     rules::R
-    boundary::B
-    proc::P
-    opt::Op
-    cellsize::C
-    timestep::T
+    settings::S
 end
-function StaticRuleset(rs::AbstractRuleset)
-    StaticRuleset(
-        rules(rs), boundary(rs), proc(rs), opt(rs), cellsize(rs), timestep(rs),
-    )
-end
+StaticRuleset(rs::AbstractRuleset) = StaticRuleset(rules(rs), settings(rs))

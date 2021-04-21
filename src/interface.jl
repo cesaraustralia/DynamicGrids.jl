@@ -1,5 +1,5 @@
 """
-    applyrule(data::SimData, rule::Rule{R,W}, state, index::Tuple{Int,Int}) -> cell value(s)
+    applyrule(data::AbstractSimData, rule::Rule{R,W}, state, index::Tuple{Int,Int}) -> cell value(s)
 
 Apply a rule to the cell state and return values to write to the grid(s).
 
@@ -7,7 +7,7 @@ This is called in `maprule!` methods during the simulation,
 not by the user. Custom `Rule` implementations must define this method.
 
 ### Arguments:
-- `data` : [`SimData`](@ref)
+- `data` : [`AbstractSimData`](@ref)
 - `rule` : [`Rule`](@ref)
 - `state`: the value(s) of the current cell
 - `index`: a (row, column) tuple of Int for the current cell coordinates
@@ -18,7 +18,7 @@ the grids specified by the `W` type parameter.
 function applyrule end
 
 """
-    applyrule!(data::SimData, rule::{R,W}, state, index::Tuple{Int,Int}) -> Nothing
+    applyrule!(data::AbstractSimData, rule::{R,W}, state, index::Tuple{Int,Int}) -> Nothing
 
 Apply a rule to the cell state and manually write to the grid data array.
 Used in all rules inheriting from [`SetCellRule`](@ref).
@@ -29,7 +29,7 @@ the user. Custom [`SetCellRule`](@ref) implementations must define this method.
 Only grids specified with the `W` type parameter will be writable from `data`.
 
 ### Arguments:
-- `data` : [`SimData`](@ref)
+- `data` : [`AbstractSimData`](@ref)
 - `rule` : [`Rule`](@ref)
 - `state`: the value(s) of the current cell
 - `index`: a (row, column) tuple of Int for the current cell coordinates - `t`: the current time step
@@ -37,7 +37,7 @@ Only grids specified with the `W` type parameter will be writable from `data`.
 function applyrule! end
 
 """
-    modifyrule(rule::Rule, data::SimData) -> Rule
+    modifyrule(rule::Rule, data::AbstractSimData) -> Rule
 
 Precalculates rule fields at each timestep. Define this method if a [`Rule`](@ref)
 has fields that need to be updated over time.
@@ -115,7 +115,7 @@ Add the value `x` to a grid cell.
 ## Example useage
 
 ```julia
-function applyrule!(data::SimData, rule::My{A,B}, state, cellindex) where {A,B}
+function applyrule!(data::AbstractSimData, rule::My{A,B}, state, cellindex) where {A,B}
 
     dest, is_inbounds = inbounds(data, (jump .+ cellindex)...)
 
@@ -172,8 +172,8 @@ Set the grid cell `c` to `xor(c, x)`. See `add!` for example usage.
 function xor! end
 
 """
-    inbounds(data::SimData, I::Tuple) -> Tuple{NTuple{2,Int}, Bool}
-    inbounds(data::SimData, I...) -> Tuple{NTuple{2,Int}, Bool}
+    inbounds(data::AbstractSimData, I::Tuple) -> Tuple{NTuple{2,Int}, Bool}
+    inbounds(data::AbstractSimData, I...) -> Tuple{NTuple{2,Int}, Bool}
 
 Check grid boundaries for a coordinate before writing in [`SetCellRule`](@ref).
 
@@ -208,14 +208,14 @@ function radius end
 """
     init(obj) -> Union{AbstractArray,NamedTUple}
 
-Retrieve the mask from an [`Output`](@ref), [`Extent`](@ref) or [`SimData`](@ref) object.
+Retrieve the mask from an [`Output`](@ref), [`Extent`](@ref) or [`AbstractSimData`](@ref) object.
 """
 function init end
 
 """
     mask(obj) -> AbstractArray
 
-Retrieve the mask from an [`Output`](@ref), [`Extent`](@ref) or [`SimData`](@ref) object.
+Retrieve the mask from an [`Output`](@ref), [`Extent`](@ref) or [`AbstractSimData`](@ref) object.
 """
 function mask end
 
@@ -223,7 +223,7 @@ function mask end
     aux(obj, [key])
 
 Retrieve auxilary data `NamedTuple` from an [`Output`](@ref),
-[`Extent`](@ref) or [`SimData`](@ref) object.
+[`Extent`](@ref) or [`AbstractSimData`](@ref) object.
 
 Given `key` specific data will be returned. `key` should be a
 `Val{:symbol}` for type stability and zero-cost access inside rules.
@@ -235,7 +235,7 @@ function aux end
     tspan(obj) -> AbstractRange
 
 Retrieve the time-span `AbstractRange` from an [`Output`](@ref),
-[`Extent`](@ref) or [`SimData`](@ref) object.
+[`Extent`](@ref) or [`AbstractSimData`](@ref) object.
 """
 function tspan end
 
@@ -243,32 +243,32 @@ function tspan end
     timestep(obj)
 
 Retrieve the timestep size from an [`Output`](@ref),
-[`Extent`](@ref), [`Ruleset`](@ref) or [`SimData`](@ref) object.
+[`Extent`](@ref), [`Ruleset`](@ref) or [`AbstractSimData`](@ref) object.
 
 This will be in whatever type/units you specify in `tspan`.
 """
 function timestep end
 
 """
-    currentframe(simdata::SimData) -> Int
+    currentframe(simdata::AbstractSimData) -> Int
 
-Retrieve the current simulation frame a [`SimData`](@ref) object.
+Retrieve the current simulation frame a [`AbstractSimData`](@ref) object.
 """
 function currentframe end
 
 """
-    currenttime(simdata::SimData)
+    currenttime(simdata::AbstractSimData)
 
-Retrieve the current simulation time from a [`SimData`](@ref) object.
+Retrieve the current simulation time from a [`AbstractSimData`](@ref) object.
 
 This will be in whatever type/units you specify in `tspan`.
 """
 function currenttime end
 
 """
-    currenttimestep(simdata::SimData)
+    currenttimestep(simdata::AbstractSimData)
 
-Retrieve the current timestep from a [`SimData`](@ref) object.
+Retrieve the current timestep from a [`AbstractSimData`](@ref) object.
 
 This may be different from the `timestep`. If the timestep is `Month`,
 `currenttimestep` will return `Seconds` for the length of the specific month.

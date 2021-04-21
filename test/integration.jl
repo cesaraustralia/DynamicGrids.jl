@@ -126,6 +126,10 @@ test5_6 = (
             ]
 )
 
+proc = SingleCPU(); 
+opt = NoOpt()
+test = test5_6
+
 @testset "Life simulation with Wrap" begin
     # Test on two sizes to test half blocks on both axes
     # Loop over shifing init arrays to make sure they all work

@@ -1,19 +1,19 @@
 # If there is no time dimension we return the same data for every timestep
 _auxval(data::AbstractSimData, key::Union{Aux,Symbol}, I...) = 
     _auxval(aux(data, key), data, key, I...)
-_auxval(A::AbstractMatrix, data::SimData, key::Union{Aux,Symbol}, y, x) = A[y, x]
-# function _auxval(A::AbstractDimArray{<:Any,2}, data::SimData, key::Union{Aux,Symbol}, y, x)
+_auxval(A::AbstractMatrix, data::AbstractSimData, key::Union{Aux,Symbol}, y, x) = A[y, x]
+# function _auxval(A::AbstractDimArray{<:Any,2}, data::AbstractSimData, key::Union{Aux,Symbol}, y, x)
     # X = DD.basetypeof(dims(A, XDim))
     # Y = DD.basetypeof(dims(A, YDim))
     # A[y, x]
 # end
-function _auxval(A::AbstractDimArray{<:Any,3}, data::SimData, key::Union{Aux,Symbol}, y, x)
+function _auxval(A::AbstractDimArray{<:Any,3}, data::AbstractSimData, key::Union{Aux,Symbol}, y, x)
     # X = DD.basetypeof(dims(A, XDim))
     # Y = DD.basetypeof(dims(A, YDim))
     A[y, x, auxframe(data, key)]
 end
 
-function boundscheck_aux(data::SimData, auxkey::Aux{Key}) where Key
+function boundscheck_aux(data::AbstractSimData, auxkey::Aux{Key}) where Key
     a = aux(data)
     (a isa NamedTuple && haskey(a, Key)) || _auxmissingerror(Key, a)
     gsize = gridsize(data)

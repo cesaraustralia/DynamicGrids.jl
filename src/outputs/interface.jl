@@ -161,8 +161,8 @@ Display an image generated from the grid, a required method for all `ImageOutput
 function showimage end
 
 """
-    grid_to_image!(o::ImageOutput, data::SimData)
-    grid_to_image!(imbuf, imgen::ImageGenerator, o::ImageOutput, data::SimData, grids)
+    grid_to_image!(o::ImageOutput, data::AbstractSimData)
+    grid_to_image!(imbuf, imgen::ImageGenerator, o::ImageOutput, data::AbstractSimData, grids)
 
 Convert a grid or `NamedRuple` of grids to an `ARGB32` image, using an 
 [`ImageGenerator`](@ref).

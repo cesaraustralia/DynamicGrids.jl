@@ -1,6 +1,6 @@
 # See interface docs
-@inline inbounds(data::Union{GridData,SimData}, I::Tuple) = inbounds(data, I...)
-@inline inbounds(data::Union{GridData,SimData}, I...) = 
+@inline inbounds(data::Union{GridData,AbstractSimData}, I::Tuple) = inbounds(data, I...)
+@inline inbounds(data::Union{GridData,AbstractSimData}, I...) = 
     _inbounds(boundary(data), gridsize(data), I...)
 
 @inline function _inbounds(boundary::BoundaryCondition, size::Tuple, i1, i2)
@@ -19,8 +19,8 @@ end
     end
 end
 
-@inline isinbounds(data::Union{SimData,GridData}, I::Tuple) = isinbounds(data, I...)
-@inline isinbounds(data::Union{SimData,GridData}, I...) = _isinbounds(gridsize(data), I...)
+@inline isinbounds(data::Union{GridData,AbstractSimData}, I::Tuple) = isinbounds(data, I...)
+@inline isinbounds(data::Union{GridData,AbstractSimData}, I...) = _isinbounds(gridsize(data), I...)
 
 @inline _isinbounds(size::Tuple, I...) = all(map(_isinbounds, size, I))
 @inline _isinbounds(size, i) = i >= one(i) && i <= size

@@ -4,11 +4,11 @@
 
 Simulation data specific to a single grid.
 """
-abstract type GridData{Y,X,R,T,N,I} <: AbstractArray{T,N} end
+abstract type GridData{Y,X,R,T,N} <: AbstractArray{T,N} end
 
 function (::Type{G})(d::GridData{Y,X,R,T,N}) where {G<:GridData,Y,X,R,T,N}
-    args = init(d), mask(d), proc(d), opt(d), boundary(d), padval(d),
-        source(d), dest(d), sourcestatus(d), deststatus(d)
+    args = source(d), dest(d), mask(d), proc(d), opt(d), boundary(d), padval(d),
+        sourcestatus(d), deststatus(d)
     G{Y,X,R,T,N,map(typeof, args)...}(args...)
 end
 function ConstructionBase.constructorof(::Type{T}) where T<:GridData{Y,X,R} where {Y,X,R}
@@ -18,14 +18,13 @@ end
 GridDataOrReps = Union{GridData, Vector{<:GridData}}
 
 # Array interface
-Base.size(d::GridData) = size(init(d))
-Base.axes(d::GridData) = axes(init(d))
-Base.eltype(d::GridData) = eltype(init(d))
-Base.firstindex(d::GridData) = firstindex(init(d))
-Base.lastindex(d::GridData) = lastindex(init(d))
+Base.size(d::GridData{Y,X}) where {Y,X} = (Y, X)
+Base.axes(d::GridData) = map(Base.OneTo, size(d))
+Base.eltype(d::GridData{<:Any,<:Any,<:Any,T}) where T = T
+Base.firstindex(d::GridData) = 1
+Base.lastindex(d::GridData{Y,X}) where {Y,X} = Y * X
 
 # Getters
-init(d::GridData) = d.init
 mask(d::GridData) = d.mask
 radius(d::GridData{<:Any,<:Any,R}) where R = R
 proc(d::GridData) = d.proc
@@ -37,14 +36,13 @@ dest(d::GridData) = d.dest
 sourcestatus(d::GridData) = d.sourcestatus
 deststatus(d::GridData) = d.deststatus
 
-gridsize(d::GridData) = size(init(d))
+gridsize(d::GridData) = size(d)
 gridsize(A::AbstractArray) = size(A)
 gridsize(nt::NamedTuple) = gridsize(first(nt))
 gridsize(nt::NamedTuple{(),Tuple{}}) = 0, 0
-gridaxes(d::GridData) = map(Base.OneTo, gridsize(d))
 gridview(d::GridData) = sourceview(d)
-sourceview(d::GridData) = view(parent(source(d)), map(a -> a .+ radius(d), gridaxes(d))...)
-destview(d::GridData) = view(parent(dest(d)), map(a -> a .+ radius(d), gridaxes(d))...)
+sourceview(d::GridData) = view(parent(source(d)), map(a -> a .+ radius(d), axes(d))...)
+destview(d::GridData) = view(parent(dest(d)), map(a -> a .+ radius(d), axes(d))...)
 source_array_or_view(d::GridData) = source(d) isa OffsetArray ? sourceview(d) : source(d)
 dest_array_or_view(d::GridData) = dest(d) isa OffsetArray ? destview(d) : dest(d)
 
@@ -154,29 +152,28 @@ Simulation data and storage passed to rules for each timestep.
 - `R`: grid padding radius 
 """
 struct ReadableGridData{
-    Y,X,R,T,N,I<:AbstractArray{T,N},M,P<:Processor,Op<:PerformanceOpt,Ov,PV,S,D,SSt,DSt
-} <: GridData{Y,X,R,T,N,I}
-    init::I
+    Y,X,R,T,N,S,D,M,P<:Processor,Op<:PerformanceOpt,Bo,PV,SSt,DSt
+} <: GridData{Y,X,R,T,N}
+    source::S
+    dest::D
     mask::M
     proc::P
     opt::Op
-    boundary::Ov
+    boundary::Bo
     padval::PV
-    source::S
-    dest::D
     sourcestatus::SSt
     deststatus::DSt
 end
 function ReadableGridData{Y,X,R}(
-    init::I, mask::M, proc::P, opt::Op, boundary::Ov, padval::PV, source::S,
-    dest::D, sourcestatus::SSt, deststatus::DSt
-) where {Y,X,R,I<:AbstractArray{T,N},M,P,Op,Ov,PV,S,D,SSt,DSt} where {T,N}
-    ReadableGridData{Y,X,R,T,N,I,M,P,Op,Ov,PV,S,D,SSt,DSt}(
-        init, mask, proc, opt, boundary, padval, source, dest, sourcestatus, deststatus
+    source::S, dest::D, mask::M, proc::P, opt::Op, boundary::Bo, 
+    padval::PV, sourcestatus::SSt, deststatus::DSt
+) where {Y,X,R,S<:AbstractArray{T,N},D,M,P,Op,Bo,PV,SSt,DSt} where {T,N}
+    ReadableGridData{Y,X,R,T,N,S,D,M,P,Op,Bo,PV,SSt,DSt}(
+        source, dest, mask, proc, opt, boundary, padval, sourcestatus, deststatus
     )
 end
 # Generate simulation data to match a ruleset and init array.
-@inline function ReadableGridData{X,Y,R}(
+@inline function ReadableGridData{Y,X,R}(
     init::AbstractArray, mask, proc, opt, boundary, padval
 ) where {Y,X,R}
     # We add one extra row and column of status blocks so
@@ -193,8 +190,8 @@ end
     end
     sourcestatus, deststatus = _build_status(opt, source, R)
 
-    grid = ReadableGridData{X,Y,R}(
-        init, mask, proc, opt, boundary, padval, source, dest, sourcestatus, deststatus
+    grid = ReadableGridData{Y,X,R}(
+        source, dest, mask, proc, opt, boundary, padval, sourcestatus, deststatus
     )
     _updatestatus!(grid)
     return grid
@@ -215,25 +212,25 @@ Reads are _always from the source array_, as rules must not be sequential betwee
 cells. This means using e.g. `+=` is not supported, instead use `add!`.
 """
 struct WritableGridData{
-    Y,X,R,T,N,I<:AbstractArray{T,N},M,P<:Processor,Op<:PerformanceOpt,Ov,PV,S,D,SSt,DSt
-} <: GridData{Y,X,R,T,N,I}
-    init::I
+    Y,X,R,T,N,S<:AbstractArray{T,N},D<:AbstractArray{T,N},
+    M,P<:Processor,Op<:PerformanceOpt,Bo,PV,SSt,DSt
+} <: GridData{Y,X,R,T,N}
+    source::S
+    dest::D
     mask::M
     proc::P
     opt::Op
-    boundary::Ov
+    boundary::Bo
     padval::PV
-    source::S
-    dest::D
     sourcestatus::SSt
     deststatus::DSt
 end
 function WritableGridData{Y,X,R}(
-    init::I, mask::M, proc::P, opt::Op, boundary::Ov, padval::PV,
-    source::S, dest::D, sourcestatus::SSt, deststatus::DSt
-) where {Y,X,R,I<:AbstractArray{T,N},M,P,Op,Ov,PV,S,D,SSt,DSt} where {T,N}
-    WritableGridData{Y,X,R,T,N,I,M,P,Op,Ov,PV,S,D,SSt,DSt}(
-        init, mask, proc, opt, boundary, padval, source, dest, sourcestatus, deststatus
+    source::S, dest::D, mask::M, proc::P, opt::Op, 
+    boundary::Bo, padval::PV, sourcestatus::SSt, deststatus::DSt
+) where {Y,X,R,S<:AbstractArray{T,N},D<:AbstractArray{T,N},M,P,Op,Bo,PV,SSt,DSt} where {T,N}
+    WritableGridData{Y,X,R,T,N,S,D,M,P,Op,Bo,PV,SSt,DSt}(
+        source, dest, mask, proc, opt, boundary, padval, sourcestatus, deststatus
     )
 end
 

@@ -47,9 +47,7 @@ export add!, sub!, min!, max!, and!, or!, xor!
 export Rule, NeighborhoodRule, CellRule, SetCellRule, SetNeighborhoodRule, SetGridRule
 
 export Cell, Neighbors, SetNeighbors, SetCell, Convolution, SetGrid, Life, CopyTo
-
 export RuleWrapper, Chain, RunIf, RunAt
-
 export AbstractRuleset, Ruleset, StaticRuleset
 
 export Neighborhood, RadialNeighborhood, Window, AbstractKernelNeighborhood, Kernel,
@@ -88,6 +86,7 @@ include("interface.jl")
 include("flags.jl")
 include("neighborhoods.jl")
 include("rules.jl")
+include("settings.jl")
 include("rulesets.jl")
 include("extent.jl")
 include("grid.jl")
