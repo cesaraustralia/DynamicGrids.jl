@@ -83,12 +83,12 @@ end
 
 function _storeframe!(::Type{<:NamedTuple}, output::Output, data)
     map(values(grids(data)), keys(data)) do grid, key
-        _copyto_output!(output[frameindex(output, data)][key], grid, proc(grid))
+        _copyto_output!(output[frameindex(output, data)][key], grid, proc(data))
     end
 end
 function _storeframe!(::Type{<:AbstractArray}, output::Output, data)
     grid = first(grids(data))
-    _copyto_output!(output[frameindex(output, data)], grid, proc(grid))
+    _copyto_output!(output[frameindex(output, data)], grid, proc(data))
 end
 
 function _copyto_output!(outgrid, grid::GridData, proc)

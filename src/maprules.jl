@@ -1,8 +1,10 @@
+
 # Map a rule over the grids it reads from and updating the grids it writes to.
 # This is broken into a setup method and an application method
 # to introduce a function barrier, for type stability.
-maprule!(data::SimData, rule) = maprule!(data, Val{ruletype(rule)}(), rule)
-function maprule!(data::SimData, ruletype::Val{T}, rule) where T
+
+maprule!(data::AbstractSimData, rule) = maprule!(data, Val{ruletype(rule)}(), rule)
+function maprule!(data::AbstractSimData, ruletype::Val{T}, rule) where T
     #= keys and grids are separated instead of in a NamedTuple as `rgrids` or `wgrids`
     may be a single grid, not a Tuple. But we still need to know what its key is.
     The structure of rgrids and wgrids determines the values that are sent to the rule
@@ -18,9 +20,9 @@ function maprule!(data::SimData, ruletype::Val{T}, rule) where T
     # This means that grids not specified to write to are read-only.
     allkeys = map(Val, keys(data))
     allgrids = values(data)
-    tempdata = _combinegrids(data, allkeys, allgrids, wkeys, wgrids)
+    ruledata = RuleData(_combinegrids(data, allkeys, allgrids, wkeys, wgrids))
     # Run the rule loop
-    maprule!(wgrids, tempdata, proc(data), opt(data), ruletype, rule, rkeys, rgrids, wkeys)
+    maprule!(wgrids, ruledata, proc(data), opt(data), ruletype, rule, rkeys, rgrids, wkeys)
     # Mask writes to dest if a mask is provided, except for
     # CellRule which doesn't move values into masked areas
     T <: CellRule || _maybemask!(wgrids)
@@ -31,7 +33,7 @@ function maprule!(data::SimData, ruletype::Val{T}, rule) where T
     # Combine the written grids with the original simdata
     _replacegrids(data, wkeys, readonly_wgrids)
 end
-function maprule!(simdata::SimData, ruletype::Val{<:SetGridRule}, rule)
+function maprule!(simdata::AbstractSimData, ruletype::Val{<:SetGridRule}, rule)
     rkeys, rgrids = _getreadgrids(rule, simdata)
     wkeys, wgrids = _getwritegrids(rule, simdata)
     tempsimdata = _combinegrids(simdata, rkeys, rgrids, wkeys, wgrids)
@@ -186,7 +188,7 @@ a single new column of data with the height of 4R, and move the existing
 data in the neighborhood buffers array across by one column. This saves on reads
 from the main array. =#
 function row_kernel!(
-    wgrids, simdata::SimData, grid::GridData{Y,X,R}, proc, opt::NoOpt,
+    wgrids, simdata::AbstractSimData, grid::GridData{Y,X,R}, proc, opt::NoOpt,
     ruletype::Val, rule::Rule, rkeys, rgrids, wkeys, bi
 ) where {Y,X,R}
     B = 2R
@@ -205,7 +207,7 @@ function row_kernel!(
     end
 end
 function row_kernel!(
-    wgrids, simdata::SimData, grid::GridData{Y,X,R}, proc, opt::SparseOpt,
+    wgrids, simdata::AbstractSimData, grid::GridData{Y,X,R}, proc, opt::SparseOpt,
     ruletype::Val, rule::Rule, rkeys, rgrids, wkeys, bi
 ) where {Y,X,R}
     B = 2R
@@ -429,7 +431,7 @@ end
 
 # Combine grids into a new NamedTuple of grids depending
 # on the read and write keys required by a rule.
-@inline function _combinegrids(simdata::SimData, rkeys, rgrids, wkeys, wgrids)
+@inline function _combinegrids(simdata::AbstractSimData, rkeys, rgrids, wkeys, wgrids)
     @set simdata.grids = _combinegrids(rkeys, rgrids, wkeys, wgrids)
 end
 @inline function _combinegrids(rkey, rgrids, wkey, wgrids)

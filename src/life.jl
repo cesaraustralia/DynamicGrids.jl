@@ -80,6 +80,6 @@ function _setbuffer(r::Life{R,W,N,B,S,L}, buffer) where {R,W,N,B,S,L}
     Life{R,W,typeof(hood),B,S,L}(hood, r.born, r.survive, r.lookup)
 end
 
-function applyrule(data::SimData, rule::Life, state, I)
+function applyrule(data, rule::Life, state, I)
     rule.lookup[state + 1][sum(neighbors(rule)) + 1]
 end

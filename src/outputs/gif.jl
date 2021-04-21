@@ -83,7 +83,7 @@ end
 filename(o::GifOutput) = o.filename
 gif(o::GifOutput) = o.gif
 
-showimage(image, o::GifOutput, data::SimData) = gif(o)[:, :, currentframe(data)] .= image 
+showimage(image, o::GifOutput, data::AbstractSimData) = gif(o)[:, :, currentframe(data)] .= image 
 
 finalisegraphics(o::GifOutput, data::AbstractSimData) = savegif(o)
 

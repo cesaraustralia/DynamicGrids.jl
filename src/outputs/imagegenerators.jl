@@ -14,10 +14,10 @@ imagesize(::ImageGenerator, init::AbstractArray) = size(init)
 
 _allocimage(p::ImageGenerator, init) = fill(ARGB32(0), imagesize(p, init)...)
 
-function grid_to_image!(o::ImageOutput, data::SimData)
+function grid_to_image!(o::ImageOutput, data::AbstractSimData)
     grid_to_image!(o, data, grids(data))
 end
-function grid_to_image!(o::ImageOutput, data::SimData, grids)
+function grid_to_image!(o::ImageOutput, data::AbstractSimData, grids)
     grid_to_image!(imagebuffer(o), imagegen(o), o, data, grids)
 end
 
@@ -33,14 +33,14 @@ used with a `NamedTuple` of grids.
 abstract type SingleGridImageGenerator <: ImageGenerator end
 
 function grid_to_image!(
-    imagebuffer, ig::SingleGridImageGenerator, o::ImageOutput, data::SimData, 
+    imagebuffer, ig::SingleGridImageGenerator, o::ImageOutput, data::AbstractSimData, 
     grids::NamedTuple;
     name=string(first(keys(grids))), time=currenttime(data)
 )
     grid_to_image!(imagebuffer, ig, o, data, first(grids); name=name, time=time)
 end
 function grid_to_image!(
-    imagebuffer, ig::SingleGridImageGenerator, o::ImageOutput, data::SimData, 
+    imagebuffer, ig::SingleGridImageGenerator, o::ImageOutput, data::AbstractSimData, 
     grids::NamedTuple{(:_default_,)};
     name=nothing, time=currenttime(data)
 )
@@ -48,7 +48,7 @@ function grid_to_image!(
 end
 function grid_to_image!(
     imagebuffer, ig::SingleGridImageGenerator, o::ImageOutput, 
-    data::SimData{Y,X}, grid::AbstractArray; 
+    data::AbstractSimData{Y,X}, grid::AbstractArray; 
     name=nothing, time=currenttime(data), minval=minval(o), maxval=maxval(o),
 ) where {Y,X}
     for j in 1:X, i in 1:Y
@@ -90,7 +90,7 @@ maskcolor(p::Image) = p.maskcolor
 # Show colorscheme in Atom etc
 Base.show(io::IO, m::MIME"image/svg+xml", p::Image) = show(io, m, scheme(p))
 
-@inline function cell_to_pixel(ig::Image, mask, minval, maxval, data::SimData, val, I)
+@inline function cell_to_pixel(ig::Image, mask, minval, maxval, data::AbstractSimData, val, I)
     if !(maskcolor(ig) isa Nothing) && ismasked(mask, I...)
         to_rgb(maskcolor(ig))
     else
@@ -113,7 +113,7 @@ Cells that do not run show in gray. Errors show in red, but if they do there's a
 """
 struct SparseOptInspector <: SingleGridImageGenerator end
 
-function cell_to_pixel(p::SparseOptInspector, mask, minval, maxval, data::SimData, val, I::Tuple)
+function cell_to_pixel(p::SparseOptInspector, mask, minval, maxval, data::AbstractSimData, val, I::Tuple)
     opt(data) isa SparseOpt || error("Can only use SparseOptInspector with SparseOpt grids")
     r = radius(first(grids(data)))
     blocksize = 2r
@@ -180,7 +180,7 @@ imagegens(p::Layout) = p.imagegens
 imagesize(p::Layout, init::NamedTuple) = size(first(init)) .* size(p.layout)
 
 function grid_to_image!(
-    imagebuffer, l::Layout, o::ImageOutput, data::SimData, grids::NamedTuple
+    imagebuffer, l::Layout, o::ImageOutput, data::AbstractSimData, grids::NamedTuple
 )
     ngrids = length(grids)
     if !(minval(o) isa Nothing)

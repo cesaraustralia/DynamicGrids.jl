@@ -9,17 +9,17 @@ A `Rule` object contains the information required to apply an
 The [`applyrule`](@ref) method follows the form:
 
 ```julia
-@inline applyrule(data::SimData, rule::YourRule, state, I::Tuple{Int,Int}) = ...
+@inline applyrule(data::AbstractSimData, rule::YourRule, state, I::Tuple{Int,Int}) = ...
 ```
 
 Where `I` is the cell index, and `state` is a single value, or a `NamedTuple`
-if multiple grids are requested. the [`SimData`](@ref) object can be used to access 
+if multiple grids are requested. the [`AbstractSimData`](@ref) object can be used to access 
 current timestep and other simulation data and metadata.
 
 Rules can be updated from the original rule before each timestep, in [`modifyrule`](@ref):
 
 ```julia
-modifyrule(rule::YourRule, data::SimData) = ...
+modifyrule(rule::YourRule, data::AbstractSimData) = ...
 ```
 
 Rules can also be run in sequence, as a `Tuple` or in a [`Ruleset`](@ref)s.
@@ -44,7 +44,7 @@ The `NamedTuple` keys will match the grid keys in `R`, which is a type like
 Read grid names be retrieved from the type here as `R1` and `R2`, while write grids are `W1` and `W2`.
 
 ```julia
-applyrule(data::SimData, rule::YourCellRule{Tuple{R1,R2},Tuple{W1,W2}}, state, I) where {R1,R2,W1,W2}
+applyrule(data::AbstractSimData, rule::YourCellRule{Tuple{R1,R2},Tuple{W1,W2}}, state, I) where {R1,R2,W1,W2}
 ```
 
 By default the output is written to the current cell in the specified `W` write grid/s.
@@ -149,7 +149,7 @@ struct YourCellRule{R,W} <: CellRule{R,W} end
 And applied as:
 
 ```julia
-function applyrule(data::SimData, rule::YourCellRule{R,W}, state, I) where {R,W}
+function applyrule(data::AbstractSimData, rule::YourCellRule{R,W}, state, I) where {R,W}
     state * 2
 end
 ```
@@ -180,7 +180,7 @@ grid that they need to.
 `SetCellRule` is applied with a method like this, that simply adds 1 to the current cell:
 
 ```julia
-function applyrule!(data::SimData, rule::YourSetCellRule, state, I)
+function applyrule!(data::AbstractSimData, rule::YourSetCellRule, state, I)
     add!(data, 1, I...)
     return nothing
 end
@@ -223,7 +223,7 @@ A Rule that only accesses a neighborhood centered around the current cell.
 `NeighborhoodRule` is applied with the method:
 
 ```julia
-applyrule(data::SimData, rule::YourNeighborhoodRule, state, I::Tuple{Int,Int})
+applyrule(data::AbstractSimData, rule::YourNeighborhoodRule, state, I::Tuple{Int,Int})
 ```
 
 `NeighborhoodRule` must have a `neighborhood` method or field, that holds
@@ -302,7 +302,7 @@ struct YourSetGridRule{R,W} <: SetGridRule{R,W} end
 And applied as:
 
 ```julia
-function applyrule!(data::SimData, rule::YourSetGridRule{R,W}) where {R,W}
+function applyrule!(data::AbstractSimData, rule::YourSetGridRule{R,W}) where {R,W}
     rand!(data[W])
 end
 ```
@@ -440,7 +440,7 @@ end
     SetCell{R,W}(f)
 
 A [`SetCellRule`](@ref) to manually write to the array where you need to.
-`f` is passed a [`SimData`](@ref) object, the grid state or `Tuple` of grid 
+`f` is passed a [`AbstractSimData`](@ref) object, the grid state or `Tuple` of grid 
 states for the cell and a `Tuple{Int,Int}` index of the current cell.
 
 To update the grid, you can use: [`add!`](@ref), [`sub!`](@ref) for `Number`,

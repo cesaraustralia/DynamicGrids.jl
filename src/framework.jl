@@ -29,8 +29,7 @@ Theses are the taken from the `ruleset` argument by default:
     KernelAbstractions.jl and a CUDA gpu is available. 
 - `opt`: a [`PerformanceOpt`](@ref) to specificy optimisations like
     [`SparseOpt`](@ref) or [`NoOpt`](@ref). Defaults to `NoOpt()`.
-- `boundary`: what to do with boundary of grid edges.
-    Options are [`Remove`](@ref) or [`Wrap`](@ref), defaulting to `Remove()`.
+- `boundary`: what to do with boundary of grid edges.  Options are [`Remove`](@ref) or [`Wrap`](@ref), defaulting to `Remove()`.
 - `cellsize`: the size of cells, which may be accessed by rules.
 - `timestep`: fixed timestep where this is required for some rules.
     eg. `Month(1)` or `1u"s"`.
@@ -182,10 +181,10 @@ function simloop!(output::Output, simdata, ruleset, fspan)
     return output
 end
 
-_step!(sd::SimData, rules) = _updaterules(rules, sd) |> sequencerules!
+_step!(sd::AbstractSimData, rules) = _updaterules(rules, sd) |> sequencerules!
 
 """
-    step!(sd::SimData, rules=rules(sd))
+    step!(sd::AbstractSimData, rules=rules(sd))
 
 Allows stepping a simulation one frame at a time, for a more manual approach
 to simulation that `sim!`. This may be useful if other processes need to be run 
@@ -214,7 +213,7 @@ DynmicGrids.gridview(simdata[:a])
 
 This example returns a `GridData` object for the `:a` grid, which is `<: AbstractAray`.
 """
-function step!(sd::SimData)
+function step!(sd::AbstractSimData)
     _updatetime(sd, currentframe(sd) + 1) |> 
     _proc_setup |> 
     sd -> _step!(sd, rules(sd))
@@ -222,5 +221,5 @@ end
 
 # Allows different processors to modify the simdata object
 # GPU needs this to convert arrays to CuArray
-_proc_setup(simdata::SimData) = _proc_setup(proc(simdata), simdata)
+_proc_setup(simdata::AbstractSimData) = _proc_setup(proc(simdata), simdata)
 _proc_setup(proc, obj) = obj
