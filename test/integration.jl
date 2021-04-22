@@ -4,10 +4,15 @@ using DynamicGrids: Extent, SimData, gridview
 
 if CUDAKernels.CUDA.has_cuda_gpu()
     CUDAKernels.CUDA.allowscalar(false)
-    hardware = (SingleCPU(), ThreadedCPU(), CuGPU())
+    hardware = (SingleCPU(), ThreadedCPU(),) 
 else
     hardware = (SingleCPU(), ThreadedCPU(), CPUGPU())
 end
+opts = (NoOpt(), SparseOpt())
+
+proc = SingleCPU()
+opt = SparseOpt()
+opt = NoOpt()
 
 # life glider sims
 
@@ -126,16 +131,12 @@ test5_6 = (
             ]
 )
 
-proc = SingleCPU(); 
-opt = NoOpt()
-test = test5_6
-
-@testset "Life simulation with Wrap" begin
+@testset "Life simulation Wrap" begin
     # Test on two sizes to test half blocks on both axes
     # Loop over shifing init arrays to make sure they all work
     for test in (test5_6, test6_7), i in 1:size(test[:init], 1)
         for j in 1:size(test[:init], 2)
-            for proc in hardware, opt in (NoOpt(), SparseOpt())
+            for proc in hardware, opt in opts
                 tspan = Date(2001, 1, 1):Day(2):Date(2001, 1, 14)
                 ruleset = Ruleset(;
                     rules=(Life(),),
@@ -149,33 +150,34 @@ test = test5_6
                     rule = Life(neighborhood=Moore{1}(bufs))
                     output = ArrayOutput(test[:init], tspan=tspan)
                     sim!(output, ruleset)
-                    @test output[2] == test[:test2]
-                    @test output[3] == test[:test3]
-                    @test output[4] == test[:test4]
-                    @test output[5] == test[:test5]
-                    @test output[7] == test[:test7]
+                    @test output[2] == test[:test2] # || (println(2); display(output[2]); display(test[:test2]))
+                    @test output[3] == test[:test3] # || (println(3); display(output[3]); display(test[:test3]))
+                    @test output[4] == test[:test4] # || (println(4); display(output[4]); display(test[:test4]))
+                    @test output[5] == test[:test5] # || (println(5); display(output[5]); display(test[:test5]))
+                    @test output[7] == test[:test7] # || (println(7); display(output[7]); display(test[:test7]))
                 end
                 @testset "$(nameof(typeof(proc))) $(nameof(typeof(opt))) using step!" begin
                     simdata = DynamicGrids._proc_setup(SimData(Extent(; init=test[:init], tspan=tspan), ruleset))
                     # Need Array here to copy from GPU to CPU
                     @test Array(gridview(first(simdata))) == test[:init]
                     simdata = step!(simdata)
-                    @test Array(gridview(first(simdata))) == test[:test2]
+                    @test Array(gridview(first(simdata))) == test[:test2] # || (println("s2"); display(Array(gridview(first(simdata)))); display(test[:test2]))
                     simdata = step!(simdata)
-                    @test Array(gridview(first(simdata))) == test[:test3]
+                    @test Array(gridview(first(simdata))) == test[:test3] # || (println("s3"); display(Array(gridview(first(simdata)))); display(test[:test3]))
                     simdata = step!(simdata)
-                    @test Array(gridview(first(simdata))) == test[:test4]
+                    @test Array(gridview(first(simdata))) == test[:test4] # || (println("s4"); display(Array(gridview(first(simdata)))); display(test[:test4]))
                     simdata = step!(simdata)
-                    @test Array(gridview(first(simdata))) == test[:test5]
+                    @test Array(gridview(first(simdata))) == test[:test5] # || (println("s5"); display(Array(gridview(first(simdata)))); display(test[:test5]))
                     simdata = step!(simdata)
                     simdata = step!(simdata)
-                    @test Array(gridview(first(simdata))) == test[:test7]
+                    @test Array(gridview(first(simdata))) == test[:test7] # || (println("s7"); display(Array(gridview(first(simdata)))); display(test[:test7]))
                 end
             end
             cyclej!(test)
         end
         cyclei!(test)
     end
+    nothing
 end
 
 @testset "Life simulation with Remove boudary" begin
@@ -227,7 +229,6 @@ end
                  0 0 0 0 0 0 0
                  0 0 0 0 0 0 0
                 ]
-
     rule = Life{:a,:a}(neighborhood=Moore(1))
 
     @testset "Wrong timestep throws an error" begin
@@ -238,7 +239,7 @@ end
 
     @testset "Results match glider behaviour" begin
         output = ArrayOutput((a=init_,); tspan=1:7)
-        for proc in hardware, opt in (NoOpt(), SparseOpt())
+        for proc in hardware, opt in opts
             sim!(output, rule; boundary=Remove(), proc=proc, opt=opt)
             @test output[2][:a] == test2_rem
             @test output[3][:a] == test3_rem
@@ -250,34 +251,35 @@ end
 
     @testset "Combinatoric comparisons in a larger Life sim" begin
         rule = Life(neighborhood=Moore(1))
-        init = rand(Bool, 100, 100)
-        mask = ones(Bool, size(init)...)
-        mask[1:50, 1:50] .= false  
+        init_ = rand(Bool, 100, 99)
+        mask_ = ones(Bool, size(init_)...)
+        mask_[1:50, 1:50] .= false  
         wrap_rs_ref = Ruleset(rule; boundary=Wrap())
         remove_rs_ref = Ruleset(rule; boundary=Remove())
-        wrap_output_ref = ArrayOutput(init; tspan=1:100, mask=mask)
-        remove_output_ref = ArrayOutput(init; tspan=1:100, mask=mask)
+        wrap_output_ref = ArrayOutput(init_; tspan=1:100, mask=mask_)
+        remove_output_ref = ArrayOutput(init_; tspan=1:100, mask=mask_)
         sim!(remove_output_ref, remove_rs_ref)
         sim!(wrap_output_ref, wrap_rs_ref)
-        for proc in hardware, opt in (NoOpt(), SparseOpt())
+        for proc in hardware, opt in opts
             @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
                 @testset "Wrap" begin
                     wrap_rs = Ruleset(rule; boundary=Wrap(), proc=proc, opt=opt)
-                    wrap_output = ArrayOutput(init; tspan=1:100, mask=mask)
+                    wrap_output = ArrayOutput(init_; tspan=1:100, mask=mask_)
                     sim!(wrap_output, wrap_rs)
-                    @test wrap_output_ref[2] == wrap_output[2]
                     wrap_output_ref[2] .- wrap_output[2]
+                    @test wrap_output_ref[2] == wrap_output[2]
+                    wrap_output_ref[3] .- wrap_output[3]
                     @test wrap_output_ref[3] == wrap_output[3]
                     @test wrap_output_ref[10] == wrap_output[10]
                     @test wrap_output_ref[100] == wrap_output[100]
                 end
                 @testset "Remove" begin
                     remove_rs = Ruleset(rule; boundary=Remove(), proc=proc, opt=opt)
-                    remove_output = ArrayOutput(init; tspan=1:100, mask=mask)
+                    remove_output = ArrayOutput(init_; tspan=1:100, mask=mask_)
                     sim!(remove_output, remove_rs);
                     @test remove_output_ref[2] == remove_output[2]
                     @test remove_output_ref[3] == remove_output[3]
-                    remove_output_ref[3] .- remove_output[3] |> sum
+                    remove_output_ref[3] .- remove_output[3]
                     @test remove_output_ref[10] == remove_output[10]
                     @test remove_output_ref[100] == remove_output[100]
                 end
@@ -288,7 +290,7 @@ end
 end
 
 @testset "sim! with other outputs" begin
-    for proc in hardware, opt in (NoOpt(), SparseOpt())
+    for proc in hardware, opt in opts
         @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
             @testset "Transformed output" begin
                 ruleset = Ruleset(Life();

@@ -36,7 +36,7 @@ struct SparseOpt{F<:Function} <: PerformanceOpt
 end
 SparseOpt() = SparseOpt(==(0))
 
-@inline can_skip(opt::SparseOpt{<:Function}, val) = opt.f(val)
+@inline _isactive(val, opt::SparseOpt{<:Function}) = !opt.f(val)
 
 """
     NoOpt <: PerformanceOpt

@@ -48,7 +48,7 @@ function isinferred(simdata::AbstractSimData, rule::SetCellRule)
     rkeys, rgrids = _getreadgrids(rule, simdata)
     wkeys, wgrids = _getwritegrids(rule, simdata)
     simdata = @set simdata.grids = _combinegrids(rkeys, rgrids, wkeys, wgrids)
-    readval = _readgrids(rkeys, rgrids, 1, 1)
+    readval = _readcell(simdata, rkeys, 1, 1)
     @inferred applyrule!(simdata, rule, readval, (1, 1))
     return true
 end
@@ -57,7 +57,7 @@ function _isinferred(simdata, rule)
     rkeys, rgrids = _getreadgrids(rule, simdata)
     wkeys, wgrids = _getwritegrids(rule, simdata)
     simdata = @set simdata.grids = _combinegrids(rkeys, rgrids, wkeys, wgrids)
-    readval = _readgrids(rkeys, rgrids, 1, 1)
+    readval = _readcell(simdata, rkeys, 1, 1)
     ex_writeval = Tuple(_example_writeval(wgrids))
     writeval = @inferred applyrule(simdata, rule, readval, (1, 1))
     typeof(Tuple(writeval)) == typeof(ex_writeval) ||
