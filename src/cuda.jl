@@ -60,35 +60,33 @@ end
 _copyto_output!(outgrid, grid::GridData, proc::GPU) = copyto!(outgrid, gridview(grid))
 
 function maprule!(
-    wgrids::Union{<:GridData{Y,X,R},Tuple{<:GridData{Y,X,R},Vararg}},
-    simdata, proc::GPU, opt, ruletype::Val{<:Rule}, rule, args...
-) where {Y,X,R}
+    simdata::AbstractSimData{Y,X}, proc::GPU, opt, ruletype::Val{<:Rule}, rule, rkeys, wkeys
+) where {Y,X}
     kernel! = cu_cell_kernel!(kernel_setup(proc)...)
-    kernel!(wgrids, simdata, ruletype, rule, args...; ndrange=gridsize(simdata)) |> wait
+    kernel!(simdata, ruletype, rule, rkeys, wkeys; ndrange=gridsize(simdata)) |> wait
 end
 function maprule!(
-    wgrids::Union{<:GridData{Y,X,R},Tuple{<:GridData{Y,X,R},Vararg}},
-    simdata, proc::GPU, opt, ruletype::Val{<:NeighborhoodRule}, rule, args...
-) where {Y,X,R}
+    simdata::AbstractSimData{Y,X}, proc::GPU, opt, ruletype::Val{<:NeighborhoodRule}, rule, rkeys, wkeys
+) where {Y,X}
     grid = simdata[neighborhoodkey(rule)]
     kernel! = cu_neighborhood_kernel!(kernel_setup(proc)...)
     n = gridsize(simdata)
-    kernel!(wgrids, simdata, grid, opt, ruletype, rule, args..., ndrange=n) |> wait
+    kernel!(simdata, opt, ruletype, rule, rkeys, wkeys, ndrange=n) |> wait
     return nothing
 end
 
 @kernel function cu_neighborhood_kernel!(
-    wgrids, data, grid::GridData{Y,X,R}, opt, ruletype::Val{<:NeighborhoodRule}, rule, args...
-) where {Y,X,R}
+    simdata, opt, ruletype::Val{<:NeighborhoodRule}, rule, rkeys, wkeys
+)
     I, J = @index(Global, NTuple)
-    src = parent(source(grid))
-    buf = _getwindow(src, Val{R}(), I, J)
+    src = parent(_firstgrid(simdata, rkeys))
+    buf = _getwindow(src, neighborhood(rule), I, J)
     bufrule = _setbuffer(rule, buf)
-    cell_kernel!(wgrids, data, ruletype, bufrule, args..., I, J)
+    cell_kernel!(simdata, ruletype, bufrule, rkeys, wkeys, I, J)
     nothing
 end
 
-@generated function _getwindow(tile::AbstractArray{T}, ::Val{R}, i, j) where {T,R}
+@generated function _getwindow(tile::AbstractArray{T}, ::Neighborhood{R}, i, j) where {T,R}
     S = 2R+1
     L = S^2
     vals = Expr(:tuple)
@@ -98,16 +96,26 @@ end
     return :(SMatrix{$S,$S,$T,$L}($vals))
 end
 
-@kernel function cu_cell_kernel!(wgrids, simdata, ruletype::Val, rule, rkeys, rgrids, wkeys)
+@kernel function cu_cell_kernel!(simdata, ruletype::Val, rule, rkeys, wkeys)
     i, j = @index(Global, NTuple)
-    cell_kernel!(wgrids, simdata, ruletype, rule, rkeys, rgrids, wkeys, i, j)
+    cell_kernel!(simdata, ruletype, rule, rkeys, wkeys, i, j)
     nothing
 end
 
+
+### UNSAFE / LOCKS required
+
+# This is not safe for general use. 
+# Can be used only where only one value can be set within a rule
+@propagate_inbounds function _setindex!(d::WritableGridData, opt::CuGPU, x, I...)
+    dest(d)[I...] = x
+end
+
+# Thread-safe atomic ops
 for (f, op) in atomic_ops
     atomic_f = Symbol(:atomic_, f)
     @eval begin
-        @propagate_inbounds function ($f)(::CuGPU, d::WritableGridData{Y,X,R}, x, I...) where {Y,X,R}
+        @propagate_inbounds function ($f)(d::WritableGridData{Y,X,R}, ::CuGPU, x, I...) where {Y,X,R}
             A = parent(dest(d))
             i = Base._to_linear_index(A, (I .+ R)...)
             ($f)(A, x, i)

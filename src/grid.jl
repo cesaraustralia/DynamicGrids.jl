@@ -76,7 +76,8 @@ end
 
 @propagate_inbounds Base.getindex(d::GridData, I...) = getindex(source(d), I...)
 
-# Swap source and dest arrays. Allways returns regular SimData.
+# _swapsource => ReadableGridData
+# Swap source and dest arrays of a grid
 _swapsource(d::Tuple) = map(_swapsource, d)
 function _swapsource(grid::GridData)
     src = grid.source
@@ -89,18 +90,17 @@ function _swapsource(grid::GridData)
     return @set grid.sourcestatus = dststatus
 end
 
-#=
-Initialise the block status array.
-This tracks whether anything has to be done in an area of the main array.
-=#
+# _updatestatus!
+# Initialise the block status array.
+# This tracks whether anything has to be done in an area of the main array.
 _updatestatus!(grid::GridData) = _updatestatus!(opt(grid), grid)
 function _updatestatus!(opt::SparseOpt, grid)
     blocksize = 2 * radius(grid)
     src = parent(source(grid))
-    for i in CartesianIndices(src)
-        # Mark the status block if there is a non-zero value
-        if !can_skip(opt, src[i])
-            bi = _indtoblock.(Tuple(i), blocksize)
+    for I in CartesianIndices(src)
+        # Mark the status block (by default a non-zero value)
+        if _isactive(src[I], opt)
+            bi = _indtoblock.(Tuple(I), blocksize)
             @inbounds sourcestatus(grid)[bi...] = true
             @inbounds deststatus(grid)[bi...] = true
         end
@@ -109,11 +109,10 @@ function _updatestatus!(opt::SparseOpt, grid)
 end
 _updatestatus!(opt, grid) = nothing
 
-#=
-Find the maximum radius required by all rules
-Add padding around the original init array, offset into the negative
-So that the first real cell is still 1, 1
-=#
+# _addpadding => OffsetArray{T,N}
+# Find the maximum radius required by all rules
+# Add padding around the original init array, offset into the negative
+# So that the first real cell is still 1, 1
 function _addpadding(init::AbstractArray{T,N}, r, padval) where {T,N}
     h, w = size(init)
     paddedsize = h + 4r, w + 2r
@@ -127,6 +126,11 @@ function _addpadding(init::AbstractArray{T,N}, r, padval) where {T,N}
     return source
 end
 
+
+# _build_status => (Matrix{Bool}, Matrix{Bool})
+# Build block-status arrays
+# We add an additional block that is never used so we can 
+# index into it in the block loop without checking
 function _build_status(opt::SparseOpt, source, r)
     hoodsize = 2r + 1
     blocksize = 2r
@@ -235,15 +239,39 @@ function WritableGridData{Y,X,R}(
 end
 
 Base.parent(d::WritableGridData) = parent(dest(d))
+
+
+### UNSAFE / LOCKS required
+
+# Base.setindex!
+# This is naot safe for general use, even on a single CPU
+# It can be used only where only one identical value is set
 @propagate_inbounds function Base.setindex!(d::WritableGridData, x, I...)
-    _setdeststatus!(d, x, I...)
-    dest(d)[I...] = x
+    _setindex!(d, proc(d), x, I...)
 end
 
+@propagate_inbounds function _setindex!(d::WritableGridData, opt::SingleCPU, x, I...)
+    @boundscheck checkbounds(dest(d), I...)
+    @inbounds _setdeststatus!(d, x, I...)
+    @inbounds dest(d)[I...] = x
+end
+@propagate_inbounds function _setindex!(d::WritableGridData, proc::ThreadedCPU, x, I...)
+    # Dest status is not threadsafe, even if the 
+    # setindex itself is safe. so we LOCK
+    lock(proc)
+    @inbounds _setdeststatus!(d, x, I...)
+    unlock(proc)
+    @inbounds dest(d)[I...] = x
+end
+
+# _setdeststatus!
+# Sets the status of the destination block that the current index is in.
+# It can't turn of block status as the block is larger than the cell
+# But should be used inside a LOCK
 _setdeststatus!(d::WritableGridData, x, I...) = _setdeststatus!(d::WritableGridData, opt(d), x, I...)
 function _setdeststatus!(d::WritableGridData{Y,X,R}, opt::SparseOpt, x, I...) where {Y,X,R}
     blockindex = _indtoblock.(I .+ R, 2R)
-    @inbounds deststatus(d)[blockindex...] = !(opt.f(x))
+    @inbounds deststatus(d)[blockindex...] |= !(opt.f(x))
     return nothing
 end
 _setdeststatus!(d::WritableGridData, opt::PerformanceOpt, x, I...) = nothing

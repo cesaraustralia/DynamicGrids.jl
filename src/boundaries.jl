@@ -19,6 +19,7 @@ end
     end
 end
 
+# See interface docs
 @inline isinbounds(data::Union{GridData,AbstractSimData}, I::Tuple) = isinbounds(data, I...)
 @inline isinbounds(data::Union{GridData,AbstractSimData}, I...) = _isinbounds(gridsize(data), I...)
 
@@ -26,8 +27,9 @@ end
 @inline _isinbounds(size, i) = i >= one(i) && i <= size
 
 
-#= Wrap boundary where required. This optimisation allows us to ignore
-bounds checks on neighborhoods and still use a wraparound grid. =#
+# _updateboundary
+# Reset or wrap boundary where required. This allows us to ignore 
+# bounds checks on neighborhoods and still use a wraparound grid.
 _updateboundary!(grids::Tuple) = map(_updateboundary!, grids)
 function _updateboundary!(g::GridData{Y,X,R}) where {Y,X,R}
     R < 1 && return g
@@ -43,10 +45,10 @@ function _updateboundary!(g::GridData{Y,X,R,T}, ::Remove) where {Y,X,R,T}
     @inbounds src[1:R, R+1:X+R] .= Ref(padval(g))
     # Bottom middle
     @inbounds src[Y+R+1:Y+2R, R+1:X+R] .= Ref(padval(g))
+    status = sourcestatus(g)
     return g
 end
 function _updateboundary!(g::GridData{Y,X,R}, ::Wrap) where {Y,X,R}
-    # TODO optimise this. Its mostly a placeholder so wrapping still works in GOL tests.
     src = parent(source(g))
     nrows, ncols = gridsize(g)
     startpadrow = startpadcol = 1:R
@@ -71,6 +73,7 @@ function _updateboundary!(g::GridData{Y,X,R}, ::Wrap) where {Y,X,R}
     # Bottom
     @inbounds copyto!(src, CartesianIndices((endpadrow, cols)),
                       src, CartesianIndices((startrow, cols)))
+
     # Corners ---
     # Top Left
     @inbounds copyto!(src, CartesianIndices((startpadrow, startpadcol)),
@@ -89,16 +92,31 @@ function _updateboundary!(g::GridData{Y,X,R}, ::Wrap) where {Y,X,R}
     return g
 end
 
+# _wrapstatus!
+# Copies status from opposite sides/corners in Wrap boundary mode
 _wrapstatus!(status::Nothing) = nothing
 function _wrapstatus!(status::AbstractArray)
-    # This could be further optimised.
+    # !!! The end row/column is always empty !!!
+    # Its padding for block opt. So we work with end-1 and end-2
+    
+    # This could be further optimised by not copying the end-2 
+    # block column/row when the blocks are aligned at both ends.
+    
+    # Sides
+    status[1, :] .|= status[end-1, :] .| status[end-2, :]
+    status[:, 1] .|= status[:, end-1] .| status[:, end-2]
     status[end-1, :] .|= status[1, :]
     status[:, end-1] .|= status[:, 1]
-    #status[end-2, :] .|= status[1, :] .|= status[2, :]
-    status[end-2, :] .= true
-    status[:, end-2] .|= status[:, 1] .|= status[:, 2]
-    #status[1, :] .|= status[end-2, :] .|= status[end-1, :]
-    status[1, :] .= true
-    status[:, 1] .|= status[:, end-2] .|= status[:, end-1]
-    status .= true
+    status[end-2, :] .|= status[1, :]
+    status[:, end-2] .|= status[:, 1]
+
+    # Corners
+    status[1, 1] |= status[end-1, end-1] | status[end-2, end-1] | 
+                    status[end-1, end-2] | status[end-2, end-2]
+    status[end-1, 1] |= status[1, end-1] | status[1, end-2]
+    status[end-2, 1] |= status[1, end-1] | status[1, end-2]
+    status[1, end-1] |= status[end-1, 1] | status[end-2, 1]
+    status[1, end-2] |= status[end-1, 1] | status[end-2, 1]
+    status[end-1, end-1] |= status[1, 1] 
+    status[end-2, end-2] |= status[1, 1] 
 end

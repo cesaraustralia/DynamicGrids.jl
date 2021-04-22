@@ -8,15 +8,15 @@ const atomic_ops = ((:add!, :+), (:sub!, :-), (:min!, :min), (:max!, :max),
 for (f, op) in atomic_ops
     @eval begin
         @propagate_inbounds ($f)(d::AbstractSimData, x, I...) = ($f)(first(d), x, I...)
-        @propagate_inbounds ($f)(d::WritableGridData, x, I...) = ($f)(proc(d), d, x, I...)
-        @propagate_inbounds function ($f)(::Processor, d::WritableGridData, x, I...)
+        @propagate_inbounds ($f)(d::WritableGridData, x, I...) = ($f)(d, proc(d), x, I...)
+        @propagate_inbounds function ($f)(d::WritableGridData, ::Processor, x, I...)
             @boundscheck checkbounds(dest(d), I...)
             @inbounds _setdeststatus!(d, x, I...)
             @inbounds dest(d)[I...] = ($op)(dest(d)[I...], x)
         end
-        @propagate_inbounds function ($f)(proc::ThreadedCPU, d::WritableGridData, x, I...)
+        @propagate_inbounds function ($f)(d::WritableGridData, proc::ThreadedCPU, x, I...)
             lock(proc)
-            ($f)(SingleCPU(), d, x, I...)
+            ($f)(d, SingleCPU(), x, I...)
             unlock(proc)
         end
     end

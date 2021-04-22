@@ -17,6 +17,9 @@ init  = [0 1 1 0
          0 1 1 0
          0 1 1 0]
 
+proc = SingleCPU()
+opt = NoOpt()
+
 @testset "Generic rule constructors" begin
    rule1 = Cell{:a}(identity)
    @test rule1.f == identity
@@ -129,6 +132,7 @@ end
             @test output[2] == ref_output
         end
     end
+
 end
 
 @testset "SetCell" begin
@@ -261,7 +265,7 @@ applyrule(data, ::TestRule, state, index) = 0
             @test newsimdata.grids[1] isa WritableGridData
             # Test type stability
             T = Val{DynamicGrids.ruletype(rule)}()
-            @inferred maprule!(wgrids, newsimdata, proc, opt, T, rule, rkeys, rgrids, wkeys)
+            @inferred maprule!(newsimdata, proc, opt, T, rule, rkeys, wkeys)
             
             resultdata = maprule!(simdata, rule)
             @test source(resultdata[:a]) == final
@@ -284,9 +288,8 @@ applyrule!(data, ::TestSetCell, state, index) = 0
             rkeys, rgrids = _getreadgrids(rule, simdata)
             wkeys, wgrids = _getwritegrids(rule, simdata)
             newsimdata = @set simdata.grids = _combinegrids(wkeys, wgrids, rkeys, rgrids)
-
             T = Val{DynamicGrids.ruletype(rule)}()
-            @inferred maprule!(wgrids, newsimdata, proc, opt, T, rule, rkeys, rgrids, wkeys)
+            @inferred maprule!(newsimdata, proc, opt, T, rule, rkeys, wkeys)
             resultdata = maprule!(simdata, rule)
             @test source(resultdata[:_default_]) == init
         end
