@@ -2,53 +2,53 @@ const MASKCOL = ARGB32(0.5)
 const ZEROCOL = ARGB32(0.3)
 
 """
-    ImageGenerator
+    Renderer
 
 Abstract supertype for objects that convert a frame of the simulation into an `ARGB32`
 image for display. Frames may be a single grid or a `NamedTuple` of multiple grids.
 """
-abstract type ImageGenerator end
+abstract type Renderer end
 
-imagesize(p::ImageGenerator, init::NamedTuple) = imagesize(p, first(init))
-imagesize(::ImageGenerator, init::AbstractArray) = size(init)
+imagesize(p::Renderer, init::NamedTuple) = imagesize(p, first(init))
+imagesize(::Renderer, init::AbstractArray) = size(init)
 
-_allocimage(p::ImageGenerator, init) = fill(ARGB32(0), imagesize(p, init)...)
+_allocimage(p::Renderer, init) = fill(ARGB32(0), imagesize(p, init)...)
 
-function grid_to_image!(o::ImageOutput, data::SimData)
-    grid_to_image!(o, data, grids(data))
+function render!(o::ImageOutput, data::AbstractSimData)
+    render!(o, data, grids(data))
 end
-function grid_to_image!(o::ImageOutput, data::SimData, grids)
-    grid_to_image!(imagebuffer(o), imagegen(o), o, data, grids)
+function render!(o::ImageOutput, data::AbstractSimData, grids)
+    render!(imagebuffer(o), renderer(o), o, data, grids)
 end
 
 """
-    SingleGridImageGenerator <: ImageGenerator
+    SingleGridRenderer <: Renderer
 
-Abstract supertype for [`ImageGenerator`](@ref)s that convert a single grid 
+Abstract supertype for [`Renderer`](@ref)s that convert a single grid 
 into an image array.
 
-The first grid will be displayed if a `SingleGridImageGenerator` is
+The first grid will be displayed if a `SingleGridRenderer` is
 used with a `NamedTuple` of grids.
 """
-abstract type SingleGridImageGenerator <: ImageGenerator end
+abstract type SingleGridRenderer <: Renderer end
 
-function grid_to_image!(
-    imagebuffer, ig::SingleGridImageGenerator, o::ImageOutput, data::SimData, 
+function render!(
+    imagebuffer, ig::SingleGridRenderer, o::ImageOutput, data::AbstractSimData, 
     grids::NamedTuple;
     name=string(first(keys(grids))), time=currenttime(data)
 )
-    grid_to_image!(imagebuffer, ig, o, data, first(grids); name=name, time=time)
+    render!(imagebuffer, ig, o, data, first(grids); name=name, time=time)
 end
-function grid_to_image!(
-    imagebuffer, ig::SingleGridImageGenerator, o::ImageOutput, data::SimData, 
+function render!(
+    imagebuffer, ig::SingleGridRenderer, o::ImageOutput, data::AbstractSimData, 
     grids::NamedTuple{(:_default_,)};
     name=nothing, time=currenttime(data)
 )
-    grid_to_image!(imagebuffer, ig, o, data, first(grids); name=name, time=time)
+    render!(imagebuffer, ig, o, data, first(grids); name=name, time=time)
 end
-function grid_to_image!(
-    imagebuffer, ig::SingleGridImageGenerator, o::ImageOutput, 
-    data::SimData{Y,X}, grid::AbstractArray; 
+function render!(
+    imagebuffer, ig::SingleGridRenderer, o::ImageOutput, 
+    data::AbstractSimData{Y,X}, grid::AbstractArray;
     name=nothing, time=currenttime(data), minval=minval(o), maxval=maxval(o),
 ) where {Y,X}
     for j in 1:X, i in 1:Y
@@ -61,7 +61,7 @@ function grid_to_image!(
 end
 
 """
-    Image <: SingleGridImageGenerator
+    Image <: SingleGridRenderer
 
     Image(; scheme=ObjectScheme(), zerocolor=nothing, maskcolor=nothing)
 
@@ -75,13 +75,14 @@ Converts output grids to a colorsheme.
 - `zerocolor`: a `Col` to use when values are zero, or `nothing` to ignore.
 - `maskcolor`: a `Color` to use when cells are masked, or `nothing` to ignore.
 """
-Base.@kwdef struct Image{S,Z,M} <: SingleGridImageGenerator
-    scheme::S      = ObjectScheme()
-    zerocolor::Z   = ZEROCOL
-    maskcolor::M   = MASKCOL
+struct Image{S,Z,M} <: SingleGridRenderer
+    scheme::S
+    zerocolor::Z
+    maskcolor::M
 end
 Image(scheme, zerocolor=ZEROCOL) = Image(scheme, zerocolor, MASKCOL)
-#Image(scheme; zerocolor=ZEROCOL, maskcolor=MASKCOL) = Image(scheme, zerocolor, maskcolor)
+Image(; scheme=ObjectScheme(), zerocolor=ZEROCOL, maskcolor=MASKCOL) =
+    Image(scheme, zerocolor, maskcolor)
 
 scheme(p::Image) = p.scheme
 zerocolor(p::Image) = p.zerocolor
@@ -90,7 +91,7 @@ maskcolor(p::Image) = p.maskcolor
 # Show colorscheme in Atom etc
 Base.show(io::IO, m::MIME"image/svg+xml", p::Image) = show(io, m, scheme(p))
 
-@inline function cell_to_pixel(ig::Image, mask, minval, maxval, data::SimData, val, I)
+@inline function cell_to_pixel(ig::Image, mask, minval, maxval, data::AbstractSimData, val, I)
     if !(maskcolor(ig) isa Nothing) && ismasked(mask, I...)
         to_rgb(maskcolor(ig))
     else
@@ -108,12 +109,12 @@ end
 """
     SparseOptInspector()
 
-A [`ImageGenerator`](@ref) that checks [`SparseOpt`](@ref) visually.
+A [`Renderer`](@ref) that checks [`SparseOpt`](@ref) visually.
 Cells that do not run show in gray. Errors show in red, but if they do there's a bug.
 """
-struct SparseOptInspector <: SingleGridImageGenerator end
+struct SparseOptInspector <: SingleGridRenderer end
 
-function cell_to_pixel(p::SparseOptInspector, mask, minval, maxval, data::SimData, val, I::Tuple)
+function cell_to_pixel(p::SparseOptInspector, mask, minval, maxval, data::AbstractSimData, val, I::Tuple)
     opt(data) isa SparseOpt || error("Can only use SparseOptInspector with SparseOpt grids")
     r = radius(first(grids(data)))
     blocksize = 2r
@@ -137,50 +138,50 @@ function cell_to_pixel(p::SparseOptInspector, mask, minval, maxval, data::SimDat
 end
 
 """
-    MultiGridImageGenerator <: ImageGenerator
+    MultiGridRenderer <: Renderer
 
-Abstract type for `ImageGenerator`s that convert a frame containing multiple 
+Abstract type for `Renderer`s that convert a frame containing multiple 
 grids into a single image.
 """
-abstract type MultiGridImageGenerator <: ImageGenerator end
+abstract type MultiGridRenderer <: Renderer end
 
 """
-    Layout <: MultiGridImageGenerator
+    Layout <: MultiGridRenderer
 
-    Layout(layout::Array, imagegens::Matrix)
+    Layout(layout::Array, renderer::Matrix)
 
-Layout allows displaying multiple grids in a block layout, by specifying a 
+Layout allows displaying multiple grids in a block layout, by specifying a
 layout matrix and a list of [`Image`](@ref)s to be run for each.
 
 # Arguments
 
 - `layout`: A Vector or Matrix containing the keys or numbers of grids in the locations to
     display them. `nothing`, `missing` or `0` values will be skipped.
-- `imagegens`: tuple of [`Image`](@ref), one for each grid in the simulation.
+- `renderer`: tuple of [`Image`](@ref), one for each grid in the simulation.
     Can be `nothing` or any other value for grids not in layout.
 """
-Base.@kwdef struct Layout{L<:AbstractMatrix,P} <: MultiGridImageGenerator
+Base.@kwdef struct Layout{L<:AbstractMatrix,P} <: MultiGridRenderer
     layout::L
-    imagegens::P
-    Layout(layouts::L, imagegens::P) where {L,P} = begin
-        imgens = map(_asimagegen, imagegens)
+    renderer::P
+    Layout(layouts::L, renderer::P) where {L,P} = begin
+        imgens = map(_asrenderer, renderer)
         new{L,typeof(imgens)}(layouts, imgens)
     end
 end
 # Convenience constructor to convert Vector input to a column Matrix
-function Layout(layout::AbstractVector, imagegens)
-    Layout(reshape(layout, length(layout), 1), imagegens)
+function Layout(layout::AbstractVector, renderer)
+    Layout(reshape(layout, length(layout), 1), renderer)
 end
 
-_asimagegen(p::ImageGenerator) = p
-_asimagegen(x) = Image(x)
+_asrenderer(p::Renderer) = p
+_asrenderer(x) = Image(x)
 
 layout(p::Layout) = p.layout
-imagegens(p::Layout) = p.imagegens
+renderer(p::Layout) = p.renderer
 imagesize(p::Layout, init::NamedTuple) = size(first(init)) .* size(p.layout)
 
-function grid_to_image!(
-    imagebuffer, l::Layout, o::ImageOutput, data::SimData, grids::NamedTuple
+function render!(
+    imagebuffer, l::Layout, o::ImageOutput, data::AbstractSimData, grids::NamedTuple
 )
     ngrids = length(grids)
     if !(minval(o) isa Nothing)
@@ -206,11 +207,11 @@ function grid_to_image!(
         I, J = map((i, j), gridsize(data)) do k, s
             (k - 1) * s + 1:k * s
         end
-        # Run image generators for section
-        grid_to_image!(
-            view(imagebuffer, I, J), imagegens(l)[n], o, data, grids[n];
+        # Run image renderers for section
+        render!(
+            view(imagebuffer, I, J), renderer(l)[n], o, data, grids[n];
             name=string(keys(grids)[n]), time=nothing,
-            minval=_valn(minval(o), n), maxval=_valn(maxval(o), n), 
+            minval=_valn(minval(o), n), maxval=_valn(maxval(o), n),
         )
     end
     _rendertime!(imagebuffer, textconfig(o), currenttime(data))
@@ -226,23 +227,22 @@ _valn(vals, n) = vals[n]
     throw(ArgumentError("Number of grids ($ngrids) and length of $f ($n) must be the same"))
 
 
-# Automatically choose an image generator
+# Automatically choose an image renderer
 
-function autoimagegen(init, scheme)
+function autorenderer(init, scheme)
     Image(first(_iterableschemes(scheme)), ZEROCOL, MASKCOL)
 end
-function autoimagegen(init::NamedTuple, scheme)
+function autorenderer(init::NamedTuple, scheme)
     rows = length(init) ÷ 4 + 1
     cols = (length(init) - 1) ÷ rows + 1
     layout = reshape([keys(init)...], (rows, cols))
-    imagegen = autoimagegen.(values(init), _iterableschemes(scheme))
-    Layout(layout, imagegen)
+    renderer = autorenderer.(values(init), _iterableschemes(scheme))
+    Layout(layout, renderer)
 end
 
 _iterableschemes(::Nothing) = (ObjectScheme(),)
 _iterableschemes(schemes::Union{Tuple,NamedTuple,AbstractArray}) = schemes
 _iterableschemes(scheme) = (scheme,)
-
 
 # Coll conversion tools
 
@@ -252,6 +252,7 @@ normalise(x::X, minv, maxv) where X = max(min((x - minv) / (maxv - minv), oneuni
 normalise(x::X, minv, maxv::Nothing) where X = max((x - minv) / (oneunit(X) - minv), zero(X))
 normalise(x::X, minv::Nothing, maxv) where X = min(x / maxv, oneunit(X), oneunit(X))
 normalise(x, minv::Nothing, maxv::Nothing) = x
+normalise(x; min=Nothing, max=Nothing) = normalise(x, min, max)
 
 # Rescale a value between 0 and 1 to be between `min` and `max`.
 # This can be used to shrink the range of a colorsheme that is displayed.
