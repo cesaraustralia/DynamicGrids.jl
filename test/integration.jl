@@ -374,7 +374,7 @@ end
             filename="test_gifoutput.gif", text=nothing,
             tspan=0u"s":5u"s":30u"s", fps=10, store=true,
         )
-        @test output.imageconfig.imagegen isa Image
+        @test output.imageconfig.renderer isa Image
         @test output.imageconfig.textconfig == nothing
         @test DynamicGrids.isstored(output) == true
         sim!(output, ruleset)
@@ -395,7 +395,7 @@ end
             tspan=0u"s":5u"s":30u"s", fps=10, store=true
         )
         @test DynamicGrids.isstored(output) == true
-        @test output.imageconfig.imagegen isa Layout
+        @test output.imageconfig.renderer isa Layout
         @test output.imageconfig.textconfig == nothing
         sim!(output, ruleset)
         @test all(map(==, output[Ti(5u"s")], (a=test6_7[:test2], b=zeroed)))

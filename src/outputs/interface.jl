@@ -161,15 +161,15 @@ Display an image generated from the grid, a required method for all `ImageOutput
 function showimage end
 
 """
-    grid_to_image!(o::ImageOutput, data::AbstractSimData)
-    grid_to_image!(imbuf, imgen::ImageGenerator, o::ImageOutput, data::AbstractSimData, grids)
+    render!(o::ImageOutput, data::AbstractSimData)
+    render!(imbuf, renderer::Renderer, o::ImageOutput, data::AbstractSimData, grids)
 
 Convert a grid or `NamedRuple` of grids to an `ARGB32` image, using an 
-[`ImageGenerator`](@ref).
+[`Renderer`](@ref).
 
-Generated pixels are written to the image buffer matrix.
+Rendered pixels are written to the image buffer matrix.
 """
-function grid_to_image! end
+function render! end
 
 """
     to_rgb(val) => ARGB32

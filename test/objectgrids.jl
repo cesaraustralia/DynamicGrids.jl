@@ -1,5 +1,5 @@
 using DynamicGrids, StaticArrays, Test, FileIO, Colors, FixedPointNumbers
-using DynamicGrids: SimData, grid_to_image!
+using DynamicGrids: SimData
 
 @testset "CellRule that multiples a StaticArray" begin
     rule = Cell{:grid1}() do state

@@ -13,16 +13,16 @@ Write the output array to a gif.
 - `font`: `String` name of font to search for. A default will be guessed.
 - `text`: `TextConfig()` or `nothing` for no text. Default is `TextConfig(; font=font)`.
 - `scheme`: ColorSchemes.jl scheme, `ObjectScheme()` or `Greyscale()`
-- `imagegen`: `ImageGenerator` like `Image` or `Layout`. Will be detected automatically
+- `render`: `Rendered` like `Image` or `Layout`. Will be detected automatically
 """
 function savegif(filename::String, o::Output, ruleset=Ruleset(); 
     minval=minval(o), maxval=maxval(o), 
-    scheme=ObjectScheme(), imagegen=autoimagegen(init(o), scheme), 
+    scheme=ObjectScheme(), renderer=autorenderer(init(o), scheme), 
     font=autofont(), text=TextConfig(font=font), textconfig=text, kw...
 )
     im_o = NoDisplayImageOutput(o; 
         imageconfig=ImageConfig(init(o); 
-            minval=minval, maxval=maxval, imagegen=imagegen, textconfig=textconfig
+            minval=minval, maxval=maxval, renderer=renderer, textconfig=textconfig
         )
     )
     savegif(filename, im_o, ruleset; kw...) 
@@ -32,7 +32,7 @@ function savegif(filename::String, o::ImageOutput, ruleset=Ruleset(); fps=fps(o)
     simdata = SimData(o, ruleset)
     images = map(firstindex(o):lastindex(o)) do f
         @set! simdata.currentframe = f
-        Array(grid_to_image!(o, simdata, o[f]))
+        Array(render!(o, simdata, o[f]))
     end
     array = cat(images..., dims=3)
     @show size(array)
@@ -62,7 +62,7 @@ Output that stores the simulation as images and saves a Gif file on completion.
 - `font`: `String` font name, used in default `TextConfig`. A default will be guessed.
 - `text`: [`TextConfig`](@ref) object or `nothing` for no text.
 - `scheme`: ColorSchemes.jl scheme, or `Greyscale()`
-- `imagegen`: [`ImageGenerator`](@ref)
+- `renderer`: [`Rendered`](@ref)
 - `minval`: minimum value(s) to set colour maximum
 - `maxval`: maximum values(s) to set colour minimum
 """
@@ -93,8 +93,8 @@ function savegif(filename::String, o::GifOutput, fps=fps(o); kw...)
 end
 
 
-_allocgif(i::ImageConfig, e::Extent) = _allocgif(imagegen(i), i::ImageConfig, e::Extent) 
-function _allocgif(::ImageGenerator, i::ImageConfig, e::Extent)
+_allocgif(i::ImageConfig, e::Extent) = _allocgif(renderer(i), i::ImageConfig, e::Extent) 
+function _allocgif(::Renderer, i::ImageConfig, e::Extent)
     zeros(ARGB32, gridsize(e)..., length(tspan(e)))
 end
 function _allocgif(p::Layout, i::ImageConfig, e::Extent)

@@ -1,6 +1,6 @@
 using DynamicGrids, Dates, Test, Colors, ColorSchemes, FileIO
 using FreeTypeAbstraction
-using DynamicGrids: grid_to_image!, imagegen, minval, maxval, normalise, SimData, NoDisplayImageOutput,
+using DynamicGrids: render!, renderer, minval, maxval, normalise, SimData, NoDisplayImageOutput,
     isstored, isasync, initialise!, finalise!, delay, fps, settimestamp!, timestamp, textconfig,
     tspan, setfps!, frames, isshowable, showframe, to_rgb, scale, Extent, extent
 using ColorSchemes: leonardo
@@ -53,7 +53,7 @@ end
     @test minval(output) === nothing
     @test maxval(output) === 40.0
     @test textconfig(output) === nothing
-    @test imagegen(output).scheme == ObjectScheme()
+    @test renderer(output).scheme == ObjectScheme()
     @test isasync(output) == false
     @test isstored(output) == false
     @test delay(output, 1.0) === nothing
@@ -73,9 +73,9 @@ end
     @test all(frames(output)[1] .=== 5init_)
     @test isshowable(output, 1)
 
-    imgen = Image()
+    rndr = Image()
     output = NoDisplayImageOutput(init_; 
-        tspan=1:10, maxval=40.0, imagegen=imgen, text=nothing
+        tspan=1:10, maxval=40.0, renderer=rndr, text=nothing
     )
     simdata = SimData(output, Ruleset(Life()))
     z0 = DynamicGrids.ZEROCOL
@@ -88,22 +88,22 @@ end
     rm("test.gif")
 end
 
-@testset "Image generator" begin
+@testset "Renderer" begin
     init_ = [8.0 10.0;
              0.0  5.0]
     mask_ = Bool[0 1;
                  1 1]
-    imgen = Image(zerocolor=(1.0, 0.0, 0.0), maskcolor=(0.1, 0.1, 0.1))
-    ic = DynamicGrids.ImageConfig(init_; imagegen=imgen, textconfig=nothing)
-    @test ic.imagegen === imgen
+    rndr = Image(zerocolor=(1.0, 0.0, 0.0), maskcolor=(0.1, 0.1, 0.1))
+    ic = DynamicGrids.ImageConfig(init_; renderer=rndr, textconfig=nothing)
+    @test ic.renderer === rndr
     output = NoDisplayImageOutput((a=init_,); 
         tspan=DateTime(2001):Year(1):DateTime(2010), mask=mask_,
-        imagegen=imgen, text=nothing, minval=0.0, maxval=10.0, store=true
+        renderer=rndr, text=nothing, minval=0.0, maxval=10.0, store=true
     )
-    @test imagegen(output) === output.imageconfig.imagegen === imgen
+    @test renderer(output) === output.imageconfig.renderer === rndr
     @test minval(output) === 0.0
     @test maxval(output) === 10.0
-    @test imagegen(output).zerocolor == Image(zerocolor=(1.0, 0.0, 0.0)).zerocolor
+    @test renderer(output).zerocolor == Image(zerocolor=(1.0, 0.0, 0.0)).zerocolor
     @test isstored(output) == true
     simdata = SimData(output, Ruleset(Life()))
 
@@ -113,25 +113,25 @@ end
                      0.0 0.5]
 
     # Test greyscale Image conversion
-    img = grid_to_image!(output, simdata)
+    img = render!(output, simdata)
     @test img == [ARGB32(0.1, 0.1, 0.1, 1.0) ARGB32(1.0, 1.0, 1.0, 1.0)
                   ARGB32(1.0, 0.0, 0.0, 1.0) ARGB32(0.5, 0.5, 0.5, 1.0)]
 
     output = NoDisplayImageOutput((a=init_,); 
         tspan=DateTime(2001):Year(1):DateTime(2010), mask=mask_,
-        imagegen=Image(; scheme=leonardo), text=nothing,
+        renderer=Image(; scheme=leonardo), text=nothing,
         minval=0.0, maxval=10.0, store=true
     )
-    img = grid_to_image!(output, simdata)
+    img = render!(output, simdata)
     @test img == [DynamicGrids.MASKCOL l1
                   DynamicGrids.ZEROCOL l05]
     z0 = ARGB32(1, 0, 0)
     output = NoDisplayImageOutput((a=init_,); 
         tspan=DateTime(2001):Year(1):DateTime(2010), mask=mask_,
-        imagegen = Image(scheme=leonardo, zerocolor=z0), text=nothing,
+        renderer = Image(scheme=leonardo, zerocolor=z0), text=nothing,
         minval=0.0, maxval=10.0, store=true
     )
-    img = grid_to_image!(output, simdata)
+    img = render!(output, simdata)
     @test img == [DynamicGrids.MASKCOL l1
                   z0 l05]
 
@@ -153,14 +153,13 @@ end
             textconfig=TextConfig(; font=font, timepixels=pixelsize, namepixels=pixelsize, bcolor=ARGB32(0))
             output = NoDisplayImageOutput(textinit; 
                 tspan=DateTime(2001):Year(1):DateTime(2001),
-                imagegen=Image(zerocolor=ARGB32(1.0, 0.0, 0.0, 1.0)), 
+                renderer=Image(zerocolor=ARGB32(1.0, 0.0, 0.0, 1.0)), 
                 text=textconfig, store=true,
             )
             simdata = SimData(output, Ruleset())
-            img = grid_to_image!(output, simdata);
+            img = render!(output, simdata);
             @test img == refimg
         end
-
     end
     
 end
@@ -179,15 +178,15 @@ end
         boundary=Wrap(),
         opt=SparseOpt(),
     )
-    imgen = SparseOptInspector()
+    rndr = SparseOptInspector()
     output = NoDisplayImageOutput(init; 
         tspan=Date(2001, 1, 1):Day(1):Date(2001, 1, 5), 
-        imagegen=imgen, minval=0.0, maxval=1.0, store=true
+        renderer=rndr, minval=0.0, maxval=1.0, store=true
     )
 
     @test minval(output) === 0.0
     @test maxval(output) === 1.0
-    @test imagegen(output) == SparseOptInspector()
+    @test renderer(output) == SparseOptInspector()
     @test isstored(output) == true
 
     global images = []
@@ -204,26 +203,26 @@ end
 
 end
 
-@testset "Layout ImageGenerator" begin
+@testset "Layout Renderer" begin
     init = [8.0 10.0;
             0.0  5.0]
     z0 = DynamicGrids.ZEROCOL
     grey = Greyscale()
     multiinit = (a=init, b=2init)
-    imgen = Layout([:a, nothing, :b], (grey, leonardo))
+    rndr = Layout([:a, nothing, :b], (grey, leonardo))
     output = NoDisplayImageOutput(multiinit; 
         tspan=DateTime(2001):Year(1):DateTime(2002), 
-        imagegen=imgen, text=nothing,
+        renderer=rndr, text=nothing,
         minval=(0, 0), maxval=(10, 20), store=true
     )
     @test minval(output) === (0, 0)
     @test maxval(output) === (10, 20)
-    @test imagegen(output) === imgen
+    @test renderer(output) === rndr
     @test isstored(output) == true
     simdata = SimData(output, Ruleset(Life()))
 
     # Test image is joined from :a, nothing, :b
-    @test grid_to_image!(output, simdata) ==
+    @test render!(output, simdata) ==
         [ARGB32(0.8, 0.8, 0.8, 1.0) ARGB32(1.0, 1.0, 1.0, 1.0)
          z0                         ARGB32(0.5, 0.5, 0.5, 1.0)
          ARGB32(0.0, 0.0, 0.0, 1.0) ARGB32(0.0, 0.0, 0.0, 1.0)
@@ -255,36 +254,36 @@ end
             renderstring!(refimg, "b", face, namepixels, nameposb...;
                           fcolor=ARGB32(RGB(1.0), 1.0), bcolor=ARGB32(RGB(0.0), 1.0))
             textconfig = TextConfig(; font=font, timepixels=timepixels, namepixels=namepixels, bcolor=ARGB32(0))
-            imgen = Layout([:a, nothing, :b], (grey, leonardo))
+            rndr = Layout([:a, nothing, :b], (grey, leonardo))
             output = NoDisplayImageOutput(textinit; 
-                 tspan=DateTime(2001):Year(1):DateTime(2001), imagegen=imgen, text=textconfig,
+                 tspan=DateTime(2001):Year(1):DateTime(2001), renderer=rndr, text=textconfig,
                  store=true, minval=(0, 0), maxval=(1, 1)
             )
             simdata = SimData(output, Ruleset())
-            img = grid_to_image!(output, simdata);
+            img = render!(output, simdata);
             @test img == refimg
         end
     end
     @testset "errors" begin
-        output = NoDisplayImageOutput(multiinit; tspan=1:10, imagegen=imgen, 
+        output = NoDisplayImageOutput(multiinit; tspan=1:10, renderer=rndr, 
             minval=(0, 0, 0), 
             maxval=(10, 20), 
         )
         simdata = SimData(output, Ruleset(Life()))
-        @test_throws ArgumentError grid_to_image!(output, simdata)
-        broken_imgen = Layout([:d, :c], (grey, leonardo))
+        @test_throws ArgumentError render!(output, simdata)
+        broken_rndr = Layout([:d, :c], (grey, leonardo))
         output = NoDisplayImageOutput(multiinit; 
-            tspan=1:10, imagegen=broken_imgen, text=nothing, minval=(0, 0), maxval=(10, 20),
+            tspan=1:10, renderer=broken_rndr, text=nothing, minval=(0, 0), maxval=(10, 20),
         )
         simdata = SimData(output, Ruleset(Life()))
-        @test_throws ArgumentError grid_to_image!(output, simdata)
+        @test_throws ArgumentError render!(output, simdata)
         @test_throws ArgumentError TextConfig(; font="not_a_font")
         @test_throws ArgumentError TextConfig(; font=:not_a_string)
     end
     @testset "Layout is the default for NamedTuple of grids" begin
         output = NoDisplayImageOutput(multiinit; tspan=1:10)
-        @test imagegen(output) isa Layout
-        @test DynamicGrids.imagesize(imagegen(output), multiinit) == (2, 4)
+        @test renderer(output) isa Layout
+        @test DynamicGrids.imagesize(renderer(output), multiinit) == (2, 4)
     end
 end
 
@@ -299,10 +298,10 @@ end
     output = ArrayOutput(init_; tspan=1:10)
     @test minval(output) == nothing
     @test maxval(output) == nothing
-    @test imagegen(output) isa Image
+    @test renderer(output) isa Image
     @test fps(output) === nothing
     sim!(output, Life())
-    savegif("test2.gif", output; imagegen=Image(zerocolor=RGB(0.0)), text=nothing)
+    savegif("test2.gif", output; renderer=Image(zerocolor=RGB(0.0)), text=nothing)
     gif = load("test2.gif")
     @test gif[:, :, 1] == RGB.(cat(output...; dims=3))[:, :, 1]
     rm("test2.gif")

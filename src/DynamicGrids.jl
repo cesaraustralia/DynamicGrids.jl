@@ -68,7 +68,7 @@ export GraphicOutput, REPLOutput
 
 export ImageOutput, GifOutput
 
-export ImageGenerator, Image, Layout, SparseOptInspector
+export Renderer, Image, Layout, SparseOptInspector
 
 export TextConfig
 
@@ -103,7 +103,7 @@ include("outputs/graphic.jl")
 include("outputs/image.jl")
 include("outputs/textconfig.jl")
 include("outputs/schemes.jl")
-include("outputs/imagegenerators.jl")
+include("outputs/render.jl")
 include("outputs/array.jl")
 include("outputs/transformed.jl")
 include("outputs/repl.jl")

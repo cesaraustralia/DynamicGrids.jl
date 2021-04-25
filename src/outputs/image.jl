@@ -15,26 +15,27 @@ Common configuration component for all [`ImageOutput`](@ref).
 - `font`: `String` name of font to search for. A default will be guessed.
 - `text`: `TextConfig()` or `nothing` for no text. Default is `TextConfig(; font=font)`.
 - `scheme`: ColorSchemes.jl scheme, or `Greyscale()`. ObjectScheme() by default.
-- `imagegen`: [`ImageGenerator`](@ref) like [`Image`](@ref) or [`Layout`](@ref) Will 
+- `renderer`: [`Renderer`](@ref) like [`Image`](@ref) or [`Layout`](@ref) Will 
     be detected automatically
 """
-struct ImageConfig{P,Min,Max,IB,TC}
-    imagegen::P
+struct ImageConfig{IB,Min,Max,Bu,TC}
+    renderer::IB
     minval::Min
     maxval::Max
-    imagebuffer::IB
+    imagebuffer::Bu
     textconfig::TC
 end
 function ImageConfig(init; 
     font=autofont(), text=TextConfig(; font=font), textconfig=text, 
-    scheme=ObjectScheme(), imagegen=autoimagegen(init, scheme), 
+    scheme=ObjectScheme(), 
+    imagegen=autorenderer(init, scheme), renderer=imagegen, 
     minval=nothing, maxval=nothing, kw...
 ) 
-    imagebuffer = _allocimage(imagegen, init)
-    ImageConfig(imagegen, minval, maxval, imagebuffer, textconfig)
+    imagebuffer = _allocimage(renderer, init)
+    ImageConfig(renderer, minval, maxval, imagebuffer, textconfig)
 end
 
-imagegen(ic::ImageConfig) = ic.imagegen
+renderer(ic::ImageConfig) = ic.renderer
 minval(ic::ImageConfig) = ic.minval
 maxval(ic::ImageConfig) = ic.maxval
 imagebuffer(ic::ImageConfig) = ic.imagebuffer
@@ -93,13 +94,13 @@ end
 imageconfig(o::Output) = ImageConfig(init(o))
 imageconfig(o::ImageOutput) = o.imageconfig
 
-imagegen(o::Output) = imagegen(imageconfig(o))
+renderer(o::Output) = renderer(imageconfig(o))
 minval(o::Output) = minval(imageconfig(o))
 maxval(o::Output) = maxval(imageconfig(o))
 imagebuffer(o::Output) = imagebuffer(imageconfig(o))
 textconfig(o::Output) = textconfig(imageconfig(o))
 
-showframe(o::ImageOutput, data) = showimage(grid_to_image!(o, data), o, data)
+showframe(o::ImageOutput, data) = showimage(render!(o, data), o, data)
 showimage(image, o, data) = showimage(image, o)
 
 # Headless image output
