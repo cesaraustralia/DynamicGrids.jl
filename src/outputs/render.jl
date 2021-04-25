@@ -49,10 +49,16 @@ end
 function render!(
     imagebuffer, ig::SingleGridRenderer, o::ImageOutput, 
     data::AbstractSimData{Y,X}, grid::AbstractArray;
-    name=nothing, time=currenttime(data), minval=minval(o), maxval=maxval(o),
+    name=nothing, time=currenttime(data), accessor=nothing,
+    minval=minval(o), maxval=maxval(o),
 ) where {Y,X}
     for j in 1:X, i in 1:Y
         @inbounds val = grid[i, j]
+        val = if accessor isa Nothing
+            _access(DynamicGrids.accessor(ig), val)
+        else
+            _access(accessor, val)
+        end
         pixel = to_rgb(cell_to_pixel(ig, mask(o), minval, maxval, data, val, (i, j)))
         @inbounds imagebuffer[i, j] = pixel
     end
@@ -82,15 +88,19 @@ Converts output grids to a colorsheme.
 - `zerocolor`: a `Col` to use when values are zero, or `nothing` to ignore.
 - `maskcolor`: a `Color` to use when cells are masked, or `nothing` to ignore.
 """
-struct Image{S,Z,M} <: SingleGridRenderer
+struct Image{A,S,Z,M} <: SingleGridRenderer
+    accessor::A
     scheme::S
     zerocolor::Z
     maskcolor::M
 end
-Image(scheme, zerocolor=ZEROCOL) = Image(scheme, zerocolor, MASKCOL)
-Image(; scheme=ObjectScheme(), zerocolor=ZEROCOL, maskcolor=MASKCOL) =
-    Image(scheme, zerocolor, maskcolor)
+Image(accesor::Union{Function,Int}, scheme, zerocolor=ZEROCOL) = Image(scheme, zerocolor, MASKCOL)
+Image(scheme, zerocolor=ZEROCOL, maskcolor=MASKCOL) = Image(identity, scheme, zerocolor, MASKCOL)
+Image(accessor::Union{Function,Int}; kw...) = Image(; accessor, kw...)
+Image(; accessor::Union{Function,Int}=identity, scheme=ObjectScheme(), zerocolor=ZEROCOL, maskcolor=MASKCOL, kw...) =
+    Image(accessor, scheme, zerocolor, maskcolor)
 
+accessor(p::Image) = p.accessor
 scheme(p::Image) = p.scheme
 zerocolor(p::Image) = p.zerocolor
 maskcolor(p::Image) = p.maskcolor
@@ -189,15 +199,17 @@ imagesize(gs::NTuple{2}, ls::NTuple{1}) = gs .* (first(ls), 1)
 function render!(
     imagebuffer, l::Layout, o::ImageOutput, data::AbstractSimData, grids::NamedTuple
 )
-    lsize = size(layout(l))
-    if !(minval(o) isa Nothing)
-        size(minval(o)) == lsize || _wrongshapeerror(minval, lsize, size(minval(o)))
+    npanes = length(layout(l))
+    minv, maxv = minval(o), maxval(o)
+    if !(minv isa Nothing)
+        length(minv) == npanes || _wronglengtherror(minval, npanes, length(minv))
     end
-    if !(maxval(o) isa Nothing)
-        size(maxval(o)) == lsize || _wrongshapeerror(maxval, lsize, size(maxval(o)))
+    if !(maxv isa Nothing)
+        length(maxv) == npanes || _wronglengtherror(maxval, npanes, length(maxv))
     end
 
-    grid_ids = layout(l)
+    grid_ids = map(_grid_ids, layout(l))
+    grid_accessors = map(_grid_accessor, layout(l))
     # Loop over the layout matrix
     for I in CartesianIndices(grid_ids)
         grid_id = grid_ids[I]
@@ -211,15 +223,17 @@ function render!(
             grid_id
         end
         Itup = length(Tuple(I)) == 1 ? (Tuple(I)..., 1) : Tuple(I) 
-        inds = map(Itup, gridsize(data)) do l, gs
+        im_I = map(Itup, gridsize(data)) do l, gs
             (l - 1) * gs + 1:l * gs
         end
+        lin = LinearIndices(grid_ids)[I]
 
         # Run image renderers for section
         render!(
-            view(imagebuffer, inds...), renderer(l)[I], o, data, grids[n];
+            view(imagebuffer, im_I...), renderer(l)[lin], o, data, grids[n];
             name=string(keys(grids)[n]), time=nothing,
-            minval=_get(minval(o), I), maxval=_get(maxval(o), I),
+            minval=_get(minv, lin), maxval=_get(maxv, lin),
+            accessor=grid_accessors[I],
         )
     end
     _rendertime!(imagebuffer, textconfig(o), currenttime(data))
@@ -229,23 +243,45 @@ end
 _get(::Nothing, I) = nothing
 _get(vals, I) = vals[I]
 
+_grid_ids(id::Symbol) = id
+_grid_ids(id::Pair{Symbol}) = first(id)
+_grid_ids(id) = throw(ArgumentError("Layout id $id is not a valid grid name. Use a `Symbol` or `Pair{Symbol,<:Any}`"))
+
+_grid_accessor(id::Pair) = last(id)
+_grid_accessor(id) = nothing
+
+_access(::Nothing, obj) = obj
+_access(f::Function, obj) = f(obj)
+_access(i::Int, obj) = obj[i] 
+
 @noinline _grididnotinkeyserror(grid_id, grids) =
     throw(ArgumentError("$grid_id is not in $(keys(grids))"))
-@noinline _wrongshapeerror(f, lsize, msize) =
-    throw(ArgumentError("Shape of ($lsize) and size of $f ($msize) must be the same"))
+@noinline _wronglengtherror(f, npanes, len) =
+    throw(ArgumentError("Number of layout panes ($npanes) and length of $f ($len) must be the same"))
 
 
 # Automatically choose an image renderer
 
-function autorenderer(init, scheme)
-    Image(first(_iterableschemes(scheme)), ZEROCOL, MASKCOL)
+function autorenderer(init, scheme; kw...)
+    Image(; scheme=first(_iterableschemes(scheme)), kw...)
 end
-function autorenderer(init::NamedTuple, scheme)
+function autorenderer(init::NamedTuple, scheme; 
+    layout=_autolayout(init), 
+    renderers=_autorenderers(init, scheme),
+    kw...
+)
+    Layout(layout, renderers)
+end
+
+function _autolayout(init) 
     rows = length(init) ÷ 4 + 1
     cols = (length(init) - 1) ÷ rows + 1
-    layout = reshape([keys(init)...], (rows, cols))
-    renderer = autorenderer.([values(init)...], _iterableschemes(scheme))
-    Layout(layout, renderer)
+    reshape([keys(init)...], (rows, cols))
+end
+
+function _autorenderers(init, scheme)
+    inits = values(init)
+    autorenderer.(reshape([inits...], 1, length(inits)), _iterableschemes(scheme))
 end
 
 _iterableschemes(::Nothing) = [ObjectScheme()]

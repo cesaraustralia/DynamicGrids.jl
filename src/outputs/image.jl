@@ -28,9 +28,10 @@ end
 function ImageConfig(init; 
     font=autofont(), text=TextConfig(; font=font), textconfig=text, 
     scheme=ObjectScheme(), 
-    imagegen=autorenderer(init, scheme), renderer=imagegen, 
+    imagegen=nothing, renderer=imagegen,
     minval=nothing, maxval=nothing, kw...
 ) 
+    renderer = renderer isa Nothing ? autorenderer(init, scheme; kw...) : renderer
     imagebuffer = _allocimage(renderer, init)
     ImageConfig(renderer, minval, maxval, imagebuffer, textconfig)
 end
