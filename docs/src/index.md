@@ -135,10 +135,14 @@ DynamicGrids.timestep
 DynamicGrids.currenttimestep
 DynamicGrids.currenttime
 DynamicGrids.currentframe
+DynamicGrids.AbstractSimData
 DynamicGrids.SimData
+DynamicGrids.RuleData
 DynamicGrids.GridData
 DynamicGrids.ReadableGridData
 DynamicGrids.WritableGridData
+DynamicGrids.AbstractSimSettings
+DynamicGrids.SimSettings
 ```
 
 ## Neighborhoods
