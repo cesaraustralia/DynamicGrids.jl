@@ -217,13 +217,13 @@ ImageOutput
 GifOutput
 ```
 
-### Image generators
+### Renderers
 
 ```@docs
-ImageGenerator
-DynamicGrids.SingleGridImageGenerator
+Renderer
+DynamicGrids.SingleGridRenderer
 Image
-DynamicGrids.MultiGridImageGenerator
+DynamicGrids.MultiGridRenderer
 Layout
 SparseOptInspector
 ```
@@ -231,7 +231,7 @@ SparseOptInspector
 ### Color schemes
 
 Schemes from Colorschemes.jl can be used for the `scheme` argument to `ImageOutput`, 
-`ImageGenerator`s. `Greyscale` control over the band of grey used, and is very fast. 
+`Renderer`s. `Greyscale` control over the band of grey used, and is very fast. 
 `ObjectScheme` is the default.
 
 ```@docs
@@ -294,7 +294,7 @@ Also uses `Output` and `GraphicOutput` interfaces.
 DynamicGrids.ImageConfig
 DynamicGrids.imageconfig
 DynamicGrids.showimage
-DynamicGrids.grid_to_image!
+DynamicGrids.render!
 DynamicGrids.to_rgb
 ```
 

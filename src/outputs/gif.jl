@@ -11,9 +11,9 @@ Write the output array to a gif.
 - `maxval`: Maximum value in the grid(s) to normalise for conversion to an RGB pixel. 
     `Number` or `Tuple` for multiple grids. 
 - `font`: `String` name of font to search for. A default will be guessed.
-- `text`: `TextConfig()` or `nothing` for no text. Default is `TextConfig(; font=font)`.
-- `scheme`: ColorSchemes.jl scheme, `ObjectScheme()` or `Greyscale()`
-- `render`: `Rendered` like `Image` or `Layout`. Will be detected automatically
+- `text`: [`TextConfig`](@ref) or `nothing` for no text. Default is `TextConfig(; font=font)`.
+- `scheme`: ColorSchemes.jl scheme, [`ObjectScheme`](@ref) or [`Greyscale`](@ref)
+- `renderer`: [`Renderer`](@ref) such as [`Image`](@ref) or [`Layout`](@ref). Will be detected automatically
 """
 function savegif(filename::String, o::Output, ruleset=Ruleset(); 
     minval=minval(o), maxval=maxval(o), 
@@ -62,7 +62,7 @@ Output that stores the simulation as images and saves a Gif file on completion.
 - `font`: `String` font name, used in default `TextConfig`. A default will be guessed.
 - `text`: [`TextConfig`](@ref) object or `nothing` for no text.
 - `scheme`: ColorSchemes.jl scheme, or `Greyscale()`
-- `renderer`: [`Rendered`](@ref)
+- `renderer`: [`Renderer`](@ref)
 - `minval`: minimum value(s) to set colour maximum
 - `maxval`: maximum values(s) to set colour minimum
 """
