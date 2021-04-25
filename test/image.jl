@@ -209,26 +209,24 @@ end
     z0 = DynamicGrids.ZEROCOL
     grey = Greyscale()
     multiinit = (a=init, b=2init)
-    rndr = Layout([:a, nothing, :b], (grey, leonardo))
+    rndr = Layout([:a nothing :b], [grey nothing leonardo])
+    @test DynamicGrids.imagesize(rndr, init) == (2, 6)
+
     output = NoDisplayImageOutput(multiinit; 
         tspan=DateTime(2001):Year(1):DateTime(2002), 
         renderer=rndr, text=nothing,
-        minval=(0, 0), maxval=(10, 20), store=true
+        minval=[0 nothing 0], maxval=[10 nothing 20], store=true
     )
-    @test minval(output) === (0, 0)
-    @test maxval(output) === (10, 20)
+    @test minval(output) == [0 nothing 0]
+    @test maxval(output) == [10 nothing 20]
     @test renderer(output) === rndr
     @test isstored(output) == true
     simdata = SimData(output, Ruleset(Life()))
 
     # Test image is joined from :a, nothing, :b
     @test render!(output, simdata) ==
-        [ARGB32(0.8, 0.8, 0.8, 1.0) ARGB32(1.0, 1.0, 1.0, 1.0)
-         z0                         ARGB32(0.5, 0.5, 0.5, 1.0)
-         ARGB32(0.0, 0.0, 0.0, 1.0) ARGB32(0.0, 0.0, 0.0, 1.0)
-         ARGB32(0.0, 0.0, 0.0, 1.0) ARGB32(0.0, 0.0, 0.0, 1.0)
-         l08                   l1
-         z0                    l05                  ]
+        [ARGB32(0.8, 0.8, 0.8, 1.0) ARGB32(1.0, 1.0, 1.0, 1.0) ARGB32(0.0) ARGB32(0.0) l08 l1
+         z0                         ARGB32(0.5, 0.5, 0.5, 1.0) ARGB32(0.0) ARGB32(0.0) z0  l05]
 
     @testset "text captions" begin
         timepixels = 20
@@ -241,6 +239,7 @@ end
             face = findfont(font)
         end
         if face !== nothing
+            # Set up refernce image
             refimg = cat(fill(z0, 200, 200), 
                          fill(ARGB32(0), 200, 200), 
                          fill(z0, 200, 200); dims=1)
@@ -254,10 +253,12 @@ end
             renderstring!(refimg, "b", face, namepixels, nameposb...;
                           fcolor=ARGB32(RGB(1.0), 1.0), bcolor=ARGB32(RGB(0.0), 1.0))
             textconfig = TextConfig(; font=font, timepixels=timepixels, namepixels=namepixels, bcolor=ARGB32(0))
-            rndr = Layout([:a, nothing, :b], (grey, leonardo))
+
+            # Build renderer
+            rndr = Layout([:a, nothing, :b], [grey, nothing, leonardo])
             output = NoDisplayImageOutput(textinit; 
                  tspan=DateTime(2001):Year(1):DateTime(2001), renderer=rndr, text=textconfig,
-                 store=true, minval=(0, 0), maxval=(1, 1)
+                 store=true, minval=[0, nothing, 0], maxval=[1, nothing, 1]
             )
             simdata = SimData(output, Ruleset())
             img = render!(output, simdata);
@@ -266,14 +267,14 @@ end
     end
     @testset "errors" begin
         output = NoDisplayImageOutput(multiinit; tspan=1:10, renderer=rndr, 
-            minval=(0, 0, 0), 
-            maxval=(10, 20), 
+            minval=[0, 0, 0], 
+            maxval=[10, 20], 
         )
         simdata = SimData(output, Ruleset(Life()))
         @test_throws ArgumentError render!(output, simdata)
         broken_rndr = Layout([:d, :c], (grey, leonardo))
         output = NoDisplayImageOutput(multiinit; 
-            tspan=1:10, renderer=broken_rndr, text=nothing, minval=(0, 0), maxval=(10, 20),
+            tspan=1:10, renderer=broken_rndr, text=nothing, minval=[0, 0], maxval=[10, 20],
         )
         simdata = SimData(output, Ruleset(Life()))
         @test_throws ArgumentError render!(output, simdata)
@@ -306,4 +307,3 @@ end
     @test gif[:, :, 1] == RGB.(cat(output...; dims=3))[:, :, 1]
     rm("test2.gif")
 end
-
