@@ -1,5 +1,5 @@
 using DynamicGrids, StaticArrays, Test, FileIO, Colors, FixedPointNumbers
-using DynamicGrids: SimData
+using DynamicGrids: SimData, NoDisplayImageOutput
 
 @testset "CellRule that multiples a StaticArray" begin
     rule = Cell{:grid1}() do state
@@ -152,11 +152,11 @@ end
     init = (grid1=fill(TS(0.0, 0.0), 3, 3),)
     # These should have the same answer
     output1 = GifOutput(init; 
-        filename="objectgrid.gif", store=true, tspan=1:2, maxval=(grid1=99.0,), text=nothing
+        filename="objectgrid.gif", store=true, tspan=1:2, maxval=[99.0], text=nothing
     )
     output2 = GifOutput(init; 
         filename="objectgrid_greyscale.gif", scheme=Greyscale(), store=true, tspan=1:2, 
-        maxval=(grid1=99.0,), text=nothing
+        maxval=reshape([99.0], 1, 1), text=nothing
     )
     sim!(output1, rule)
     sim!(output2, rule)
@@ -173,4 +173,33 @@ end
                (0.298,0.298,0.298) (1.0,1.0,1.0) (0.298,0.298,0.298)          
                (0.298,0.298,0.298) (0.298,0.298,0.298) (0.298,0.298,0.298)]
           )
+end
+
+@testset "static arrays grid can generate an image" begin
+    rule = Cell{:grid1}() do state
+         2state
+    end
+    init = (grid1 = fill(SA[1.0, 2.0], 5, 5),)
+
+    # We can index into the SArray or access
+    # it with a function, defined using a Pair
+    output = GifOutput(init; 
+        filename="sa.gif",
+        tspan=1:3, 
+        store=true,
+        layout=[:grid1=>1 :grid1=>x->x[2]],
+        renderers=[Greyscale() Greyscale()],
+        minval=[0.0 0.0], maxval=[10.0 10.0],
+        text=nothing,
+    )
+
+    sim!(output, rule)
+    a02 = ARGB32(0.2)
+    a04 = ARGB32(0.4)
+    @test output.gif[:, :, 2] ==
+        [a02 a02 a02 a02 a02 a04 a04 a04 a04 a04
+         a02 a02 a02 a02 a02 a04 a04 a04 a04 a04
+         a02 a02 a02 a02 a02 a04 a04 a04 a04 a04
+         a02 a02 a02 a02 a02 a04 a04 a04 a04 a04
+         a02 a02 a02 a02 a02 a04 a04 a04 a04 a04]
 end
