@@ -4,12 +4,14 @@ using DynamicGrids: Extent, SimData, gridview
 
 if CUDAKernels.CUDA.has_cuda_gpu()
     CUDAKernels.CUDA.allowscalar(false)
-    hardware = (SingleCPU(), ThreadedCPU(),) 
+    hardware = (SingleCPU(), ThreadedCPU(), CPUGPU())
+    # hardware = (CPUGPU(),) 
 else
     hardware = (SingleCPU(), ThreadedCPU(), CPUGPU())
 end
 opts = (NoOpt(), SparseOpt())
 
+proc = CPUGPU()
 proc = SingleCPU()
 opt = SparseOpt()
 opt = NoOpt()
@@ -131,6 +133,10 @@ test5_6 = (
             ]
 )
 
+test = test5_6
+proc = SingleCPU()
+proc = CPUGPU()
+
 @testset "Life simulation Wrap" begin
     # Test on two sizes to test half blocks on both axes
     # Loop over shifing init arrays to make sure they all work
@@ -146,8 +152,7 @@ test5_6 = (
                     opt=opt,
                 )
                 @testset "$(nameof(typeof(proc))) $(nameof(typeof(opt))) results match glider behaviour" begin
-                    bufs = (zeros(Int, 3, 3), zeros(Int, 3, 3))
-                    rule = Life(neighborhood=Moore{1}(bufs))
+                    rule = Life(neighborhood=Moore{1}())
                     output = ArrayOutput(test[:init], tspan=tspan)
                     sim!(output, ruleset)
                     @test output[2] == test[:test2] # || (println(2); display(output[2]); display(test[:test2]))
@@ -179,6 +184,16 @@ test5_6 = (
     end
     nothing
 end
+
+# sim!(output, nrule)
+# output[2]
+# init2 = zeros(Bool, 15, 15)
+# init2[6:10, 5:10] .= test5_6[:init]
+# output = ArrayOutput(init2, tspan=Date(2001, 1, 1):Day(2):Date(2001, 1, 5), proc=proc)
+# init2
+# init2 = Array(rand(300, 300) .< 0.05)
+# output = REPLOutput(init2, tspan=Date(2001, 1, 1):Day(2):Date(2003, 1, 5), proc=proc)
+# sim!(output, ruleset)
 
 @testset "Life simulation with Remove boudary" begin
     init_ =     DimArray(Bool[

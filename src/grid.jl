@@ -244,8 +244,9 @@ Base.parent(d::WritableGridData) = parent(dest(d))
 ### UNSAFE / LOCKS required
 
 # Base.setindex!
-# This is naot safe for general use, even on a single CPU
-# It can be used only where only one identical value is set
+# This is not safe for general use. 
+# It can be used where only identical transformations of a cell 
+# can happen from any other cell, such as setting all 1s to 2.
 @propagate_inbounds function Base.setindex!(d::WritableGridData, x, I...)
     _setindex!(d, proc(d), x, I...)
 end
@@ -257,7 +258,7 @@ end
 end
 @propagate_inbounds function _setindex!(d::WritableGridData, proc::ThreadedCPU, x, I...)
     # Dest status is not threadsafe, even if the 
-    # setindex itself is safe. so we LOCK
+    # setindex itself is safe. So we LOCK
     lock(proc)
     @inbounds _setdeststatus!(d, x, I...)
     unlock(proc)
@@ -275,4 +276,3 @@ function _setdeststatus!(d::WritableGridData{Y,X,R}, opt::SparseOpt, x, I...) wh
     return nothing
 end
 _setdeststatus!(d::WritableGridData, opt::PerformanceOpt, x, I...) = nothing
-

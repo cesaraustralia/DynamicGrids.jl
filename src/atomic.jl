@@ -14,7 +14,9 @@ for (f, op) in atomic_ops
             @inbounds _setdeststatus!(d, x, I...)
             @inbounds dest(d)[I...] = ($op)(dest(d)[I...], x)
         end
-        @propagate_inbounds function ($f)(d::WritableGridData, proc::ThreadedCPU, x, I...)
+        @propagate_inbounds function ($f)(
+            d::WritableGridData, proc::Union{ThreadedCPU,CPUGPU}, x, I...
+        )
             lock(proc)
             ($f)(d, SingleCPU(), x, I...)
             unlock(proc)

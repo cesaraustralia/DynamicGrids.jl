@@ -15,6 +15,7 @@ using Adapt,
       FreeTypeAbstraction,
       FileIO,
       LinearAlgebra,
+      KernelAbstractions,
       OffsetArrays,
       REPL,
       Reexport,
@@ -53,7 +54,7 @@ export AbstractRuleset, Ruleset, StaticRuleset
 export Neighborhood, RadialNeighborhood, Window, AbstractKernelNeighborhood, Kernel,
        Moore, AbstractPositionalNeighborhood, Positional, VonNeumann, LayeredPositional
 
-export Processor, SingleCPU, ThreadedCPU
+export Processor, SingleCPU, ThreadedCPU, CPUGPU
 
 export PerformanceOpt, NoOpt, SparseOpt
 
@@ -91,6 +92,7 @@ include("rulesets.jl")
 include("extent.jl")
 include("grid.jl")
 include("simulationdata.jl")
+include("gpu.jl")
 include("atomic.jl")
 include("auxiliary.jl")
 include("chain.jl")

@@ -2,11 +2,11 @@ using DynamicGrids, ModelParameters, Setfield, Test, StaticArrays,
       LinearAlgebra, CUDAKernels
 import DynamicGrids: applyrule, applyrule!, maprule!, ruletype, extent, source, dest,
        _getreadgrids, _getwritegrids, _combinegrids, _readkeys, _writekeys,
-       SimData, WritableGridData, Rule, Extent
+       SimData, WritableGridData, Rule, Extent, CPUGPU
 
 if CUDAKernels.CUDA.has_cuda_gpu()
     CUDAKernels.CUDA.allowscalar(false)
-    hardware = (SingleCPU(), ThreadedCPU(), CuGPU())
+    hardware = (SingleCPU(), ThreadedCPU(), CPUGPU(), CuGPU())
 else
     hardware = (SingleCPU(), ThreadedCPU(), CPUGPU())
 end
@@ -201,9 +201,9 @@ end
     end
 end
 
-
-struct AddOneRule{R,W} <: Rule{R,W} end
+struct AddOneRule{R,W} <: CellRule{R,W} end
 DynamicGrids.applyrule(data, ::AddOneRule, state, args...) = state + 1
+
 
 @testset "Rulset mask ignores false cells" begin
     init = [0.0 4.0 0.0
@@ -231,7 +231,7 @@ end
 
 # Single grid rules
 
-struct TestRule{R,W} <: Rule{R,W} end
+struct TestRule{R,W} <: CellRule{R,W} end
 applyrule(data, ::TestRule, state, index) = 0
 
 @testset "A rule that returns zero gives zero outputs" begin
@@ -345,7 +345,7 @@ applyrule(data, ::TestCellSquare, (state,), index) = state^2
     end
 end
 
-struct PrecalcRule{R,W,P} <: Rule{R,W}
+struct PrecalcRule{R,W,P} <: CellRule{R,W}
     precalc::P
 end
 DynamicGrids.modifyrule(rule::PrecalcRule, simdata) = PrecalcRule(currenttime(simdata))
