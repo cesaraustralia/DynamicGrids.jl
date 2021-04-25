@@ -65,7 +65,7 @@ end
     expr = Expr(:tuple)
     keys = map(_unwrap, Tuple(K.parameters))
     for (i, k) in enumerate(keys)
-        push!(expr.args, :(@inbounds data[$(QuoteNode(k))][I...]))
+        push!(expr.args, :(@inbounds source(data[$(QuoteNode(k))])[I...]))
     end
     return quote
         keys = $keys
@@ -74,59 +74,79 @@ end
     end
 end
 @inline function _readcell(data::AbstractSimData, ::Val, I...)
-    @inbounds first(data)[I...]
+    @inbounds source(first(data))[I...]
 end
 
 # _writecell! => nothing
 # Write values to grid/s at index `I`. 
 # This occurs for every cell for every rule, so has to be very fast.
-@generated function _writecell!(simdata, wkeys::K, vals::Union{Tuple,NamedTuple}, I...) where K<:Tuple
+@generated function _writecell!(data, ::Val{<:CellRule}, wkeys::K, vals::Union{Tuple,NamedTuple}, I...) where K<:Tuple
     expr = Expr(:block)
     keys = map(_unwrap, Tuple(K.parameters))
     for (i, k) in enumerate(keys) 
         # MUST write to dest(grid) here, not grid K
-        push!(expr.args, :(@inbounds dest(simdata[$(QuoteNode(k))])[I...] = vals[$i]))
+        push!(expr.args, :(@inbounds source(data[$(QuoteNode(k))])[I...] = vals[$i]))
     end
     push!(expr.args, :(nothing))
     return expr
 end
-@inline function _writecell!(simdata, wkeys::Val{K}, val, I...) where K
+@inline function _writecell!(data, ::Val{<:CellRule}, wkeys::Val{K}, val, I...) where K
     # MUST write to dest(grid) here, not grid K
-    @inbounds dest(simdata[K])[I...] = val
+    @inbounds source(data[K])[I...] = val
+    return nothing
+end
+@generated function _writecell!(data, ::Val, wkeys::K, vals::Union{Tuple,NamedTuple}, I...) where K<:Tuple
+    expr = Expr(:block)
+    keys = map(_unwrap, Tuple(K.parameters))
+    for (i, k) in enumerate(keys) 
+        # MUST write to dest(grid) here, not grid K
+        push!(expr.args, :(@inbounds dest(data[$(QuoteNode(k))])[I...] = vals[$i]))
+    end
+    push!(expr.args, :(nothing))
+    return expr
+end
+@inline function _writecell!(data, ::Val, wkeys::Val{K}, val, I...) where K
+    # MUST write to dest(grid) here, not grid K
+    @inbounds dest(data[K])[I...] = val
     return nothing
 end
 
 # _getreadgrids => Union{ReadableGridData,Tuple{ReadableGridData,Vararg}}
 # Retrieves `GridData` from a `SimData` object to match the requirements of a `Rule`.
 # Returns a `Tuple` holding the key or `Tuple` of keys, and grid or `Tuple` of grids.
-@generated function _getreadgrids(::Rule{R,W}, simdata::AbstractSimData) where {R<:Tuple,W}
+@generated function _getreadgrids(::Rule{R,W}, data::AbstractSimData) where {R<:Tuple,W}
     Expr(:tuple,
         Expr(:tuple, (:(Val{$(QuoteNode(key))}()) for key in R.parameters)...),
-        Expr(:tuple, (:(simdata[$(QuoteNode(key))]) for key in R.parameters)...),
+        Expr(:tuple, (:(data[$(QuoteNode(key))]) for key in R.parameters)...),
     )
 end
-@generated function _getreadgrids(::Rule{R,W}, simdata::AbstractSimData) where {R,W}
-    :((Val{$(QuoteNode(R))}(), simdata[$(QuoteNode(R))]))
+@generated function _getreadgrids(::Rule{R,W}, data::AbstractSimData) where {R,W}
+    :((Val{$(QuoteNode(R))}(), data[$(QuoteNode(R))]))
 end
 
 # _getwritegrids => Union{WritableGridData,Tuple{WritableGridData,Vararg}}
 # Retrieves `GridData` from a `SimData` object to match the requirements of a `Rule`.
 # Returns a `Tuple` holding the key or `Tuple` of keys, and grid or `Tuple` of grids.
-@generated function _getwritegrids(::Rule{R,W}, simdata::AbstractSimData) where {R,W<:Tuple}
+@generated function _getwritegrids(::Rule{R,W}, data::AbstractSimData) where {R,W<:Tuple}
     Expr(:tuple,
         Expr(:tuple, (:(Val{$(QuoteNode(key))}()) for key in W.parameters)...),
-        Expr(:tuple, (:(WritableGridData(simdata[$(QuoteNode(key))])) for key in W.parameters)...),
+        Expr(:tuple, (:(WritableGridData(data[$(QuoteNode(key))])) for key in W.parameters)...),
     )
 end
-@generated function _getwritegrids(::Rule{R,W}, simdata::AbstractSimData) where {R,W}
-    :((Val{$(QuoteNode(W))}(), WritableGridData(simdata[$(QuoteNode(W))])))
+@generated function _getwritegrids(::Rule{R,W}, data::AbstractSimData) where {R,W}
+    :((Val{$(QuoteNode(W))}(), WritableGridData(data[$(QuoteNode(W))])))
 end
 
 # _combinegrids |> AbstractSimData
 # Combine grids into a new NamedTuple of grids depending
 # on the read and write keys required by a rule.
-@inline function _combinegrids(simdata::AbstractSimData, rkeys, rgrids, wkeys, wgrids)
-    @set simdata.grids = _combinegrids(rkeys, rgrids, wkeys, wgrids)
+@inline function _combinegrids(data::AbstractSimData, wkeys, wgrids)
+    allkeys = map(Val, keys(data))
+    allgrids = values(data)
+    _combinegrids(data, allkeys, allgrids, wkeys, wgrids)
+end
+@inline function _combinegrids(data::AbstractSimData, rkeys, rgrids, wkeys, wgrids)
+    @set data.grids = _combinegrids(rkeys, rgrids, wkeys, wgrids)
 end
 @inline function _combinegrids(rkey, rgrids, wkey, wgrids)
     _combinegrids((rkey,), (rgrids,), (wkey,), (wgrids,))
@@ -159,8 +179,8 @@ end
 
 # _replacegrids => AbstractSimData
 # Replace grids in a NamedTuple with new grids where required.
-function _replacegrids(simdata::AbstractSimData, newkeys, newgrids)
-    @set simdata.grids = _replacegrids(grids(simdata), newkeys, newgrids)
+function _replacegrids(data::AbstractSimData, newkeys, newgrids)
+    @set data.grids = _replacegrids(grids(data), newkeys, newgrids)
 end
 @generated function _replacegrids(allgrids::NamedTuple, newkeys::Tuple, newgrids::Tuple)
     newkeys = map(_unwrap, newkeys.parameters)
@@ -202,3 +222,15 @@ end
 # Get symbols from a Val or Tuple type
 @inline _vals2syms(x::Type{<:Tuple}) = map(v -> _vals2syms(v), x.parameters)
 @inline _vals2syms(::Type{<:Val{X}}) where X = X
+
+# _getwindow
+# Get a single window square from an array, as a SMatrix
+@generated function _getwindow(tile::AbstractArray{T}, ::Neighborhood{R}, i, j) where {T,R}
+    S = 2R+1
+    L = S^2
+    vals = Expr(:tuple)
+    for jj in 1:S, ii in 1:S 
+        push!(vals.args, :(@inbounds tile[$ii + i - 1, $jj + j - 1]))
+    end
+    return :(SMatrix{$S,$S,$T,$L}($vals))
+end

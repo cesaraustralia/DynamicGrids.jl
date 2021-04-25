@@ -78,8 +78,8 @@ _zerogrids(initgrids::NamedTuple, nframes) =
 @inline _asiterable(x::Tuple) = x
 
 @inline _astuple(rule::Rule, state) = _astuple(_readkeys(rule), state)
-@inline _astuple(::Tuple, state) = state
-@inline _astuple(::Symbol, state) = (state,)
+@inline _astuple(keys::Tuple, state) = state
+@inline _astuple(key, state) = (state,)
 
 @inline _asnamedtuple(x::NamedTuple) = x
 @inline _asnamedtuple(x::AbstractArray) = (_default_=x,)

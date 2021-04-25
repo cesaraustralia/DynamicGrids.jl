@@ -1,5 +1,4 @@
 using DynamicGrids, Test, Dates
-
 using DynamicGrids: ruletype
 
 @testset "RunIf" begin
