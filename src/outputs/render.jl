@@ -63,9 +63,16 @@ end
 """
     Image <: SingleGridRenderer
 
-    Image(; scheme=ObjectScheme(), zerocolor=nothing, maskcolor=nothing)
+    Image(f=identity; scheme=ObjectScheme(), zerocolor=nothing, maskcolor=nothing)
 
 Converts output grids to a colorsheme.
+
+# Arguments
+
+- `f`: a function to convert value from the grid to `Real`
+    oran `RGB`. `Real` will be scaled by minval/maxval and be colored by the `scheme`.
+    `RGB` is used directly in the output. This is useful for grids of complex objects,
+    but not necessary for numbers. The default is `identity`.
 
 # Keywords
 
@@ -155,12 +162,12 @@ layout matrix and a list of [`Image`](@ref)s to be run for each.
 
 # Arguments
 
-- `layout`: A Vector or Matrix containing the keys or numbers of grids in the locations to
-    display them. `nothing`, `missing` or `0` values will be skipped.
-- `renderer`: tuple of [`Image`](@ref), one for each grid in the simulation.
+- `layout`: A `Vector` or `Matrix` containing the keys or numbers of grids in the 
+    locations to display them. `nothing`, `missing` or `0` values will be skipped.
+- `renderer`: `Vector/Matrix` of [`Image`](@ref), matching the `layout`.
     Can be `nothing` or any other value for grids not in layout.
 """
-Base.@kwdef struct Layout{L<:AbstractMatrix,P} <: MultiGridRenderer
+Base.@kwdef struct Layout{L<:Union{AbstractVector,AbstractMatrix},P} <: MultiGridRenderer
     layout::L
     renderer::P
     Layout(layouts::L, renderer::P) where {L,P} = begin
@@ -168,33 +175,32 @@ Base.@kwdef struct Layout{L<:AbstractMatrix,P} <: MultiGridRenderer
         new{L,typeof(imgens)}(layouts, imgens)
     end
 end
-# Convenience constructor to convert Vector input to a column Matrix
-function Layout(layout::AbstractVector, renderer)
-    Layout(reshape(layout, length(layout), 1), renderer)
-end
 
 _asrenderer(p::Renderer) = p
 _asrenderer(x) = Image(x)
 
 layout(p::Layout) = p.layout
 renderer(p::Layout) = p.renderer
-imagesize(p::Layout, init::NamedTuple) = size(first(init)) .* size(p.layout)
+imagesize(p::Layout, init::NamedTuple) = imagesize(p, first(init))
+imagesize(p::Layout, init::Array) = imagesize(size(init), size(p.layout))
+imagesize(gs::NTuple{2}, ls::NTuple{2}) = gs .* ls
+imagesize(gs::NTuple{2}, ls::NTuple{1}) = gs .* (first(ls), 1)
 
 function render!(
     imagebuffer, l::Layout, o::ImageOutput, data::AbstractSimData, grids::NamedTuple
 )
-    ngrids = length(grids)
+    lsize = size(layout(l))
     if !(minval(o) isa Nothing)
-        length(minval(o)) == ngrids || _wronglengtherror(minval, ngrids, length(minval(o)))
+        size(minval(o)) == lsize || _wrongshapeerror(minval, lsize, size(minval(o)))
     end
     if !(maxval(o) isa Nothing)
-        length(maxval(o)) == ngrids || _wronglengtherror(maxval, ngrids, length(maxval(o)))
+        size(maxval(o)) == lsize || _wrongshapeerror(maxval, lsize, size(maxval(o)))
     end
 
     grid_ids = layout(l)
     # Loop over the layout matrix
-    for i in 1:size(grid_ids, 1), j in 1:size(grid_ids, 2)
-        grid_id = grid_ids[i, j]
+    for I in CartesianIndices(grid_ids)
+        grid_id = grid_ids[I]
         # Accept symbol keys and numbers, skip missing/nothing/0
         (ismissing(grid_id) || grid_id === nothing || grid_id == 0)  && continue
         n = if grid_id isa Symbol
@@ -204,27 +210,29 @@ function render!(
         else
             grid_id
         end
-        I, J = map((i, j), gridsize(data)) do k, s
-            (k - 1) * s + 1:k * s
+        Itup = length(Tuple(I)) == 1 ? (Tuple(I)..., 1) : Tuple(I) 
+        inds = map(Itup, gridsize(data)) do l, gs
+            (l - 1) * gs + 1:l * gs
         end
+
         # Run image renderers for section
         render!(
-            view(imagebuffer, I, J), renderer(l)[n], o, data, grids[n];
+            view(imagebuffer, inds...), renderer(l)[I], o, data, grids[n];
             name=string(keys(grids)[n]), time=nothing,
-            minval=_valn(minval(o), n), maxval=_valn(maxval(o), n),
+            minval=_get(minval(o), I), maxval=_get(maxval(o), I),
         )
     end
     _rendertime!(imagebuffer, textconfig(o), currenttime(data))
     return imagebuffer
 end
 
-_valn(::Nothing, n) = nothing
-_valn(vals, n) = vals[n]
+_get(::Nothing, I) = nothing
+_get(vals, I) = vals[I]
 
 @noinline _grididnotinkeyserror(grid_id, grids) =
     throw(ArgumentError("$grid_id is not in $(keys(grids))"))
-@noinline _wronglengtherror(f, ngrids, n) =
-    throw(ArgumentError("Number of grids ($ngrids) and length of $f ($n) must be the same"))
+@noinline _wrongshapeerror(f, lsize, msize) =
+    throw(ArgumentError("Shape of ($lsize) and size of $f ($msize) must be the same"))
 
 
 # Automatically choose an image renderer
@@ -236,13 +244,13 @@ function autorenderer(init::NamedTuple, scheme)
     rows = length(init) ÷ 4 + 1
     cols = (length(init) - 1) ÷ rows + 1
     layout = reshape([keys(init)...], (rows, cols))
-    renderer = autorenderer.(values(init), _iterableschemes(scheme))
+    renderer = autorenderer.([values(init)...], _iterableschemes(scheme))
     Layout(layout, renderer)
 end
 
-_iterableschemes(::Nothing) = (ObjectScheme(),)
-_iterableschemes(schemes::Union{Tuple,NamedTuple,AbstractArray}) = schemes
-_iterableschemes(scheme) = (scheme,)
+_iterableschemes(::Nothing) = [ObjectScheme()]
+_iterableschemes(schemes::AbstractArray) = schemes
+_iterableschemes(scheme) = [scheme]
 
 # Coll conversion tools
 
