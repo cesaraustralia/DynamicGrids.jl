@@ -58,6 +58,22 @@ end
     end
 end
 
+# _getwindow
+# Get a single window square from an array, as an SMatrix.
+# We use this on GPUs to get a neighborhood window from the main 
+# grid, which is 10x or more faster than using a view. 
+# We could possible just use this instead of _update_buffers
+# for the sake of simplicity, with some performance loss.
+@generated function _getwindow(tile::AbstractArray{T}, ::Neighborhood{R}, i, j) where {T,R}
+    S = 2R+1
+    L = S^2
+    vals = Expr(:tuple)
+    for jj in 1:S, ii in 1:S 
+        push!(vals.args, :(@inbounds tile[$ii + i - 1, $jj + j - 1]))
+    end
+    return :(SMatrix{$S,$S,$T,$L}($vals))
+end
+
 # _readcell
 # Returns a single value or NamedTuple of values.
 # This occurs for every cell for every rule, so has to be very fast.
@@ -73,8 +89,8 @@ end
         NamedTuple{keys,typeof(vals)}(vals)
     end
 end
-@inline function _readcell(data::AbstractSimData, ::Val, I...)
-    @inbounds source(first(data))[I...]
+@inline function _readcell(data::AbstractSimData, ::Val{K}, I...) where K
+    @inbounds source(data[K])[I...]
 end
 
 # _writecell! => nothing
@@ -100,6 +116,7 @@ end
     keys = map(_unwrap, Tuple(K.parameters))
     for (i, k) in enumerate(keys) 
         # MUST write to dest(grid) here, not grid K
+        # setindex! has overrides for the grid
         push!(expr.args, :(@inbounds dest(data[$(QuoteNode(k))])[I...] = vals[$i]))
     end
     push!(expr.args, :(nothing))
@@ -107,6 +124,7 @@ end
 end
 @inline function _writecell!(data, ::Val, wkeys::Val{K}, val, I...) where K
     # MUST write to dest(grid) here, not grid K
+    # setindex! has overrides for the grid
     @inbounds dest(data[K])[I...] = val
     return nothing
 end
@@ -222,15 +240,3 @@ end
 # Get symbols from a Val or Tuple type
 @inline _vals2syms(x::Type{<:Tuple}) = map(v -> _vals2syms(v), x.parameters)
 @inline _vals2syms(::Type{<:Val{X}}) where X = X
-
-# _getwindow
-# Get a single window square from an array, as a SMatrix
-@generated function _getwindow(tile::AbstractArray{T}, ::Neighborhood{R}, i, j) where {T,R}
-    S = 2R+1
-    L = S^2
-    vals = Expr(:tuple)
-    for jj in 1:S, ii in 1:S 
-        push!(vals.args, :(@inbounds tile[$ii + i - 1, $jj + j - 1]))
-    end
-    return :(SMatrix{$S,$S,$T,$L}($vals))
-end

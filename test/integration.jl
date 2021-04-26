@@ -185,16 +185,6 @@ proc = CPUGPU()
     nothing
 end
 
-# sim!(output, nrule)
-# output[2]
-# init2 = zeros(Bool, 15, 15)
-# init2[6:10, 5:10] .= test5_6[:init]
-# output = ArrayOutput(init2, tspan=Date(2001, 1, 1):Day(2):Date(2001, 1, 5), proc=proc)
-# init2
-# init2 = Array(rand(300, 300) .< 0.05)
-# output = REPLOutput(init2, tspan=Date(2001, 1, 1):Day(2):Date(2003, 1, 5), proc=proc)
-# sim!(output, ruleset)
-
 @testset "Life simulation with Remove boudary" begin
     init_ =     DimArray(Bool[
                  0 0 0 0 0 0 0
