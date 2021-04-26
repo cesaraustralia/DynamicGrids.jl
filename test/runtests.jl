@@ -11,6 +11,7 @@ if VERSION >= v"1.5.0"
     Aqua.test_project_toml_formatting(DynamicGrids)
 end
 
+@time @safetestset "generated" begin include("generated.jl") end
 @time @safetestset "rules" begin include("rules.jl") end
 @time @safetestset "neighborhoods" begin include("neighborhoods.jl") end
 @time @safetestset "simulationdata" begin include("simulationdata.jl") end
