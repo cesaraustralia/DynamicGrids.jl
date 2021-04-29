@@ -129,7 +129,12 @@ end
 A [`Renderer`](@ref) that checks [`SparseOpt`](@ref) visually.
 Cells that do not run show in gray. Errors show in red, but if they do there's a bug.
 """
-struct SparseOptInspector <: SingleGridRenderer end
+struct SparseOptInspector{A} <: SingleGridRenderer 
+    accessor::A
+end
+SparseOptInspector() = SparseOptInspector(identity)
+
+accessor(p::SparseOptInspector) = p.accessor
 
 function cell_to_pixel(p::SparseOptInspector, mask, minval, maxval, data::AbstractSimData, val, I::Tuple)
     opt(data) isa SparseOpt || error("Can only use SparseOptInspector with SparseOpt grids")
@@ -244,8 +249,11 @@ _get(::Nothing, I) = nothing
 _get(vals, I) = vals[I]
 
 _grid_ids(id::Symbol) = id
+_grid_ids(id::Integer) = id
+_grid_ids(::Nothing) = nothing
+_grid_ids(::Missing) = missing
 _grid_ids(id::Pair{Symbol}) = first(id)
-_grid_ids(id) = throw(ArgumentError("Layout id $id is not a valid grid name. Use a `Symbol` or `Pair{Symbol,<:Any}`"))
+_grid_ids(id) = throw(ArgumentError("Layout id $id is not a valid grid name. Use an `Int`, `Symbol`, `Pair{Symbol,<:Any}` or `nothing`"))
 
 _grid_accessor(id::Pair) = last(id)
 _grid_accessor(id) = nothing
