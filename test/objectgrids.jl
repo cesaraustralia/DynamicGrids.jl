@@ -188,7 +188,7 @@ end
         tspan=1:3, 
         store=true,
         layout=[:grid1=>1 :grid1=>x->x[2]],
-        renderers=[Greyscale() Greyscale()],
+        scheme=[Greyscale() Greyscale()],
         minval=[0.0 0.0], maxval=[10.0 10.0],
         text=nothing,
     )
