@@ -9,14 +9,15 @@ Common configuration component for all [`ImageOutput`](@ref).
 
 - `init` output init object, used to generate other arguments automatically.
 - `minval`: Minimum value in the grid(s) to normalise for conversion to an RGB pixel. 
-    Number or `Tuple` for multiple grids. 
+    A `Vector/Matrix` for multiple grids, matching the `layout` array. 
 - `maxval`: Maximum value in the grid(s) to normalise for conversion to an RGB pixel. 
-    Number or `Tuple` for multiple grids. 
+    A `Vector/Matrix` for multiple grids, matching the `layout` array. 
 - `font`: `String` name of font to search for. A default will be guessed.
 - `text`: `TextConfig()` or `nothing` for no text. Default is `TextConfig(; font=font)`.
-- `scheme`: ColorSchemes.jl scheme, or `Greyscale()`. ObjectScheme() by default.
-- `renderer`: [`Renderer`](@ref) like [`Image`](@ref) or [`Layout`](@ref) Will 
-    be detected automatically
+- `scheme`: ColorSchemes.jl scheme(s), or `Greyscale()`. ObjectScheme() by default.
+    A `Vector/Matrix` for multiple grids, matching the `layout` array. 
+- `renderer`: [`Renderer`](@ref) like [`Image`](@ref) or [`Layout`](@ref) Will be detected 
+    automatically. A `Vector/Matrix` for multiple grids, matching the `layout` array. 
 """
 struct ImageConfig{IB,Min,Max,Bu,TC}
     renderer::IB
@@ -27,11 +28,10 @@ struct ImageConfig{IB,Min,Max,Bu,TC}
 end
 function ImageConfig(init; 
     font=autofont(), text=TextConfig(; font=font), textconfig=text, 
-    scheme=ObjectScheme(), 
     imagegen=nothing, renderer=imagegen,
     minval=nothing, maxval=nothing, kw...
 ) 
-    renderer = renderer isa Nothing ? autorenderer(init, scheme; kw...) : renderer
+    renderer = renderer isa Nothing ? autorenderer(init; kw...) : renderer
     imagebuffer = _allocimage(renderer, init)
     ImageConfig(renderer, minval, maxval, imagebuffer, textconfig)
 end
