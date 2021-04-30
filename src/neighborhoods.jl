@@ -143,9 +143,12 @@ struct Kernel{R,L,N,K} <: AbstractKernelNeighborhood{R,L}
     neighborhood::N
     kernel::K
 end
-@inline Kernel(A::AbstractMatrix) = Kernel(Window(A), A)
+Kernel(A::AbstractMatrix) = Kernel(Window(A), A)
 @inline function Kernel(hood::N, kernel::K) where {N<:Neighborhood{R,L},K} where {R,L}
     length(hood) == length(kernel) || _kernel_length_error(hood, kernel)
+    Kernel{R,L,N,K}(hood, kernel)
+end
+function Kernel{R,L}(hood::N, kernel::K) where {R,L,N<:Neighborhood{R,L},K}
     Kernel{R,L,N,K}(hood, kernel)
 end
 
