@@ -193,8 +193,7 @@ end
 # _setdelays
 # Update any Delay anywhere in the rules Tuple.
 function _setdelays(rules::Tuple, output, data) 
-    isstored(output) || _notstorederror()
-    Flatten.modify(rules, Delay, Function) do delay
+    Flatten.modify(rules, Delay, Union{Function,SArray,AbstractDict}) do delay
         _setdelay(delay, output, data)
     end
 end
@@ -203,6 +202,7 @@ end
 # checking that the delay matches the simulation step size.
 # Delays at the start just use the init frame, for now.
 function _setdelay(delay::Delay{K}, output, data) where K
+    isstored(output) || _notstorederror()
     nsteps = steps(delay) / step(tspan(data))
     isteps = trunc(Int, nsteps)
     nsteps == isteps || _delaysteperror(delay, step(tspan(data)))
