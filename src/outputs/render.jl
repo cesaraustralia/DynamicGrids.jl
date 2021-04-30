@@ -179,14 +179,14 @@ layout matrix and a list of [`Image`](@ref)s to be run for each.
 
 - `layout`: A `Vector` or `Matrix` containing the keys or numbers of grids in the 
     locations to display them. `nothing`, `missing` or `0` values will be skipped.
-- `renderer`: `Vector/Matrix` of [`Image`](@ref), matching the `layout`.
+- `renderers`: `Vector/Matrix` of [`Image`](@ref), matching the `layout`.
     Can be `nothing` or any other value for grids not in layout.
 """
-Base.@kwdef struct Layout{L<:Union{AbstractVector,AbstractMatrix},P} <: MultiGridRenderer
+Base.@kwdef struct Layout{L<:Union{AbstractVector,AbstractMatrix},R} <: MultiGridRenderer
     layout::L
-    renderer::P
-    Layout(layouts::L, renderer::P) where {L,P} = begin
-        imgens = map(_asrenderer, renderer)
+    renderers::R
+    Layout(layouts::L, renderers::R) where {L,R} = begin
+        imgens = map(_asrenderer, renderers)
         new{L,typeof(imgens)}(layouts, imgens)
     end
 end
@@ -195,7 +195,7 @@ _asrenderer(p::Renderer) = p
 _asrenderer(x) = Image(x)
 
 layout(p::Layout) = p.layout
-renderer(p::Layout) = p.renderer
+renderers(p::Layout) = p.renderers
 imagesize(p::Layout, init::NamedTuple) = imagesize(p, first(init))
 imagesize(p::Layout, init::Array) = imagesize(size(init), size(p.layout))
 imagesize(gs::NTuple{2}, ls::NTuple{2}) = gs .* ls
@@ -235,7 +235,7 @@ function render!(
 
         # Run image renderers for section
         render!(
-            view(imagebuffer, im_I...), renderer(l)[lin], o, data, grids[n];
+            view(imagebuffer, im_I...), renderers(l)[lin], o, data, grids[n];
             name=string(keys(grids)[n]), time=nothing,
             minval=_get(minv, lin), maxval=_get(maxv, lin),
             accessor=grid_accessors[I],
@@ -270,31 +270,35 @@ _access(i::Int, obj) = obj[i]
 
 # Automatically choose an image renderer
 
-function autorenderer(init, scheme; kw...)
-    Image(; scheme=first(_iterableschemes(scheme)), kw...)
-end
-function autorenderer(init::NamedTuple, scheme; 
+autorenderer(init; scheme=ObjectScheme(), zerocolor=ZEROCOL, maskcolor=MASKCOL, kw...) = 
+    _autorenderer(init, scheme, zerocolor, maskcolor; kw...)
+
+_autorenderer(init, scheme, zerocolor, maskcolor; kw...) = _asrenderer(scheme, zerocolor, maskcolor)
+function _autorenderer(init::NamedTuple, scheme, zerocolor, maskcolor; 
     layout=_autolayout(init), 
-    renderers=_autorenderers(init, scheme),
+    renderers=_autorenderers(layout, scheme, zerocolor, maskcolor),
     kw...
 )
     Layout(layout, renderers)
 end
 
-function _autolayout(init) 
+_asrenderer(renderer::Renderer, zerocolor, maskcolor) = renderer
+_asrenderer(scheme, zerocolor, maskcolor) = Image(scheme, zerocolor, maskcolor)
+
+function _autolayout(init)
     rows = length(init) ÷ 4 + 1
     cols = (length(init) - 1) ÷ rows + 1
     reshape([keys(init)...], (rows, cols))
 end
 
-function _autorenderers(init, scheme)
-    inits = values(init)
-    autorenderer.(reshape([inits...], 1, length(inits)), _iterableschemes(scheme))
+function _autorenderers(layout, scheme, zerocolor, maskcolor)
+    _asrenderer_key.(layout, _iterable(scheme), _iterable(zerocolor), _iterable(maskcolor))
 end
 
-_iterableschemes(::Nothing) = [ObjectScheme()]
-_iterableschemes(schemes::AbstractArray) = schemes
-_iterableschemes(scheme) = [scheme]
+_asrenderer_key(key, args...) = _asrenderer(args...)
+
+_iterable(obj::AbstractArray) = obj
+_iterable(obj) = (obj,)
 
 # Coll conversion tools
 
