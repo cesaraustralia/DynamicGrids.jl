@@ -60,7 +60,7 @@ export PerformanceOpt, NoOpt, SparseOpt
 
 export BoundaryCondition, Remove, Wrap
 
-export ParameterSource, Aux, Grid
+export ParameterSource, Aux, Grid, Delay
 
 export Output, ArrayOutput, ResultOutput, TransformedOutput
 
@@ -92,9 +92,9 @@ include("rulesets.jl")
 include("extent.jl")
 include("grid.jl")
 include("simulationdata.jl")
+include("parametersources.jl")
 include("gpu.jl")
 include("atomic.jl")
-include("auxiliary.jl")
 include("chain.jl")
 include("condition.jl")
 include("outputs/interface.jl")

@@ -10,7 +10,6 @@ init(e::AbstractExtent) = e.init
 mask(e::AbstractExtent) = e.mask
 aux(e::AbstractExtent) = e.aux
 @inline aux(e::AbstractExtent, key) = aux(aux(e), key)
-@inline aux(nt::NamedTuple, ::Aux{Key}) where Key = nt[Key] # Fast compile-time version
 @noinline aux(::Nothing, key) =
     throw(ArgumentError("No aux data available. Pass a NamedTuple to the `aux=` keyword of the Output"))
 padval(e::AbstractExtent) = e.padval
