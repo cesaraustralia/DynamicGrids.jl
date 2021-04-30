@@ -160,8 +160,12 @@ function simloop!(output::Output, simdata, ruleset, fspan)
     simdata = _updatetime(simdata, 1) |> _proc_setup
     # Loop over the simulation
     for f in fspan[2:end]
-        # Run the a timestep
-        simdata = _updatetime(simdata, f) |> sd -> _step!(sd, rules(ruleset))
+        # Update the current simulation frame and time
+        simdata = _updatetime(simdata, f) 
+        # Update any Delay parameters
+        drules = _setdelays(rules(ruleset), output, simdata)
+        # Run a timestep
+        simdata = _step!(simdata, drules)
         # Save/do something with the the current grid
         storeframe!(output, simdata)
         # Let output UI things happen

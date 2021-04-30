@@ -46,20 +46,6 @@ in specific contexts.
 """
 abstract type AbstractSimData{Y,X} end
 
-"""
-    Base.get(data::AbstractSimData, key::Union{Symbol,Aux,Grid}, I...)
-
-Allows parameters to be taken from a single value, another grid or an aux array.
-
-If aux arrays are a `DimArray` time sequence (with a `Ti` dim) the currect date will be 
-calculated automatically.
-
-Currently this is cycled by default, but will use Cyclic mode in DiensionalData.jl in future.
-"""
-@propagate_inbounds Base.get(data::AbstractSimData, val, I...) = val
-@propagate_inbounds Base.get(data::AbstractSimData, key::Grid{K}, I...) where K = data[K][I...]
-@propagate_inbounds Base.get(data::AbstractSimData, key::Aux, I...) = _auxval(data, key, I...)
-
 @propagate_inbounds Base.setindex!(d::AbstractSimData, x, I...) = setindex!(first(grids(d)), x, I...)
 @propagate_inbounds Base.getindex(d::AbstractSimData, I...) = getindex(first(grids(d)), I...)
 Base.keys(d::AbstractSimData) = keys(grids(d))

@@ -15,7 +15,6 @@ end
 @time @safetestset "rules" begin include("rules.jl") end
 @time @safetestset "neighborhoods" begin include("neighborhoods.jl") end
 @time @safetestset "simulationdata" begin include("simulationdata.jl") end
-@time @safetestset "auxiliary" begin include("auxiliary.jl") end
 @time @safetestset "utils" begin include("utils.jl") end
 @time @safetestset "chain" begin include("chain.jl") end
 @time @safetestset "condition" begin include("condition.jl") end
@@ -23,6 +22,7 @@ end
 @time @safetestset "chain" begin include("chain.jl") end
 @time @safetestset "integration" begin include("integration.jl") end
 @time @safetestset "objectgrids" begin include("objectgrids.jl") end
+@time @safetestset "parametersources" begin include("parametersources.jl") end
 # TODO move these tests to 1.6 syntax, or test both?
 if VERSION >= v"1.5.0" && VERSION < v"1.6.0"
     @time @safetestset "show" begin include("show.jl") end
