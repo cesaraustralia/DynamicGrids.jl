@@ -214,8 +214,10 @@ end
 
     output = NoDisplayImageOutput(multiinit; 
         tspan=DateTime(2001):Year(1):DateTime(2002), 
-        renderer=rndr, text=nothing,
-        minval=[0 nothing 0], maxval=[10 nothing 20], store=true
+        renderer=rndr, 
+        text=nothing,
+        minval=[0 nothing 0], maxval=[10 nothing 20], 
+        store=true
     )
     @test minval(output) == [0 nothing 0]
     @test maxval(output) == [10 nothing 20]
@@ -252,21 +254,29 @@ end
             nameposb = 3timepixels + namepixels + 400, timepixels
             renderstring!(refimg, "b", face, namepixels, nameposb...;
                           fcolor=ARGB32(RGB(1.0), 1.0), bcolor=ARGB32(RGB(0.0), 1.0))
-            textconfig = TextConfig(; font=font, timepixels=timepixels, namepixels=namepixels, bcolor=ARGB32(0))
+            textconf = TextConfig(; font=font, timepixels=timepixels, namepixels=namepixels, bcolor=ARGB32(0))
 
             # Build renderer
-            rndr = Layout([:a, nothing, :b], [grey, nothing, leonardo])
             output = NoDisplayImageOutput(textinit; 
-                 tspan=DateTime(2001):Year(1):DateTime(2001), renderer=rndr, text=textconfig,
-                 store=true, minval=[0, nothing, 0], maxval=[1, nothing, 1]
+                 tspan=DateTime(2001):Year(1):DateTime(2001), 
+                 text=textconf,
+                 store=true, 
+                 layout=[:a, nothing, :b],
+                 scheme=[grey, nothing, leonardo],
+                 minval=[0, nothing, 0], 
+                 maxval=[1, nothing, 1]
             )
+
+            output.imageconfig.renderer
+
             simdata = SimData(output, Ruleset())
             img = render!(output, simdata);
             @test img == refimg
         end
     end
     @testset "errors" begin
-        output = NoDisplayImageOutput(multiinit; tspan=1:10, renderer=rndr, 
+        output = NoDisplayImageOutput(multiinit; 
+            tspan=1:10, renderer=rndr, 
             minval=[0, 0, 0], 
             maxval=[10, 20], 
         )
