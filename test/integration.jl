@@ -398,3 +398,19 @@ end
         rm("test_gifoutput2.gif")
     end
 end
+
+@testset "SparseOpt rules run everywhere with non zero values" begin
+    set_hood = SetNeighbors() do data, hood, val, I 
+        for p in positions(hood, I)
+            data[p...] = 2
+        end
+    end
+    clearcell = Cell() do val
+        zero(val)
+    end
+    output = ArrayOutput(ones(10, 11); tspan=1:3)
+    sim!(output, set_hood; opt=SparseOpt())
+    @test all(output[3] .=== 2.0)
+    sim!(output, set_hood, clearcell; opt=SparseOpt())
+    @test all(output[3] .=== 0.0)
+end

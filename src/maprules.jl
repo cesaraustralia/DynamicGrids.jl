@@ -88,6 +88,7 @@ end
 
 # optmap
 # Map kernel over the grid, specialising on PerformanceOpt.
+
 #
 # Run kernels with SparseOpt, block by block:
 function optmap(
@@ -103,8 +104,8 @@ function optmap(
     B = 2R
     status = sourcestatus(grid)
     let f=f, proc=proc, status=status
-        procmap(proc, 1:_indtoblock(X, B)) do bj
-            for  bi in 1:_indtoblock(Y, B)
+        procmap(proc, 1:_indtoblock(X+R, B)) do bj
+            for  bi in 1:_indtoblock(Y+R, B)
                 status[bi, bj] || continue
                 # Convert from padded block to init dimensions
                 istart, jstart = _blocktoind(bi, B) - R, _blocktoind(bj, B) - R
@@ -141,7 +142,6 @@ function optmap(
         end
     end
 end
-
 # procmap
 # Map kernel over the grid, specialising on Processor
 # Looping over cells or blocks on CPU
@@ -198,7 +198,7 @@ function row_kernel!(
 ) where {Y,X,R}
     B = 2R
     S = 2R + 1
-    nblockcols = _indtoblock(X, B)
+    nblockcols = _indtoblock(X+R, B)
     src = parent(source(grid))
     srcstatus, dststatus = sourcestatus(grid), deststatus(grid)
 
