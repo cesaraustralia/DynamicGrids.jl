@@ -51,6 +51,8 @@ for all rules.
 """
 struct NoOpt <: PerformanceOpt end
 
+struct Differentiable <: PerformanceOpt end
+
 """
     Processor
 

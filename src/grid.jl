@@ -110,23 +110,41 @@ function _updatestatus!(opt::SparseOpt, grid)
 end
 _updatestatus!(opt, grid) = nothing
 
-# _addpadding => OffsetArray{T,N}
-# Find the maximum radius required by all rules
-# Add padding around the original init array, offset into the negative
-# So that the first real cell is still 1, 1
-function _addpadding(init::AbstractArray{T,N}, r, padval) where {T,N}
-    h, w = size(init)
-    paddedsize = h + 4r, w + 2r
-    paddedindices = -r + 1:h + 3r, -r + 1:w + r
+# _build_arrays => Tuple{AbstractArray,AbstractArray}
+function _build_arrays(init, padval, opt, ::Val{Tuple{Y,X,0}}) where {Y,X}
+    deepcopy(init), deepcopy(init)
+end
+function _build_arrays(init, padval, opt, ::Val{Tuple{Y,X,R}}) where {Y,X,R}
+    # Find the maximum radius required by all rules
+    # Add padding around the original init array, offset into the negative
+    # So that the first real cell is still 1, 1
+    paddedsize = Y + 4R, X + 2R
+    paddedindices = -R + 1:Y + 3R, -R + 1:X + R
     sourceparent = fill(convert(eltype(init), padval), paddedsize)
     source = OffsetArray(sourceparent, paddedindices...)
     # Copy the init array to the middle section of the source array
     for j in 1:size(init, 2), i in 1:size(init, 1)
         @inbounds source[i, j] = init[i, j]
     end
-    return source
+    return source, deepcopy(source)
 end
-
+function _build_arrays(init, padval, opt::Differentiable, ::Val{Tuple{Y,X,0}}) where {Y,X}
+    bi, bj = _indtoblock.(size(init), 8)
+    vY, vX = Val{bi}(), Val{bj}()
+    sI = SMatrix{8,8}(CartesianIndices(Base.OneTo.((bi, bj))))
+    source = map(I -> DynamicGrids._getblock(A, vY, vX, DynamicGrids._blocktoind.(I.I, 8)...), sI)
+    return source, deepcopy(source)
+end
+function _build_arrays(init, padval, opt::Differentiable, ::Val{Tuple{Y,X,R}}) where {Y,X,R}
+    paddedsize = Y + 4R, X + 2R
+    bi, bj = _indtoblock.(paddedsize, 8)
+    vY, vX = Val{bi}(), Val{bj}()
+    sI = SMatrix{bi,bj}(CartesianIndices(Base.OneTo.((bi, bj))))
+    source = map(sI) do I
+        DynamicGrids._getblock(init, vY, vX, DynamicGrids._blocktoind.(I.I, 8)...)
+    end
+    return source, deepcopy(source)
+end
 
 # _build_status => (Matrix{Bool}, Matrix{Bool})
 # Build block-status arrays
@@ -180,22 +198,10 @@ end
 # Generate simulation data to match a ruleset and init array.
 @inline function ReadableGridData{S,R}(
     init::AbstractArray, mask, proc, opt, boundary, padval
-) where {S,R}
-    # We add one extra row and column of status blocks so
-    # we dont have to worry about special casing the last block
-    if R > 0
-        source = _addpadding(init, R, padval)
-        dest = _addpadding(init, R, padval)
-    else
-        if opt isa SparseOpt
-            opt = NoOpt()
-        end
-        source = deepcopy(init)
-        dest = deepcopy(init)
-    end
+) where {Y,X,R}
+    source, dest = _build_arrays(init, padval, opt, Val{Tuple{Y,X,R}}()) 
     sourcestatus, deststatus = _build_status(opt, source, R)
-
-    grid = ReadableGridData{S,R}(
+    grid = ReadableGridData{Y,X,R}(
         source, dest, mask, proc, opt, boundary, padval, sourcestatus, deststatus
     )
     _updatestatus!(grid)
@@ -203,6 +209,7 @@ end
 end
 
 Base.parent(d::ReadableGridData{S,<:Any,T,N}) where {S,T,N} = SizedArray{S,T,N}(sourceview(d))
+
 
 """
     WritableGridData <: GridData

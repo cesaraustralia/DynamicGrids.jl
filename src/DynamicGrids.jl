@@ -57,7 +57,7 @@ export Neighborhood, RadialNeighborhood, Window, AbstractKernelNeighborhood, Ker
 
 export Processor, SingleCPU, ThreadedCPU, CPUGPU
 
-export PerformanceOpt, NoOpt, SparseOpt
+export PerformanceOpt, NoOpt, SparseOpt, Differentiable
 
 export BoundaryCondition, Remove, Wrap
 

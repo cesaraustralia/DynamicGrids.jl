@@ -59,9 +59,9 @@ end
 end
 
 # _getwindow
-# Get a single window square from an array, as an SMatrix.
-# We use this on GPUs to get a neighborhood window from the main 
-# grid, which is 10x or more faster than using a view. 
+# Get a single window square from an array around the central cel lindex, 
+# as an SMatrix. We use this on GPUs to get a neighborhood window from 
+# the main grid, which is 10x or more faster than using a view. 
 # We could possible just use this instead of _update_buffers
 # for the sake of simplicity, with some performance loss.
 @generated function _getwindow(tile::AbstractArray{T}, ::Neighborhood{R}, i, j) where {T,R}
@@ -72,6 +72,17 @@ end
         push!(vals.args, :(@inbounds tile[$ii + i - 1, $jj + j - 1]))
     end
     return :(SMatrix{$S,$S,$T,$L}($vals))
+end
+
+# _getblock
+# get a block of size Y, X, from corner i, j
+@generated function _getblock(tile::AbstractArray{T}, ::Val{Y}, ::Val{X}, i, j) where {T,Y,X}
+    L = Y*X
+    vals = Expr(:tuple)
+    for jj in 1:X, ii in 1:Y
+        push!(vals.args, :(@inbounds tile[i + $ii, j + $jj]))
+    end
+    return :(SMatrix{$Y,$X,$T,$L}($vals))
 end
 
 # _readcell
