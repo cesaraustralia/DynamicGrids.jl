@@ -64,19 +64,19 @@ function maprule!(
 end
 
 function _mapneighborhoodgrid!(
-    data, hoodgrid::GridData{Y,X,R}, proc, opt, ruletype, args...
+    data, hoodgrid::GridData{Y,X,R}, proc, opt, ruletype, rule, rkeys, wkeys 
 ) where {Y,X,R}
-    let data=data, proc=proc, opt=opt, ruletype=ruletype, args=args
+    let data=data, hoodgrid=hoodgrid, proc=proc, opt=opt, ruletyp=ruletype, rule=rule, rkeys=rkeys, wkeys=wkeys
         B = 2R
         # UNSAFE: we must avoid sharing status blocks, it could cause race conditions 
         # when setting status from different threads. So we split the grid in 2 interleaved
         # sets of rows, so that we never run adjacent rows simultaneously
-        procmap(proc, 1:2:_indtoblock(Y, B)) do bi
-            row_kernel!(data, hoodgrid, proc, opt, ruletype, args..., bi)
+        procmap(proc, 1:2:_indtoblock(Y+R, B)) do bi
+            row_kernel!(data, hoodgrid, proc, opt, ruletype, rule, rkeys, wkeys, bi)
         end
-        procmap(proc, 2:2:_indtoblock(Y, B)) do bi
-            if bi <=_indtoblock(Y, B)
-                row_kernel!(data, hoodgrid, proc, opt, ruletype, args..., bi)
+        procmap(proc, 2:2:_indtoblock(Y+R, B)) do bi
+            if bi <=_indtoblock(Y+R, B)
+                row_kernel!(data, hoodgrid, proc, opt, ruletype, rule, rkeys, wkeys, bi)
             end
         end
     end

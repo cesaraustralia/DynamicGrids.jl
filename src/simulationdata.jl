@@ -116,13 +116,10 @@ SimData(extent::AbstractExtent, ruleset::AbstractRuleset) =
 function SimData(extent::AbstractExtent{<:NamedTuple{Keys}}, ruleset::AbstractRuleset) where Keys
     # Calculate the neighborhood radus (and grid padding) for each grid
     y, x = gridsize(extent)
-    radii = NamedTuple{Keys}(get(radius(ruleset), key, 0) for key in Keys)
+    radii = map(k-> Val{get(radius(ruleset), k, 0)}(), Keys)
+    radii = NamedTuple{Keys}(radii)
+    grids = _buildgrids(extent, ruleset, Val{y}(), Val{x}(), radii)
     # Construct the SimData for each grid
-    grids = map(init(extent), radii, padval(extent)) do in, r, pv
-        ReadableGridData{y,x,r}(
-            in, mask(extent), proc(ruleset), opt(ruleset), boundary(ruleset), pv 
-        )
-    end
     SimData(grids, extent, ruleset)
 end
 function SimData(
@@ -142,6 +139,14 @@ function SimData{Y,X}(
     grids::G, extent::E, ruleset::RS, currentframe::F, auxframe::A
 ) where {Y,X,G,E,RS,F,A}
     SimData{Y,X,G,E,RS,F,A}(grids, extent, ruleset, currentframe, auxframe)
+end
+
+_buildgrids(extent, ruleset, y, x, radii::NamedTuple) =
+    map((r, in, pv) -> _buildgrids(extent, ruleset, y, x, r, in, pv), radii, init(extent), padval(extent))
+function _buildgrids(extent, ruleset, ::Val{Y}, ::Val{X}, ::Val{R}, init, padval) where {Y,X,R}
+    ReadableGridData{Y,X,R}(
+        init, mask(extent), proc(ruleset), opt(ruleset), boundary(ruleset), padval 
+    )
 end
 
 ConstructionBase.constructorof(::Type{<:SimData{Y,X}}) where {Y,X} = SimData{Y,X}
