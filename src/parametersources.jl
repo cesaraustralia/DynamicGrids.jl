@@ -192,10 +192,11 @@ end
 
 # _setdelays
 # Update any Delay anywhere in the rules Tuple.
-function _setdelays(rules::Tuple, output, data) 
-    Flatten.modify(rules, Delay, Union{Function,SArray,AbstractDict}) do delay
-        _setdelay(delay, output, data)
-    end
+function _setdelays(rules::Tuple, output, data)
+    ignore = Union{Function,SArray,AbstractDict,Number}
+    delays = Flatten.flatten(rules, Delay, ignore)
+    newdelays = map(d -> _setdelay(d, output, data), delays)
+    Flatten.reconstruct(rules, newdelays, Delay, ignore)
 end
 # _setdelay
 # Replace the delay step size with an integer for fast indexing

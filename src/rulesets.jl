@@ -64,4 +64,12 @@ struct StaticRuleset{R<:Tuple,S} <: AbstractRuleset
     rules::R
     settings::S
 end
+StaticRuleset(rule1, rules::Rule...; kw...) = StaticRuleset((rule1, rules...); kw...)
+StaticRuleset(rules::Tuple; kw...) = StaticRuleset(rules, SimSettings(; kw...))
 StaticRuleset(rs::AbstractRuleset) = StaticRuleset(rules(rs), settings(rs))
+function StaticRuleset(; rules=(), settings=nothing, kw...) 
+    settings1 = settings isa Nothing ? SimSettings(; kw...) : settings
+    StaticRuleset(rules, settings1)
+end
+
+const SRuleset = StaticRuleset

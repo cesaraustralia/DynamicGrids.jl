@@ -55,10 +55,11 @@ mutable struct Extent{I<:Union{AbstractArray,NamedTuple},
             if !all(map(i -> size(i) == size_, init))
                 throw(ArgumentError("`init` grid sizes do not match"))
             end
+            size_
         else
-            size_ = size(init)
+            size(init)
         end
-        if (mask !== nothing) && (size(mask) != size_)
+        if (mask !== nothing) && (size(mask) != gridsize)
             throw(ArgumentError("`mask` size do not match `init`"))
         end
         new{I,M,A,PV}(init, mask, aux, padval, tspan)
