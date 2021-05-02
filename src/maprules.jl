@@ -7,8 +7,8 @@ maprule!(data::AbstractSimData, rule) = maprule!(data, Val{ruletype(rule)}(), ru
 function maprule!(data::AbstractSimData, ruletype::Val{<:CellRule}, rule)
     rkeys, _ = _getreadgrids(rule, data)
     wkeys, _ = _getwritegrids(rule, data)
-    maprule!(RuleData(data), ruletype, rule, rkeys, wkeys)
-    return data
+    ruledata = maprule!(RuleData(data), ruletype, rule, rkeys, wkeys)
+    return _replacegrids(data, wkeys, ruledata)
 end
 function maprule!(data::AbstractSimData, ruletype::Val{<:NeighborhoodRule}, rule)
     rkeys, rgrids = _getreadgrids(rule, data)
@@ -19,10 +19,10 @@ function maprule!(data::AbstractSimData, ruletype::Val{<:NeighborhoodRule}, rule
     # Copy or zero out boundary where needed
     _updateboundary!(rgrids)
     _cleardest!(data[neighborhoodkey(rule)])
-    maprule!(RuleData(data), ruletype, rule, rkeys, wkeys)
+    data = maprule!(RuleData(data), ruletype, rule, rkeys, wkeys)
     # Swap the dest/source of grids that were written to
     # and combine the written grids with the original simdata
-    return _replacegrids(data, wkeys, _swapsource(_to_readonly(wgrids)))
+    return _replacegrids(data, wkeys, _swapsource(_to_readonly(_getwritegrids(rule, ruledata))))
 end
 function maprule!(data::AbstractSimData, ruletype::Val{<:SetRule}, rule)
     rkeys, _ = _getreadgrids(rule, data)
@@ -31,8 +31,8 @@ function maprule!(data::AbstractSimData, ruletype::Val{<:SetRule}, rule)
         copyto!(parent(dest(g)), parent(source(g)))
     end
     ruledata = RuleData(_combinegrids(data, wkeys, wgrids))
-    maprule!(ruledata, ruletype, rule, rkeys, wkeys)
-    return _replacegrids(data, wkeys, _swapsource(_to_readonly(wgrids)))
+    ruledata = maprule!(ruledata, ruletype, rule, rkeys, wkeys)
+    return _replacegrids(data, wkeys, _swapsource(_to_readonly(_getwritegrids(rule, ruledata))))
 end
 function maprule!(data::AbstractSimData, ruletype::Val{<:SetGridRule}, rule)
     rkeys, rgrids = _getreadgrids(rule, data)

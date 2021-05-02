@@ -129,19 +129,21 @@ function _build_arrays(init, padval, opt, ::Val{Tuple{Y,X,R}}) where {Y,X,R}
     return source, deepcopy(source)
 end
 function _build_arrays(init, padval, opt::Differentiable, ::Val{Tuple{Y,X,0}}) where {Y,X}
-    bi, bj = _indtoblock.(size(init), 8)
+    B  = 16
+    bi, bj = _indtoblock.(size(init), B)
     vY, vX = Val{bi}(), Val{bj}()
-    sI = SMatrix{8,8}(CartesianIndices(Base.OneTo.((bi, bj))))
-    source = map(I -> DynamicGrids._getblock(A, vY, vX, DynamicGrids._blocktoind.(I.I, 8)...), sI)
+    sI = SMatrix{B,B}(CartesianIndices(Base.OneTo.((bi, bj))))
+    source = map(I -> DynamicGrids._getblock(A, vY, vX, DynamicGrids._blocktoind.(I.I, B)...), sI)
     return source, deepcopy(source)
 end
 function _build_arrays(init, padval, opt::Differentiable, ::Val{Tuple{Y,X,R}}) where {Y,X,R}
+    B = 16
     paddedsize = Y + 4R, X + 2R
-    bi, bj = _indtoblock.(paddedsize, 8)
+    bi, bj = _indtoblock.(paddedsize, B)
     vY, vX = Val{bi}(), Val{bj}()
     sI = SMatrix{bi,bj}(CartesianIndices(Base.OneTo.((bi, bj))))
     source = map(sI) do I
-        DynamicGrids._getblock(init, vY, vX, DynamicGrids._blocktoind.(I.I, 8)...)
+        DynamicGrids._getblock(init, vY, vX, DynamicGrids._blocktoind.(I.I, B)...)
     end
     return source, deepcopy(source)
 end
