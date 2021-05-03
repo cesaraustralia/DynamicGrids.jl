@@ -71,13 +71,11 @@ function _mapneighborhoodgrid!(
         # UNSAFE: we must avoid sharing status blocks, it could cause race conditions 
         # when setting status from different threads. So we split the grid in 2 interleaved
         # sets of rows, so that we never run adjacent rows simultaneously
-        procmap(proc, 1:2:_indtoblock(Y+R, B)) do bi
+        procmap(proc, 1:2:_indtoblock(Y, B)) do bi
             row_kernel!(data, hoodgrid, proc, opt, ruletype, rule, rkeys, wkeys, bi)
         end
-        procmap(proc, 2:2:_indtoblock(Y+R, B)) do bi
-            if bi <=_indtoblock(Y+R, B)
-                row_kernel!(data, hoodgrid, proc, opt, ruletype, rule, rkeys, wkeys, bi)
-            end
+        procmap(proc, 2:2:_indtoblock(Y, B)) do bi
+            row_kernel!(data, hoodgrid, proc, opt, ruletype, rule, rkeys, wkeys, bi)
         end
     end
     return nothing
@@ -89,7 +87,6 @@ end
 # optmap
 # Map kernel over the grid, specialising on PerformanceOpt.
 
-#
 # Run kernels with SparseOpt, block by block:
 function optmap(
     f, simdata::AbstractSimData{Y,X}, proc, ::SparseOpt, ruletype::Val{<:Rule}, rkeys
@@ -179,6 +176,7 @@ function row_kernel!(
 ) where {Y,X,R}
     B = 2R
     i = _blocktoind(bi, B)
+    i > Y && return nothing
     # Loop along the block ROW.
     src = parent(source(grid))
     buffers = _initialise_buffers(src, Val{R}(), i, 1)
@@ -191,6 +189,7 @@ function row_kernel!(
             cell_kernel!(simdata, ruletype, bufrule, rkeys, wkeys, i + b - 1, j)
         end
     end
+    return nothing
 end
 function row_kernel!(
     simdata::AbstractSimData, grid::GridData{Y,X,R}, proc, opt::SparseOpt,
@@ -204,6 +203,7 @@ function row_kernel!(
 
     # Blocks ignore padding! the first block contains padding.
     i = _blocktoind(bi, B)
+    i > Y && return nothing
     # Get current bloc
     skippedlastblock = true
 
