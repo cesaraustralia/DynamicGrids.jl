@@ -4,29 +4,29 @@
 
 Simulation data specific to a single grid.
 """
-abstract type GridData{Y,X,R,T,N} <: AbstractArray{T,N} end
+abstract type GridData{S,R,T,N} <: StaticArray{S,T,N} end
 
-function (::Type{G})(d::GridData{Y,X,R,T,N}) where {G<:GridData,Y,X,R,T,N}
+function (::Type{G})(d::GridData{S,R,T,N}) where {G<:GridData,S,R,T,N}
     args = source(d), dest(d), mask(d), proc(d), opt(d), boundary(d), padval(d),
         sourcestatus(d), deststatus(d)
-    G{Y,X,R,T,N,map(typeof, args)...}(args...)
+    G{S,R,T,N,map(typeof, args)...}(args...)
 end
-function ConstructionBase.constructorof(::Type{T}) where T<:GridData{Y,X,R} where {Y,X,R}
-    T.name.wrapper{Y,X,R}
+function ConstructionBase.constructorof(::Type{T}) where T<:GridData{S,R} where {S,R}
+    T.name.wrapper{S,R}
 end
 
 GridDataOrReps = Union{GridData, Vector{<:GridData}}
 
 # Array interface
-Base.size(d::GridData{Y,X}) where {Y,X} = (Y, X)
-Base.axes(d::GridData) = map(Base.OneTo, size(d))
-Base.eltype(d::GridData{<:Any,<:Any,<:Any,T}) where T = T
-Base.firstindex(d::GridData) = 1
-Base.lastindex(d::GridData{Y,X}) where {Y,X} = Y * X
+# Base.size(d::GridData{<:Tuple{S}}) where {S} = (Y, X)
+# Base.axes(d::GridData) = map(Base.OneTo, size(d))
+# Base.eltype(d::GridData{<:Any,<:Any,T}) where T = T
+# Base.firstindex(d::GridData) = 1
+# Base.lastindex(d::GridData{<:Tuple{S}}) where {S} = Y * X
 
 # Getters
 mask(d::GridData) = d.mask
-radius(d::GridData{<:Any,<:Any,R}) where R = R
+radius(d::GridData{<:Any,R}) where R = R
 proc(d::GridData) = d.proc
 opt(d::GridData) = d.opt
 boundary(d::GridData) = d.boundary
@@ -46,26 +46,26 @@ destview(d::GridData) = view(parent(dest(d)), map(a -> a .+ radius(d), axes(d)).
 source_array_or_view(d::GridData) = source(d) isa OffsetArray ? sourceview(d) : source(d)
 dest_array_or_view(d::GridData) = dest(d) isa OffsetArray ? destview(d) : dest(d)
 
-function Base.copy!(grid::GridData{<:Any,<:Any,R}, A::AbstractArray) where R
+function Base.copy!(grid::GridData{<:Any,R}, A::AbstractArray) where R
     pad_axes = map(ax -> ax .+ R, axes(A))
     copyto!(parent(source(grid)), CartesianIndices(pad_axes), A, CartesianIndices(A))
     _updatestatus!(grid)
     return grid
 end
-function Base.copy!(A::AbstractArray, grid::GridData{<:Any,<:Any,R}) where R
+function Base.copy!(A::AbstractArray, grid::GridData{<:Any,R}) where R
     pad_axes = map(ax -> ax .+ R, axes(A))
     copyto!(A, CartesianIndices(A), parent(source(grid)), CartesianIndices(pad_axes))
     return A
 end
-function Base.copy!(A::AbstractDimArray{T,N}, grid::GridData{<:Any,<:Any,R}) where {T,N,R}
+function Base.copy!(A::AbstractDimArray{T,N}, grid::GridData{<:Any,R}) where {T,N,R}
     copy!(parent(A), grid)
     return A
 end
-function Base.copy!(grid::GridData{<:Any,<:Any,R}, A::AbstractDimArray{T,N}) where {R,T,N}
+function Base.copy!(grid::GridData{<:Any,R}, A::AbstractDimArray{T,N}) where {R,T,N}
     copy!(grid, parent(A))
     return grid
 end
-function Base.copy!(dst::GridData{<:Any,<:Any,RD}, src::GridData{<:Any,<:Any,RS}) where {RD,RS}
+function Base.copy!(dst::GridData{<:Any,RD}, src::GridData{<:Any,RS}) where {RD,RS}
     dst_axes = map(s -> RD:s + RD, gridsize(dst))
     src_axes = map(s -> RS:s + RS, gridsize(src))
     copyto!(parent(source(dst)), CartesianIndices(dst_axes), 
@@ -74,7 +74,9 @@ function Base.copy!(dst::GridData{<:Any,<:Any,RD}, src::GridData{<:Any,<:Any,RS}
     return dst
 end
 
-@propagate_inbounds Base.getindex(d::GridData, I...) = getindex(source(d), I...)
+@propagate_inbounds Base.getindex(d::GridData{s}, I...) where s = getindex(parent(d), I...)
+@propagate_inbounds Base.getindex(d::GridData{s}, i1::Int, I::Int...) where s = 
+    getindex(parent(d), i1, I...)
 
 # _swapsource => ReadableGridData
 # Swap source and dest arrays of a grid
@@ -145,7 +147,7 @@ _build_status(opt::PerformanceOpt, init, r) = nothing, nothing
     ReadableGridData <: GridData
 
     ReadableGridData(grid::GridData)
-    ReadableGridData{Y,X,R}(init::AbstractArray, mask, opt, boundary, padval)
+    ReadableGridData{S,R}(init::AbstractArray, mask, opt, boundary, padval)
 
 Simulation data and storage passed to rules for each timestep.
 
@@ -156,9 +158,9 @@ Simulation data and storage passed to rules for each timestep.
 - `R`: grid padding radius 
 """
 struct ReadableGridData{
-    Y,X,R,T,N,S,D,M,P<:Processor,Op<:PerformanceOpt,Bo,PV,SSt,DSt
-} <: GridData{Y,X,R,T,N}
-    source::S
+    S<:Tuple,R,T,N,Sc,D,M,P<:Processor,Op<:PerformanceOpt,Bo,PV,SSt,DSt
+} <: GridData{S,R,T,N}
+    source::Sc
     dest::D
     mask::M
     proc::P
@@ -168,18 +170,18 @@ struct ReadableGridData{
     sourcestatus::SSt
     deststatus::DSt
 end
-function ReadableGridData{Y,X,R}(
-    source::S, dest::D, mask::M, proc::P, opt::Op, boundary::Bo, 
+function ReadableGridData{S,R}(
+    source::Sc, dest::D, mask::M, proc::P, opt::Op, boundary::Bo, 
     padval::PV, sourcestatus::SSt, deststatus::DSt
-) where {Y,X,R,S<:AbstractArray{T,N},D,M,P,Op,Bo,PV,SSt,DSt} where {T,N}
-    ReadableGridData{Y,X,R,T,N,S,D,M,P,Op,Bo,PV,SSt,DSt}(
+) where {S,R,Sc<:AbstractArray{T,N},D,M,P,Op,Bo,PV,SSt,DSt} where {T,N}
+    ReadableGridData{S,R,T,N,Sc,D,M,P,Op,Bo,PV,SSt,DSt}(
         source, dest, mask, proc, opt, boundary, padval, sourcestatus, deststatus
     )
 end
 # Generate simulation data to match a ruleset and init array.
-@inline function ReadableGridData{Y,X,R}(
+@inline function ReadableGridData{S,R}(
     init::AbstractArray, mask, proc, opt, boundary, padval
-) where {Y,X,R}
+) where {S,R}
     # We add one extra row and column of status blocks so
     # we dont have to worry about special casing the last block
     if R > 0
@@ -194,14 +196,14 @@ end
     end
     sourcestatus, deststatus = _build_status(opt, source, R)
 
-    grid = ReadableGridData{Y,X,R}(
+    grid = ReadableGridData{S,R}(
         source, dest, mask, proc, opt, boundary, padval, sourcestatus, deststatus
     )
     _updatestatus!(grid)
     return grid
 end
 
-Base.parent(d::ReadableGridData) = parent(source(d))
+Base.parent(d::ReadableGridData{S,<:Any,T,N}) where {S,T,N} = SizedArray{S,T,N}(sourceview(d))
 
 """
     WritableGridData <: GridData
@@ -216,10 +218,10 @@ Reads are _always from the source array_, as rules must not be sequential betwee
 cells. This means using e.g. `+=` is not supported, instead use `add!`.
 """
 struct WritableGridData{
-    Y,X,R,T,N,S<:AbstractArray{T,N},D<:AbstractArray{T,N},
+    S<:Tuple,R,T,N,Sc<:AbstractArray{T,N},D<:AbstractArray{T,N},
     M,P<:Processor,Op<:PerformanceOpt,Bo,PV,SSt,DSt
-} <: GridData{Y,X,R,T,N}
-    source::S
+} <: GridData{S,R,T,N}
+    source::Sc
     dest::D
     mask::M
     proc::P
@@ -229,16 +231,16 @@ struct WritableGridData{
     sourcestatus::SSt
     deststatus::DSt
 end
-function WritableGridData{Y,X,R}(
-    source::S, dest::D, mask::M, proc::P, opt::Op, 
+function WritableGridData{S,R}(
+    source::Sc, dest::D, mask::M, proc::P, opt::Op, 
     boundary::Bo, padval::PV, sourcestatus::SSt, deststatus::DSt
-) where {Y,X,R,S<:AbstractArray{T,N},D<:AbstractArray{T,N},M,P,Op,Bo,PV,SSt,DSt} where {T,N}
-    WritableGridData{Y,X,R,T,N,S,D,M,P,Op,Bo,PV,SSt,DSt}(
+) where {S,R,Sc<:AbstractArray{T,N},D<:AbstractArray{T,N},M,P,Op,Bo,PV,SSt,DSt} where {T,N}
+    WritableGridData{S,R,T,N,Sc,D,M,P,Op,Bo,PV,SSt,DSt}(
         source, dest, mask, proc, opt, boundary, padval, sourcestatus, deststatus
     )
 end
 
-Base.parent(d::WritableGridData) = parent(dest(d))
+Base.parent(d::WritableGridData{S}) where {S} = SizedArray{S}(destview(d))
 
 
 ### UNSAFE / LOCKS required
@@ -249,6 +251,9 @@ Base.parent(d::WritableGridData) = parent(dest(d))
 # can happen from any other cell, such as setting all 1s to 2.
 @propagate_inbounds function Base.setindex!(d::WritableGridData, x, I...)
     _setindex!(d, proc(d), x, I...)
+end
+@propagate_inbounds function Base.setindex!(d::WritableGridData, x, i1::Int, I::Int...)
+    _setindex!(d, proc(d), x, i1, I...)
 end
 
 @propagate_inbounds function _setindex!(d::WritableGridData, opt::SingleCPU, x, I...)
@@ -269,10 +274,11 @@ end
 # Sets the status of the destination block that the current index is in.
 # It can't turn of block status as the block is larger than the cell
 # But should be used inside a LOCK
-_setdeststatus!(d::WritableGridData, x, I...) = _setdeststatus!(d::WritableGridData, opt(d), x, I...)
-function _setdeststatus!(d::WritableGridData{Y,X,R}, opt::SparseOpt, x, I...) where {Y,X,R}
+_setdeststatus!(d::WritableGridData{<:Any,R}, x, I...) where R = 
+    _setdeststatus!(d, opt(d), x, I...)
+function _setdeststatus!(d::WritableGridData{<:Any,R}, opt::SparseOpt, x, I...) where R
     blockindex = _indtoblock.(I .+ R, 2R)
     @inbounds deststatus(d)[blockindex...] |= !(opt.f(x))
     return nothing
 end
-_setdeststatus!(d::WritableGridData, opt::PerformanceOpt, x, I...) = nothing
+_setdeststatus!(d::WritableGridData{<:Any,R}, opt::PerformanceOpt, x, I...) where R = nothing

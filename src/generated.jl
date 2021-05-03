@@ -100,14 +100,14 @@ end
     expr = Expr(:block)
     keys = map(_unwrap, Tuple(K.parameters))
     for (i, k) in enumerate(keys) 
-        # MUST write to dest(grid) here, not grid K
+        # MUST write to source(grid) - CellRule doesn't switch grids
         push!(expr.args, :(@inbounds source(data[$(QuoteNode(k))])[I...] = vals[$i]))
     end
     push!(expr.args, :(nothing))
     return expr
 end
 @inline function _writecell!(data, ::Val{<:CellRule}, wkeys::Val{K}, val, I...) where K
-    # MUST write to dest(grid) here, not grid K
+    # MUST write to source(grid) - CellRule doesn't switch grids
     @inbounds source(data[K])[I...] = val
     return nothing
 end

@@ -56,15 +56,15 @@ function maprule!(data::AbstractSimData, proc::CPU, opt, ruletype::Val, rule, rk
     end
 end
 function maprule!(
-    data::AbstractSimData{Y,X}, proc::CPU, opt, ruletype::Val{<:NeighborhoodRule}, 
+    data::AbstractSimData, proc::CPU, opt, ruletype::Val{<:NeighborhoodRule}, 
     rule, args...
-) where {Y,X}
+)
     hoodgrid = data[neighborhoodkey(rule)]
     _mapneighborhoodgrid!(data, hoodgrid, proc, opt, ruletype, rule, args...)
 end
 
 function _mapneighborhoodgrid!(
-    data, hoodgrid::GridData{Y,X,R}, proc, opt, ruletype, rule, rkeys, wkeys 
+    data, hoodgrid::GridData{<:Tuple{Y,X},R}, proc, opt, ruletype, rule, rkeys, wkeys 
 ) where {Y,X,R}
     let data=data, hoodgrid=hoodgrid, proc=proc, opt=opt, ruletyp=ruletype, rule=rule, rkeys=rkeys, wkeys=wkeys
         B = 2R
@@ -89,8 +89,8 @@ end
 
 # Run kernels with SparseOpt, block by block:
 function optmap(
-    f, simdata::AbstractSimData{Y,X}, proc, ::SparseOpt, ruletype::Val{<:Rule}, rkeys
-) where {Y,X}
+    f, simdata::AbstractSimData{S}, proc, ::SparseOpt, ruletype::Val{<:Rule}, rkeys
+) where {S<:Tuple{Y,X}} where {Y,X}
     # Only use SparseOpt for single-grid rules with grid radii > 0
     grid = _firstgrid(simdata, rkeys)
     R = radius(grid)
@@ -122,8 +122,8 @@ function optmap(
 end
 # Run kernel over the whole grid, cell by cell:
 function optmap(
-    f, simdata::AbstractSimData{Y,X}, proc, ::NoOpt, ::Val{<:Rule}, rkeys
-) where {Y,X}
+    f, simdata::AbstractSimData{S}, proc, ::NoOpt, ::Val{<:Rule}, rkeys
+) where S<:Tuple{Y,X} where {Y,X}
     procmap(proc, 1:X) do j
         for i in 1:Y
             f(i, j) # Run rule for each row in column j
@@ -131,8 +131,8 @@ function optmap(
     end
 end
 function optmap(
-    f, simdata::AbstractSimData{Y,X}, proc, ::NoOpt, ::Val{<:CellRule}, rkeys
-) where {Y,X}
+    f, simdata::AbstractSimData{S}, proc, ::NoOpt, ::Val{<:CellRule}, rkeys
+) where S<:Tuple{Y,X} where {Y,X}
     procmap(proc, 1:X) do j
         @simd for i in 1:Y
             f(i, j) # Run rule for each row in column j
@@ -171,7 +171,7 @@ end
 # data in the neighborhood buffers array across by one column. This saves on reads
 # from the main array.
 function row_kernel!(
-    simdata::AbstractSimData, grid::GridData{Y,X,R}, proc, opt::NoOpt,
+    simdata::AbstractSimData, grid::GridData{<:Tuple{Y,X},R}, proc, opt::NoOpt,
     ruletype::Val, rule::Rule, rkeys, wkeys, bi
 ) where {Y,X,R}
     B = 2R
@@ -192,7 +192,7 @@ function row_kernel!(
     return nothing
 end
 function row_kernel!(
-    simdata::AbstractSimData, grid::GridData{Y,X,R}, proc, opt::SparseOpt,
+    simdata::AbstractSimData, grid::GridData{<:Tuple{Y,X},R}, proc, opt::SparseOpt,
     ruletype::Val, rule::Rule, rkeys, wkeys, bi
 ) where {Y,X,R}
     B = 2R
@@ -302,14 +302,18 @@ _to_readonly(data::WritableGridData) = ReadableGridData(data)
 _maybemask!(wgrids::Union{Tuple,NamedTuple}) = map(_maybemask!, wgrids)
 _maybemask!(wgrid::GridData) = _maybemask!(wgrid, proc(wgrid), mask(wgrid))
 _maybemask!(wgrid::GridData, proc, mask::Nothing) = nothing
-function _maybemask!(wgrid::GridData{Y,X}, proc::CPU, mask::AbstractArray) where {Y,X}
+function _maybemask!(
+    wgrid::GridData{<:Tuple{Y,X}}, proc::CPU, mask::AbstractArray
+) where {Y,X}
     procmap(proc, 1:X) do j
         @simd for i in 1:Y
             source(wgrid)[i, j] *= mask[i, j]
         end
     end
 end
-function _maybemask!(wgrid::GridData{Y,X}, proc, mask::AbstractArray) where {Y,X}
+function _maybemask!(
+    wgrid::GridData{<:Tuple{Y,X}}, proc, mask::AbstractArray
+) where {Y,X}
     sourceview(wgrid) .*= mask
 end
 

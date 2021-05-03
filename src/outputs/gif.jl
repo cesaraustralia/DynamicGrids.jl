@@ -35,7 +35,6 @@ function savegif(filename::String, o::ImageOutput, ruleset=Ruleset(); fps=fps(o)
         Array(render!(o, simdata, o[f]))
     end
     array = cat(images..., dims=3)
-    @show size(array)
     FileIO.save(filename, array; fps=fps, kw...)
     array
 end

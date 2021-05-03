@@ -22,17 +22,17 @@ Base.Threads.unlock(opt::CPUGPU) = unlock(opt.spinlock)
 kernel_setup(::CPUGPU) = KernelAbstractions.CPU(), 1
 
 function maprule!(
-    data::AbstractSimData{Y,X}, proc::GPU, opt, ruletype::Val{<:Rule}, rule, rkeys, wkeys
-) where {Y,X}
+    data::AbstractSimData, proc::GPU, opt, ruletype::Val{<:Rule}, rule, rkeys, wkeys
+)
     kernel! = cu_cell_kernel!(kernel_setup(proc)...)
     kernel!(data, ruletype, rule, rkeys, wkeys; ndrange=gridsize(data)) |> wait
 end
 function maprule!(
-    data::AbstractSimData{Y,X}, proc::GPU, opt, 
+    data::AbstractSimData, proc::GPU, opt, 
     ruletype::Val{<:NeighborhoodRule}, rule, rkeys, wkeys
-) where {Y,X}
+)
     kernel! = cu_neighborhood_kernel!(kernel_setup(proc)...)
-    kernel!(data, opt, ruletype, rule, rkeys, wkeys, ndrange=(Y,X)) |> wait
+    kernel!(data, opt, ruletype, rule, rkeys, wkeys, ndrange=gridsize(data)) |> wait
     return nothing
 end
 
@@ -40,7 +40,7 @@ end
     data, opt, ruletype::Val{<:NeighborhoodRule}, rule, rkeys, wkeys
 )
     I, J = @index(Global, NTuple)
-    src = parent(_firstgrid(data, rkeys))
+    src = parent(source(_firstgrid(data, rkeys)))
     buf = _getwindow(src, neighborhood(rule), I, J)
     bufrule = _setbuffer(rule, buf)
     cell_kernel!(data, ruletype, bufrule, rkeys, wkeys, I, J)

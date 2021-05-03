@@ -44,7 +44,7 @@ in specific contexts.
 - `radius(data)` : returns the `Int` radius used on the grid,
     which is also the amount of border padding.
 """
-abstract type AbstractSimData{Y,X} end
+abstract type AbstractSimData{S} end
 
 @propagate_inbounds Base.setindex!(d::AbstractSimData, x, I...) = setindex!(first(grids(d)), x, I...)
 @propagate_inbounds Base.getindex(d::AbstractSimData, I...) = getindex(first(grids(d)), I...)
@@ -101,7 +101,7 @@ Additional methods not found in `AbstractSimData`:
 - `rules(d::SimData)` : get the simulation rules.
 - `ruleset(d::SimData)` : get the simulation [`AbstractRuleset`](@ref).
 """
-struct SimData{Y,X,G<:NamedTuple,E,RS,F,A} <: AbstractSimData{Y,X}
+struct SimData{S<:Tuple,G<:NamedTuple,E,RS,F,A} <: AbstractSimData{S}
     grids::G
     extent::E
     ruleset::RS
@@ -115,10 +115,10 @@ SimData(extent::AbstractExtent, ruleset::AbstractRuleset) =
     SimData(_asnamedtuple(extent), ruleset)
 function SimData(extent::AbstractExtent{<:NamedTuple{Keys}}, ruleset::AbstractRuleset) where Keys
     # Calculate the neighborhood radus (and grid padding) for each grid
-    y, x = gridsize(extent)
+    S = Val{Tuple{gridsize(extent)...}}()
     radii = map(k-> Val{get(radius(ruleset), k, 0)}(), Keys)
     radii = NamedTuple{Keys}(radii)
-    grids = _buildgrids(extent, ruleset, Val{y}(), Val{x}(), radii)
+    grids = _buildgrids(extent, ruleset, S, radii)
     # Construct the SimData for each grid
     SimData(grids, extent, ruleset)
 end
@@ -126,30 +126,30 @@ function SimData(
     grids::G, extent::AbstractExtent, ruleset::AbstractRuleset
 ) where {G<:Union{NamedTuple{<:Any,<:Tuple{GridData,Vararg}},GridData}}
     currentframe = 1; auxframe = nothing
-    Y, X = gridsize(extent)
+    S = Tuple{gridsize(extent)...}
     # SimData is isbits-only
     s_extent = StaticExtent(extent)
     s_ruleset = StaticRuleset(ruleset)
-    SimData{Y,X,G,typeof(s_extent),typeof(s_ruleset),Int,typeof(auxframe)}(
+    SimData{S,G,typeof(s_extent),typeof(s_ruleset),Int,typeof(auxframe)}(
         grids, s_extent, s_ruleset, currentframe, auxframe
     )
 end
 # For ConstrutionBase
-function SimData{Y,X}(
+function SimData{S}(
     grids::G, extent::E, ruleset::RS, currentframe::F, auxframe::A
-) where {Y,X,G,E,RS,F,A}
-    SimData{Y,X,G,E,RS,F,A}(grids, extent, ruleset, currentframe, auxframe)
+) where {S,G,E,RS,F,A}
+    SimData{S,G,E,RS,F,A}(grids, extent, ruleset, currentframe, auxframe)
 end
 
-_buildgrids(extent, ruleset, y, x, radii::NamedTuple) =
-    map((r, in, pv) -> _buildgrids(extent, ruleset, y, x, r, in, pv), radii, init(extent), padval(extent))
-function _buildgrids(extent, ruleset, ::Val{Y}, ::Val{X}, ::Val{R}, init, padval) where {Y,X,R}
-    ReadableGridData{Y,X,R}(
+_buildgrids(extent, ruleset, S, radii::NamedTuple) =
+    map((r, in, pv) -> _buildgrids(extent, ruleset, S, r, in, pv), radii, init(extent), padval(extent))
+function _buildgrids(extent, ruleset, ::Val{S}, ::Val{R}, init, padval) where {S,R}
+    ReadableGridData{S,R}(
         init, mask(extent), proc(ruleset), opt(ruleset), boundary(ruleset), padval 
     )
 end
 
-ConstructionBase.constructorof(::Type{<:SimData{Y,X}}) where {Y,X} = SimData{Y,X}
+ConstructionBase.constructorof(::Type{<:SimData{S}}) where S = SimData{S}
 
 ruleset(d::SimData) = d.ruleset
 rules(d::SimData) = rules(ruleset(d))
@@ -181,23 +181,23 @@ end
 `AbstractSimData` object that is passed to rules. Basically 
 a trimmed-down version of [`SimData`](@ref).
 """
-struct RuleData{Y,X,G<:NamedTuple,E,S,F,A} <: AbstractSimData{Y,X}
+struct RuleData{S<:Tuple,G<:NamedTuple,E,Se,F,A} <: AbstractSimData{S}
     grids::G
     extent::E
-    settings::S
+    settings::Se
     currentframe::F
     auxframe::A
 end
-function RuleData{Y,X}(
-    grids::G, extent::E, settings::S, currentframe::F, auxframe::A
-) where {Y,X,G,E,S,F,A}
-    RuleData{Y,X,G,E,S,F,A}(grids, extent, settings, currentframe, auxframe)
+function RuleData{S}(
+    grids::G, extent::E, settings::Se, currentframe::F, auxframe::A
+) where {S,G,E,Se,F,A}
+    RuleData{S,G,E,Se,F,A}(grids, extent, settings, currentframe, auxframe)
 end
-function RuleData(d::AbstractSimData{Y,X}) where {Y,X}
-    RuleData{Y,X}(grids(d), extent(d), settings(d), currentframe(d), auxframe(d))
+function RuleData(d::AbstractSimData{S}) where S
+    RuleData{S}(grids(d), extent(d), settings(d), currentframe(d), auxframe(d))
 end
 
-ConstructionBase.constructorof(::Type{<:RuleData{Y,X}}) where {Y,X} = RuleData{Y,X}
+ConstructionBase.constructorof(::Type{<:RuleData{S}}) where {S} = RuleData{S}
 
 settings(d::RuleData) = d.settings
 boundary(d::RuleData) = boundary(settings(d))

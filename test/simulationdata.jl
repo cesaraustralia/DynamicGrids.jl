@@ -17,6 +17,7 @@ tspan_ = DateTime(2001):Day(1):DateTime(2001, 2)
 
     ext = Extent(; init=initab, tspan=tspan_)
     simdata = SimData(ext, rs)
+
     @test simdata isa SimData
     @test init(simdata) == initab
     @test mask(simdata) === nothing
@@ -43,8 +44,13 @@ tspan_ = DateTime(2001):Day(1):DateTime(2001, 2)
          0 0 0 0 0]
 
     wgrida = WritableGridData(grida)
-    @test parent(grida) == parent(source(grida)) == parent(source(wgrida))
-    @test parent(wgrida) === parent(dest(grida)) === parent(dest(wgrida))
+    @test parent(source(grida)) === parent(source(wgrida))
+    @test parent(dest(grida)) === parent(dest(wgrida))
+
+    @test parent(grida) == parent(wgrida) ==
+        [0 1 1 
+         0 1 1]
+    
 
     @test sourcestatus(grida) == deststatus(grida) == 
         [0 1 0 0

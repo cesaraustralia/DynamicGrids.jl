@@ -48,10 +48,10 @@ function render!(
 end
 function render!(
     imagebuffer, ig::SingleGridRenderer, o::ImageOutput, 
-    data::AbstractSimData{Y,X}, grid::AbstractArray;
+    data::AbstractSimData{S}, grid::AbstractArray;
     name=nothing, time=currenttime(data), accessor=nothing,
     minval=minval(o), maxval=maxval(o),
-) where {Y,X}
+) where S<:Tuple{Y,X} where {Y,X}
     for j in 1:X, i in 1:Y
         @inbounds val = grid[i, j]
         val = if accessor isa Nothing
