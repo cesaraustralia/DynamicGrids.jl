@@ -26,6 +26,7 @@ function maprule!(
 )
     kernel! = cu_cell_kernel!(kernel_setup(proc)...)
     kernel!(data, ruletype, rule, rkeys, wkeys; ndrange=gridsize(data)) |> wait
+    return data
 end
 function maprule!(
     data::AbstractSimData, proc::GPU, opt, 
@@ -33,7 +34,7 @@ function maprule!(
 )
     kernel! = cu_neighborhood_kernel!(kernel_setup(proc)...)
     kernel!(data, opt, ruletype, rule, rkeys, wkeys, ndrange=gridsize(data)) |> wait
-    return nothing
+    return data
 end
 
 @kernel function cu_neighborhood_kernel!(

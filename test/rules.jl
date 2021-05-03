@@ -401,11 +401,11 @@ end
 
 @testset "Multi-grid rules work" begin
     init = (prey=[10. 10.], predator=[1. 0.])
-    rules = DoubleY{Tuple{:predator,:prey},:prey}(), predation
+    rules_ = DoubleY{Tuple{:predator,:prey},:prey}(), predation
     output = ArrayOutput(init; tspan=1:3)
     for proc in hardware, opt in (NoOpt(), SparseOpt())
         @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
-            sim!(output, rules; opt=opt, proc=proc)
+            sim!(output, rules_; opt=opt, proc=proc)
             @test output[2] == (prey=[18. 20.], predator=[2. 0.])
             @test output[3] == (prey=[32. 40.], predator=[4. 0.])
         end

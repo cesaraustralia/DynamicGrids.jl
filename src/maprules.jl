@@ -8,7 +8,7 @@ function maprule!(data::AbstractSimData, ruletype::Val{<:CellRule}, rule)
     rkeys, _ = _getreadgrids(rule, data)
     wkeys, _ = _getwritegrids(rule, data)
     ruledata = maprule!(RuleData(data), ruletype, rule, rkeys, wkeys)
-    return _replacegrids(data, wkeys, ruledata)
+    return _replacegrids(data, _getwritegrids(rule, ruledata)...)
 end
 function maprule!(data::AbstractSimData, ruletype::Val{<:NeighborhoodRule}, rule)
     rkeys, rgrids = _getreadgrids(rule, data)
@@ -19,10 +19,11 @@ function maprule!(data::AbstractSimData, ruletype::Val{<:NeighborhoodRule}, rule
     # Copy or zero out boundary where needed
     _updateboundary!(rgrids)
     _cleardest!(data[neighborhoodkey(rule)])
-    data = maprule!(RuleData(data), ruletype, rule, rkeys, wkeys)
+    ruledata = maprule!(RuleData(data), ruletype, rule, rkeys, wkeys)
     # Swap the dest/source of grids that were written to
     # and combine the written grids with the original simdata
-    return _replacegrids(data, wkeys, _swapsource(_to_readonly(_getwritegrids(rule, ruledata))))
+    swapped = _swapsource(_to_readonly(_getwritegrids(rule, ruledata)[2]))
+    return _replacegrids(data, wkeys, swapped)
 end
 function maprule!(data::AbstractSimData, ruletype::Val{<:SetRule}, rule)
     rkeys, _ = _getreadgrids(rule, data)
@@ -32,7 +33,8 @@ function maprule!(data::AbstractSimData, ruletype::Val{<:SetRule}, rule)
     end
     ruledata = RuleData(_combinegrids(data, wkeys, wgrids))
     ruledata = maprule!(ruledata, ruletype, rule, rkeys, wkeys)
-    return _replacegrids(data, wkeys, _swapsource(_to_readonly(_getwritegrids(rule, ruledata))))
+    swapped = _swapsource(_to_readonly(_getwritegrids(rule, ruledata)[2]))
+    return _replacegrids(data, wkeys, swapped)
 end
 function maprule!(data::AbstractSimData, ruletype::Val{<:SetGridRule}, rule)
     rkeys, rgrids = _getreadgrids(rule, data)
@@ -41,7 +43,7 @@ function maprule!(data::AbstractSimData, ruletype::Val{<:SetGridRule}, rule)
     ruledata = RuleData(_combinegrids(data, wkeys, wgrids))
     # Run the rule
     applyrule!(ruledata, rule)
-    return data
+    return _replacegrids(data, _getwritegrids(rule, ruledata)...)
 end
 function maprule!(data::AbstractSimData, ruletype::Val, rule, rkeys, wkeys)
     maprule!(data, proc(data), opt(data), ruletype, rule, rkeys, wkeys)
@@ -54,6 +56,18 @@ function maprule!(data::AbstractSimData, proc::CPU, opt, ruletype::Val, rule, rk
             cell_kernel!(data, ruletype, rule, rkeys, wkeys, i, j)
         end
     end
+    return data
+end
+function maprule!(data::AbstractSimData, proc::CPU, opt::Differentiable, ruletype::Val, rule, rkeys, wkeys)
+    K = _unwrap(rkeys)
+    grid = data[K]
+    newwritegrid = map(source(grid)) do block
+        map(block) do cell
+            applyrule(data, rule, cell, (1, 1))
+        end
+    end
+    grid = @set grid.source = newwritegrid 
+    return _replacegrids(data, wkeys, grid)
 end
 function maprule!(
     data::AbstractSimData, proc::CPU, opt, ruletype::Val{<:NeighborhoodRule}, 
@@ -61,6 +75,7 @@ function maprule!(
 )
     hoodgrid = data[neighborhoodkey(rule)]
     _mapneighborhoodgrid!(data, hoodgrid, proc, opt, ruletype, rule, args...)
+    return data
 end
 
 function _mapneighborhoodgrid!(
@@ -78,7 +93,7 @@ function _mapneighborhoodgrid!(
             row_kernel!(data, hoodgrid, proc, opt, ruletype, rule, rkeys, wkeys, bi)
         end
     end
-    return nothing
+    return data
 end
 
 
@@ -95,8 +110,7 @@ function optmap(
     grid = _firstgrid(simdata, rkeys)
     R = radius(grid)
     if R == 0
-        optmap(f, simdata, proc, NoOpt(), ruletype, rkeys)
-        return nothing
+        return optmap(f, simdata, proc, NoOpt(), ruletype, rkeys)
     end
     B = 2R
     status = sourcestatus(grid)
@@ -118,7 +132,7 @@ function optmap(
             end
         end
     end
-    return nothing
+    return simdata
 end
 # Run kernel over the whole grid, cell by cell:
 function optmap(
@@ -129,6 +143,7 @@ function optmap(
             f(i, j) # Run rule for each row in column j
         end
     end
+    return simdata
 end
 function optmap(
     f, simdata::AbstractSimData{S}, proc, ::NoOpt, ::Val{<:CellRule}, rkeys
@@ -138,6 +153,7 @@ function optmap(
             f(i, j) # Run rule for each row in column j
         end
     end
+    return simdata
 end
 # procmap
 # Map kernel over the grid, specialising on Processor

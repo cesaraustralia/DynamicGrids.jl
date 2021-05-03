@@ -98,3 +98,12 @@ end
 _unwrap(x) = x
 _unwrap(::Val{X}) where X = X
 _unwrap(::Type{<:Val{X}}) where X = X
+
+
+# Convert regular index to block index
+@inline function _indtoblock(x::Int, blocksize::Int)
+    (x - 1) ÷ blocksize + 1
+end
+
+# Convert block index to regular index
+@inline _blocktoind(x, blocksize) = (x - 1) * blocksize + 1

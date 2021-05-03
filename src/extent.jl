@@ -67,6 +67,7 @@ mutable struct Extent{I<:Union{AbstractArray,NamedTuple},
 end
 Extent(; init, mask=nothing, aux=nothing, padval=_padval(init), tspan, kw...) =
     Extent(init, mask, aux, padval, tspan)
+Extent(init; kw...) = Extent(; init=init, kw...)
 
 settspan!(e::Extent, tspan) = e.tspan = tspan
 
@@ -85,3 +86,6 @@ struct StaticExtent{I<:Union{AbstractArray,NamedTuple},
     tspan::T
 end
 StaticExtent(e::Extent) = StaticExtent(init(e), mask(e), aux(e), padval(e), tspan(e))
+StaticExtent(; init, mask=nothing, aux=nothing, padval=_padval(init), tspan, kw...) =
+    StaticExtent(init, mask, aux, padval, tspan)
+StaticExtent(init; kw...) = StaticExtent(; init=init, kw...)

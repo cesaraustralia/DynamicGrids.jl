@@ -82,13 +82,6 @@ function _updatetime(simdata::AbstractSimData, f::Integer)
     @set simdata.auxframe = _calc_auxframe(simdata)
 end
 
-# Convert regular index to block index
-@inline _indtoblock(x::Int, blocksize::Int) = (x - 1) ÷ blocksize + 1
-
-# Convert block index to regular index
-@inline _blocktoind(x, blocksize) = (x - 1) * blocksize + 1
-
-
 """
     SimData <: AbstractSimData
 

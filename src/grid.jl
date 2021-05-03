@@ -129,11 +129,11 @@ function _build_arrays(init, padval, opt, ::Val{Tuple{Y,X,R}}) where {Y,X,R}
     return source, deepcopy(source)
 end
 function _build_arrays(init, padval, opt::Differentiable, ::Val{Tuple{Y,X,0}}) where {Y,X}
-    B  = 16
+    B = 16
     bi, bj = _indtoblock.(size(init), B)
-    vY, vX = Val{bi}(), Val{bj}()
-    sI = SMatrix{B,B}(CartesianIndices(Base.OneTo.((bi, bj))))
-    source = map(I -> DynamicGrids._getblock(A, vY, vX, DynamicGrids._blocktoind.(I.I, B)...), sI)
+    vY, vX = Val{B}(), Val{B}()
+    sI = SMatrix{bi,bj}(CartesianIndices(Base.OneTo.((bi, bj))))
+    source = map(I -> DynamicGrids._getblock(init, vY, vX, DynamicGrids._blocktoind.(I.I, B)...), sI)
     return source, deepcopy(source)
 end
 function _build_arrays(init, padval, opt::Differentiable, ::Val{Tuple{Y,X,R}}) where {Y,X,R}
@@ -152,15 +152,15 @@ end
 # Build block-status arrays
 # We add an additional block that is never used so we can 
 # index into it in the block loop without checking
-function _build_status(opt::SparseOpt, source, r)
-    hoodsize = 2r + 1
-    blocksize = 2r
+function _build_status(opt::SparseOpt, source, ::Val{R}) where R
+    hoodsize = 2R + 1
+    blocksize = 2R
     nblocs = _indtoblock.(size(source), blocksize) .+ 1
     sourcestatus = zeros(Bool, nblocs)
     deststatus = zeros(Bool, nblocs)
-    sourcestatus, deststatus
+    return sourcestatus, deststatus
 end
-_build_status(opt::PerformanceOpt, init, r) = nothing, nothing
+_build_status(opt, init, r) = nothing, nothing
 
 """
     ReadableGridData <: GridData
@@ -201,8 +201,11 @@ end
 @inline function ReadableGridData{S,R}(
     init::AbstractArray, mask, proc, opt, boundary, padval
 ) where {Y,X,R}
+    if R == 0 && opt isa SparseOpt
+        opt = NoOpt()
+    end
     source, dest = _build_arrays(init, padval, opt, Val{Tuple{Y,X,R}}()) 
-    sourcestatus, deststatus = _build_status(opt, source, R)
+    sourcestatus, deststatus = _build_status(opt, source, Val{R}())
     grid = ReadableGridData{Y,X,R}(
         source, dest, mask, proc, opt, boundary, padval, sourcestatus, deststatus
     )
