@@ -31,11 +31,11 @@ end
 # Reset or wrap boundary where required. This allows us to ignore 
 # bounds checks on neighborhoods and still use a wraparound grid.
 _updateboundary!(grids::Tuple) = map(_updateboundary!, grids)
-function _updateboundary!(g::GridData{Y,X,R}) where {Y,X,R}
+function _updateboundary!(g::GridData{S,R}) where {S<:Tuple{Y,X},R} where {Y,X}
     R < 1 && return g
     return _updateboundary!(g, boundary(g))
 end
-function _updateboundary!(g::GridData{Y,X,R,T}, ::Remove) where {Y,X,R,T}
+function _updateboundary!(g::GridData{S,R}, ::Remove) where {S<:Tuple{Y,X},R} where {Y,X}
     src = parent(source(g))
     # Left
     @inbounds src[1:Y, 1:R] .= Ref(padval(g))
@@ -48,7 +48,7 @@ function _updateboundary!(g::GridData{Y,X,R,T}, ::Remove) where {Y,X,R,T}
     status = sourcestatus(g)
     return g
 end
-function _updateboundary!(g::GridData{Y,X,R}, ::Wrap) where {Y,X,R}
+function _updateboundary!(g::GridData{S,R}, ::Wrap) where {S<:Tuple{Y,X},R} where {Y,X}
     src = parent(source(g))
     nrows, ncols = gridsize(g)
     startpadrow = startpadcol = 1:R
