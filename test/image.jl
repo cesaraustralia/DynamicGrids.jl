@@ -1,7 +1,7 @@
 using DynamicGrids, Dates, Test, Colors, ColorSchemes, FileIO
 using FreeTypeAbstraction
 using DynamicGrids: render!, renderer, minval, maxval, normalise, SimData, NoDisplayImageOutput,
-    isstored, isasync, initialise!, finalise!, delay, fps, settimestamp!, timestamp, textconfig,
+    isstored, isasync, initialise!, finalise!, maybesleep, fps, settimestamp!, timestamp, textconfig,
     tspan, setfps!, frames, isshowable, showframe, to_rgb, scale, Extent, extent
 using ColorSchemes: leonardo
 
@@ -56,7 +56,7 @@ end
     @test renderer(output).scheme == ObjectScheme()
     @test isasync(output) == false
     @test isstored(output) == false
-    @test delay(output, 1.0) === nothing
+    @test maybesleep(output, 1.0) === nothing
     @test timestamp(output) === 0.0
     pre = time()
     settimestamp!(output, 1)

@@ -30,6 +30,7 @@ using Adapt,
 const DG = DynamicGrids
 const DD = DimensionalData
 
+
 using Base: tail, @propagate_inbounds
 
 import Base: show, getindex, setindex!, lastindex, size, length, push!, append!,
@@ -75,6 +76,10 @@ export TextConfig
 export ObjectScheme, Greyscale, Grayscale
 
 export CharStyle, Block, Braile
+
+
+const DEFAULT_KEY = :_default_
+
 
 function __init__()
     global terminal

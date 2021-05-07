@@ -1,4 +1,3 @@
-
 """
     GridData <: AbstractArray
 

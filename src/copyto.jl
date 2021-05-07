@@ -11,8 +11,8 @@ struct CopyTo{W,F} <: CellRule{Tuple{},W}
     "An Aux or Grid key for data source or a single value"
     from::F
 end
-CopyTo(from) = CopyTo{:_default_}(from)
-CopyTo(; from) = CopyTo{:_default_}(from)
+CopyTo(from) = CopyTo{DEFAULT_KEY}(from)
+CopyTo(; from) = CopyTo{DEFAULT_KEY}(from)
 CopyTo{W}(from) where W = CopyTo{W,typeof(from)}(from)
 CopyTo{W}(; from) where W = CopyTo{W,typeof(from)}(from)
 

@@ -41,7 +41,7 @@ function render!(
 end
 function render!(
     imagebuffer, ig::SingleGridRenderer, o::ImageOutput, data::AbstractSimData, 
-    grids::NamedTuple{(:_default_,)};
+    grids::NamedTuple{(DEFAULT_KEY,)};
     name=nothing, time=currenttime(data)
 )
     render!(imagebuffer, ig, o, data, first(grids); name=name, time=time)

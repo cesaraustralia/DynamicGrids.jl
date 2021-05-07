@@ -48,7 +48,7 @@ function _store_x(o::TransformedOutput, grids::NamedTuple)
     end
     o.f(nt)
 end
-function _store_x(o::TransformedOutput, grids::NamedTuple{(:_default_,)})
+function _store_x(o::TransformedOutput, grids::NamedTuple{(DEFAULT_KEY,)})
     g = first(grids)
     A = source(g) isa OffsetArray ? copy!(o.buffer, g) : parent(source(g))
     o.f(A)

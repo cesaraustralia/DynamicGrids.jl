@@ -68,7 +68,7 @@ function sim!(output::Output, ruleset=ruleset(output);
     # Set up output
     settspan!(output, tspan)
     # Create or update the combined data object for the simulation
-    simdata = _initdata!(simdata, extent, simruleset)
+    simdata = _initdata!(simdata, output, extent, ruleset)
     init_output_grids!(output, init)
     # Set run speed for GraphicOutputs
     setfps!(output, fps)
@@ -77,7 +77,7 @@ function sim!(output::Output, ruleset=ruleset(output);
     # Show the first grid
     showframe(output, simdata)
     # Let the init grid be displayed for as long as a normal grid
-    delay(output, 1)
+    maybesleep(output, 1)
     # Run the simulation over simdata and a unitrange we keep 
     # the original ruleset to allow interactive updates to rules.
     return runsim!(output, simdata, ruleset, 1:lastindex(tspan))
@@ -126,7 +126,7 @@ function resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
 
     setfps!(output, fps)
     extent = Extent(; init=_asnamedtuple(init), mask=mask(output), aux=aux(output), tspan=new_tspan)
-    simdata = _initdata!(simdata, extent, ruleset)
+    simdata = _initdata!(simdata, output, extent, ruleset)
     initialise!(output, simdata)
     initialisegraphics(output, simdata)
     setrunning!(output, true) || error("Could not start the simulation with this output")
@@ -163,7 +163,7 @@ function simloop!(output::Output, simdata, ruleset, fspan)
         # Update the current simulation frame and time
         simdata = _updatetime(simdata, f) 
         # Update any Delay parameters
-        drules = _setdelays(rules(ruleset), output, simdata)
+        drules = _setdelays(rules(ruleset), simdata)
         # Run a timestep
         simdata = _step!(simdata, drules)
         # Save/do something with the the current grid
@@ -171,7 +171,7 @@ function simloop!(output::Output, simdata, ruleset, fspan)
         # Let output UI things happen
         isasync(output) && yield()
         # Stick to the FPS
-        delay(output, f)
+        maybesleep(output, f)
         # Exit gracefully
         if !isrunning(output) || f == last(fspan)
             showframe(output, simdata)

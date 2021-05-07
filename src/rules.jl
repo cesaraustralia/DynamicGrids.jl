@@ -79,7 +79,7 @@ and type parameters, besides the initial `R` and `W` params.  =#
 
 # No {R,W} with args or kw
 function (::Type{T})(args...; kw...) where T<:Rule
-    T{:_default_,:_default_}(args...; kw...)
+    T{DEFAULT_KEY,DEFAULT_KEY}(args...; kw...)
 end
 # {R,W} with args
 function (::Type{T})(args...) where T<:Rule{R,W} where {R,W}

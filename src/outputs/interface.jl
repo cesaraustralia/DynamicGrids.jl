@@ -72,14 +72,14 @@ Every frame has an index of 1 if the simulation isn't stored.
 function frameindex end
 
 """
-    delay(o::Output, f::Int) => nothing
+    maybesleep(o::Output, f::Int) => nothing
 
 [`GraphicOutput`](@ref) interface method.
 
 Delay the simulations to match some `fps` rate. The default for outputs not 
 `<: GraphicOutput` is to do nothing and continue.
 """
-function delay end
+function maybesleep end
 
 """
     showframe(o::Output, data::AbstractSimData)

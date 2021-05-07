@@ -78,7 +78,7 @@ settimestamp!(o::GraphicOutput, f) = settimestamp!(graphicconfig(o), f)
 setstoppedframe!(o::GraphicOutput, f) = setstoppedframe!(graphicconfig(o), f)
 
 # Delay output to maintain the frame rate
-delay(o::GraphicOutput, f) =
+maybesleep(o::GraphicOutput, f) =
     sleep(max(0.0, timestamp(o) + (f - stampframe(o))/fps(o) - time()))
 isshowable(o::GraphicOutput, f) = true
 

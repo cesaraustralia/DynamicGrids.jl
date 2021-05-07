@@ -53,20 +53,20 @@ Aux(key::Symbol) = Aux{key}()
 _unwrap(::Aux{X}) where X = X
 _unwrap(::Type{<:Aux{X}}) where X = X
 
-@propagate_inbounds Base.get(data::AbstractSimData, key::Aux, I...) = _auxval(data, key, I...)
+@propagate_inbounds Base.get(data::AbstractSimData, key::Aux, I...) = _getaux(data, key, I...)
 
 @inline aux(nt::NamedTuple, ::Aux{Key}) where Key = nt[Key]
 
 # If there is no time dimension we return the same data for every timestep
-_auxval(data::AbstractSimData, key::Union{Aux,Symbol}, I...) = 
-    _auxval(aux(data, key), data, key, I...)
-_auxval(A::AbstractMatrix, data::AbstractSimData, key::Union{Aux,Symbol}, y, x) = A[y, x]
-# function _auxval(A::AbstractDimArray{<:Any,2}, data::AbstractSimData, key::Union{Aux,Symbol}, y, x)
+_getaux(data::AbstractSimData, key::Union{Aux,Symbol}, I...) = 
+    _getaux(aux(data, key), data, key, I...)
+_getaux(A::AbstractMatrix, data::AbstractSimData, key::Union{Aux,Symbol}, y, x) = A[y, x]
+# function _getaux(A::AbstractDimArray{<:Any,2}, data::AbstractSimData, key::Union{Aux,Symbol}, y, x)
     # X = DD.basetypeof(dims(A, XDim))
     # Y = DD.basetypeof(dims(A, YDim))
     # A[y, x]
 # end
-function _auxval(A::AbstractDimArray{<:Any,3}, data::AbstractSimData, key::Union{Aux,Symbol}, y, x)
+function _getaux(A::AbstractDimArray{<:Any,3}, data::AbstractSimData, key::Union{Aux,Symbol}, y, x)
     # X = DD.basetypeof(dims(A, XDim))
     # Y = DD.basetypeof(dims(A, YDim))
     A[y, x, auxframe(data, key)]
@@ -146,21 +146,48 @@ _unwrap(::Type{<:Grid{X}}) where X = X
 @propagate_inbounds Base.get(data::AbstractSimData, key::Grid{K}, I...) where K = data[K][I...]
 
 
+"""
+    AbstractDelay <: ParameterSource
+
+Abstract supertype for [`ParameterSource`](@ref)s that use data from a grid
+with a time delay.
+"""
+abstract type AbstractDelay{K} <: ParameterSource end
+
+@inline frame(delay::AbstractDelay) = delay.frame
+
+@propagate_inbounds function Base.get(data::AbstractSimData, delay::AbstractDelay{K}, I...) where K
+    _getdelay(frames(data)[frame(delay, data)], delay, I...)
+end
+
+@propagate_inbounds function _getdelay(frame::NamedTuple, delay::AbstractDelay{K}, I...) where K
+    _getdelay(frame[K], delay, I...)
+end
+@propagate_inbounds function _getdelay(frame::AbstractArray, ::AbstractDelay{K}, I...) where K
+    frame[I...]
+end
 
 """
-    Delay(key::Symbol, length)
+    Delay <: AbstractDelay
+
+    Delay{K}(steps)
 
 `Delay` allows using a [`Grid`](@ref) from previous timesteps as a parameter source as 
-a field in any `Rule` that uses `get` to retrieve it's parameters. It must be coupled with 
-an output that stores all frames, so that `@assert DynamicGrids.isstored(output) == true`. 
+a field in any `Rule` that uses `get` to retrieve it's parameters.
 
-With [`GraphicOutput`](@ref)s this may be acheived by using the keyword argument 
-`store=true` when constructing the output object.
+It must be coupled with an output that stores all frames, so that `@assert 
+DynamicGrids.isstored(output) == true`.  With [`GraphicOutput`](@ref)s this may be 
+acheived by using the keyword argument `store=true` when constructing the output object.
+
+# Type Parameters
+
+- `K::Symbol`: matching the name of a grid in `init`.
 
 # Arguments
 
-- `key::Symbol`: matching the name of a grid in `init`.
-- `length`: a multiple of the step size of the output `tspan`.
+- `steps`: As a user supplied parameter, this is a multiple of the step size of the output 
+    `tspan`. This is automatically replaced with an integer for each step. Used within the 
+    code in a rule, it must be an `Int` number of frames, for performance.
 
 # Example
 
@@ -171,45 +198,119 @@ SomeRule(;
 )
 `` `
 """
-struct Delay{K,S,F,DF}
+struct Delay{K,S} <: AbstractDelay{K}
     steps::S
-    frames::F
-    delayframe::DF
 end
-Delay(key::Symbol, step) = Delay{key}(step)
-Delay{K}(step::S, frames::F=nothing, delayframe::DF=nothing) where {K,S,F,DF} = 
-    Delay{K,S,F,DF}(step, frames, delayframe)
+Delay{K}(steps::S) where {K,S} = Delay{K,S}(steps)
 
 ConstructionBase.constructorof(::Delay{K}) where K = Delay{K}
-
 steps(delay::Delay) = delay.steps
-frames(delay::Delay) = delay.frames
-delayframe(delay::Delay) = delay.delayframe
 
-@propagate_inbounds function Base.get(data::AbstractSimData, delay::Delay, I...) 
-    frames(delay)[delayframe(delay)][I...]
-end
-
-# _setdelays
-# Update any Delay anywhere in the rules Tuple.
-function _setdelays(rules::Tuple, output, data)
-    ignore = Union{Function,SArray,AbstractDict,Number}
-    delays = Flatten.flatten(rules, Delay, ignore)
-    newdelays = map(d -> _setdelay(d, output, data), delays)
-    Flatten.reconstruct(rules, newdelays, Delay, ignore)
-end
-# _setdelay
+# _to_frame
 # Replace the delay step size with an integer for fast indexing
 # checking that the delay matches the simulation step size.
 # Delays at the start just use the init frame, for now.
-function _setdelay(delay::Delay{K}, output, data) where K
-    isstored(output) || _notstorederror()
+function _to_frame(delay::Delay{K}, data) where K
     nsteps = steps(delay) / step(tspan(data))
     isteps = trunc(Int, nsteps)
     nsteps == isteps || _delaysteperror(delay, step(tspan(data)))
-    delayframe = max(currentframe(data) - isteps, 1)
-    Delay{K}(isteps, map(f -> f[K], frames(output)), delayframe)
+    frame = max(currentframe(data) - isteps, 1)
+    Frame{K}(frame)
 end
+
+"""
+    Lag <: AbstractDelay
+
+    Lag{K}(frames::Int) 
+
+`Lag` allows using a [`Grid`](@ref) from a specific previous frame from within a rule, 
+using `get`. It is similar to [`Delay`](@ref), but an integer amount of steps should be 
+used, instead of a quantity related to the simulation `tspan`. Used within rule code,
+the lower bound will not be checked. Do this manually, or use [`Frame`](@ref) instead.
+
+# Type Parameter
+
+- `K::Symbol`: matching the name of a grid in `init`.
+
+# Argument
+
+- `frames::Int`: number of frames to lag by, 1 or larger.
+
+# Example
+
+```julia
+SomeRule(;
+    someparam=Delay(:grid_a, Month(3))
+    otherparam=1.075
+)
+`` `
+"""
+struct Lag{K} <: AbstractDelay{K}
+    nframes::Int
+end
+Lag{K}(nframes::Int) where K = Lag{K}(nframes)
+
+function _to_frame(delay::Lag{K}, data) where K
+    frame = max(currentframe(data) - steps(delay), 1)
+    Frame{K}(frame)
+end
+
+@inline frame(delay::Lag, data) = max(1, currentframe(data) - steps(delay))
+
+"""
+    Frame <: AbstractDelay
+
+    Frame{K}(frame) 
+
+`Frame` allows using a [`Grid`](@ref) from a specific previous timestep from within 
+a rule, using `get`. It should only be used within rule code, not as a parameter.
+
+# Type Parameter
+
+- `K::Symbol`: matching the name of a grid in `init`.
+
+# Argument
+
+- `frame::Int`: the exact frame number to use.
+"""
+struct Frame{K} <: AbstractDelay{K}
+    frame::Int
+    Frame{K}(frame::Int) where K = new{K}(frame)
+end
+
+ConstructionBase.constructorof(::Frame{K}) where K = Frame{K}
+
+@inline frame(delay::Frame) = delay.frame
+@inline frame(delay::Frame, data) = frame(delay)
+
+
+# Delay utils
+
+const DELAY_IGNORE = Union{Function,SArray,AbstractDict,Number}
+
+@inline function hasdelay(rules::Tuple)
+    # Check for Delay as parameter or used in rule code
+    length(_getdelays(rules)) > 0 || any(map(needsdelay, rules))
+end
+
+needsdelay(rule::Rule) = false
+
+# _setdelays
+# Update any Delay anywhere in the rules Tuple.
+function _setdelays(rules::Tuple, data)
+    delays = _getdelays(rules)
+    if length(delays) > 0
+        newdelays = map(d -> _to_frame(d, data), delays)
+        _setdelays(rules, newdelays)
+    else
+        rules
+    end
+end
+
+_getdelays(rules::Tuple) = Flatten.flatten(rules, AbstractDelay, DELAY_IGNORE)
+_setdelays(rules::Tuple, delays::Tuple) = 
+    Flatten.reconstruct(rules, delays, AbstractDelay, DELAY_IGNORE)
+
 
 _notstorederror() = 
     throw(ArgumentError("Output does not store frames, which is needed for a Delay. Use ArrayOutput or any GraphicOutput with `store=true` keyword"))

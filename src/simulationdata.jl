@@ -57,6 +57,7 @@ gridsize(d::AbstractSimData) = gridsize(first(d))
 padval(d::AbstractSimData) = padval(extent(d))
 
 extent(d::AbstractSimData) = d.extent
+frames(d::AbstractSimData) = d.frames
 grids(d::AbstractSimData) = d.grids
 init(d::AbstractSimData) = init(extent(d))
 mask(d::AbstractSimData) = mask(first(d))
@@ -101,44 +102,51 @@ Additional methods not found in `AbstractSimData`:
 - `rules(d::SimData)` : get the simulation rules.
 - `ruleset(d::SimData)` : get the simulation [`AbstractRuleset`](@ref).
 """
-struct SimData{S<:Tuple,G<:NamedTuple,E,RS,F,A} <: AbstractSimData{S}
+struct SimData{S<:Tuple,G<:NamedTuple,E,RS,F,CF,AF} <: AbstractSimData{S}
     grids::G
     extent::E
     ruleset::RS
-    currentframe::F
-    auxframe::A
+    frames::F
+    currentframe::CF
+    auxframe::AF
 end
-# Get the extent, usually from an Output
-SimData(x, ruleset::AbstractRuleset) = SimData(extent(x), ruleset)
+function SimData{S}(
+    grids::G, extent::E, ruleset::RS, frames::F, currentframe::CF, auxframe::AF
+) where {S,G,E,RS,F,CF,AF}
+    SimData{S,G,E,RS,F,CF,AF}(grids, extent, ruleset, frames, currentframe, auxframe)
+end
+SimData(o, ruleset::AbstractRuleset) = SimData(o, extent(o), ruleset)
+function SimData(o, extent::AbstractExtent, ruleset::AbstractRuleset)
+    frames_ = if hasdelay(rules(ruleset)) 
+        isstored(o) || _notstorederror()
+        frames(o) 
+    else
+        nothing 
+    end
+    SimData(extent, ruleset, frames_)
+end
 # Convert grids in extent to NamedTuple
-SimData(extent::AbstractExtent, ruleset::AbstractRuleset) = 
+SimData(extent::AbstractExtent, ruleset::AbstractRuleset, frames=nothing) = 
     SimData(_asnamedtuple(extent), ruleset)
-function SimData(extent::AbstractExtent{<:NamedTuple{Keys}}, ruleset::AbstractRuleset) where Keys
+function SimData(extent::AbstractExtent{<:NamedTuple{Keys}}, ruleset::AbstractRuleset, frames=nothing) where Keys
     # Calculate the neighborhood radus (and grid padding) for each grid
+
     S = Val{Tuple{gridsize(extent)...}}()
     radii = map(k-> Val{get(radius(ruleset), k, 0)}(), Keys)
     radii = NamedTuple{Keys}(radii)
     grids = _buildgrids(extent, ruleset, S, radii)
     # Construct the SimData for each grid
-    SimData(grids, extent, ruleset)
+    SimData(grids, extent, ruleset, frames)
 end
 function SimData(
-    grids::G, extent::AbstractExtent, ruleset::AbstractRuleset
+    grids::G, extent::AbstractExtent, ruleset::AbstractRuleset, frames
 ) where {G<:Union{NamedTuple{<:Any,<:Tuple{GridData,Vararg}},GridData}}
     currentframe = 1; auxframe = nothing
     S = Tuple{gridsize(extent)...}
     # SimData is isbits-only
     s_extent = StaticExtent(extent)
     s_ruleset = StaticRuleset(ruleset)
-    SimData{S,G,typeof(s_extent),typeof(s_ruleset),Int,typeof(auxframe)}(
-        grids, s_extent, s_ruleset, currentframe, auxframe
-    )
-end
-# For ConstrutionBase
-function SimData{S}(
-    grids::G, extent::E, ruleset::RS, currentframe::F, auxframe::A
-) where {S,G,E,RS,F,A}
-    SimData{S,G,E,RS,F,A}(grids, extent, ruleset, currentframe, auxframe)
+    SimData{S}(grids, s_extent, s_ruleset, frames, currentframe, auxframe)
 end
 
 _buildgrids(extent, ruleset, S, radii::NamedTuple) =
@@ -159,19 +167,23 @@ opt(d::SimData) = opt(ruleset(d))
 settings(d::SimData) = settings(ruleset(d))
 
 # When no simdata is passed in, create new AbstractSimData
-function _initdata!(::Nothing, extent::AbstractExtent, ruleset::AbstractRuleset)
-    SimData(extent, ruleset)
+function _initdata!(::Nothing, output, extent::AbstractExtent, ruleset::AbstractRuleset)
+    SimData(output, extent, ruleset)
 end
 # Initialise a AbstractSimData object with a new `Extent` and `Ruleset`.
 function _initdata!(
-    simdata::SimData, extent::AbstractExtent, ruleset::AbstractRuleset
+    simdata::SimData, output, extent::AbstractExtent, ruleset::AbstractRuleset
 )
+    # TODO: make sure this works with delays and new outputs?
     map(copy!, values(simdata), values(init(extent)))
     @set! simdata.extent = StaticExtent(extent)
     @set! simdata.ruleset = StaticRuleset(ruleset)
+    if hasdelay(rules(ruleset)) 
+        isstored(o) || _not_stored_delay_error()
+        @set! simdata.frames = frames(o) 
+    end
     simdata
 end
-
 
 """
     SimData <: AbstractSimData
@@ -181,20 +193,21 @@ end
 `AbstractSimData` object that is passed to rules. Basically 
 a trimmed-down version of [`SimData`](@ref).
 """
-struct RuleData{S<:Tuple,G<:NamedTuple,E,Se,F,A} <: AbstractSimData{S}
+struct RuleData{S<:Tuple,G<:NamedTuple,E,Se,F,CF,AF} <: AbstractSimData{S}
     grids::G
     extent::E
     settings::Se
-    currentframe::F
-    auxframe::A
+    frames::F
+    currentframe::CF
+    auxframe::AF
 end
 function RuleData{S}(
-    grids::G, extent::E, settings::Se, currentframe::F, auxframe::A
-) where {S,G,E,Se,F,A}
-    RuleData{S,G,E,Se,F,A}(grids, extent, settings, currentframe, auxframe)
+    grids::G, extent::E, settings::Se, frames::F, currentframe::CF, auxframe::AF
+) where {S,G,E,Se,F,CF,AF}
+    RuleData{S,G,E,Se,F,CF,AF}(grids, extent, settings, frames, currentframe, auxframe)
 end
 function RuleData(d::AbstractSimData{S}) where S
-    RuleData{S}(grids(d), extent(d), settings(d), currentframe(d), auxframe(d))
+    RuleData{S}(grids(d), extent(d), settings(d), frames(d), currentframe(d), auxframe(d))
 end
 
 ConstructionBase.constructorof(::Type{<:RuleData{S}}) where {S} = RuleData{S}

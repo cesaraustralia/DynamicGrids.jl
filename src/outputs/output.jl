@@ -70,7 +70,7 @@ initialise!(o::Output, data) = nothing
 finalise!(o::Output, data) = nothing
 initialisegraphics(o::Output, data) = nothing
 finalisegraphics(o::Output, data) = nothing
-delay(o::Output, frame) = nothing
+maybesleep(o::Output, frame) = nothing
 showframe(o::Output, data) = nothing
 
 frameindex(o::Output, data::AbstractSimData) = frameindex(o, currentframe(data))
