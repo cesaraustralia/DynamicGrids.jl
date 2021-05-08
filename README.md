@@ -12,6 +12,12 @@ range of behaviours like random jumps and interactions between multiple grids.
 It is extended by [Dispersal.jl](https://github.com/cesaraustralia/Dispersal.jl)
 for modelling organism dispersal processes.
 
+[DynamicGridsInteract.jl](https://github.com/cesaraustralia/DynamicGridsInteract.jl)
+and [DynamicGridsGtk.jl](https://github.com/cesaraustralia/DynamicGridsGtk.jl)
+provide live interfaces. DynamicGridsInteract.jl provides live control over
+model parameters while the simulation runs, allowing instant visual feedback for
+manual parametrisation and model exploration.
+
 DynamicGrids can run rules on single CPUs, threaded CPUs, and on CUDA GPUs. 
 Simulation run-time is usually measured in fractions of a second.
 
@@ -52,9 +58,18 @@ how a simulation works: *grids*, *rules*, and *outputs*.
 
 ## Grids
 
-Simulation grids may be any single `AbstractArray` or a `NamedTuple` of multiple
-`AbstractArray`. Usually grids contain values of `Number`, but other types are possible.
-Grids are updated by `Rule`s that are run for every cell, at every timestep. 
+Simulations run over one or many grids, derived from `init` of a single
+`AbstractArray` or a `NamedTuple` of multiple `AbstractArray`. Grids (`GridData`
+types) are, however not a single array but both source and destination arrays,
+to maintain independence between cell reads and writes where required. These may
+be padded or otherwise altered for specific performance optimisations. However,
+broadcasted `getindex` operations are guaranteed to work on them as if the grid
+is a regular array. This may be useful running simulations manually with
+`step!`.
+
+Usually grids contain values of `Number`, but other types are possible, such as
+`SArray`, `FieldVector` or other custom structs. Grids are updated by `Rule`s
+that are run for every cell, at every timestep. 
 
 The `init` grid/s contain whatever initialisation data is required to start
 a simulation: the array type, size and element type, as well as providing the
@@ -78,15 +93,15 @@ sim!(output, ruleset; init=init)
 ```
 
 For multiple grids, `init` is a `NamedTuple` of equal-sized arrays
-matching the names given to each `Ruleset` :
+matching the names used in each `Ruleset` :
 
 ```julia
 init = (predator=rand(100, 100), prey=(rand(100, 100))
 ```
 
 Handling and passing of the correct grids to a `Rule` is automated by
-DynamicGrids.jl. `Rule`s specify which grids they require in what order using
-the first two (`R` and `W`) type parameters.
+DynamicGrids.jl, as a no-cost abstraction. `Rule`s specify which grids they
+require in what order using the first two (`R` and `W`) type parameters.
 
 Dimensional or spatial `init` grids from
 [DimensionalData.jl](https://github.com/rafaqz/DimensionalData.jl) or
