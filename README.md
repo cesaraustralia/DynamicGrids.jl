@@ -12,9 +12,9 @@ range of behaviours like random jumps and interactions between multiple grids.
 It is extended by [Dispersal.jl](https://github.com/cesaraustralia/Dispersal.jl)
 for modelling organism dispersal processes.
 
-[DynamicGridsGtk.jl](https://github.com/cesaraustralia/DynamicGridsGtk.jl) provides live interfaces.
-[DynamicGridsInteract.jl](https://github.com/cesaraustralia/DynamicGridsInteract.jl) also has 
-live control over model parameters while the simulation runs: real-time visual feedback for
+[DynamicGridsGtk.jl](https://github.com/cesaraustralia/DynamicGridsGtk.jl) provides a simple live 
+interface, while [DynamicGridsInteract.jl](https://github.com/cesaraustralia/DynamicGridsInteract.jl) 
+also has live control over model parameters while the simulation runs: real-time visual feedback for
 manual parametrisation and model exploration.
 
 DynamicGrids can run rules on single CPUs, threaded CPUs, and on CUDA GPUs. 
