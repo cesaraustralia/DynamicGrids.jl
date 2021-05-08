@@ -109,7 +109,10 @@ RunAt
 ParameterSource
 Aux
 Grid
+DynamicGrids.AbstractDelay
 Delay
+Frame
+Lag
 ```
 
 ### Custom Rule interface and helpers
@@ -282,7 +285,6 @@ DynamicGrids.graphicconfig
 DynamicGrids.fps
 DynamicGrids.setfps!
 DynamicGrids.showframe
-DynamicGrids.delay
 DynamicGrids.initialisegraphics
 DynamicGrids.finalisegraphics
 ```

@@ -248,14 +248,13 @@ SomeRule(;
 struct Lag{K} <: AbstractDelay{K}
     nframes::Int
 end
-Lag{K}(nframes::Int) where K = Lag{K}(nframes)
 
-function _to_frame(delay::Lag{K}, data) where K
-    frame = max(currentframe(data) - steps(delay), 1)
+function _to_frame(lag::Lag{K}, data) where K
+    frame = max(currentframe(data) - lag.nframes, 1)
     Frame{K}(frame)
 end
 
-@inline frame(delay::Lag, data) = max(1, currentframe(data) - steps(delay))
+@inline frame(lag::Lag, data) = max(1, currentframe(data) - lag.nframes)
 
 """
     Frame <: AbstractDelay

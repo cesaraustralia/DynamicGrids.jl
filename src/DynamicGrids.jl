@@ -61,7 +61,7 @@ export PerformanceOpt, NoOpt, SparseOpt
 
 export BoundaryCondition, Remove, Wrap
 
-export ParameterSource, Aux, Grid, Delay
+export ParameterSource, Aux, Grid, Delay, Lag, Frame
 
 export Output, ArrayOutput, ResultOutput, TransformedOutput
 
