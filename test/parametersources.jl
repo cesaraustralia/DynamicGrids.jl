@@ -144,4 +144,18 @@ end
         ]                   
 
     end
+
+    @testset "CopyTo from Lag" begin
+        ruleset = Ruleset(Cell{:s,:s}(x -> x + 1), CopyTo{:d}(from=Lag{:s}(1)))
+        @test DynamicGrids.hasdelay(rules(ruleset)) == true
+        output = ArrayOutput((s=[1 3], d=[0 0],); tspan=1d:1d:4d)
+        sim!(output, ruleset)
+        @test output == [
+            (s=[1 3], d=[0 0]), 
+            (s=[2 4], d=[1 3]), 
+            (s=[3 5], d=[2 4]), 
+            (s=[4 6], d=[3 5])
+        ]
+
+    end
 end
