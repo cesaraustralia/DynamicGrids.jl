@@ -5,19 +5,19 @@ using DynamicGrids: SimData, radius, rules, _readkeys, _writekeys,
 
 @testset "CellRule chain" begin
 
-    rule1 = Cell{:a,:b}() do a
+    rule1 = Cell{:a,:b}() do data, a, I
         2a
     end
 
-    rule2 = Cell{Tuple{:b,:d},:c}() do (b, d)
+    rule2 = Cell{Tuple{:b,:d},:c}() do data, (b, d), I
         b + d
     end
 
-    rule3 = Cell{Tuple{:a,:c,:d},Tuple{:d,:e}}() do (a, c, d)
+    rule3 = Cell{Tuple{:a,:c,:d},Tuple{:d,:e}}() do data, (a, c, d), I
         a + c + d, 3a
     end
 
-    rule4 = Cell{Tuple{:a,:b,:c,:d},Tuple{:a,:b,:c,:d}}() do (a, b, c, d)
+    rule4 = Cell{Tuple{:a,:b,:c,:d},Tuple{:a,:b,:c,:d}}() do data, (a, b, c, d), I
         2a, 2b, 2c, 2d
     end
 
@@ -96,11 +96,11 @@ end
 
     buf = reshape(1:9, 3, 3)
     hood = Moore{1}(buf)
-    hoodrule = Neighbors{:a,:a}(hood) do neighborhodhood, cell
+    hoodrule = Neighbors{:a,:a}(hood) do data, neighborhodhood, cell, I
         sum(neighborhodhood)
     end
 
-    rule = Cell{Tuple{:a,:c},:b}() do (b, c)
+    rule = Cell{Tuple{:a,:c},:b}() do data, (b, c), I
         b + c 
     end
 

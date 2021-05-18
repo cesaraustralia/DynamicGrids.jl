@@ -2,7 +2,7 @@ using DynamicGrids, StaticArrays, Test, FileIO, Colors, FixedPointNumbers
 using DynamicGrids: SimData, NoDisplayImageOutput
 
 @testset "CellRule that multiples a StaticArray" begin
-    rule = Cell{:grid1}() do state
+    rule = Cell{:grid1}() do data, state, I
          2state
     end
     init = (grid1 = fill(SA[1.0, 2.0], 5, 5),)
@@ -25,8 +25,8 @@ using DynamicGrids: SimData, NoDisplayImageOutput
 end
 
 @testset "Neighborhood Rule that sums a Neighborhood of StaticArrays" begin
-    rule = Neighbors{Tuple{:grid1,:grid2},:grid1}(Moore(1)) do neighborhood, (state1, state2)
-        sum(neighborhood) .+ state2
+    rule = Neighbors{Tuple{:grid1,:grid2},:grid1}(Moore(1)) do data, hood, (s1, s2), I
+        sum(hood) .+ s2
     end
     init = (
         grid1 = fill(SA[1.0, 2.0], 5, 5),
@@ -81,7 +81,7 @@ DynamicGrids.to_rgb(scheme, obj::TestStruct) = get(scheme, obj.a)
 
 
 @testset "CellRule that multiples a struct" begin
-    rule = Cell{:grid1,:grid1}() do state
+    rule = Cell{:grid1,:grid1}() do data, state, I
          2state
     end
     init = (grid1 = fill(TS(1.0, 2.0), 5, 5),)
@@ -104,8 +104,8 @@ DynamicGrids.to_rgb(scheme, obj::TestStruct) = get(scheme, obj.a)
 end
 
 @testset "Neighborhood Rule that sums a Neighborhood of stucts" begin
-    rule = Neighbors{Tuple{:grid1,:grid2},:grid1}(Moore(1)) do neighborhood, (state1, state2)
-        sum(neighborhood) * state2
+    rule = Neighbors{Tuple{:grid1,:grid2},:grid1}(Moore(1)) do data, hood, (s1, s2), I
+        sum(hood) * s2
     end
     init = (
         grid1 = fill(TS(1.0, 2.0), 5, 5),
@@ -176,7 +176,7 @@ end
 end
 
 @testset "static arrays grid can generate an image" begin
-    rule = Cell{:grid1}() do state
+    rule = Cell{:grid1}() do data, state, I
          2state
     end
     init = (grid1 = fill(SA[1.0, 2.0], 5, 5),)

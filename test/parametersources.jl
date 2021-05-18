@@ -105,12 +105,12 @@ end
     end
 
     @testset "CopyTo from Grid" begin
-        ruleset = Ruleset(Cell{:s,:s}(x -> x + 1), CopyTo{:d}(from=Grid(:s)))
+        ruleset = Ruleset(Cell{:s,:s}((d, x, I) -> x + 1), CopyTo{:d}(from=Grid(:s)))
         output = ArrayOutput((s=[1 3], d=[0 0],); tspan=1d:1d:3d)
         sim!(output, ruleset)
         @test output == [(s=[1 3], d=[0 0]), (s=[2 4], d=[2 4]), (s=[3 5], d=[3 5])]
 
-        ruleset = Ruleset(Cell{:s,:s}(x -> x + 1), CopyTo{Tuple{:d1,:d2}}(from=Grid{:s}()))
+        ruleset = Ruleset(Cell{:s,:s}((d, x, I) -> x + 1), CopyTo{Tuple{:d1,:d2}}(from=Grid{:s}()))
         output = ArrayOutput((s=[1 3], d1=[0 0], d2=[-1 -1],); tspan=1d:1d:3d)
         sim!(output, ruleset)
         @test output == [(s=[1 3], d1=[0 0], d2=[-1 -1]), 
@@ -119,7 +119,7 @@ end
     end
 
     @testset "CopyTo from Delay" begin
-        ruleset = Ruleset(Cell{:s,:s}(x -> x + 1), CopyTo{:d}(from=Delay{:s}(1d)))
+        ruleset = Ruleset(Cell{:s,:s}((d, x, I) -> x + 1), CopyTo{:d}(from=Delay{:s}(1d)))
         @test DynamicGrids.hasdelay(rules(ruleset)) == true
         output = ArrayOutput((s=[1 3], d=[0 0],); tspan=1d:1d:4d)
         sim!(output, ruleset)
@@ -130,7 +130,7 @@ end
             (s=[4 6], d=[3 5])
         ]
 
-        ruleset = Ruleset(Cell{:s,:s}(x -> x + 1), CopyTo{:d}(from=Delay{:s}(Month(2))))
+        ruleset = Ruleset(Cell{:s,:s}((d, x, I) -> x + 1), CopyTo{:d}(from=Delay{:s}(Month(2))))
         @test DynamicGrids.hasdelay(rules(ruleset)) == true
         output = ArrayOutput((s=[1 3], d=[0 0]); tspan=Date(2001):Month(1):Date(2001, 6))
         sim!(output, ruleset)
@@ -146,7 +146,7 @@ end
     end
 
     @testset "CopyTo from Lag" begin
-        ruleset = Ruleset(Cell{:s,:s}(x -> x + 1), CopyTo{:d}(from=Lag{:s}(1)))
+        ruleset = Ruleset(Cell{:s,:s}((d, x, I) -> x + 1), CopyTo{:d}(from=Lag{:s}(1)))
         @test DynamicGrids.hasdelay(rules(ruleset)) == true
         output = ArrayOutput((s=[1 3], d=[0 0],); tspan=1d:1d:4d)
         sim!(output, ruleset)
