@@ -382,8 +382,8 @@ end
 Cell{R,W}(; kw...) where {R,W} = _nofunctionerror(Cell)
 
 @inline function applyrule(data, rule::Cell, read, I)
-    let rule=rule, read=read
-        rule.f(read)
+    let data=data, rule=rule, read=read, I=I
+        rule.f(data, read, I)
     end
 end
 
@@ -428,8 +428,8 @@ Neighbors{R,W}(f; neighborhood=Moore(1)) where {R,W} =
     Neighbors{R,W}(f, neighborhood)
 
 @inline function applyrule(data, rule::Neighbors, read, I)
-    let rule=rule, hood=neighborhood(rule), read=read
-        rule.f(hood, read)
+    let rule=rule, hood=neighborhood(rule), read=read, I=I
+        rule.f(data, hood, read, I)
     end
 end
 

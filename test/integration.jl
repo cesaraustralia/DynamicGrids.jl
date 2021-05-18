@@ -405,7 +405,7 @@ end
             data[p...] = 2
         end
     end
-    clearcell = Cell() do val
+    clearcell = Cell() do data, val, I
         zero(val)
     end
     output = ArrayOutput(ones(10, 11); tspan=1:3)

@@ -74,17 +74,17 @@ end
 end
 
 @testset "Cell" begin
-    rule = Cell(x -> 2x)
+    rule = Cell((d, x, I) -> 2x)
     @test applyrule(nothing, rule, 1, (0, 0)) == 2
 end
 
 @testset "Neighbors" begin
     buf = [1 0 0; 0 0 1; 0 0 1]
-    rule = Neighbors(VonNeumann(1, buf)) do hood, state
+    rule = Neighbors(VonNeumann(1, buf)) do data, hood, state, I
         sum(hood)
     end
     @test applyrule(nothing, rule, 0, (3, 3)) == 1
-    rule = Neighbors(Moore{1}(buf)) do hood, state
+    rule = Neighbors(Moore{1}(buf)) do data, hood, state, I
         sum(hood)
     end
     @test applyrule(nothing, rule, 0, (3, 3)) == 3
@@ -364,6 +364,7 @@ applyrule(data, rule::PrecalcRule, state, index) = rule.precalc[]
             ruleset = Ruleset(rule; proc=proc, opt=opt)
             output = ArrayOutput(init; tspan=1:3)
             sim!(output, ruleset)
+            # Copy for GPU
             @test output[2] == out2
             @test output[3] == out3
         end

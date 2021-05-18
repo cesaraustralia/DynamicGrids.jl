@@ -3,7 +3,7 @@ using DynamicGrids: ruletype
 
 @testset "RunIf" begin
     @testset "CellRule" begin
-        rule = Cell{:a,:a}() do a
+        rule = Cell{:a,:a}() do data, a, I
             10a
         end
         condition = RunIf(rule) do data, state, index
@@ -22,7 +22,7 @@ using DynamicGrids: ruletype
         @test output[3][:a] == [10 20 3; 0 4 -100]
     end
     @testset "NeighborhoodRule" begin
-        neighborsrule = Neighbors{:a,:a}(Moore{1}()) do hood, a
+        neighborsrule = Neighbors{:a,:a}(Moore{1}()) do data, hood, a, I
             sum(hood)
         end
         condition = RunIf(neighborsrule) do data, state, index
@@ -53,9 +53,9 @@ using DynamicGrids: ruletype
 end
 
 @testset "RunAt" begin
-    rule = Cell{:a,:a}(a -> a + 1)
-    timedrule1 = Cell{:a,:a}(a -> 4a)
-    timedrule2 = Cell{:a,:a}(a -> a ÷ 2)
+    rule = Cell{:a,:a}((d, a, I) -> a + 1)
+    timedrule1 = Cell{:a,:a}((d, a, I) -> 4a)
+    timedrule2 = Cell{:a,:a}((d, a, I) -> a ÷ 2)
     runatrule = RunAt(timedrule1, timedrule2; times=DateTime(2001, 3):Month(2):DateTime(2001, 5))
 
     init = (a=[1 2 3; 0 4 -5],)

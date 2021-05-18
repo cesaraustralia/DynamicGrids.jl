@@ -40,7 +40,7 @@ end
 @testset "isinferred" begin
     @testset "unstable conditional" begin
         rule = let threshold = 20
-            Cell() do x
+            Cell() do data, x, I
                 x > 1 ? 2 : 0.0
             end
         end
@@ -49,7 +49,7 @@ end
     end
 
     @testset "return type" begin
-        rule = Neighbors{:a,:a}(Moore{1}(zeros(Bool, 3, 3))) do hood, x
+        rule = Neighbors{:a,:a}(Moore{1}(zeros(Bool, 3, 3))) do data, hood, x, I
             round(Int, x + sum(hood))
         end
         output = ArrayOutput((a=rand(Int, 10, 10),); tspan=1:10)
