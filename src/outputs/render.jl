@@ -197,7 +197,7 @@ _asrenderer(x) = Image(x)
 layout(p::Layout) = p.layout
 renderers(p::Layout) = p.renderers
 imagesize(p::Layout, init::NamedTuple) = imagesize(p, first(init))
-imagesize(p::Layout, init::Array) = imagesize(size(init), size(p.layout))
+imagesize(p::Layout, init::AbstractArray) = imagesize(size(init), size(p.layout))
 imagesize(gs::NTuple{2}, ls::NTuple{2}) = gs .* ls
 imagesize(gs::NTuple{2}, ls::NTuple{1}) = gs .* (first(ls), 1)
 
