@@ -198,7 +198,7 @@ using DynamicGrids, ColorSchemes, Colors, BenchmarkTools
 const DEAD, ALIVE, BURNING = 1, 2, 3
 
 neighbors_rule = let prob_combustion=0.0001, prob_regrowth=0.01
-    Neighbors(Moore(1)) do neighborhood, cell
+    Neighbors(Moore(1)) do data, neighborhood, cell, I
         if cell == ALIVE
             if BURNING in neighborhood
                 BURNING
@@ -302,7 +302,7 @@ instead of `rand()`:
 
 ```julia
 neighbors_gpu = let prob_combustion=0.0001, prob_regrowth=0.01
-    Neighbors{Tuple{:ff,:rand},:ff}(Moore(1)) do neighborhood, (cell, rand)
+    Neighbors{Tuple{:ff,:rand},:ff}(Moore(1)) do data, neighborhood, (cell, rand), I
         if cell == ALIVE
             if BURNING in neighborhood
                 BURNING
