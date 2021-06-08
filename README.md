@@ -359,21 +359,3 @@ julia> @btime sim!($bench_output_rand, $randomiser, $setneighbors_gpu; proc=CuGP
 That is, we are running the rule at a rate of _1.4 billion times per second_.
 These timings could be improved (maybe 10-20%) by using grids of `Int32` or
 `Int16` to use less memory and cache. But we will stop here!
-
-## Alternatives
-
-[Agents.jl](https://github.com/JuliaDynamics/Agents.jl) can also do
-cellular-automata style simulations. The design of Agents.jl is to iterate over
-a list of agents, instead of broadcasting over an array of cells. This approach
-is well suited to when you need to track the movement and details about
-individual agents throughout the simulation. 
-
-However, for simple grid models where you don't need to track individuals,
-DynamicGrids.jl is orders of magnitude faster than Agents.jl, and usually
-requires less code to define a model. For low-density simulations like the
-forest fire model above, it can be one or two orders of magnitudes faster, while
-for higher activity rules like the game of life on a randomised grid, it is two
-to three, even four order of magnitude faster, increasing with grid size. If you
-are doing grid-based simulation and you don't need to track individual agents,
-DynamicGrids.jl is probably the best tool. For other use cases where you need to
-track individuals, try Agents.jl.
