@@ -1,57 +1,55 @@
 using CUDA, Setfield, StaticArrays, BenchmarkTools, DynamicGrids, Adapt, ConstructionBase, Flatten
 
-struct AgentTracker{C,ID}
+import DynamicGrids: maprule!, applyrule, applyrule!, cell_kernel!, ruletype
+
+struct AgentTracker{A,C,ID}
+    agent::A
     cell::C
     id::ID
 end
-AgentTracker(cell::T) where T = AgentTracker(cell, typemax(T))
-AgentTracker{T}() where T = AgentTracker(typemax(T), typemax(T))
 
-cell(id::AgentTracker) = id.cell
-active(id::AgentTracker{I}) where I = id.cell == typemax(I)
-deactivate(id::AgentTracker{I}) where I = @set id.cell = typemax(I)
-id(id::AgentTracker) = id.id
+agent(tr::AgentTracker) = tr.agent
+cell(tr::AgentTracker) = tr.cell
+id(tr::AgentTracker) = tr.id
+isactive(tr::AgentTracker{I}) where I = tr.cell == typemax(I)
+deactivate(tr::AgentTracker{I}) where I = @set tr.cell = typemax(I)
 #, Inactive are sorted last
 Base.isless(id1::AgentTracker, id2::AgentTracker) = isless(cell(id1), cell(id2))
-Base.zero(::Type{<:AgentTracker{I,A}}) where {I,A} = AgentTracker(typemax(I), typemax(I))
-Base.one(::Type{<:AgentTracker{I,A}}) where {I,A} = AgentTracker(one(I), one(A))
-Base.zero(id::AgentTracker) = zero(typeof(id))
-Base.one(id::AgentTracker) = one(typeof(id))
+Base.zero(::Type{<:AgentTracker{A,C,ID}}) where {A,C,ID} = AgentTracker(zero(A), typemax(C), typemax(ID))
+Base.one(::Type{<:AgentTracker{A,C,ID}}) where {A,C,ID} = AgentTracker(one(A), one(C), one(ID))
+Base.zero(tr::AgentTracker) = zero(typeof(tr))
+Base.one(tr::AgentTracker) = one(typeof(tr))
 
 struct AgentCell
     start::Int
     count::Int
 end
 Base.zero(::Type{AgentCell}) = AgentCell(1, 0)
-zeros(AgentCell, 100, 100)
 
-struct AgentGrid{S,T,N,CS,CC,NC,Tr,Ag} <: StaticArray{S,T,N}
+struct AgentGrid{S,T,N,Sc,Dt,ScC,DtC,CS,Co,IDCo} <: StaticArray{S,T,N}
+    source::Sc
+    dest::Dt
+    sourcecounts::ScC
+    destcounts::DtC
     cellstarts::CS
-    cellcounts::CC
-    nextcounts::NC
-    trackers1::Tr
-    trackers2::Tr
-    agents::Ag
-    count::Int
-    prevcount::Int
+    count::Co
+    idcount::IDCo
     maxcount::Int
 end
 function AgentGrid{S,T,N}(
-    cellstarts::CS, cellcounts::CC, nextcounts::NC, trackers1::Tr, trackers2::Tr, 
-    agents::Ag, count, prevcount, maxcount
-) where {S,T,N,CS,CC,NC,Tr,Ag}
-    AgentGrid{S,T,N,CS,CC,NC,Tr,Ag}(
-        cellstarts, cellcounts, nextcounts, trackers1, trackers2, 
-        agents, count, prevcount, maxcount
+    source::Sc, dest::Dt, sourcecounts::ScC, destcounts::DtC, 
+    cellstarts::CS, count::Co, idcount::IDCo, maxcount
+) where {S,T,N,Sc,Dt,ScC,DtC,CS,Co,IDCo}
+    AgentGrid{S,T,N,Sc,Dt,ScC,DtC,CS,Co,IDCo}(
+        source, dest, sourcecounts, destcounts, cellstarts, count, idcount, maxcount
     )
 end
 function AgentGrid(A::AbstractArray{<:AbstractArray{T}}; maxcount=n_agents(A) * 2) where T
+    source = zeros(AgentTracker{T,Int,Int}, maxcount)
+    dest = zeros(AgentTracker{T,Int,Int}, maxcount)
+    sourcecounts = zeros(Int, size(A))
+    destcounts = zeros(Int, size(A))
     cellstarts = zeros(Int, size(A))
-    cellcounts = zeros(Int, size(A))
-    nextcounts = zeros(Int, size(A))
-    agents = zeros(T, maxcount) 
-    trackers1 = fill(AgentTracker{Int}(), maxcount)
-    trackers2 = fill(AgentTracker{Int}(), maxcount)
     id = 0
     for i in eachindex(A)
         count = 0
@@ -59,15 +57,14 @@ function AgentGrid(A::AbstractArray{<:AbstractArray{T}}; maxcount=n_agents(A) * 
         for a in A[i]
             count += 1
             id += 1
-            agents[id] = a
-            trackers1[id] = AgentTracker(i, id)
+            source[id] = AgentTracker(a, i, id)
         end
-        cellcounts[i] = count
+        sourcecounts[i] = count
     end
     S = Tuple{size(A)...}
-    T2 = typeof(view(agents, 1:0)) 
+    T2 = typeof(view(source, 1:0))
     N = ndims(A)
-    AgentGrid{S,T2,N}(cellstarts, cellcounts, nextcounts, trackers1, trackers2, agents, id, id, maxcount)
+    AgentGrid{S,T2,N}(source, dest, sourcecounts, destcounts, cellstarts, fill(id), fill(id), maxcount)
 end
 
 ConstructionBase.constructorof(::Type{<:AgentGrid{S,T,N}}) where {S,T,N} = AgentGrid{S,T,N}
@@ -77,13 +74,13 @@ function Adapt.adapt_structure(T, grid::AgentGrid)
 end
 
 function Base.getindex(g::AgentGrid, i::Int)
-    range = g.cellstarts[i]:(g.cellstarts[i] + g.cellcounts[i])
-    (g.agents[g.trackers1[n].id] for n in agents_in_cell)
+    range = g.cellstarts[i]:(g.cellstarts[i] + g.sourcecounts[i])
+    (g.source[n].agent for n in range)
 end
 
 n_agents(A) = sum(length(a) for a in skipmissing(A))
 
-# Base.parent(pop::AgentGrid) = pop.agents
+# Base.parent(pop::AgentGrid) = pop.source
 # Base.size(pop::AgentGrid) = size(parent(pop))
 # Base.getindex(pop::AgentGrid, I...) = getindex(parent(pop), I...)
 # Base.setindex!(pop::AgentGrid, x, I...) = setindex!(parent(pop), x, I...)
@@ -94,7 +91,7 @@ abstract type AbstractSummary end
 summarise(::Type{<:AbstractAgent}, agents) = nothing
 
 abstract type AgentRule{R,W} <: Rule{R,W} end
-abstract type MultiplyRule{R,W} <: AgentRule{R,W} end
+abstract type ReproduceRule{R,W} <: AgentRule{R,W} end
 abstract type MoveRule{R,W} <: AgentRule{R,W} end
 abstract type UpdateAgentRule{R,W} <: AgentRule{R,W} end
 
@@ -110,16 +107,15 @@ end
 struct Summary{K,F} <: ParameterSource end
 Summary(key, field=nothing) = Summary{key,field}()
 
-# struct AgentList{K} end
-# AgentList(key) = AgentList{key}()
-
 """
-    Move{A,G}
+    Move <: MoveRule
+
+    Move(f)
 
 Move can either return the new location, or a
 tuple of the location and the updated agent
 """
-struct Move{R,W,F,ID} <: MoveRule{R,W}
+struct Move{R,W,F} <: MoveRule{R,W}
     f::F
 end
 function applyrule(data, rule::Move, val, I)
@@ -128,21 +124,31 @@ function applyrule(data, rule::Move, val, I)
     end
 end
 
+"""
+    Reproduce <: ReproduceRule
+
+    Reproduce(f)
+
+Add or remove population
+"""
+struct Reproduce{R,W,F} <: ReproduceRule{R,W}
+    f::F
+end
+function applyrule!(data, rule::Reproduce, val, I)
+    let data=data, rule=rule, val=val, I=I
+        rule.f(data, val, I)
+    end
+end
+
 summaries(neighborhood::Neighborhood) = nothing
-
-moverule = Move{Tuple{:a,:a}}() do data, agent, I
-    I .+ typeof(I)(1)
-end
-
-agentrule = Agent{Tuple{:a,:a}}() do data, agent, I
-    @set! agent.age += typeof(I)(1)
-end
 
 struct MyAgent{A} <: AbstractAgent
     age::A
 end
 Base.one(::Type{<:MyAgent{A}}) where A = MyAgent(one(A))
+Base.one(a::MyAgent) = one(typeof(a))
 Base.zero(::Type{<:MyAgent{A}}) where A = MyAgent(zero(A))
+Base.zero(a::MyAgent) = zero(typeof(a))
 
 struct MyAgentsSummary <: AbstractSummary end
 function summarise(::Type{<:MyAgent}, agents)
@@ -153,83 +159,113 @@ function summarise(::Type{<:MyAgent}, agents)
     MyAgentsSummary(males, females)
 end
 
-Base.sort!(grid::AgentGrid) = sort!(grid.trackers1)
-
-# inc_age(id::AgentTracker) = @set id.agent.age = id.agent.age + 1
-# CUDA.allowscalar(false)
-# trackers = AgentTracker.(rand(Int32, 500_000))
-# trackers = ((t, id) -> @set a.id = id).(trackers, 1:length(trackers))
-# agents = [zero(MyAgent{Int32}) for i in eachindex(ids)]
-# pop = AgentList(ids, agents, 100, 100, 100);
-# cupop = @set pop.agents = CuArray(pop.agents)
-
-# @time sort!(pop.ids);
-# CUDA.@time sort!(cupop.ids);
-# @time partialsort!(pop.ids, 1:length(pop.ids) ÷ 10)
-# CUDA.@time partialsort!(pop.ids, 1:length(pop.ids) ÷ 10)
-
-
-
-function runsomerules(grid, rule1, rule2)
-    grid.nextcounts .= 0
-    applyrule!.(Ref(grid), Ref(rule1), range)
-    applyrule!.(Ref(grid), Ref(rule2), range)
-end
-
-import DynamicGrids: maprule!, applyrule, applyrule!, cell_kernel!
-
 function maprule!(grid, ruletype::Val{<:AgentRule}, rule)
     # rkeys, _ = _getreadgrids(rule, data)
     # wkeys, _ = _getwritegrids(rule, data)
-    grid.cellcounts .= grid.nextcounts
-    range = Base.OneTo(grid.count)
-    cell_kernel!.(Ref(RuleData(data)), Ref(ruletype), Ref(rule), range)
+    grid.destcounts .= 0
+    range = Base.OneTo(grid.count[])
+    agent_kernel!.(Ref(grid), Ref(ruletype), Ref(rule), range)
+    grid.sourcecounts .= grid.destcounts
     count = 0
     return grid
 end
 
+DynamicGrids.ruletype(::AgentRule) = AgentRule
+DynamicGrids.ruletype(::MoveRule) = MoveRule
+DynamicGrids.ruletype(::ReproduceRule) = ReproduceRule
+
+maprule!(grid, rule::AgentRule) = maprule!(grid, Val{ruletype(rule)}(), rule)
 function maprule!(grid, ruletype::Val{<:MoveRule}, rule)
     # rkeys, _ = _getreadgrids(rule, data)
     # wkeys, _ = _getwritegrids(rule, data)
-    grid.cellcounts .= grid.nextcounts
-    range = Base.OneTo(grid.count)
-    cell_kernel!.(Ref(RuleData(data)), Ref(ruletype), Ref(rule), range)
+    range = Base.OneTo(grid.count[])
+    grid.destcounts .= 0
+    agent_kernel!.(Ref(grid), Ref(ruletype), Ref(rule), range)
+    count_buffer = grid.sourcecounts
+    count_buffer .= 0
     count = 0
-    for i in eachindex(grid.cellcounts)
-        count += grid.cellcounts[i]
-        grid.nextcounts[i] = count
+    for i in eachindex(grid.destcounts)
+        count += grid.destcounts[i]
+        count_buffer[i] = count
     end
     for i in range
-        t = grid.trackers1[i]
+        t = grid.dest[i]
         cell = t.cell
-        pos = grid.nextcounts[cell]
-        grid.trackers2[pos] = t
+        pos = count_buffer[cell]
+        count_buffer[cell] -= 1
+        grid.source[pos] = t
     end
+    grid.source .= grid.dest
+    grid.sourcecounts .= grid.destcounts
     return grid
 end
 
-function DynamicGrids.cell_kernel!(g, ruletype::Val{<:MoveRule}, rule, i)
-    t = g.trackers1[i]
-    dest = applyrule(nothing, rule2, g.agents[t.id], t.cell)
-    dest = dest > length(g.nextcounts) ? t.cell : dest
-    g.nextcounts[dest] += 1 
-    g.trackers1[i] = @set t.cell = dest 
+function agent_kernel!(g, ruletype::Val{<:MoveRule}, rule, n)
+    t = g.source[n]
+    I = applyrule(g, rule, t.agent, t.cell)
+    I = (I > length(g.destcounts) || I < 1) ? t.cell : I
+    g.destcounts[I] += 1 # TODO: use atomics
+    g.dest[n] = @set t.cell = I
+    nothing
 end
 
-function DynamicGrids.cell_kernel!(g, rule, ruletype::Val{<:AgentRule}, i)
-    t = g.trackers1[i]
-    g.agents[t.id] = applyrule(g, rule1, g.agents[t.id], t.cell)
+function agent_kernel!(g, ruletype::Val{<:ReproduceRule}, rule, i)
+    t = g.source[i]
+    applyrule!(g, rule, t.agent, t.cell)
+    nothing
 end
 
+function agent_kernel!(g, ruletype::Val{<:AgentRule}, rule, i)
+    t = g.source[i]
+    a = applyrule(g, rule, t.agent, t.cell)
+    t = g.source[i] = @set t.agent = a
+    nothing
+end
+
+function new!(grid, agent, cell)
+    id = grid.idcount[] + 1
+    count = grid.count[] + 1
+    count <= grid.maxcount || _exceed_maxcount_error(grid.maxcount)
+
+    tr = AgentTracker(agent, cell, id) 
+    grid.source[count] = tr
+    grid.sourcecounts[cell] += 1   
+
+    grid.idcount[] = id
+    grid.count[] = count
+end
+
+@noinline _exceed_maxcount_error(maxcount) = error("Agents exceed maxcount: $maxcount")
+
+function rem!(grid, agent)
+    grid.dest[agent.cell] = zero(AgentTracker)
+    grid.destcounts[agent.cell] -= 1   
+end
+
+
+# Scripts
+
+moverule = Move{Tuple{:a,:a}}() do data, agent, I
+    I .+ typeof(I)(1)
+end
+
+reprule = Reproduce{Tuple{:a,:a}}() do data, agent, I
+    if rand() < 0.01
+        new!(data, zero(agent), I)
+    end
+    return nothing
+end
+
+agentrule = Agent{Tuple{:a,:a}}() do data, agent, I
+    @set! agent.age += typeof(I)(1)
+end
 
 S = 500
-agentgrid = [[zero(MyAgent{Int}) for a in 1:rand(0:10)] for I in CartesianIndices((S, S))]
+agentgrid = [[zero(MyAgent{Int}) for a in 1:rand(0:5)] for I in CartesianIndices((S, S))];
 n_agents(agentgrid)
-grid = AgentGrid(agentgrid);
-runsomerules(grid, agentrule, moverule)
-culist = Adapt.adapt(CuArray, grid)
-typeof(grid)
+grid = AgentGrid(agentgrid; maxcount=5_000_000);
+maprule!(grid, reprule);
 
 # Simulate running 2 rules over 100 frames
-@time for i in 1:100 runsomerules(grid, agentrule, moverule) end
+@time for i in 1:100 maprule!(grid, reprule) end
 # CUDA.@time for i in 1:100 runsomerules(culist, agentrule, moverule) end
