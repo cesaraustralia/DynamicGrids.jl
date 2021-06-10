@@ -39,7 +39,6 @@ function savegif(filename::String, o::ImageOutput, ruleset=Ruleset(); fps=fps(o)
     array
 end
 
-
 """
     GifOutput <: ImageOutput
 
@@ -81,6 +80,8 @@ end
 
 filename(o::GifOutput) = o.filename
 gif(o::GifOutput) = o.gif
+
+maybesleep(output::GifOutput, f) = nothing
 
 showimage(image, o::GifOutput, data::AbstractSimData) = gif(o)[:, :, currentframe(data)] .= image 
 
