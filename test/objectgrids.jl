@@ -71,6 +71,8 @@ Base.:*(x::Number, ts::TestStruct) = TestStruct(x * ts.a, x * ts.b)
 Base.:/(ts::TestStruct, x::Number) = TestStruct(ts.a / x, ts.b / x) 
 Base.:+(ts1::TestStruct, ts2::TestStruct) = TestStruct(ts1.a + ts2.a, ts1.b + ts2.b)
 Base.:-(ts1::TestStruct, ts2::TestStruct) = TestStruct(ts1.a - ts2.a, ts1.b - ts2.b)
+Base.:+(ts::TestStruct, x::Number) = TestStruct(ts.a + x, ts.b + x)
+Base.:-(ts::TestStruct, x::Number) = TestStruct(ts.a - x, ts.b - x)
 
 Base.isless(a::TestStruct, b::TestStruct) = isless(a.a, b.a)
 Base.zero(::Type{<:TestStruct{T1,T2}}) where {T1,T2} = TestStruct(zero(T1), zero(T2))
