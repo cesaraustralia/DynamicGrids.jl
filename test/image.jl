@@ -2,7 +2,8 @@ using DynamicGrids, Dates, Test, Colors, ColorSchemes, FileIO
 using FreeTypeAbstraction
 using DynamicGrids: render!, renderer, minval, maxval, normalise, SimData, NoDisplayImageOutput,
     isstored, isasync, initialise!, finalise!, maybesleep, fps, settimestamp!, timestamp, textconfig,
-    tspan, setfps!, frames, isshowable, showframe, to_rgb, scale, Extent, extent
+    tspan, setfps!, frames, isshowable, showframe, to_rgb, scale, Extent, extent, 
+    _autokeys, _autolayout
 using ColorSchemes: leonardo
 
 @testset "to_rgb" begin
@@ -50,7 +51,7 @@ end
     output = NoDisplayImageOutput(init_; tspan=1:1, maxval=40.0, text=nothing)
 
     @test all(parent(output)[1] .=== init_)
-    @test minval(output) === nothing
+    @test minval(output) === 0
     @test maxval(output) === 40.0
     @test textconfig(output) === nothing
     @test renderer(output).scheme == ObjectScheme()
@@ -89,6 +90,17 @@ end
 end
 
 @testset "Renderer" begin
+
+    @testset "auto render layout" begin
+        @test _autokeys((a=[0], b=[0], c=[0])) == (:a, :b, :c)
+        @test _autokeys((a=[[0,0]], b=[1], c=[[3,4]])) == (:a=>1, :a=>2, :b, :c=>1, :c=>2)
+        @test _autolayout([0]) == reshape(Any[1], 1, 1)
+        @test _autolayout((a=[0], b=[0], c=[0])) == Any[:a :b :c]
+        @testset "Empty layout cells are fileld with nothing" begin
+            @test _autolayout((a=[[0,0]], b=[1], c=[[3,4]])) == Any[:a=>1 :b :c=>2; :a=>2 :c=>1 nothing]
+        end
+    end
+
     init_ = [8.0 10.0;
              0.0  5.0]
     mask_ = Bool[0 1;
@@ -307,8 +319,8 @@ end
     ]
     ig = Image(zerocolor=RGB(0.0))
     output = ArrayOutput(init_; tspan=1:10)
-    @test minval(output) == nothing
-    @test maxval(output) == nothing
+    @test minval(output) == 0
+    @test maxval(output) == 1
     @test renderer(output) isa Image
     @test fps(output) === nothing
     sim!(output, Life())

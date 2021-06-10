@@ -206,10 +206,10 @@ function render!(
 )
     npanes = length(layout(l))
     minv, maxv = minval(o), maxval(o)
-    if !(minv isa Nothing)
+    if !(minv isa Union{Number,Nothing})
         length(minv) == npanes || _wronglengtherror(minval, npanes, length(minv))
     end
-    if !(maxv isa Nothing)
+    if !(maxv isa Union{Number,Nothing})
         length(maxv) == npanes || _wronglengtherror(maxval, npanes, length(maxv))
     end
 
@@ -246,7 +246,8 @@ function render!(
 end
 
 _get(::Nothing, I) = nothing
-_get(vals, I) = vals[I]
+_get(vals::Union{AbstractArray,Tuple}, I) = vals[I]
+_get(x, I) = x
 
 _grid_ids(id::Symbol) = id
 _grid_ids(id::Integer) = id
@@ -286,9 +287,27 @@ _asrenderer(renderer::Renderer, zerocolor, maskcolor) = renderer
 _asrenderer(scheme, zerocolor, maskcolor) = Image(scheme, zerocolor, maskcolor)
 
 function _autolayout(init)
-    rows = length(init) ÷ 4 + 1
-    cols = (length(init) - 1) ÷ rows + 1
-    reshape([keys(init)...], (rows, cols))
+    keys = _autokeys(init)
+    len = length(keys)
+    rows = len ÷ 4 + 1
+    cols = (len - 1) ÷ rows + 1
+    layout = Array{Any}(fill(nothing, rows, cols))
+    for i in eachindex(keys)
+        layout[i] = keys[i]
+    end
+    return layout
+end
+
+function _autokeys(init)
+    foldl(pairs(init); init=()) do acc, (key, val)
+        keys = if eltype(val) <: AbstractArray
+            cellcontents = first(val)
+            map(i -> key => i, 1:length(cellcontents))
+        else
+            (key,)
+        end
+        (acc..., keys...)
+    end
 end
 
 function _autorenderers(layout, scheme, zerocolor, maskcolor)
