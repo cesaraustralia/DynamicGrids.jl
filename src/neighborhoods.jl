@@ -26,13 +26,21 @@ ConstructionBase.constructorof(::Type{<:T}) where T <: Neighborhood{R,L} where {
     T.name.wrapper{R,L}
 
 radius(hood::Neighborhood{R}) where R = R
+neighbors(hood::Neighborhood{R}) where R = map(i -> _buffer(hood)[i], bufindices(hood))
 _buffer(hood::Neighborhood) = hood._buffer
-@inline positions(hood::Neighborhood, I) = (I .+ o for o in offsets(hood))
+@inline positions(hood::Neighborhood, I) = map(o -> o .+ I, offsets(hood))
+@inline function bufindices(hood::Neighborhood{R}) where R
+    map(offsets(hood)) do o
+        i = o[1] + (R + 1) 
+        j = o[2] + (R + 1)
+        i + (j - 1) * (2R + 1) 
+    end
+end
 
 Base.eltype(hood::Neighborhood) = eltype(_buffer(hood))
 Base.length(hood::Neighborhood{<:Any,L}) where L = L
 Base.iterate(hood::Neighborhood, args...) = iterate(neighbors(hood), args...)
-Base.getindex(hood::Neighborhood, I...) = getindex(_buffer(hood), I...)
+Base.getindex(hood::Neighborhood, i) = getindex(_buffer(hood), bufindices(hood)[i])
 
 """
     RadialNeighborhood <: Neighborhood
@@ -57,14 +65,25 @@ Moore(radius::Int=1) = Moore{radius}()
 Moore{R}(_buffer=nothing) where R = Moore{R,(2R+1)^2-1}(_buffer)
 Moore{R,L}(_buffer::B=nothing) where {R,L,B} = Moore{R,L,B}(_buffer)
 
-@inline function neighbors(hood::Moore{R}) where R
-    # Use linear indexing
-    buflen = (2R + 1)^2
+@generated function bufindices(hood::Moore{R}) where R
+    buflen = (2R + 1)^2 # Use linear indexing
     centerpoint = buflen ÷ 2 + 1
-    return (_buffer(hood)[i] for i in 1:buflen if i != centerpoint)
+    exp = Expr(:tuple)
+    for i in 1:buflen 
+        if i != centerpoint
+            push!(exp.args, :($i))
+        end
+    end
+    return exp
 end
-@inline function offsets(hood::Moore{R}) where R
-    ((i, j) for j in -R:R, i in -R:R if i != (0, 0))
+@generated function offsets(hood::Moore{R}) where R
+    exp = Expr(:tuple)
+    for j in -R:R, i in -R:R
+        if i != (0, 0)
+            push!(exp.args, :($i, $j))
+        end
+    end
+    return exp
 end
 @inline _setbuffer(n::Moore{R,L}, buf::B2) where {R,L,B2} = Moore{R,L,B2}(buf)
 
@@ -84,15 +103,20 @@ A neighboorhood of radius R that includes the central cell.
 struct Window{R,L,B} <: RadialNeighborhood{R,L}
     _buffer::B
 end
-@inline Window(R::Int) = Window{R}()
-@inline Window{R}(_buffer=nothing) where R = Window{R,(2R+1)^2}(_buffer)
-@inline Window{R,L}(_buffer::B=nothing) where {R,L,B} = Window{R,L,B}(_buffer)
-@inline Window(A::AbstractArray) = Window{(size(A, 1) - 1) ÷ 2}()
+Window(R::Int) = Window{R}()
+Window{R}(_buffer=nothing) where R = Window{R,(2R+1)^2}(_buffer)
+Window{R,L}(_buffer::B=nothing) where {R,L,B} = Window{R,L,B}(_buffer)
+Window(A::AbstractArray) = Window{(size(A, 1) - 1) ÷ 2}()
+
 
 @inline _setbuffer(::Window{R,L}, buf::B2) where {R,L,B2} = Window{R,L,B2}(buf)
 
 # The central cell is included
-@inline offsets(hood::Window{R}) where R = ((i, j) for j in -R:R, i in -R:R)
+@inline function offsets(hood::Window{R}) where R 
+    D = 2R + 1
+    ntuple(i -> (rem(i-1, D)-R, (i-1) ÷ D - R), D^2)
+end
+bufindices(hood::Window{R}) where R = Base.OneTo((2R+1)^2)
 
 neighbors(hood::Window) = _buffer(hood)
 
@@ -114,19 +138,19 @@ kernel(hood::AbstractKernelNeighborhood) = hood.kernel
 
 kernelproduct(hood::AbstractKernelNeighborhood) = 
     kernelproduct(neighborhood(hood), kernel(hood))
-function kernelproduct(hood::Neighborhood, kernel)
+function kernelproduct(hood::Neighborhood{<:Any,L}, kernel) where L
     sum = zero(first(hood))
-    for (n, k) in zip(hood, kernel)
-        sum += n * k
+    @simd for i in 1:L
+        sum += hood[i] * kernel[i]
     end
-    sum
+    return sum
 end
 function kernelproduct(hood::Window{<:Any,L}, kernel) where L
     sum = zero(first(hood))
     @simd for i in 1:L
         @inbounds sum += _buffer(hood)[i] * kernel[i]
     end
-    sum
+    return sum
 end
 
 """
@@ -144,7 +168,7 @@ struct Kernel{R,L,N,K} <: AbstractKernelNeighborhood{R,L}
     kernel::K
 end
 Kernel(A::AbstractMatrix) = Kernel(Window(A), A)
-@inline function Kernel(hood::N, kernel::K) where {N<:Neighborhood{R,L},K} where {R,L}
+function Kernel(hood::N, kernel::K) where {N<:Neighborhood{R,L},K} where {R,L}
     length(hood) == length(kernel) || _kernel_length_error(hood, kernel)
     Kernel{R,L,N,K}(hood, kernel)
 end
@@ -157,7 +181,7 @@ end
 
 @inline function _setbuffer(n::Kernel{R,L,<:Any,K}, buf) where {R,L,K}
     hood = _setbuffer(neighborhood(n), buf)
-    Kernel{R,L,typeof(hood),K}(hood, kernel(n))
+    return Kernel{R,L,typeof(hood),K}(hood, kernel(n))
 end
 
 """
@@ -207,10 +231,9 @@ ConstructionBase.constructorof(::Type{Positional{R,L,C,B}}) where {R,L,C,B} =
 Base.length(hood::Positional) = length(offsets(hood))
 
 offsets(hood::Positional) = hood.offsets
-@inline neighbors(hood::Positional) =
-    (_buffer(hood)[(offset .+ radius(hood) .+ 1)...] for offset in offsets(hood))
 @inline _setbuffer(n::Positional{R,L,O}, buf::B2) where {R,L,O,B2} =
     Positional{R,L,O,B2}(offsets(n), buf)
+
 
 """
     LayeredPositional <: AbstractPositional

@@ -56,7 +56,8 @@ function modifyrule end
 """
     neighbors(x::Union{Neighborhood,NeighborhoodRule}}) -> iterable
 
-Returns an iteraterable generator over all cells in the neighborhood.
+Returns an indexable iterator for all cells in the neighborhood, 
+either a Tuple of values or a range.
 
 Custom `Neighborhood`s must define this method.
 """
@@ -91,8 +92,8 @@ function kernelproduct end
 """
     offsets(x::Union{Neighborhood,NeighborhoodRule}}) -> iterable
 
-Returns an iteraterable over all cells as a `Tuple` of the index 
-offset from the central cell.
+Returns an indexable iterable over all cells, containing `Tuple`s of 
+the index offset from the central cell.
 
 Custom `Neighborhood`s must define this method.
 """
@@ -101,9 +102,9 @@ function offsets end
 """
     positions(x::Union{Neighborhood,NeighborhoodRule}}, cellindex::Tuple) -> iterable
 
-Returns an iteraterable over all cells as a `Tuple` of the index 
-in the main array. Useful in [`SetNeighborhoodRule`](@ref) for 
-setting neighborhood values.
+Returns an indexable iterable, over all cells as `Tuple`s of each 
+index in the main array. Useful in [`SetNeighborhoodRule`](@ref) for 
+setting neighborhood values, or for getting values in an Aux array.
 """
 function positions end
 

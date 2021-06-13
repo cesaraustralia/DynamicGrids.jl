@@ -6,7 +6,8 @@ import DynamicGrids: applyrule, applyrule!, maprule!, ruletype, extent, source, 
 
 if CUDAKernels.CUDA.has_cuda_gpu()
     CUDAKernels.CUDA.allowscalar(false)
-    hardware = (SingleCPU(), ThreadedCPU(), CPUGPU(), CuGPU())
+    # hardware = (SingleCPU(), ThreadedCPU(), CPUGPU(), CuGPU())
+    hardware = (SingleCPU(), ThreadedCPU(), CPUGPU())
 else
     hardware = (SingleCPU(), ThreadedCPU(), CPUGPU())
 end
