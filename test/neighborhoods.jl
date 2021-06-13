@@ -24,14 +24,14 @@ import DynamicGrids: SimData, Extent, WritableGridData,
         moore = Moore{1}(init[1:3, 1:3])
         @test _buffer(moore) == init[1:3, 1:3]
         @test hoodsize(moore) == 3
-        @test moore[2, 2] == 0
+        @test moore[1] == 0
         @test length(moore) == 8
         @test eltype(moore) == Int
-        @test neighbors(moore) isa Base.Generator
+        @test neighbors(moore) isa Tuple
         @test collect(neighbors(moore)) == [0, 1, 0, 0, 1, 0, 1, 1]
         @test sum(moore) == sum(neighbors(moore)) == 4
-        @test Tuple(offsets(moore)) == ((-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 0), 
-                                        (0, 1), (1, -1), (1, 0), (1, 1))
+        @test offsets(moore) == 
+            ((-1, -1), (0, -1), (1, -1), (-1, 0), (0, 0), (1, 0), (-1, 1), (0, 1), (1, 1))
 
         moore1 = @set moore._buffer = buf1
         @test moore1._buffer == buf1
@@ -47,14 +47,15 @@ import DynamicGrids: SimData, Extent, WritableGridData,
         window = Window{1}(init[1:3, 1:3])
         @test _buffer(window) == init[1:3, 1:3]
         @test hoodsize(window) == 3
-        @test window[2, 2] == 0
+        @test window[1] == 0
+        @test window[2] == 1
         @test length(window) == 9
         @test eltype(window) == Int
         @test neighbors(window) isa Array 
         @test neighbors(window) == _buffer(window)
         @test sum(window) == sum(neighbors(window)) == 4
-        @test Tuple(offsets(window)) == ((-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 0), 
-                                        (0, 1), (1, -1), (1, 0), (1, 1))
+        @test offsets(window) == ((-1, -1), (0, -1), (1, -1), (-1, 0), (0, 0), 
+                                  (1, 0), (-1, 1), (0, 1), (1, 1))
 
         window1 = @set window._buffer = buf1
         @test window1._buffer == buf1
@@ -70,10 +71,11 @@ import DynamicGrids: SimData, Extent, WritableGridData,
         @test offsets(vonneumann) == ((0, -1), (-1, 0), (1, 0), (0, 1))
         @test _buffer(vonneumann) == init[1:3, 1:3]
         @test hoodsize(vonneumann) == 3
-        @test vonneumann[2, 1] == 1
+        @test vonneumann[1] == 1
+        @test vonneumann[2] == 0
         @test length(vonneumann) == 4
         @test eltype(vonneumann) == Int
-        @test neighbors(vonneumann) isa Base.Generator
+        @test neighbors(vonneumann) isa Tuple
         @test collect(neighbors(vonneumann)) == [1, 0, 1, 1]
         @test sum(neighbors(vonneumann)) == 3
         vonneumann2 = VonNeumann(2)
@@ -102,7 +104,7 @@ import DynamicGrids: SimData, Extent, WritableGridData,
         layered = LayeredPositional(
             (Positional((-1,1), (-2,2)), Positional((1,2), (2,2))), buf)
 
-        @test neighbors(custom1) isa Base.Generator
+        @test neighbors(custom1) isa Tuple
         @test collect(neighbors(custom1)) == [0, 1, 1, 0, 0]
 
         @test sum(custom1) == 2
@@ -131,15 +133,10 @@ end
         k = Kernel(Window{1,9,typeof(buf)}(buf), SMatrix{3,3}(reshape(1:9, 3, 3)))
         @test kernelproduct(k) == sum((1:9).^2)
         @test neighbors(k) == reshape(1:9, 3, 3)
-        @test collect(offsets(k)) ==
-            [(-1, -1) (0, -1) (1, -1)
-             (-1, 0)  (0, 0)  (1, 0)
-             (-1, 1)  (0, 1)  (1, 1)]
-        @test collect(positions(k, (2, 2))) ==
-             [(1, 1) (2, 1) (3, 1)
-              (1, 2) (2, 2) (3, 2)
-              (1, 3) (2, 3) (3, 3)]
-
+        @test offsets(k) == ((-1, -1), (0, -1), (1, -1), (-1, 0), (0, 0), 
+                             (1, 0), (-1, 1), (0, 1), (1, 1))
+        @test positions(k, (2, 2)) == ((1, 1), (2, 1), (3, 1), (1, 2), 
+                                       (2, 2), (3, 2), (1, 3), (2, 3), (3, 3))
     end
     @testset "Moore" begin
         k = Kernel(Moore{1,8,typeof(buf)}(buf), (1:4..., 6:9...))
@@ -171,28 +168,31 @@ end
 @testset "neighborhood rules" begin
     ruleA = TestSetNeighborhoodRule{:a,:a}(Moore{3}())
     ruleB = TestSetNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}())
-    @test offsets(ruleA) isa Base.Generator
-    @test positions(ruleA, (1, 1)) isa Base.Generator
+    @test offsets(ruleA) isa Tuple
+    @test positions(ruleA, (1, 1)) isa Tuple
     @test neighborhood(ruleA) == Moore{3}()
     @test neighborhood(ruleB) == Moore{2}()
     @test neighborhoodkey(ruleA) == :a
     @test neighborhoodkey(ruleB) == :b
     ruleA = TestNeighborhoodRule{:a,:a}(Moore{3}())
     ruleB = TestNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}())
-    @test neighbors(ruleA) isa Base.Generator
-    @test offsets(ruleA) isa Base.Generator
+    @test offsets(ruleA) isa Tuple
     @test neighborhood(ruleA) == Moore{3}()
     @test neighborhood(ruleB) == Moore{2}()
     @test neighborhoodkey(ruleA) == :a
     @test neighborhoodkey(ruleB) == :b
-    @test Tuple(offsets(ruleB)) === 
-        ((-2, -2), (-2, -1), (-2, 0), (-2, 1), (-2, 2), (-1, -2), (-1, -1), (-1, 0), 
-         (-1, 1), (-1, 2), (0, -2), (0, -1), (0, 0), (0, 1), (0, 2), (1, -2), (1, -1), 
-         (1, 0), (1, 1), (1, 2), (2, -2), (2, -1), (2, 0), (2, 1), (2, 2))
-    @test Tuple(positions(ruleB, (10, 10))) == 
-        ((8, 8), (8, 9), (8, 10), (8, 11), (8, 12), (9, 8), (9, 9), (9, 10), (9, 11), 
-         (9, 12), (10, 8), (10, 9), (10, 10), (10, 11), (10, 12), (11, 8), (11, 9), 
-         (11, 10), (11, 11), (11, 12), (12, 8), (12, 9), (12, 10), (12, 11), (12, 12))
+    @test offsets(ruleB) === 
+        ((-2,-2), (-1,-2), (0,-2), (1,-2), (2,-2),
+         (-2,-1), (-1,-1), (0,-1), (1,-1), (2,-1),
+         (-2,0), (-1,0), (0,0), (1,0), (2,0),
+         (-2,1), (-1,1), (0,1), (1,1), (2,1),
+         (-2,2), (-1,2), (0,2), (1,2), (2,2))
+    @test positions(ruleB, (10, 10)) == 
+        ((8, 8), (9, 8), (10, 8), (11, 8), (12, 8), 
+         (8, 9), (9, 9), (10, 9), (11, 9), (12, 9), 
+         (8, 10), (9, 10), (10, 10), (11, 10), (12, 10), 
+         (8, 11), (9, 11), (10, 11), (11, 11), (12, 11), 
+         (8, 12), (9, 12), (10, 12), (11, 12), (12, 12))
 end
 
 @testset "radius" begin
