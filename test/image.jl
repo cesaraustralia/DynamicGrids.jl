@@ -96,7 +96,7 @@ end
         @test _autokeys((a=[[0,0]], b=[1], c=[[3,4]])) == (:a=>1, :a=>2, :b, :c=>1, :c=>2)
         @test _autolayout([0]) == reshape(Any[1], 1, 1)
         @test _autolayout((a=[0], b=[0], c=[0])) == Any[:a :b :c]
-        @testset "Empty layout cells are fileld with nothing" begin
+        @testset "Empty layout cells are filled with nothing" begin
             @test _autolayout((a=[[0,0]], b=[1], c=[[3,4]])) == Any[:a=>1 :b :c=>2; :a=>2 :c=>1 nothing]
         end
     end
