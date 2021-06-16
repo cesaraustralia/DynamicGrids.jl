@@ -80,6 +80,11 @@ export CharStyle, Block, Braile
 
 const DEFAULT_KEY = :_default_
 
+const EXPERIMENTAL = """
+        WARNING: This feature is experimental. It may change in future versions, 
+        and may not be 100% reliable in all cases.  Please file github issues if problems occur.
+        """
+
 
 function __init__()
     global terminal
