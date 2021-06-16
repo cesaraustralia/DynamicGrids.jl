@@ -1,26 +1,24 @@
 import ModelParameters.Flatten
-          
-"""
-    Base.get(data::AbstractSimData, key::Union{Symbol,Aux,Grid}, I...)
-
-Allows parameters to be taken from a single value, another grid or an aux array.
-
-If aux arrays are a `DimArray` time sequence (with a `Ti` dim) the currect date will be 
-calculated automatically.
-
-Currently this is cycled by default, but will use Cyclic mode in DiensionalData.jl in future.
-"""
-@propagate_inbounds Base.get(data::AbstractSimData, val, I...) = val
 
 
 """
     ParameterSource
 
-Abstract supertypes for parameter source wrappers. These allow
-parameters to be retreived from auxilliary data or from other grids.
+Abstract supertypes for parameter source wrappers such as `Aux` and `Grid`. 
+These allow flexibly in that parameters can be retreived from various data sources.
 """
 abstract type ParameterSource end
 
+"""
+    get(data::AbstractSimData, key::ParameterSource, I...)
+    get(data::AbstractSimData, key::ParameterSource, I::Union{Tuple,CartesianIndex})
+
+Allows parameters to be taken from a single value or a [`ParameterSource`](@ref) 
+such as another [`Grid`](@ref), an [`Aux`](@ref) array, or a [`Delay`](@ref).
+"""
+@propagate_inbounds Base.get(data::AbstractSimData, val, I...) = val
+@propagate_inbounds Base.get(data::AbstractSimData, key::ParameterSource, I...) = get(data, key, I)
+@propagate_inbounds Base.get(data::AbstractSimData, key::ParameterSource, I::CartesianIndex) = get(data, key, Tuple(I))
 
 """
     Aux <: ParameterSource
@@ -33,7 +31,7 @@ Use auxilary array with key `K` as a parameter source.
 Implemented in rules with:
 
 ```julia
-get(data, rule.myparam, index...)
+get(data, rule.myparam, I)
 ```
 
 When an `Aux` param is specified at rule construction with:
@@ -46,30 +44,35 @@ output = ArrayOutput(init; aux=(myaux=myauxarray,))
 If the array is a DimensionalData.jl `DimArray` with a `Ti` (time)
 dimension, the correct interval will be selected automatically,
 precalculated for each timestep so it has no significant overhead.
+
+Currently this is cycled by default. Note that cycling may be incorrect 
+when the simulation timestep (e.g. `Week`) does not fit 
+equally into the length of the time dimension (e.g. `Year`).
+This will reuire a `Cyclic` index mode in DimensionalData.jl in future 
+to correct this problem.
 """
-struct Aux{K} end
+struct Aux{K} <: ParameterSource end
 Aux(key::Symbol) = Aux{key}()
 
 _unwrap(::Aux{X}) where X = X
 _unwrap(::Type{<:Aux{X}}) where X = X
 
-@propagate_inbounds Base.get(data::AbstractSimData, key::Aux, I...) = _getaux(data, key, I...)
+@propagate_inbounds Base.get(data::AbstractSimData, key::Aux, I::Tuple) = _getaux(data, key, I)
 
 @inline aux(nt::NamedTuple, ::Aux{Key}) where Key = nt[Key]
 
 # If there is no time dimension we return the same data for every timestep
-_getaux(data::AbstractSimData, key::Union{Aux,Symbol}, I...) = 
-    _getaux(aux(data, key), data, key, I...)
-_getaux(A::AbstractMatrix, data::AbstractSimData, key::Union{Aux,Symbol}, y, x) = A[y, x]
+@propagate_inbounds _getaux(data::AbstractSimData, key::Union{Aux,Symbol}, I::Tuple) = _getaux(aux(data, key), data, key, I)
+@propagate_inbounds _getaux(A::AbstractMatrix, data::AbstractSimData, key::Union{Aux,Symbol}, I::Tuple) = A[I...]
 # function _getaux(A::AbstractDimArray{<:Any,2}, data::AbstractSimData, key::Union{Aux,Symbol}, y, x)
     # X = DD.basetypeof(dims(A, XDim))
     # Y = DD.basetypeof(dims(A, YDim))
     # A[y, x]
 # end
-function _getaux(A::AbstractDimArray{<:Any,3}, data::AbstractSimData, key::Union{Aux,Symbol}, y, x)
+function _getaux(A::AbstractDimArray{<:Any,3}, data::AbstractSimData, key::Union{Aux,Symbol}, I::Tuple)
     # X = DD.basetypeof(dims(A, XDim))
     # Y = DD.basetypeof(dims(A, YDim))
-    A[y, x, auxframe(data, key)]
+    A[I..., auxframe(data, key)]
 end
 
 function boundscheck_aux(data::AbstractSimData, auxkey::Aux{Key}) where Key
@@ -128,22 +131,22 @@ Use grid with key `K` as a parameter source.
 Implemented in rules with:
 
 ```julia
-get(data, rule.myparam, index...)
+get(data, rule.myparam, I)
 ```
 
 And specified at rule construction with:
 
 ```julia
-SomeRule(; myparam=Grid{:somegrid})
+SomeRule(; myparam=Grid(:somegrid))
 ```
 """
-struct Grid{K} end
+struct Grid{K} <: ParameterSource end
 Grid(key::Symbol) = Grid{key}()
 
 _unwrap(::Grid{X}) where X = X
 _unwrap(::Type{<:Grid{X}}) where X = X
 
-@propagate_inbounds Base.get(data::AbstractSimData, key::Grid{K}, I...) where K = data[K][I...]
+@propagate_inbounds Base.get(data::AbstractSimData, key::Grid{K}, I::Tuple) where K = data[K][I...]
 
 
 """
@@ -156,14 +159,14 @@ abstract type AbstractDelay{K} <: ParameterSource end
 
 @inline frame(delay::AbstractDelay) = delay.frame
 
-@propagate_inbounds function Base.get(data::AbstractSimData, delay::AbstractDelay{K}, I...) where K
-    _getdelay(frames(data)[frame(delay, data)], delay, I...)
+@propagate_inbounds function Base.get(data::AbstractSimData, delay::AbstractDelay{K}, I::Tuple) where K
+    _getdelay(frames(data)[frame(delay, data)], delay, I)
 end
 
-@propagate_inbounds function _getdelay(frame::NamedTuple, delay::AbstractDelay{K}, I...) where K
-    _getdelay(frame[K], delay, I...)
+@propagate_inbounds function _getdelay(frame::NamedTuple, delay::AbstractDelay{K}, I::Tuple) where K
+    _getdelay(frame[K], delay, I)
 end
-@propagate_inbounds function _getdelay(frame::AbstractArray, ::AbstractDelay{K}, I...) where K
+@propagate_inbounds function _getdelay(frame::AbstractArray, ::AbstractDelay{K}, I::Tuple) where K
     frame[I...]
 end
 
