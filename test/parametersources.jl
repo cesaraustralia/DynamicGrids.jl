@@ -54,16 +54,16 @@ const DG = DynamicGrids
             data = SimData(Extent(init=init, aux=(seq=seq,), tspan=Date(2001):Day(1):Date(2001, 3)), Ruleset())
             data1 = DG._updatetime(data, 1)
             @test data1.auxframe == (seq = 1,)
-            @test get(data1, Aux(:seq), 1, 1) == 0.1
+            @test get(data1, Aux(:seq), (1, 1)) == 0.1
             data2 = DG._updatetime(data, 5)
             @test data2.auxframe == (seq = 2,)
             @test get(data2, Aux(:seq), 1, 1) == 1.1
             data3 = DG._updatetime(data, 10)
             @test data3.auxframe == (seq = 3,)
-            @test get(data3, Aux(:seq), 1, 1) == 2.1
+            @test get(data3, Aux(:seq), (1, 1)) == 2.1
             data4 = DG._updatetime(data, 15)
             @test data4.auxframe == (seq = 1,)
-            @test get(data4, Aux(:seq), 1, 1) == 0.1
+            @test get(data4, Aux(:seq), CartesianIndex(1, 1)) == 0.1
         end
 
         @testset "errors" begin
