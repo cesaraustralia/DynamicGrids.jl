@@ -6,7 +6,7 @@ An output that stores the result of some function `f` of the grid/s
 # Arguments
 
 - `f`: a function or functor that accepts an `AbstractArray` or `NamedTuple` of
-    `AbstractArray` with names matchin `init`. The `AbstractArray` will be a view into 
+    `AbstractArray` with names matching `init`. The `AbstractArray` will be a view into 
     the grid the same size as the init grids, removing any padding that has been added.
 - `init`: initialisation `Array` or `NamedTuple` of `Array`
 
@@ -17,6 +17,7 @@ An output that stores the result of some function `f` of the grid/s
     to access from a `Rule` in a type-stable way.
 - `mask`: `BitArray` for defining cells that will/will not be run.
 - `padval`: padding value for grids with neighborhood rules. The default is `zero(eltype(init))`.
+
 """
 mutable struct TransformedOutput{T,A<:AbstractVector{T},E,F,B} <: Output{T,A} 
     frames::A
@@ -26,33 +27,53 @@ mutable struct TransformedOutput{T,A<:AbstractVector{T},E,F,B} <: Output{T,A}
     buffer::B
 end
 function TransformedOutput(f::Function, init::Union{NamedTuple,AbstractMatrix}; extent=nothing, kw...)
+    # We have to handle some things manually as we are changing the standard output frames
     extent = extent isa Nothing ? Extent(; init=init, kw...) : extent
+    # Define buffers to copy to before applying `f`
     buffer = init isa NamedTuple ? map(zero, init) : zero(init)
-    frames = append!([f(init)], map(_ -> f(buffer), tspan(extent)))
-    TransformedOutput(frames, false, extent, f, buffer)
+    zeroframe = f(buffer)
+    # Build simulation frames from the output of `f` for empty frames
+    frames = [deepcopy(zeroframe) for f in eachindex(tspan(extent))]
+    # Set the first frame to the output of `f` for `init`
+    frames[1] = f(init)
+
+    return TransformedOutput(frames, false, extent, f, buffer)
 end
 function TransformedOutput(init; kw...)
     throw(ArgumentError("TransformedOutput must be passed a function and the init grid(s) as arguments"))
 end
 
 function storeframe!(o::TransformedOutput, data::AbstractSimData) 
-    o[frameindex(o, data)] = _store_x(o, grids(data))
+    transformed = _transform_grids(o, grids(data))
+    i = frameindex(o, data) 
+    # Copy the transformed grid/s to the output frames, 
+    # instead of just assigning (see issue #169)
+    o[i] = _copytransformed!(o[i], transformed) 
 end
 
-function _store_x(o::TransformedOutput, grids::NamedTuple)
+# Copy arrays manually as reducing functions can return the original object without copy.
+_copytransformed!(dest::NamedTuple, src::NamedTuple) = map(_copytransformed!, dest, src)
+_copytransformed!(dest::AbstractArray, src::AbstractArray) = dest .= src
+# Non-array output is just assigned
+_copytransformed!(dest, src) = src
+
+# Multi/named grid simulation, f is passed a NamedTuple
+function _transform_grids(o::TransformedOutput, grids::NamedTuple)
     # Make a new named tuple of raw arrays without wrappers, copying
-    # to the buffer where an OffsetArray was used for padding
-    # Often it's faster to copy than use a view when f is sum/mean etc
-    nt = map(grids, o.buffer) do g, b
-        source(g) isa OffsetArray ? copy!(b, g) : parent(source(g))
+    # to the buffer where an OffsetArray was used for padding.
+    # Often it's faster to copy than use a view when f is sum/mean etc.
+    nt = map(map(source, grids), o.buffer) do g, b
+        g isa OffsetArray ? copy!(b, g) : g
     end
     o.f(nt)
 end
-function _store_x(o::TransformedOutput, grids::NamedTuple{(DEFAULT_KEY,)})
-    g = first(grids)
-    A = source(g) isa OffsetArray ? copy!(o.buffer, g) : parent(source(g))
+# Single unnamed grid simulation, f is passed an AbstractArray
+function _transform_grids(o::TransformedOutput, grids::NamedTuple{(DEFAULT_KEY,)})
+    g = source(first(grids))
+    A = g isa OffsetArray ? copy!(o.buffer, g) : g
     o.f(A)
 end
+
 
 init_output_grids!(o::TransformedOutput, init) = nothing
 _initdata!(o::TransformedOutput, init) = nothing

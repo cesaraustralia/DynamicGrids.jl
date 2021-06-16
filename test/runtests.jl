@@ -19,6 +19,7 @@ end
 @time @safetestset "chain" begin include("chain.jl") end
 @time @safetestset "condition" begin include("condition.jl") end
 @time @safetestset "outputs" begin include("outputs.jl") end
+@time @safetestset "transformed" begin include("transformed.jl") end
 @time @safetestset "chain" begin include("chain.jl") end
 @time @safetestset "integration" begin include("integration.jl") end
 @time @safetestset "objectgrids" begin include("objectgrids.jl") end
