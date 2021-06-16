@@ -18,6 +18,7 @@ An output that stores the result of some function `f` of the grid/s
 - `mask`: `BitArray` for defining cells that will/will not be run.
 - `padval`: padding value for grids with neighborhood rules. The default is `zero(eltype(init))`.
 
+$EXPERIMENTAL
 """
 mutable struct TransformedOutput{T,A<:AbstractVector{T},E,F,B} <: Output{T,A} 
     frames::A

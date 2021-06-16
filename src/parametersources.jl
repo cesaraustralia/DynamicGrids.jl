@@ -151,6 +151,8 @@ _unwrap(::Type{<:Grid{X}}) where X = X
 
 Abstract supertype for [`ParameterSource`](@ref)s that use data from a grid
 with a time delay.
+
+$EXPERIMENTAL
 """
 abstract type AbstractDelay{K} <: ParameterSource end
 
@@ -197,6 +199,8 @@ SomeRule(;
     otherparam=1.075
 )
 `` `
+
+$EXPERIMENTAL
 """
 struct Delay{K,S} <: AbstractDelay{K}
     steps::S
@@ -244,6 +248,8 @@ SomeRule(;
     otherparam=1.075
 )
 `` `
+
+$EXPERIMENTAL
 """
 struct Lag{K} <: AbstractDelay{K}
     nframes::Int
@@ -271,6 +277,8 @@ a rule, using `get`. It should only be used within rule code, not as a parameter
 # Argument
 
 - `frame::Int`: the exact frame number to use.
+
+$EXPERIMENTAL
 """
 struct Frame{K} <: AbstractDelay{K}
     frame::Int
