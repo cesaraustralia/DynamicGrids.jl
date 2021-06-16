@@ -64,14 +64,7 @@ _unwrap(::Type{<:Aux{X}}) where X = X
 # If there is no time dimension we return the same data for every timestep
 @propagate_inbounds _getaux(data::AbstractSimData, key::Union{Aux,Symbol}, I::Tuple) = _getaux(aux(data, key), data, key, I)
 @propagate_inbounds _getaux(A::AbstractMatrix, data::AbstractSimData, key::Union{Aux,Symbol}, I::Tuple) = A[I...]
-# function _getaux(A::AbstractDimArray{<:Any,2}, data::AbstractSimData, key::Union{Aux,Symbol}, y, x)
-    # X = DD.basetypeof(dims(A, XDim))
-    # Y = DD.basetypeof(dims(A, YDim))
-    # A[y, x]
-# end
 function _getaux(A::AbstractDimArray{<:Any,3}, data::AbstractSimData, key::Union{Aux,Symbol}, I::Tuple)
-    # X = DD.basetypeof(dims(A, XDim))
-    # Y = DD.basetypeof(dims(A, YDim))
     A[I..., auxframe(data, key)]
 end
 
@@ -312,7 +305,6 @@ end
 _getdelays(rules::Tuple) = Flatten.flatten(rules, AbstractDelay, DELAY_IGNORE)
 _setdelays(rules::Tuple, delays::Tuple) = 
     Flatten.reconstruct(rules, delays, AbstractDelay, DELAY_IGNORE)
-
 
 _notstorederror() = 
     throw(ArgumentError("Output does not store frames, which is needed for a Delay. Use ArrayOutput or any GraphicOutput with `store=true` keyword"))
