@@ -89,3 +89,59 @@ end
     sim!(output, Life{:a}())
     output == [0, 1, 2]
 end
+
+
+@testset "Defining new function" begin
+    ruleAR = Cell() do data, state, I
+        state + 10.0
+    end
+    ruleNT = Cell{:a, :a}() do data, state, I
+        state + 10.0
+    end
+
+    # Defining 2 functions giving square of all single values
+    f_square(AR::AbstractArray) = map(x -> x^2, AR)
+    function f_square(NT::NamedTuple)      
+        v = [map(x -> x^2, el) for el in values(NT)]
+        return NamedTuple{keys(NT)}(v)
+    end
+
+    @testset "Array" begin
+        init = [1 3]
+        f_square(init) == [1 9]
+    
+        transformed_output = TransformedOutput(f_square, init; tspan=1:3)  
+        sim!(transformed_output, ruleAR)  
+        
+        @test transformed_output[1] == [1 3] .^2
+        @test transformed_output[2] == ([1 3] .+ 10) .^2
+        @test transformed_output[3] == ([1 3] .+ 10 .+ 10) .^2
+    end
+
+    @testset "Single NamedTuple" begin    
+        init = (a = [1 3],)
+        f_square(init) == (a = [ 1 9],)
+        
+        transformed_output = TransformedOutput(f_square, init; tspan=1:3)
+        sim!(transformed_output, ruleNT)
+
+        @test transformed_output[1] == (a=[1 3] .^2 ,)
+        @test transformed_output[2] == (a=([1 3] .+ 10) .^2 ,)
+        @test transformed_output[3] == (a=([1 3] .+ 10 .+ 10) .^2 ,)
+
+    end
+
+    @testset "Multiple NamedTuple" begin
+        init = (a = [1 3], b = [2 5])
+        @test f_square(init) == (a = [1 9], b = [4 25])
+                
+        transformed_output = TransformedOutput(f_square, init; tspan=1:3)
+        sim!(transformed_output, ruleNT)
+
+        @test transformed_output[1] == (a=[1 3] .^2 , b=[2 5] .^2)
+        @test transformed_output[2] == (a=([1 3] .+ 10) .^2 , b=[2 5] .^2)
+        @test transformed_output[3] == (a=([1 3] .+ 10 .+ 10) .^2 , b=[2 5] .^2)
+
+    end
+
+end
