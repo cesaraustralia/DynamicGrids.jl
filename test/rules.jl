@@ -111,26 +111,46 @@ end
              0 1 0 0
              0 0 1 0]
     @test_throws ArgumentError SetNeighbors()
-    rule = SetNeighbors(VonNeumann(1)) do data, hood, state, I
-        if state > 0
-            for pos in positions(hood, I)
-                add!(data, 1, pos...) 
+    @testset "atomics" begin
+        rule = SetNeighbors(VonNeumann(1)) do data, hood, state, I
+            if state > 0
+                for pos in positions(hood, I)
+                    add!(data, 1, pos...) 
+                end
+            end
+        end
+        output = ArrayOutput(init; tspan=1:2)
+        for proc in hardware, opt in (NoOpt(), SparseOpt())
+            @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
+                ref_output = [1 1 1 0
+                              0 1 0 0
+                              0 1 0 0
+                              1 1 2 0
+                              0 2 1 1]
+                sim!(output, rule, proc=proc, opt=opt)
+                @test output[2] == ref_output
             end
         end
     end
-    output = ArrayOutput(init; tspan=1:2)
-    data = SimData(output, Ruleset(rule)) 
-    for proc in hardware, opt in (NoOpt(), SparseOpt())
-        @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
-            # Cant use applyrule! without a lot of work on SimData
-            # so just trun the whole thing
-            ref_output = [1 1 1 0
-                          0 1 0 0
-                          0 1 0 0
-                          1 1 2 0
-                          0 2 1 1]
-            sim!(output, rule, proc=proc, opt=opt)
-            @test output[2] == ref_output
+
+    @testset "setindex" begin
+        rule = SetNeighbors(VonNeumann(1)) do data, hood, state, I
+            state == 0 && return nothing
+            for pos in positions(hood, I)
+                data[pos...] = 1 
+            end
+        end
+        output = ArrayOutput(init; tspan=1:2)
+        for proc in hardware, opt in (NoOpt(), SparseOpt())
+            @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
+                ref_output = [1 1 1 0
+                              0 1 0 0
+                              0 1 0 0
+                              1 1 1 0
+                              0 1 1 1]
+                sim!(output, rule, proc=proc, opt=opt)
+                @test output[2] == ref_output
+            end
         end
     end
 
