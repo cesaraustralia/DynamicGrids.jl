@@ -73,9 +73,10 @@ function Base.copy!(dst::GridData{<:Any,RD}, src::GridData{<:Any,RS}) where {RD,
     return dst
 end
 
-@propagate_inbounds Base.getindex(d::GridData{s}, I...) where s = getindex(parent(d), I...)
-@propagate_inbounds Base.getindex(d::GridData{s}, i1::Int, I::Int...) where s = 
-    getindex(parent(d), i1, I...)
+@propagate_inbounds Base.getindex(d::GridData{s}, I...) where s = getindex(source(d), I...)
+@propagate_inbounds function Base.getindex(d::GridData{s}, i1::Int, I::Int...) where s 
+    getindex(source(d), i1, I...)
+end
 
 # _swapsource => ReadableGridData
 # Swap source and dest arrays of a grid
