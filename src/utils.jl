@@ -58,6 +58,10 @@ function _isinferred(simdata, rule)
     wkeys, wgrids = _getwritegrids(rule, simdata)
     simdata = @set simdata.grids = _combinegrids(rkeys, rgrids, wkeys, wgrids)
     readval = _readcell(simdata, rkeys, 1, 1)
+
+    _example_writeval(grids::Tuple) = map(_example_writeval, grids)
+    _example_writeval(grid::WritableGridData) = grid[1, 1]
+
     ex_writeval = Tuple(_example_writeval(wgrids))
     writeval = @inferred applyrule(simdata, rule, readval, (1, 1))
     typeof(Tuple(writeval)) == typeof(ex_writeval) ||
@@ -65,22 +69,31 @@ function _isinferred(simdata, rule)
     return true
 end
 
+# _zerogrids
+# Generate a Vector of zero valued grids
+_zerogrids(initgrid::AbstractArray, length) = [zero(initgrid) for f in 1:length]
+_zerogrids(initgrids::NamedTuple, length) =
+    [map(grid -> zero(grid), initgrids) for f in 1:length]
 
-_example_writeval(grids::Tuple) = map(_example_writeval, grids)
-_example_writeval(grid::WritableGridData) = grid[1, 1]
-
-_zerogrids(initgrid::AbstractArray, nframes) = [zero(initgrid) for f in 1:nframes]
-_zerogrids(initgrids::NamedTuple, nframes) =
-    [map(grid -> zero(grid), initgrids) for f in 1:nframes]
-
+# _asiterable
+# Return some iterable value from a 
+# Symbol, Tuple or tuple type
+@inline _asiterable(x) = (x,)
 @inline _asiterable(x::Symbol) = (x,)
 @inline _asiterable(x::Type{<:Tuple}) = x.parameters
 @inline _asiterable(x::Tuple) = x
+@inline _asiterable(x::AbstractArray) = x
 
+# _astuple
+# Wrap a value in a tuple if the matching keys are not a tuple
+# we cant just dispatch on state, as it may be meant to be a tuple.
 @inline _astuple(rule::Rule, state) = _astuple(_readkeys(rule), state)
 @inline _astuple(keys::Tuple, state) = state
 @inline _astuple(key, state) = (state,)
 
+# _asnamedtuple => NamedTuple
+# Returns a NamedTuple given a NamedTuple or an Array.
+# the Array will be called _default_.
 @inline _asnamedtuple(x::NamedTuple) = x
 @inline _asnamedtuple(x::AbstractArray) = (_default_=x,)
 @inline function _asnamedtuple(e::Extent) 
@@ -88,13 +101,17 @@ _zerogrids(initgrids::NamedTuple, nframes) =
     @set e.padval = _samenamedtuple(init(e), padval(e))
 end
 
-@inline _samenamedtuple(init::NamedTuple{K}, padval::NamedTuple{K}) where K = x
-@noinline _samenamedtuple(init::NamedTuple{K}, padval::NamedTuple{J}) where {K,J} = 
+# _samenamedtuple => NamedTuple
+# Returns a NamedTuple with length and keys matching the `init` 
+# NamedTuple, for another NamedTuple, a Tuple, or a scalar.
+@inline _samenamedtuple(init::NamedTuple{K}, x::NamedTuple{K}) where K = x
+@noinline _samenamedtuple(init::NamedTuple{K}, x::NamedTuple{J}) where {K,J} = 
     error("Keys $K and $J do not match")
 @inline _samenamedtuple(init::NamedTuple{K}, x::Tuple) where K = NamedTuple{K}(x)
 @inline _samenamedtuple(init::NamedTuple, x) = map(_ -> x, init) 
 
 
+# Unwrap a Val or Val type to its internal value
 _unwrap(x) = x
 _unwrap(::Val{X}) where X = X
 _unwrap(::Type{<:Val{X}}) where X = X

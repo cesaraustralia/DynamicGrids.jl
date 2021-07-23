@@ -1,7 +1,7 @@
 """
     TransformedOutput(f, init; tspan::AbstractRange, kw...) 
 
-An output that stores the result of some function `f` of the grid/s
+An output that stores the result of some function `f` of the grid/s.
 
 # Arguments
 
@@ -75,6 +75,5 @@ function _transform_grids(o::TransformedOutput, grids::NamedTuple{(DEFAULT_KEY,)
     o.f(A)
 end
 
-
 init_output_grids!(o::TransformedOutput, init) = nothing
-_initdata!(o::TransformedOutput, init) = nothing
+initdata!(o::TransformedOutput, init) = nothing

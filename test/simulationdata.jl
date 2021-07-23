@@ -1,5 +1,5 @@
 using DynamicGrids, OffsetArrays, Test, Dates
-using DynamicGrids: _initdata!, data, init, mask, boundary, source, dest, 
+using DynamicGrids: initdata!, data, init, mask, boundary, source, dest, 
     sourcestatus, deststatus, gridsize, ruleset, grids, SimData, Extent,
     _updatetime, WritableGridData, tspan, extent
 
@@ -12,7 +12,7 @@ initab = (a=inita, b=initb)
 life = Life{:a,:a}()
 tspan_ = DateTime(2001):Day(1):DateTime(2001, 2)
 
-@testset "_initdata!" begin
+@testset "initdata!" begin
     rs = Ruleset(life, timestep=Day(1); opt=SparseOpt());
 
     ext = Extent(; init=initab, tspan=tspan_)
@@ -71,7 +71,7 @@ tspan_ = DateTime(2001):Day(1):DateTime(2001, 2)
     @test eltype(grida) == Int
 
     output = ArrayOutput(initab; tspan=tspan_)
-    _initdata!(simdata, output, extent(output), rs)
+    initdata!(simdata, output, extent(output), rs)
 end
 
 @testset "initdata! with :_default_" begin
@@ -79,7 +79,7 @@ end
     rs = Ruleset(Life())
     output = ArrayOutput((_default_=initx,); tspan=tspan_)
     simdata = SimData(output, rs)
-    simdata2 = _initdata!(simdata, output, extent(output), rs)
+    simdata2 = initdata!(simdata, output, extent(output), rs)
     @test keys(simdata2) == (:_default_,)
     @test DynamicGrids.ruleset(simdata2) == DynamicGrids.StaticRuleset(rs)
     @test DynamicGrids.init(simdata2)[:_default_] == [1 0]

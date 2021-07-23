@@ -1,4 +1,3 @@
-
 """
     GraphicConfig
 
@@ -61,11 +60,11 @@ function (::Type{T})(
     T(; frames=[deepcopy(init)], running=false,
       extent=extent, graphicconfig=graphicconfig, kw...)
 end
-
+ 
 graphicconfig(o::Output) = GraphicConfig()
 graphicconfig(o::GraphicOutput) = o.graphicconfig
 
-# Forwarded getters and setters
+# Forward getters and setters to GraphicConfig object ####################################
 fps(o::GraphicOutput) = fps(graphicconfig(o))
 timestamp(o::GraphicOutput) = timestamp(graphicconfig(o))
 stampframe(o::GraphicOutput) = stampframe(graphicconfig(o))
@@ -82,13 +81,14 @@ maybesleep(o::GraphicOutput, f) =
     sleep(max(0.0, timestamp(o) + (f - stampframe(o))/fps(o) - time()))
 isshowable(o::GraphicOutput, f) = true
 
+# Store frames, and show them graphically ################################################
 function storeframe!(o::GraphicOutput, data)
     f = frameindex(o, data)
     if f > length(o)
         _pushgrid!(eltype(o), o)
     end
     if isstored(o)
-        _storeframe!(eltype(o), o, data)
+        _storeframe!(o, eltype(o), data)
     end
     if isshowable(o, currentframe(data)) 
         showframe(o, data)
@@ -96,21 +96,24 @@ function storeframe!(o::GraphicOutput, data)
     return nothing
 end
 
+# Add additional grids if they were not pre-allocated
 _pushgrid!(::Type{<:NamedTuple}, o) = push!(o, map(grid -> similar(grid), o[1]))
 _pushgrid!(::Type{<:AbstractArray}, o) = push!(o, similar(o[1]))
-
-showframe(o::GraphicOutput, data) = showframe(o, proc(data), data)
-showframe(o::GraphicOutput, ::Processor, data) = showframe(map(gridview, grids(data)), o, data)
-# Handle NamedTuple for outputs that only accept AbstractArray
-showframe(frame::NamedTuple, o::GraphicOutput, data) = showframe(first(frame), o, data)
 
 function initialise!(o::GraphicOutput, data) 
     initalisegraphics(o, data)
 end
 function finalise!(o::GraphicOutput, data) 
-    _storeframe!(eltype(o), o, data)
+    _storeframe!(o, eltype(o), data)
     finalisegraphics(o, data)
 end
+
+# Additional interface for GraphicOutput
+
+showframe(o::GraphicOutput, data) = showframe(o, proc(data), data)
+showframe(o::GraphicOutput, ::Processor, data) = showframe(map(gridview, grids(data)), o, data)
+# Handle NamedTuple for outputs that only accept AbstractArray
+showframe(frame::NamedTuple, o::GraphicOutput, data) = showframe(first(frame), o, data)
 
 initalisegraphics(o::GraphicOutput, data) = nothing
 finalisegraphics(o::GraphicOutput, data) = showframe(o, data)

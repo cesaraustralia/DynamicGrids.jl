@@ -71,14 +71,20 @@ function _print_to_repl(pos, color::Crayon, str::String)
     _restorepos(io)
 end
 
-
+# Block size constants to calculate the frame size as 
+# braile pixels are half the height and width of block pixels
 const YBRAILE = 4
 const XBRAILE = 2
 const YBLOCK = 2
 const XBLOCK = 1
 
+_chartype(o::REPLOutput) = _chartype(o.style)
+_chartype(s::Braile) = YBRAILE, XBRAILE, brailize
+_chartype(s::Block) = YBLOCK, XBLOCK, blockize
+
+# Generate a text frame to show in the repl, matching the available size
 function _replframe(o, frame)
-    ystep, xstep, f = _chartype(o)
+    ystep, xstep, charfunc = _chartype(o)
 
     # Limit output area to available terminal size.
     dispy, dispx = displaysize(stdout)
@@ -87,10 +93,6 @@ function _replframe(o, frame)
 
     yrange = max(1, ystep * yoffset):min(youtput, ystep * (dispy + yoffset - 1))
     xrange = max(1, xstep * xoffset):min(xoutput, xstep * (dispx + xoffset - 1))
-    window = view(adapt(Array, frame), yrange, xrange)
-    f(window, o.cutoff)
+    window = view(adapt(Array, frame), yrange, xrange) # TODO make this more efficient on GPU
+    charfunc(window, o.cutoff)
 end
-
-_chartype(o::REPLOutput) = _chartype(o.style)
-_chartype(s::Braile) = YBRAILE, XBRAILE, brailize
-_chartype(s::Block) = YBLOCK, XBLOCK, blockize

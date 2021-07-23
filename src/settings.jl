@@ -8,7 +8,7 @@ abstract type AbstractSimSettings end
 """
     SimSettings <: AbstractSimSettings
 
-Holds settings for the simulation, in a `Ruleset` or `SimData` object.
+Holds settings for the simulation, inside a `Ruleset` or `SimData` object.
 """
 Base.@kwdef struct SimSettings{B,P,Op,C,T} <: AbstractSimSettings
     boundary::B = Remove()

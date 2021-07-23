@@ -66,9 +66,21 @@ broadcasted `getindex` operations are guaranteed to work on them as if the grid
 is a regular array. This may be useful running simulations manually with
 `step!`.
 
-Usually grids contain values of `Number`, but other types are possible, such as
-`SArray`, `FieldVector` or other custom structs. Grids are updated by `Rule`s
-that are run for every cell, at every timestep. 
+### Grid contents
+
+Often grids contain simple values of some kind of `Number`, but other types are
+possible, such as `SArray`, `FieldVector` or other custom structs. Grids are
+updated by `Rule`s that are run for every cell, at every timestep. 
+
+NOTE: Grids of mutable objects (e.g `Array` or any `mutable struct` have
+undefined behaviour. DynamicGrids.jl does not `deepcopy` grids between frames as
+it is expensive, so successive frames will contain the same objects. Mutable
+objects will not work at all on GPUs, and are relatively slow on CPUs. Instead,
+use regular immutable structs and `StaticArrays.jl` if you need arrays. Update
+them using `@set` from Setfield.jl or Accessors.jl, and generally use functional
+programming approaches over object-oriented ones.
+
+### Init
 
 The `init` grid/s contain whatever initialisation data is required to start
 a simulation: the array type, size and element type, as well as providing the
@@ -286,8 +298,8 @@ But the scaling is not quite as good, at 3.9x for 6 cores. The first
 method may be better on a machine with a lot of cores.
 
 Last, we can slightly rewrite these rules for GPU, as `rand` is not available
-within a GPU kernel. Instead we call `CUDA.rand!` on the entire parent array
-of the `:rand` grid, using a `SetGrid` rule:
+within a GPU kernel (it will be very soon). Instead we call `CUDA.rand!` on the
+entire parent array of the `:rand` grid, using a `SetGrid` rule:
 
 ```julia
 using CUDAKernels, CUDA

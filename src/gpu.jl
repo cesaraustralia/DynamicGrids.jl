@@ -36,6 +36,10 @@ function maprule!(
     return nothing
 end
 
+# cu_neighborhood_kernel!
+# Runs cell_kernel! on GPU after retrieving the global index
+# and setting the neighborhood buffer to a SArray window retrieved 
+# from the first (neighborhood) grid
 @kernel function cu_neighborhood_kernel!(
     data, opt, ruletype::Val{<:NeighborhoodRule}, rule, rkeys, wkeys
 )
@@ -47,6 +51,8 @@ end
     nothing
 end
 
+# cu_cell_kernel!
+# Runs cell_kernel! on GPU after retrieving the global index
 @kernel function cu_cell_kernel!(data, ruletype::Val, rule, rkeys, wkeys)
     i, j = @index(Global, NTuple)
     cell_kernel!(data, ruletype, rule, rkeys, wkeys, i, j)

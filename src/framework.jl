@@ -68,7 +68,7 @@ function sim!(output::Output, ruleset=ruleset(output);
     # Set up output
     settspan!(output, tspan)
     # Create or update the combined data object for the simulation
-    simdata = _initdata!(simdata, output, extent, ruleset)
+    simdata = initdata!(simdata, output, extent, simruleset)
     init_output_grids!(output, init)
     # Set run speed for GraphicOutputs
     setfps!(output, fps)
@@ -80,6 +80,8 @@ function sim!(output::Output, ruleset=ruleset(output);
     maybesleep(output, 1)
     # Run the simulation over simdata and a unitrange we keep 
     # the original ruleset to allow interactive updates to rules.
+    # We pass throught the original ruleset as a handle for e.g. 
+    # control sliders to update the rules.
     return runsim!(output, simdata, ruleset, 1:lastindex(tspan))
 end
 sim!(output::Output, rules::Tuple; kw...) = sim!(output, rules...; kw...)
@@ -126,7 +128,7 @@ function resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
 
     setfps!(output, fps)
     extent = Extent(; init=_asnamedtuple(init), mask=mask(output), aux=aux(output), tspan=new_tspan)
-    simdata = _initdata!(simdata, output, extent, ruleset)
+    simdata = initdata!(simdata, output, extent, ruleset)
     initialise!(output, simdata)
     initialisegraphics(output, simdata)
     setrunning!(output, true) || error("Could not start the simulation with this output")
@@ -223,7 +225,8 @@ function step!(sd::AbstractSimData)
     sd -> _step!(sd, rules(sd))
 end
 
+# _proc_setup
 # Allows different processors to modify the simdata object
 # GPU needs this to convert arrays to CuArray
 _proc_setup(simdata::AbstractSimData) = _proc_setup(proc(simdata), simdata)
-_proc_setup(proc, obj) = obj
+_proc_setup(proc, simdata) = simdata
