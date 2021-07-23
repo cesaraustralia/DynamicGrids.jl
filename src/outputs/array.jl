@@ -57,5 +57,6 @@ isstored(o::ResultOutput) = false
 storeframe!(o::ResultOutput, data::AbstractSimData) = nothing
 
 function finalise!(o::ResultOutput, data::AbstractSimData) 
-    _storeframe!(eltype(o), o, data)
+    # Only store after the last frame
+    _storeframe!(o, eltype(o), data)
 end

@@ -23,6 +23,7 @@ Chain(rules::Tuple) = begin
     Chain{rkeys,wkeys,typeof(rules)}(rules)
 end
 
+# Getter
 rules(chain::Chain) = chain.rules
 # Only the first rule in a chain can be a NeighborhoodRule
 radius(chain::Chain) = radius(chain[1])

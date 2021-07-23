@@ -27,6 +27,8 @@ using Adapt,
 
 @reexport using ModelParameters
 
+import ModelParameters.Flatten
+
 const DG = DynamicGrids
 const DD = DimensionalData
 

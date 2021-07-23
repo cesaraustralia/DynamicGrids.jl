@@ -78,21 +78,22 @@ function GifOutput(; frames, running, extent, graphicconfig, imageconfig, filena
     GifOutput(frames, running, extent, graphicconfig, imageconfig, gif, filename)
 end
 
+# Getters
 filename(o::GifOutput) = o.filename
 gif(o::GifOutput) = o.gif
 
+# Output/ImageOutput interface methods
 maybesleep(output::GifOutput, f) = nothing
-
 showimage(image, o::GifOutput, data::AbstractSimData) = gif(o)[:, :, currentframe(data)] .= image 
-
 finalisegraphics(o::GifOutput, data::AbstractSimData) = savegif(o)
 
+# The gif is already generated, just save it again if neccessary
 savegif(o::GifOutput) = savegif(filename(o), o)
 function savegif(filename::String, o::GifOutput, fps=fps(o); kw...)
     FileIO.save(filename, gif(o); fps=fps, kw...)
 end
 
-
+# Preallocate the 3 dimensional gif array
 _allocgif(i::ImageConfig, e::Extent) = _allocgif(renderer(i), i::ImageConfig, e::Extent) 
 function _allocgif(::Renderer, i::ImageConfig, e::Extent)
     zeros(ARGB32, gridsize(e)..., length(tspan(e)))

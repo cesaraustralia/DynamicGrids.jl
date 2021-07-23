@@ -2,8 +2,9 @@
 """
     AbstractSimData
 
-Supertype for simulation data objects. Thes hold grids, settings other objects required
-to run the simulation and potentially requireing access from rules.
+Supertype for simulation data objects. Thes hold [`GridData`](@ref), 
+[`SimSettings`](@ref) and other objects needed to run the simulation, 
+and potentially required from within rules.
 
 An `AbstractSimData` object is accessable in [`applyrule`](@ref) as the first parameter.
 
@@ -31,9 +32,9 @@ if they are a `Matrix`.
 - `boundary(data)` : returns the [`BoundaryCondition`](@ref) - `Remove` or `Wrap`.
 - `padval(data)` : returns the value to use as grid border padding.
 
-These are available, but you probably shouldn't use them and their behaviour
-is not guaranteed in furture versions. They will mean rule is useful only
-in specific contexts.
+These are also available, but you probably shouldn't use them and their behaviour
+is not guaranteed in furture versions. Using them will also mean a rule is useful 
+only in specific contexts, which is discouraged.
 
 - `settings(data)`: get the simulaitons [`SimSettings`](@ref) object.
 - `extent(data)` : get the simulation [`AbstractExtent`](@ref) object.
@@ -46,47 +47,45 @@ in specific contexts.
 """
 abstract type AbstractSimData{S} end
 
-@propagate_inbounds Base.setindex!(d::AbstractSimData, x, I...) = setindex!(first(grids(d)), x, I...)
-@propagate_inbounds Base.getindex(d::AbstractSimData, I...) = getindex(first(grids(d)), I...)
+# Getters
+extent(d::AbstractSimData) = d.extent
+frames(d::AbstractSimData) = d.frames
+grids(d::AbstractSimData) = d.grids
+auxframe(d::AbstractSimData) = d.auxframe
+currentframe(d::AbstractSimData) = d.currentframe
+
+# Forwarded to the Extent object
+gridsize(d::AbstractSimData) = gridsize(extent(d))
+padval(d::AbstractSimData) = padval(extent(d))
+init(d::AbstractSimData) = init(extent(d))
+mask(d::AbstractSimData) = mask(extent(d))
+aux(d::AbstractSimData, args...) = aux(extent(d), args...)
+auxframe(d::AbstractSimData, key) = auxframe(d)[_unwrap(key)]
+tspan(d::AbstractSimData) = tspan(extent(d))
+timestep(d::AbstractSimData) = step(tspan(d))
+
+# Calculated:
+# Get the current time for this frame
+currenttime(d::AbstractSimData) = tspan(d)[currentframe(d)]
+# Get the actual current timestep, e.g. in seconds instead of variable periods like Month
+currenttimestep(d::AbstractSimData) = currenttime(d) + timestep(d) - currenttime(d)
+
+# Base methods forwarded to grids NamedTuple
 Base.keys(d::AbstractSimData) = keys(grids(d))
 Base.values(d::AbstractSimData) = values(grids(d))
 Base.first(d::AbstractSimData) = first(grids(d))
 Base.last(d::AbstractSimData) = last(grids(d))
-
-gridsize(d::AbstractSimData) = gridsize(first(d))
-padval(d::AbstractSimData) = padval(extent(d))
-
-extent(d::AbstractSimData) = d.extent
-frames(d::AbstractSimData) = d.frames
-grids(d::AbstractSimData) = d.grids
-init(d::AbstractSimData) = init(extent(d))
-mask(d::AbstractSimData) = mask(first(d))
-aux(d::AbstractSimData, args...) = aux(extent(d), args...)
-auxframe(d::AbstractSimData, key) = auxframe(d)[_unwrap(key)]
-auxframe(d::AbstractSimData) = d.auxframe
-tspan(d::AbstractSimData) = tspan(extent(d))
-timestep(d::AbstractSimData) = step(tspan(d))
-currentframe(d::AbstractSimData) = d.currentframe
-currenttime(d::AbstractSimData) = tspan(d)[currentframe(d)]
-
-# Getters forwarded to data
 Base.getindex(d::AbstractSimData, key::Symbol) = getindex(grids(d), key)
 
-# Get the actual current timestep, e.g. seconds instead of variable periods like Month
-currenttimestep(d::AbstractSimData) = currenttime(d) + timestep(d) - currenttime(d)
-
+# Indexing forwarded to the first grid
+@propagate_inbounds Base.setindex!(d::AbstractSimData, x, I...) = setindex!(first(grids(d)), x, I...)
+@propagate_inbounds Base.getindex(d::AbstractSimData, I...) = getindex(first(grids(d)), I...)
 
 # Uptate timestamp
 function _updatetime(simdata::AbstractSimData, f::Integer) 
     @set! simdata.currentframe = f
     @set simdata.auxframe = _calc_auxframe(simdata)
 end
-
-# Convert regular index to block index
-@inline _indtoblock(x::Int, blocksize::Int) = (x - 1) ÷ blocksize + 1
-
-# Convert block index to regular index
-@inline _blocktoind(x, blocksize) = (x - 1) * blocksize + 1
 
 
 """
@@ -97,7 +96,7 @@ end
 Simulation dataset to hold all intermediate arrays, timesteps
 and frame numbers for the current frame of the simulation.
 
-Additional methods not found in `AbstractSimData`:
+Additional methods not found in [`AbstractSimData`](@ref):
 
 - `rules(d::SimData)` : get the simulation rules.
 - `ruleset(d::SimData)` : get the simulation [`AbstractRuleset`](@ref).
@@ -126,11 +125,11 @@ function SimData(o, extent::AbstractExtent, ruleset::AbstractRuleset)
     SimData(extent, ruleset, frames_)
 end
 # Convert grids in extent to NamedTuple
-SimData(extent::AbstractExtent, ruleset::AbstractRuleset, frames=nothing) = 
-    SimData(_asnamedtuple(extent), ruleset)
+function SimData(extent::AbstractExtent, ruleset::AbstractRuleset, frames=nothing)
+    SimData(_asnamedtuple(extent), ruleset) 
+end
 function SimData(extent::AbstractExtent{<:NamedTuple{Keys}}, ruleset::AbstractRuleset, frames=nothing) where Keys
     # Calculate the neighborhood radus (and grid padding) for each grid
-
     S = Val{Tuple{gridsize(extent)...}}()
     radii = map(k-> Val{get(radius(ruleset), k, 0)}(), Keys)
     radii = NamedTuple{Keys}(radii)
@@ -143,14 +142,18 @@ function SimData(
 ) where {G<:Union{NamedTuple{<:Any,<:Tuple{GridData,Vararg}},GridData}}
     currentframe = 1; auxframe = nothing
     S = Tuple{gridsize(extent)...}
-    # SimData is isbits-only
+    # SimData is isbits-only, so use Static versions
     s_extent = StaticExtent(extent)
     s_ruleset = StaticRuleset(ruleset)
     SimData{S}(grids, s_extent, s_ruleset, frames, currentframe, auxframe)
 end
 
-_buildgrids(extent, ruleset, S, radii::NamedTuple) =
-    map((r, in, pv) -> _buildgrids(extent, ruleset, S, r, in, pv), radii, init(extent), padval(extent))
+# Build the grids for the simulation from the exebnt, ruleset, init and padval
+function _buildgrids(extent, ruleset, s, radii::NamedTuple)
+    map(radii, init(extent), padval(extent)) do r, in, pv
+        _buildgrids(extent, ruleset, s, r, in, pv)
+    end
+end
 function _buildgrids(extent, ruleset, ::Val{S}, ::Val{R}, init, padval) where {S,R}
     ReadableGridData{S,R}(
         init, mask(extent), proc(ruleset), opt(ruleset), boundary(ruleset), padval 
@@ -159,6 +162,7 @@ end
 
 ConstructionBase.constructorof(::Type{<:SimData{S}}) where S = SimData{S}
 
+# Getters
 ruleset(d::SimData) = d.ruleset
 rules(d::SimData) = rules(ruleset(d))
 boundary(d::SimData) = boundary(ruleset(d))
@@ -167,11 +171,11 @@ opt(d::SimData) = opt(ruleset(d))
 settings(d::SimData) = settings(ruleset(d))
 
 # When no simdata is passed in, create new AbstractSimData
-function _initdata!(::Nothing, output, extent::AbstractExtent, ruleset::AbstractRuleset)
+function initdata!(::Nothing, output, extent::AbstractExtent, ruleset::AbstractRuleset)
     SimData(output, extent, ruleset)
 end
 # Initialise a AbstractSimData object with a new `Extent` and `Ruleset`.
-function _initdata!(
+function initdata!(
     simdata::SimData, output, extent::AbstractExtent, ruleset::AbstractRuleset
 )
     # TODO: make sure this works with delays and new outputs?
@@ -186,12 +190,14 @@ function _initdata!(
 end
 
 """
-    SimData <: AbstractSimData
+    RuleData <: AbstractSimData
 
     RuleData(extent::AbstractExtent, settings::SimSettings)
 
-`AbstractSimData` object that is passed to rules. Basically 
-a trimmed-down version of [`SimData`](@ref).
+[`AbstractSimData`](@ref) object that is passed to rules. 
+Basically a trimmed-down version of [`SimData`](@ref).
+
+Passing a smaller object to rules leads to faster GPU compilation.
 """
 struct RuleData{S<:Tuple,G<:NamedTuple,E,Se,F,CF,AF} <: AbstractSimData{S}
     grids::G
@@ -212,6 +218,7 @@ end
 
 ConstructionBase.constructorof(::Type{<:RuleData{S}}) where {S} = RuleData{S}
 
+# Getters
 settings(d::RuleData) = d.settings
 boundary(d::RuleData) = boundary(settings(d))
 proc(d::RuleData) = proc(settings(d))

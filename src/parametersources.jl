@@ -1,20 +1,20 @@
-import ModelParameters.Flatten
-
-
 """
     ParameterSource
 
-Abstract supertypes for parameter source wrappers such as `Aux` and `Grid`. 
-These allow flexibly in that parameters can be retreived from various data sources.
+Abstract supertypes for parameter source wrappers such as [`Aux`](@ref), 
+[`Grid`](@ref) and [`Delay`](@ref). These allow flexibility in that parameters 
+can be retreived from various data sources not specified when the rule is written.
 """
 abstract type ParameterSource end
 
 """
-    get(data::AbstractSimData, key::ParameterSource, I...)
-    get(data::AbstractSimData, key::ParameterSource, I::Union{Tuple,CartesianIndex})
+    get(data::AbstractSimData, source::ParameterSource, I...)
+    get(data::AbstractSimData, source::ParameterSource, I::Union{Tuple,CartesianIndex})
 
 Allows parameters to be taken from a single value or a [`ParameterSource`](@ref) 
 such as another [`Grid`](@ref), an [`Aux`](@ref) array, or a [`Delay`](@ref).
+
+Other `source` objects are used as-is without indexing with `I`.
 """
 @propagate_inbounds Base.get(data::AbstractSimData, val, I...) = val
 @propagate_inbounds Base.get(data::AbstractSimData, key::ParameterSource, I...) = get(data, key, I)
@@ -57,17 +57,28 @@ Aux(key::Symbol) = Aux{key}()
 _unwrap(::Aux{X}) where X = X
 _unwrap(::Type{<:Aux{X}}) where X = X
 
-@propagate_inbounds Base.get(data::AbstractSimData, key::Aux, I::Tuple) = _getaux(data, key, I)
-
 @inline aux(nt::NamedTuple, ::Aux{Key}) where Key = nt[Key]
 
-# If there is no time dimension we return the same data for every timestep
-@propagate_inbounds _getaux(data::AbstractSimData, key::Union{Aux,Symbol}, I::Tuple) = _getaux(aux(data, key), data, key, I)
-@propagate_inbounds _getaux(A::AbstractMatrix, data::AbstractSimData, key::Union{Aux,Symbol}, I::Tuple) = A[I...]
+@propagate_inbounds Base.get(data::AbstractSimData, key::Aux, I::Tuple) = _getaux(data, key, I)
+
+# _getaux
+# Get the value of an auxilliary array at index I
+# Get the aux array to index into
+@propagate_inbounds function _getaux(data::AbstractSimData, key::Union{Aux,Symbol}, I::Tuple) 
+    _getaux(aux(data, key), data, key, I)
+end
+# For a matrix just return the value for the index
+@propagate_inbounds function _getaux(A::AbstractMatrix, data::AbstractSimData, key::Union{Aux,Symbol}, I::Tuple)
+    A[I...]
+end
+# For a DimArray with a third (time) dimension we return the data at the current auxframe
 function _getaux(A::AbstractDimArray{<:Any,3}, data::AbstractSimData, key::Union{Aux,Symbol}, I::Tuple)
     A[I..., auxframe(data, key)]
 end
 
+
+# boundscheck_aux
+# Bounds check the aux arrays ahead of time
 function boundscheck_aux(data::AbstractSimData, auxkey::Aux{Key}) where Key
     a = aux(data)
     (a isa NamedTuple && haskey(a, Key)) || _auxmissingerror(Key, a)
@@ -79,12 +90,15 @@ function boundscheck_aux(data::AbstractSimData, auxkey::Aux{Key}) where Key
     return true
 end
 
-@noinline _auxmissingerror(key, aux) = error("Aux data $key is not present in aux")
-@noinline _auxsizeerror(key, asize, gsize) =
-    error("Aux data $key is size $asize does not match grid size $gsize")
-
-_calc_auxframe(data) = _calc_auxframe(aux(data), data)
-_calc_auxframe(aux::NamedTuple, data) = map(A -> _calc_auxframe(A, data), aux)
+# _calc_auxframe
+# Calculate the frame to use in the aux data for this timestep.
+# This uses the index of any AbstractDimArray, which must be a
+# matching type to the simulation tspan.
+# This is called from _updatetime in simulationdata.jl
+_calc_auxframe(data::AbstractSimData) = _calc_auxframe(aux(data), data)
+function _calc_auxframe(aux::NamedTuple, data::AbstractSimData)
+    map(A -> _calc_auxframe(A, data), aux)
+end
 function _calc_auxframe(A::AbstractDimArray, data)
     hasdim(A, Ti) || return nothing
     curtime = currenttime(data)
@@ -97,10 +111,14 @@ function _calc_auxframe(A::AbstractDimArray, data)
     else
         1 - length(firstauxtime-timestep(data):-auxstep:curtime)
     end
+    # TODO use a cyclic mode DimensionalArray
+    # and handle the mismatch of e.g. weeks and years
     _cyclic_index(i, size(A, 3))
 end
 _calc_auxframe(aux, data) = nothing
 
+# _cyclic_index
+# Cycle an index over the length of the aux data.
 function _cyclic_index(i::Integer, len::Integer)
     return if i > len
         rem(i + len - 1, len) + 1
@@ -158,11 +176,12 @@ abstract type AbstractDelay{K} <: ParameterSource end
     _getdelay(frames(data)[frame(delay, data)], delay, I)
 end
 
+# The output may store a single Array or a NamedTuplea.
+@propagate_inbounds function _getdelay(frame::AbstractArray, ::AbstractDelay, I::Tuple)
+    frame[I...]
+end
 @propagate_inbounds function _getdelay(frame::NamedTuple, delay::AbstractDelay{K}, I::Tuple) where K
     _getdelay(frame[K], delay, I)
-end
-@propagate_inbounds function _getdelay(frame::AbstractArray, ::AbstractDelay{K}, I::Tuple) where K
-    frame[I...]
 end
 
 """
@@ -204,13 +223,14 @@ end
 Delay{K}(steps::S) where {K,S} = Delay{K,S}(steps)
 
 ConstructionBase.constructorof(::Delay{K}) where K = Delay{K}
+
 steps(delay::Delay) = delay.steps
 
 # _to_frame
 # Replace the delay step size with an integer for fast indexing
 # checking that the delay matches the simulation step size.
-# Delays at the start just use the init frame, for now.
-function _to_frame(delay::Delay{K}, data) where K
+# Delays at the start just use the init frame.
+function _to_frame(delay::Delay{K}, data::AbstractSimData) where K
     nsteps = steps(delay) / step(tspan(data))
     isteps = trunc(Int, nsteps)
     nsteps == isteps || _delaysteperror(delay, step(tspan(data)))
@@ -224,9 +244,9 @@ end
     Lag{K}(frames::Int) 
 
 `Lag` allows using a [`Grid`](@ref) from a specific previous frame from within a rule, 
-using `get`. It is similar to [`Delay`](@ref), but an integer amount of steps should be 
-used, instead of a quantity related to the simulation `tspan`. Used within rule code,
-the lower bound will not be checked. Do this manually, or use [`Frame`](@ref) instead.
+using `get`. It is similar to [`Delay`](@ref), but an integer amount of frames should be 
+used, instead of a quantity related to the simulation `tspan`. The lower bound is the first 
+frame.
 
 # Type Parameter
 
@@ -251,12 +271,13 @@ struct Lag{K} <: AbstractDelay{K}
     nframes::Int
 end
 
-function _to_frame(lag::Lag{K}, data) where K
-    frame = max(currentframe(data) - lag.nframes, 1)
-    Frame{K}(frame)
+# convert the Lag to a Frame object
+# Lags at the start just use the init frame.
+function _to_frame(ps::Lag{K}, data::AbstractSimData) where K
+    Frame{K}(frame(ps, data))
 end
 
-@inline frame(lag::Lag, data) = max(1, currentframe(data) - lag.nframes)
+@inline frame(ps::Lag, data) = max(1, currentframe(data) - ps.nframes)
 
 """
     Frame <: AbstractDelay
@@ -283,12 +304,13 @@ end
 
 ConstructionBase.constructorof(::Frame{K}) where K = Frame{K}
 
-@inline frame(delay::Frame) = delay.frame
-@inline frame(delay::Frame, data) = frame(delay)
+@inline frame(ps::Frame) = ps.frame
+@inline frame(ps::Frame, data) = frame(ps)
 
 
 # Delay utils
 
+# Types to ignore when flattening rules to <: AbstractDelay
 const DELAY_IGNORE = Union{Function,SArray,AbstractDict,Number}
 
 @inline function hasdelay(rules::Tuple)
@@ -296,11 +318,22 @@ const DELAY_IGNORE = Union{Function,SArray,AbstractDict,Number}
     length(_getdelays(rules)) > 0 || any(map(needsdelay, rules))
 end
 
+# needsdelay
+# Speficy that a rule needs a delay frames present
+# to run. This will throw an early error if the Output
+# does not store frames, instead of an indexing error during
+# the simulation.
 needsdelay(rule::Rule) = false
 
+# _getdelays
+# Get all the delays found in fields of the rules tuple
+_getdelays(rules::Tuple) = Flatten.flatten(rules, AbstractDelay, DELAY_IGNORE)
+
 # _setdelays
-# Update any Delay anywhere in the rules Tuple.
-function _setdelays(rules::Tuple, data)
+# Update any AbstractDelay anywhere in the rules Tuple. 
+# These are converted to Frame objects so the calculation 
+# happens only once for each timestep, instead of for each cell.
+function _setdelays(rules::Tuple, data::AbstractSimData)
     delays = _getdelays(rules)
     if length(delays) > 0
         newdelays = map(d -> _to_frame(d, data), delays)
@@ -309,12 +342,14 @@ function _setdelays(rules::Tuple, data)
         rules
     end
 end
-
-_getdelays(rules::Tuple) = Flatten.flatten(rules, AbstractDelay, DELAY_IGNORE)
 _setdelays(rules::Tuple, delays::Tuple) = 
     Flatten.reconstruct(rules, delays, AbstractDelay, DELAY_IGNORE)
 
-_notstorederror() = 
+# Errors
+@noinline _notstorederror() = 
     throw(ArgumentError("Output does not store frames, which is needed for a Delay. Use ArrayOutput or any GraphicOutput with `store=true` keyword"))
-_delaysteperror(delay::Delay{K}, simstep) where K = 
+@noinline _delaysteperror(delay::Delay{K}, simstep) where K = 
     throw(ArgumentError("Delay $K size $(steps(delay)) is not a multiple of simulations step $simstep"))
+@noinline _auxmissingerror(key, aux) = error("Aux data $key is not present in aux")
+@noinline _auxsizeerror(key, asize, gsize) =
+    error("Aux data $key is size $asize does not match grid size $gsize")

@@ -1,7 +1,7 @@
 
-# Map a rule over the grids it reads from and updating the grids it writes to.
-# This is broken into a setup method and an application method
-# to introduce a function barrier, for type stability.
+# Map a rule over the grids it reads from, updating the grids it writes to.
+# This is broken into setup methods and application methods,
+# for dispatch and to introduce a function barrier for type stability.
 
 maprule!(data::AbstractSimData, rule) = maprule!(data, Val{ruletype(rule)}(), rule)
 function maprule!(data::AbstractSimData, ruletype::Val{<:CellRule}, rule)
@@ -60,10 +60,10 @@ function maprule!(
     rule, args...
 )
     hoodgrid = data[neighborhoodkey(rule)]
-    _mapneighborhoodgrid!(data, hoodgrid, proc, opt, ruletype, rule, args...)
+    _mapneighborhoodrule!(data, hoodgrid, proc, opt, ruletype, rule, args...)
 end
 
-function _mapneighborhoodgrid!(
+function _mapneighborhoodrule!(
     data, hoodgrid::GridData{<:Tuple{Y,X},R}, proc, opt, ruletype, rule, rkeys, wkeys 
 ) where {Y,X,R}
     let data=data, hoodgrid=hoodgrid, proc=proc, opt=opt, ruletyp=ruletype, rule=rule, rkeys=rkeys, wkeys=wkeys

@@ -22,10 +22,15 @@ CuGPU() = CuGPU{32}()
 
 kernel_setup(::CuGPU{N}) where N = CUDAKernels.CUDADevice(), (N, N)
 
+# Adapt method for DynamicGrids objects
 function Adapt.adapt_structure(to, x::Union{AbstractSimData,GridData,Rule})
     Flatten.modify(A -> adapt(to, A), x, Union{CuArray,Array,AbstractDimArray}, Union{SArray,Function})
 end
 
+# Adapt output frames to GPU
+# TODO: this may be incorrect use of Adapt.jl, as the Output
+# object is not entirely adopted for GPU use, the CuArray
+# frames are still held in a regular Array.
 function Adapt.adapt_structure(to, o::Output)
     frames = map(o.frames) do f
         if f isa NamedTuple
@@ -38,14 +43,16 @@ function Adapt.adapt_structure(to, o::Output)
     @set o.frames = frames
 end
 
-@noinline function _proc_setup(::CuGPU, obj) 
-    Flatten.modify(CuArray, obj, Union{Array,BitArray}, Union{CuArray,SArray,Dict,Function})
+# _proc_setup
+# Convert all arrays in SimData to CuArrays
+@noinline function _proc_setup(::CuGPU, simdata::AbstractSimData) 
+    Flatten.modify(CuArray, simdata, Union{Array,BitArray}, Union{CuArray,SArray,Dict,Function})
 end
 
 _copyto_output!(outgrid, grid::GridData, proc::GPU) = copyto!(outgrid, gridview(grid))
 
 
-# Thread-safe atomic ops
+# Thread-safe CUDA atomic ops
 
 for (f, op) in atomic_ops
     atomic_f = Symbol(:atomic_, f)

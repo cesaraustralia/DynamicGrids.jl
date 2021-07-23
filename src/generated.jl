@@ -58,7 +58,7 @@ end
     end
 end
 
-# _getwindow
+# _getwindow => SMatrix
 # Get a single window square from an array, as an SMatrix.
 # We use this on GPUs to get a neighborhood window from the main 
 # grid, which is 10x or more faster than using a view. 
@@ -155,7 +155,7 @@ end
     :((Val{$(QuoteNode(W))}(), WritableGridData(data[$(QuoteNode(W))])))
 end
 
-# _combinegrids |> AbstractSimData
+# _combinegrids => AbstractSimData
 # Combine grids into a new NamedTuple of grids depending
 # on the read and write keys required by a rule.
 @inline function _combinegrids(data::AbstractSimData, wkeys, wgrids)
@@ -236,7 +236,7 @@ end
     end
 end
 
-# _vals2syms
+# _vals2syms => Union{Symbol,Tuple}
 # Get symbols from a Val or Tuple type
 @inline _vals2syms(x::Type{<:Tuple}) = map(v -> _vals2syms(v), x.parameters)
 @inline _vals2syms(::Type{<:Val{X}}) where X = X

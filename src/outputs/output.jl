@@ -29,7 +29,8 @@ Base.lastindex(o::Output) = lastindex(parent(o))
 Base.push!(o::Output, x) = push!(parent(o), x)
 Base.step(o::Output) = step(tspan(o))
 
-# DimensionalData interface
+# DimensionalData interface ######################################################
+# This allows indexing the output using values from tspan
 function DimensionalData.dims(o::Output)
     ts = tspan(o)
     val = isstored(o) ? ts : ts[end]:step(ts):ts[end]
@@ -42,7 +43,7 @@ DimensionalData.metadata(o::Output) = NoMetadata()
 DimensionalData.rebuild(o::Output, data, dims::Tuple, refdims, name, metadata) = 
     DimArray(data, dims, refdims, name, metadata)
 
-# Getters and setters
+# Required getters and setters for all outputs ###################################
 frames(o::Output) = o.frames
 isrunning(o::Output) = o.running
 extent(o::Output) = o.extent
@@ -52,13 +53,15 @@ aux(o::Output, key...) = aux(extent(o), key...)
 tspan(o::Output) = tspan(extent(o))
 timestep(o::Output) = step(tspan(o))
 
+setrunning!(o::Output, val) = o.running = val
+settspan!(o::Output, tspan) = settspan!(extent(o), tspan)
+
+# Default values for optional getters and setters ################################
 ruleset(o::Output) =
     throw(ArgumentError("No ruleset on the output. Pass one to `sim!` as the second argument"))
 fps(o::Output) = nothing
 stoppedframe(o::Output) = lastindex(o)
 
-setrunning!(o::Output, val) = o.running = val
-settspan!(o::Output, tspan) = settspan!(extent(o), tspan)
 setfps!(o::Output, x) = nothing
 settimestamp!(o::Output, f) = nothing
 setstoppedframe!(o::Output, f) = nothing
@@ -76,24 +79,32 @@ showframe(o::Output, data) = nothing
 frameindex(o::Output, data::AbstractSimData) = frameindex(o, currentframe(data))
 frameindex(o::Output, f::Int) = isstored(o) ? f : oneunit(f)
 
+
+# Storing grid values to outputs during the simulation ###################################
+
 function storeframe!(output::Output, data)
+    # Make sure the frame exists in the output
     checkbounds(output, frameindex(output, data))
-    _storeframe!(eltype(output), output, data)
+    # copy to it
+    _storeframe!(output, eltype(output), data)
 end
 
-function _storeframe!(::Type{<:NamedTuple}, output::Output, data)
+# copy one or multiple frames from grid/s to the Output
+function _storeframe!(output::Output, ::Type{<:AbstractArray}, data)
+    grid = first(grids(data))
+    _copyto_output!(output[frameindex(output, data)], grid, proc(data))
+end
+function _storeframe!(output::Output, ::Type{<:NamedTuple}, data)
     map(values(grids(data)), keys(data)) do grid, key
         _copyto_output!(output[frameindex(output, data)][key], grid, proc(data))
     end
 end
-function _storeframe!(::Type{<:AbstractArray}, output::Output, data)
-    grid = first(grids(data))
-    _copyto_output!(output[frameindex(output, data)], grid, proc(data))
-end
 
+# Copy cells from grid to output
 function _copyto_output!(outgrid, grid::GridData, proc)
     copyto!(outgrid, CartesianIndices(outgrid), source(grid), CartesianIndices(outgrid))
 end
+# Copy cells from grid to output using multiple threads
 function _copyto_output!(outgrid, grid::GridData, proc::ThreadedCPU)
     Threads.@threads for j in axes(outgrid, 2) 
         for i in axes(outgrid, 1)
@@ -101,6 +112,8 @@ function _copyto_output!(outgrid, grid::GridData, proc::ThreadedCPU)
         end
     end
 end
+
+# Grid initialisation ###################################################################
 
 # Grids are preallocated and reused.
 init_output_grids!(o::Output, init) = init_output_grids!(o[1], o::Output, init)

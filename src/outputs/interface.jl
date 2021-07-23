@@ -1,3 +1,4 @@
+# Interface for output methods
 
 """
     extent(o::Output) => Extent

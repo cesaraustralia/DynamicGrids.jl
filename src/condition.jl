@@ -15,13 +15,15 @@ struct RunIf{R,W,F,T<:Rule{R,W}} <: RuleWrapper{R,W}
 end
 
 rule(runif::RunIf) = runif.rule
+# Forward ruletype, radius and neighborhoodkey to the contained rule
 ruletype(runif::RunIf) = ruletype(rule(runif))
 radius(runif::RunIf) = radius(rule(runif))
 neighborhoodkey(runif::RunIf) = neighborhoodkey(rule(runif))
 
 @inline function _setbuffer(runif::RunIf{R,W}, buf) where {R,W}
+    f = runif.f
     r = _setbuffer(rule(runif), buf)
-    RunIf{R,W,typeof(runif.f),typeof(r)}(runif.f, r)
+    RunIf{R,W,typeof(f),typeof(r)}(f, r)
 end
 
 # We have to hook into cell_kernel! to handle the option of no return value
@@ -73,6 +75,7 @@ end
 rules(runat::RunAt) = runat.rules
 # Only the first rule in runat can be a NeighborhoodRule, but this seems annoying...
 radius(runat::RunAt) = radius(first(rules(runat)))
+# Forward ruletype to the contained rule
 ruletype(runat::RunAt) = ruletype(first(rules(runat)))
 neighborhoodkey(runat::RunAt) = neighborhoodkey(first(rules(runat)))
 

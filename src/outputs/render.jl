@@ -14,12 +14,16 @@ imagesize(::Renderer, init::AbstractArray) = size(init)
 
 _allocimage(p::Renderer, init) = fill(ARGB32(0), imagesize(p, init)...)
 
+# render!
+# Converts grid/s to an image for viewing.
 function render!(o::ImageOutput, data::AbstractSimData)
     render!(o, data, grids(data))
 end
 function render!(o::ImageOutput, data::AbstractSimData, grids)
     render!(imagebuffer(o), renderer(o), o, data, grids)
 end
+
+# Single-grid renderers ###############################################################
 
 """
     SingleGridRenderer <: Renderer
@@ -55,9 +59,9 @@ function render!(
     for j in 1:X, i in 1:Y
         @inbounds val = grid[i, j]
         val = if accessor isa Nothing
-            _access(DynamicGrids.accessor(ig), val)
+            _access_grid_object(DynamicGrids.accessor(ig), val)
         else
-            _access(accessor, val)
+            _access_grid_object(accessor, val)
         end
         pixel = to_rgb(cell_to_pixel(ig, mask(o), minval, maxval, data, val, (i, j)))
         @inbounds imagebuffer[i, j] = pixel
@@ -108,6 +112,8 @@ maskcolor(p::Image) = p.maskcolor
 # Show colorscheme in Atom etc
 Base.show(io::IO, m::MIME"image/svg+xml", p::Image) = show(io, m, scheme(p))
 
+# cell_to_pixel!
+# Convert a single sell to an ARGB pixel
 @inline function cell_to_pixel(ig::Image, mask, minval, maxval, data::AbstractSimData, val, I)
     if !(maskcolor(ig) isa Nothing) && ismasked(mask, I...)
         to_rgb(maskcolor(ig))
@@ -159,6 +165,8 @@ function cell_to_pixel(p::SparseOptInspector, mask, minval, maxval, data::Abstra
     end
 end
 
+# Multi-grid renderers ###############################################################
+
 """
     MultiGridRenderer <: Renderer
 
@@ -186,20 +194,21 @@ Base.@kwdef struct Layout{L<:Union{AbstractVector,AbstractMatrix},R} <: MultiGri
     layout::L
     renderers::R
     Layout(layouts::L, renderers::R) where {L,R} = begin
-        imgens = map(_asrenderer, renderers)
-        new{L,typeof(imgens)}(layouts, imgens)
+        renderers1 = map(_asrenderer, renderers)
+        new{L,typeof(renderers1)}(layouts, renderers1)
     end
 end
 
-_asrenderer(p::Renderer) = p
-_asrenderer(x) = Image(x)
+layout(l::Layout) = l.layout
+renderers(l::Layout) = l.renderers
 
-layout(p::Layout) = p.layout
-renderers(p::Layout) = p.renderers
-imagesize(p::Layout, init::NamedTuple) = imagesize(p, first(init))
-imagesize(p::Layout, init::AbstractArray) = imagesize(size(init), size(p.layout))
+imagesize(l::Layout, init::NamedTuple) = imagesize(l, first(init))
+imagesize(l::Layout, init::AbstractArray) = imagesize(size(init), size(l.layout))
 imagesize(gs::NTuple{2}, ls::NTuple{2}) = gs .* ls
 imagesize(gs::NTuple{2}, ls::NTuple{1}) = gs .* (first(ls), 1)
+
+_asrenderer(r::Renderer) = r
+_asrenderer(x) = Image(x)
 
 function render!(
     imagebuffer, l::Layout, o::ImageOutput, data::AbstractSimData, grids::NamedTuple
@@ -249,6 +258,7 @@ _get(::Nothing, I) = nothing
 _get(vals::Union{AbstractArray,Tuple}, I) = vals[I]
 _get(x, I) = x
 
+# Get the id of each grid in the layout
 _grid_ids(id::Symbol) = id
 _grid_ids(id::Integer) = id
 _grid_ids(::Nothing) = nothing
@@ -256,12 +266,14 @@ _grid_ids(::Missing) = missing
 _grid_ids(id::Pair{Symbol}) = first(id)
 _grid_ids(id) = throw(ArgumentError("Layout id $id is not a valid grid name. Use an `Int`, `Symbol`, `Pair{Symbol,<:Any}` or `nothing`"))
 
+# Get the grid accessor function/value if there is one
 _grid_accessor(id::Pair) = last(id)
 _grid_accessor(id) = nothing
 
-_access(::Nothing, obj) = obj
-_access(f::Function, obj) = f(obj)
-_access(i::Int, obj) = obj[i] 
+# Access a grid object with a function or index, or use it as-is
+_access_grid_object(::Nothing, obj) = obj
+_access_grid_object(f::Function, obj) = f(obj)
+_access_grid_object(i::Int, obj) = obj[i] 
 
 @noinline _grididnotinkeyserror(grid_id, grids) =
     throw(ArgumentError("$grid_id is not in $(keys(grids))"))
@@ -269,23 +281,37 @@ _access(i::Int, obj) = obj[i]
     throw(ArgumentError("Number of layout panes ($npanes) and length of $f ($len) must be the same"))
 
 
-# Automatically choose an image renderer
+# Automatically choose an image renderer ############################################################
 
 autorenderer(init; scheme=ObjectScheme(), zerocolor=ZEROCOL, maskcolor=MASKCOL, kw...) = 
     _autorenderer(init, scheme, zerocolor, maskcolor; kw...)
 
+# Single grid render
 _autorenderer(init, scheme, zerocolor, maskcolor; kw...) = _asrenderer(scheme, zerocolor, maskcolor)
+# Multi-grid renders
 function _autorenderer(init::NamedTuple, scheme, zerocolor, maskcolor; 
+    # If no layout argument was passed in, generate the layout from the init grids
     layout=_autolayout(init), 
-    renderers=_autorenderers(layout, scheme, zerocolor, maskcolor),
+    # If no renders argument was passed in, generate them from the layout
+    renderers=_asrenderer.(layout, _iterable(scheme), _iterable(zerocolor), _iterable(maskcolor)),
     kw...
 )
     Layout(layout, renderers)
 end
 
+# Maybe wrap in a tuple for broadcasting
+_iterable(obj::AbstractArray) = obj
+_iterable(obj::Tuple) = obj
+_iterable(obj) = (obj,)
+
+# _asrenderer
+# Use a renderer as-is or convert a colorscheme to a renderer
 _asrenderer(renderer::Renderer, zerocolor, maskcolor) = renderer
 _asrenderer(scheme, zerocolor, maskcolor) = Image(scheme, zerocolor, maskcolor)
+_asrenderer(layout, renderer, zerocolor, maskcolor) = _asrenderer(renderer, zerocolor, maskcolor) 
 
+# _autolayout
+# Generate a layout from the provided grids and their contents
 function _autolayout(init)
     keys = _autokeys(init)
     len = length(keys)
@@ -298,6 +324,11 @@ function _autolayout(init)
     return layout
 end
 
+# _autokeys
+# Generate a list of keys for layout grids.
+# These may simply be the NamedTuple key or Pairs
+# of the key name and index value, if the grid contains
+# objects like FieldVector or StaticArray
 function _autokeys(init)
     foldl(pairs(init); init=()) do acc, (key, val)
         keys = if eltype(val) <: AbstractArray
@@ -310,16 +341,7 @@ function _autokeys(init)
     end
 end
 
-function _autorenderers(layout, scheme, zerocolor, maskcolor)
-    _asrenderer_key.(layout, _iterable(scheme), _iterable(zerocolor), _iterable(maskcolor))
-end
-
-_asrenderer_key(key, args...) = _asrenderer(args...)
-
-_iterable(obj::AbstractArray) = obj
-_iterable(obj) = (obj,)
-
-# Coll conversion tools
+# Colour conversion tools ############################################333
 
 # Set a value to be between zero and one, before converting to Color.
 # min and max of `nothing` are assumed to be 0 and 1.

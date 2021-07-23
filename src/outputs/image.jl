@@ -28,10 +28,11 @@ struct ImageConfig{IB,Min,Max,Bu,TC}
 end
 function ImageConfig(init; 
     font=autofont(), text=TextConfig(; font=font), textconfig=text, 
-    imagegen=nothing, renderer=imagegen,
-    minval=0, maxval=1, kw...
+    renderer=nothing, minval=0, maxval=1, kw...
 ) 
+    # Generate a renderer automatically if it is not passed in
     renderer = renderer isa Nothing ? autorenderer(init; kw...) : renderer
+    # Allocate an image buffer based on the renderer and init grids
     imagebuffer = _allocimage(renderer, init)
     ImageConfig(renderer, minval, maxval, imagebuffer, textconfig)
 end
@@ -92,19 +93,24 @@ function (::Type{T})(init::Union{NamedTuple,AbstractMatrix};
     )
 end
 
-imageconfig(o::Output) = ImageConfig(init(o))
+# Getters
 imageconfig(o::ImageOutput) = o.imageconfig
+# Other outputs get a constructed ImageConfig
+imageconfig(o::Output) = ImageConfig(init(o))
 
+# Methods forwarded to ImageConfig
 renderer(o::Output) = renderer(imageconfig(o))
 minval(o::Output) = minval(imageconfig(o))
 maxval(o::Output) = maxval(imageconfig(o))
 imagebuffer(o::Output) = imagebuffer(imageconfig(o))
 textconfig(o::Output) = textconfig(imageconfig(o))
 
+# GraphicOutput interface methods
 showframe(o::ImageOutput, data) = showimage(render!(o, data), o, data)
 showimage(image, o, data) = showimage(image, o)
 
-# Headless image output
+
+# Headless image output. Useful for gifs and testing.
 mutable struct NoDisplayImageOutput{T,F<:AbstractVector{T},E,GC,IC} <: ImageOutput{T,F}
     frames::F
     running::Bool 

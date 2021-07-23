@@ -1,6 +1,9 @@
-# We have to use the original rules as they may be modified 
-# elsewhere, like in an Interact.jl interface. So here we build them
-# into the SimData object after running _modifyrules on them
+
+# _updaterules
+# Update the StaticRuleset in the SimData object with
+# a (potentially) modifed version of the original rules tuple.
+# This must be passed in to allow async updating from a live
+# interface while the simulation runs.
 function _updaterules(rules::Tuple, sd::AbstractSimData)
     newrs = ModelParameters.setparent(
         ruleset(sd),
@@ -9,10 +12,11 @@ function _updaterules(rules::Tuple, sd::AbstractSimData)
     @set sd.ruleset = newrs
 end
 
+# _modifyrules
+# Run `modifyrule` for each rule, recursively.
 _modifyrules(rules::Tuple, simdata) =
     (modifyrule(rules[1], simdata), _modifyrules(tail(rules), simdata)...)
 _modifyrules(rules::Tuple{}, simdata) = ()
 
-# The default is to return a rule unchanged
+# The default `modifyrule` returns the rule unchanged.
 modifyrule(rule, simdata) = rule
-
