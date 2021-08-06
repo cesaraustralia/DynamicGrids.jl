@@ -141,8 +141,9 @@ Rules hold the parameters for running a simulation, and are applied in
 Rules come in a number of flavours (outlined in the
 [docs](https://cesaraustralia.github.io/DynamicGrids.jl/stable/#Rules-1)). This
 allows using specialised methods for different types of rules, ecoding assumtions 
-about their behaviours that can greatly improve performance. Rules can be collected 
-in a `Ruleset`, with some additional arguments to control the simulation:
+about their behaviours that can greatly improve performance through more efficient 
+use of caches and parallelisation. Rules can be collected in a `Ruleset`, with some 
+additional arguments to control the simulation:
 
 ```
 ruleset = Ruleset(Life(2, 3); opt=SparseOpt(), proc=CuGPU())
