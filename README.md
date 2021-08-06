@@ -139,16 +139,16 @@ and addition are required to use `Convolution` kernels.
 Rules hold the parameters for running a simulation, and are applied in
 `applyrule` method that is called for each of the active cells in the grid.
 Rules come in a number of flavours (outlined in the
-[docs](https://cesaraustralia.github.io/DynamicGrids.jl/stable/#Rules-1)), which
-allow assumptions to be made about running them that can greatly improve
-performance. Rules can be collected in a `Ruleset`, with some additional
-arguments to control the simulation:
+[docs](https://cesaraustralia.github.io/DynamicGrids.jl/stable/#Rules-1)). This
+allows using specialised methods for different types of rules, ecoding assumtions 
+about their behaviours that can greatly improve performance. Rules can be collected 
+in a `Ruleset`, with some additional arguments to control the simulation:
 
 ```
 ruleset = Ruleset(Life(2, 3); opt=SparseOpt(), proc=CuGPU())
 ```
 
-Multiple rules can be combined in a `Ruleset` or simply passed to `sim!`. Each rule 
+Multiple rules can be combined in a `Ruleset` or simply passed to `sim!` directly. Each rule 
 will be run for the whole grid, in sequence, using appropriate optimisations depending 
 on the parent types of each rule:
 
