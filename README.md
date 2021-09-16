@@ -2,7 +2,7 @@
 
 [![](https://img.shields.io/badge/docs-stable-blue.svg)](https://cesaraustralia.github.io/DynamicGrids.jl/stable)
 [![](https://img.shields.io/badge/docs-dev-blue.svg)](https://cesaraustralia.github.io/DynamicGrids.jl/dev)
-[![Build Status](https://travis-ci.com/cesaraustralia/DynamicGrids.jl.svg?branch=master)](https://travis-ci.com/cesaraustralia/DynamicGrids.jl) 
+[![CI](https://github.com/cesaraustralia/DynamicGrids.jl/actions/workflows/ci.yml/badge.svg)](https://github.com/cesaraustralia/DynamicGrids.jl/actions/workflows/ci.yml)
 [![codecov.io](http://codecov.io/github/cesaraustralia/DynamicGrids.jl/coverage.svg?branch=master)](http://codecov.io/github/cesaraustralia/DynamicGrids.jl?branch=master)
 [![Aqua.jl Quality Assurance](https://img.shields.io/badge/Aqua.jl-%F0%9F%8C%A2-aqua.svg)](https://github.com/JuliaTesting/Aqua.jl)
 
