@@ -326,10 +326,10 @@ end
                 @test DynamicGrids.isstored(output) == true
                 sim!(output, ruleset)
                 resume!(output, ruleset; tstop=30u"s")
-                @test output[Ti(5u"s")] == test6_7[:test2]
-                @test output[Ti(10u"s")] == test6_7[:test3]
-                @test output[Ti(20u"s")] == test6_7[:test5]
-                @test output[Ti(30u"s")] == test6_7[:test7]
+                @test output[At(5u"s")] == test6_7[:test2]
+                @test output[At(10u"s")] == test6_7[:test3]
+                @test output[At(20u"s")] == test6_7[:test5]
+                @test output[At(30u"s")] == test6_7[:test7]
             end
             @testset "REPLOutput braile works, in Months" begin
                 ruleset = Ruleset(Life();
@@ -341,7 +341,7 @@ end
                 tspan_ = Date(2010, 4):Month(1):Date(2010, 7)
                 output = REPLOutput(test6_7[:init]; tspan=tspan_, style=Braile(), fps=1000, store=false)
                 sim!(output, ruleset)
-                @test output[Ti(Date(2010, 7))] == test6_7[:test4]
+                @test output[At(Date(2010, 7))] == test6_7[:test4]
                 @test DynamicGrids.tspan(output) == Date(2010, 4):Month(1):Date(2010, 7)
                 resume!(output, ruleset; tstop=Date(2010, 10))
                 @test DynamicGrids.tspan(output) == Date(2010, 4):Month(1):Date(2010, 10)
@@ -368,10 +368,10 @@ end
         @test output.imageconfig.textconfig == nothing
         @test DynamicGrids.isstored(output) == true
         sim!(output, ruleset)
-        @test output[Ti(5u"s")] == test6_7[:test2]
-        @test output[Ti(10u"s")] == test6_7[:test3]
-        @test output[Ti(20u"s")] == test6_7[:test5]
-        @test output[Ti(30u"s")] == test6_7[:test7]
+        @test output[At(5u"s")] == test6_7[:test2]
+        @test output[At(10u"s")] == test6_7[:test3]
+        @test output[At(20u"s")] == test6_7[:test5]
+        @test output[At(30u"s")] == test6_7[:test7]
         gif = load("test_gifoutput.gif")
         @test gif == RGB.(output.gif)
         rm("test_gifoutput.gif")
@@ -388,10 +388,10 @@ end
         @test output.imageconfig.renderer isa Layout
         @test output.imageconfig.textconfig == nothing
         sim!(output, ruleset)
-        @test all(map(==, output[Ti(5u"s")], (a=test6_7[:test2], b=zeroed)))
-        @test all(map(==, output[Ti(10u"s")], (a=test6_7[:test3], b=zeroed)))
-        @test all(map(==, output[Ti(20u"s")], (a=test6_7[:test5], b=zeroed)))
-        @test all(map(==, output[Ti(30u"s")], (a=test6_7[:test7], b=zeroed)))
+        @test all(map(==, output[At(5u"s")], (a=test6_7[:test2], b=zeroed)))
+        @test all(map(==, output[At(10u"s")], (a=test6_7[:test3], b=zeroed)))
+        @test all(map(==, output[At(20u"s")], (a=test6_7[:test5], b=zeroed)))
+        @test all(map(==, output[At(30u"s")], (a=test6_7[:test7], b=zeroed)))
         gif = load("test_gifoutput2.gif")
         @test gif == RGB.(output.gif)
         @test gif[:, 1, 7] == RGB{N0f8}.([1.0, 1.0, 0.298, 0.298, 0.298, 1.0])

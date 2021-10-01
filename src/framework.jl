@@ -4,10 +4,11 @@
     sim!(output, rules::Tuple{<:Rule,Vararg}; kw...)
     sim!(output, [ruleset::Ruleset=ruleset(output)]; kw...)
 
-Runs the simulation, passing the destination aray to
-the passed in output for each time-step.
+Runs the simulation rules over the `output` `tspan`,
+writing the destination array to `output` for each time-step.
 
 # Arguments
+
 - `output`: An [`Output`](@ref) to store grids or display them on the screen.
 - `ruleset`: A [`Ruleset`](@ref) containing one or more [`Rule`](@ref)s. If the output
   has a `Ruleset` attached, it will be used.
@@ -93,13 +94,14 @@ sim!(output::Output, rules::Rule...; kw...) = sim!(output, Ruleset(rules...); kw
 Restart the simulation from where you stopped last time. For arguments see [`sim!`](@ref).
 The keyword arg `tstop` can be used to extend the length of the simulation.
 
-### Arguments
+# Arguments
+
 - `output`: An [`Output`](@ref) to store grids or display them on the screen.
 - `ruleset`: A [`Ruleset`](@ref) containing one ore more [`Rule`](@ref)s.
-  These will each be run in sequence.
+    These will each be run in sequence.
 
-### Keyword Arguments (optional
-- `init`: an optional initialisation array
+# Keywords (optional)
+
 - `tstop`: the new stop time for the simulation. Taken from the output length by default.
 - `fps`: the frames per second to display. Taken from the output by default.
 - `simdata`: a [`SimData`](@ref) object. Keeping it between simulations can improve performance
@@ -190,7 +192,7 @@ end
 _step!(sd::AbstractSimData, rules) = _updaterules(rules, sd) |> sequencerules!
 
 """
-    step!(sd::AbstractSimData, rules=rules(sd))
+    step!(sd::AbstractSimData)
 
 Allows stepping a simulation one frame at a time, for a more manual approach
 to simulation that `sim!`. This may be useful if other processes need to be run 
@@ -208,13 +210,16 @@ and can be defined using a [`Extent`](@ref) object and a [`Ruleset`](@ref).
 # Example
 
 ```julia
-ruleset = Ruleset(myrules; proc=ThreadedCPU())
+using DynmicGrids, Plots
+ruleset = Ruleset(Life(); proc=ThreadedCPU())
 extent = Extent(; init=(a=A, b=B), aux=aux, tspan=tspan)
 simdata = SimData(extent, ruleset)
-# Run a single step, which returns an updated SimData object
+
+# Run a single step, which returns an updated `SimData` object
 simdata = step!(simdata)
-# Get a view of the grid without padding, for NeighborhoodRule/SetNeighborhoodRule
-DynmicGrids.gridview(simdata[:a])
+# Get a view of the grid without padding
+grid = DynmicGrids.gridview(simdata[:a])
+heatmap(grid)
 ```
 
 This example returns a `GridData` object for the `:a` grid, which is `<: AbstractAray`.
