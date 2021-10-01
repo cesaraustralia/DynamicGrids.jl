@@ -6,7 +6,8 @@ Apply a rule to the cell state and return values to write to the grid(s).
 This is called in `maprule!` methods during the simulation,
 not by the user. Custom `Rule` implementations must define this method.
 
-### Arguments:
+## Arguments
+
 - `data` : [`AbstractSimData`](@ref)
 - `rule` : [`Rule`](@ref)
 - `state`: the value(s) of the current cell
@@ -28,7 +29,8 @@ the user. Custom [`SetCellRule`](@ref) implementations must define this method.
 
 Only grids specified with the `W` type parameter will be writable from `data`.
 
-### Arguments:
+## Arguments
+
 - `data` : [`AbstractSimData`](@ref)
 - `rule` : [`Rule`](@ref)
 - `state`: the value(s) of the current cell
@@ -42,13 +44,13 @@ function applyrule! end
 Precalculates rule fields at each timestep. Define this method if a [`Rule`](@ref)
 has fields that need to be updated over time.
 
-`Rule`s are usually immutable (it's faster), so precalc is expected to returns a
-new rule object with changes applied to it.  Setfield.jl or Acessors.jl may help
+`Rule`s are usually immutable (it's faster), so `modifyrule` is expected to returns a
+new rule object with changes applied to it. Setfield.jl or Acessors.jl may help
 with updating the immutable struct.
 
 The default behaviour is to return the existing rule without change.
 
-Updated rules are be discarded, and the `rule` argument is always be the
+Updated rules are discarded after use, and the `rule` argument is always the
 original object passed in.
 """
 function modifyrule end
@@ -57,7 +59,7 @@ function modifyrule end
     neighbors(x::Union{Neighborhood,NeighborhoodRule}}) -> iterable
 
 Returns an indexable iterator for all cells in the neighborhood, 
-either a Tuple of values or a range.
+either a `Tuple` of values or a range.
 
 Custom `Neighborhood`s must define this method.
 """
