@@ -37,10 +37,10 @@ output = REPLOutput(init; tspan=1:200, fps=30, color=Crayon(foreground=:red, bac
 sim!(output, Life())
 
 # Or define it from scratch (yes this is actually the whole implementation!)
-const sum_states = (false, false, true, false, false, false, false, false, false), 
-                   (false, false, true, true,  false, false, false, false, false)
-life = Neighbors(Moore(1)) do hood, state
-    sum_states[state + 1][sum(hood) + 1]
+life = Neighbors(Moore(1)) do data, hood, state, I
+    born_survive = (false, false, false, true, false, false, false, false, false), 
+                 (false, false, true, true,  false, false, false, false, false)
+    born_survive[state + 1][sum(hood) + 1]
 end
 sim!(output, life)
 ```
