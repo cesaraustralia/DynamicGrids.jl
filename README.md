@@ -39,7 +39,7 @@ sim!(output, Life())
 # Or define it from scratch (yes this is actually the whole implementation!)
 life = Neighbors(Moore(1)) do data, hood, state, I
     born_survive = (false, false, false, true, false, false, false, false, false), 
-                 (false, false, true, true,  false, false, false, false, false)
+                   (false, false, true, true,  false, false, false, false, false)
     born_survive[state + 1][sum(hood) + 1]
 end
 sim!(output, life)
