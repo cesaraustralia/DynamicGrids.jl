@@ -229,9 +229,12 @@ end
 # Set up the init array and output (using a Gtk window)
 init = fill(ALIVE, 400, 400)
 output = GifOutput(init; 
-    filename="forestfire.gif", tspan=1:200, fps=25, 
+    filename="forestfire.gif", 
+    tspan=1:200, 
+    fps=25, 
     minval=DEAD, maxval=BURNING, 
-    imagegen=Image(scheme=ColorSchemes.rainbow, zerocolor=RGB24(0.0))
+    scheme=ColorSchemes.rainbow,
+    zerocolor=RGB24(0.0)
 )
 
 # Run the simulation, which will save a gif when it completes
