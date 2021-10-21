@@ -9,17 +9,27 @@ A `Rule` object contains the information required to apply an
 The [`applyrule`](@ref) method follows the form:
 
 ```julia
-@inline applyrule(data::AbstractSimData, rule::YourRule, state, I::Tuple{Int,Int}) = ...
+@inline applyrule(data::AbstractSimData, rule::MyRule, state, I::Tuple{Int,Int}) = ...
 ```
 
 Where `I` is the cell index, and `state` is a single value, or a `NamedTuple`
 if multiple grids are requested. the [`AbstractSimData`](@ref) object can be used to access 
 current timestep and other simulation data and metadata.
 
-Rules can be updated from the original rule before each timestep, in [`modifyrule`](@ref):
+Rules can be updated from the original rule before each timestep, in [`modifyrule`](@ref).
+Here a paremeter depends on the sum of a grid:
 
-```julia
-modifyrule(rule::YourRule, data::AbstractSimData) = ...
+```jldoctest 
+using DynamicGrids, Setfield
+struct MySummedRule{R,W,T} <: CellRule{R,W}
+    gridsum::T
+end
+function modifyrule(rule::MySummedRule{R,W}, data::AbstractSimData) where {R,W}
+    Setfield.@set rule.gridsum = sum(data[R])
+end
+
+# output
+modifyrule (generic function with 1 method)
 ```
 
 Rules can also be run in sequence, as a `Tuple` or in a [`Ruleset`](@ref)s.
@@ -29,27 +39,39 @@ DynamicGrids guarantees that:
 - `modifyrule` is run once for every rule for every timestep.
     The result is passed to `applyrule`, but not retained after that.
 - `applyrule` is run once for every rule, for every cell, for every timestep, unless an
-    optimisation like `SparseOpt` is enable to skips empty cells.
+    optimisation like [`SparseOpt`](@ref) is used to skip empty cells.
 - the output of running a rule for any cell does not affect the input of the
     same rule running anywhere else in the grid.
 - rules later in the sequence are passed grid state updated by the earlier rules.
-- masked areas and wrapped or removed boundary regions are updated between all rules and 
-    timesteps.
+- masked areas, and wrapped or removed `boundary` regions are updated between rules when
+    they have changed.
 
 ## Multiple grids
 
-The `NamedTuple` keys will match the grid keys in `R`, which is a type like 
-`Tuple{:key1,:key1}`. Note the names are user-specified, and should never be fixed by a `Rule`.
+The keys of the init `NamedTuple` will be match the grid keys used in `R` and `W` for each
+rule, which is a type like `Tuple{:key1,:key1}`. Note that the names are user-specified,
+and should never be fixed by a `Rule`.
 
-Read grid names be retrieved from the type here as `R1` and `R2`, while write grids are `W1` and `W2`.
+Read grid names are retrieved from the type here as `R1` and `R2`, while write grids are
+`W1` and `W2`.
 
-```julia
-applyrule(data::AbstractSimData, rule::YourCellRule{Tuple{R1,R2},Tuple{W1,W2}}, state, I) where {R1,R2,W1,W2}
+```jldoctest
+using DynamicGrids
+struct MyMultiSetRule{R,W} <: SetCellRule{R,W} end
+function applyrule(
+    data::AbstractSimData, rule::MyMultiSetRule{Tuple{R1,R2},Tuple{W1,W2}}, (r1, r2), I
+) where {R1,R2,W1,W2}
+    add!(data[W1], 1, I) 
+    add!(data[W2], 1, I) 
+end
+
+# output
+applyrule (generic function with 1 method)
 ```
 
-By default the output is written to the current cell in the specified `W` write grid/s.
-`Rule`s writing to multiple grids, simply return a `Tuple` in the order specified by
-the `W` type params.
+The return value of an `applyrule` is written to the current cell in the specified `W`
+write grid/s. `Rule`s writing to multiple grids simply return a `Tuple` in the order
+specified by the `W` type params.
 
 ## Rule Performance
 
@@ -139,19 +161,22 @@ and has its return value written back to the same cell(s).
 This limitation can be useful for performance optimisation,
 such as wrapping rules in [`Chain`](@ref) so that no writes occur between rules.
 
-
 `CellRule` is defined with :
 
-```julia
-struct YourCellRule{R,W} <: CellRule{R,W} end
+```jldoctest yourcellrule
+using DynamicGrids
+struct MyCellRule{R,W} <: CellRule{R,W} end
+# output
 ```
 
 And applied as:
 
-```julia
-function applyrule(data::AbstractSimData, rule::YourCellRule{R,W}, state, I) where {R,W}
+```jldoctest yourcellrule
+function applyrule(data, rule::MyCellRule, state, I)
     state * 2
 end
+# output
+applyrule (generic function with 1 method)
 ```
 
 As the index `I` is provided in `applyrule`, you can use it to look up [`Aux`](@ref) data. 
@@ -159,6 +184,63 @@ As the index `I` is provided in `applyrule`, you can use it to look up [`Aux`](@
 abstract type CellRule{R,W} <: Rule{R,W} end
 
 ruletype(::CellRule) = CellRule
+
+"""
+    Call <: CellRule
+
+    Cell(f)
+    Cell{R,W}(f)
+
+A [`CellRule`](@ref) that applies a function `f` to the `R` grid value, 
+or `Tuple` of values, and returns the `W` grid value or `Tuple` of values.
+
+Especially convenient with `do` notation.
+
+## Example
+
+Double the cell value in grid `:a`:
+
+```jldoctest Cell
+using DynamicGrids
+simplerule = Cell{:a}() do data, a, I
+    2a
+end
+# output
+Cell{:a,:a} :
+    f = var"#1#2"
+```
+
+`data` is an [`AbstractSimData`](@ref) object, `a` is the cell value, and `I`
+is a `Tuple` holding the cell index.
+
+If you need to use multiple grids (a and b), use the `R`
+and `W` type parameters. If you want to use external variables,
+wrap the whole thing in a `let` block, for performance. This
+rule sets the new value of `b` to the value of `a` to `b` times scalar `y`:
+
+```jldoctest Cell
+y = 0.7
+rule = let y = y
+    rule = Cell{Tuple{:a,:b},:b}() do data, (a, b), I
+        a + b * y
+    end
+end
+# output
+Cell{Tuple{:a, :b},:b} :
+    f = var"#3#4"{Float64}
+```
+"""
+struct Cell{R,W,F} <: CellRule{R,W}
+    "Function to apply to the R grid values"
+    f::F
+end
+Cell{R,W}(; kw...) where {R,W} = _nofunctionerror(Cell)
+
+@inline function applyrule(data, rule::Cell, read, I)
+    let data=data, rule=rule, read=read, I=I
+        rule.f(data, read, I)
+    end
+end
 
 """
     SetRule <: Rule
@@ -177,13 +259,20 @@ ruletype(::SetRule) = SetRule
 Abstract supertype for rules that can manually write to any cells of the
 grid that they need to.
 
-`SetCellRule` is applied with a method like this, that simply adds 1 to the current cell:
+For example, `SetCellRule` is applied with like this, here simply adding 1 to the current cell:
 
-```julia
-function applyrule!(data::AbstractSimData, rule::YourSetCellRule, state, I)
-    add!(data, 1, I...)
+```jldoctest SetCellRule
+using DynamicGrids
+struct MySetCellRule{R,W} <: SetCellRule{R,W} end
+
+function applyrule!(data::AbstractSimData, rule::MySetCellRule{R,W}, state, I) where {R,W}
+    # Add 1 to the cell 10 up and 10 accross
+    I, isinbounds = inbounds(I .+ 10)
+    isinbounds && add!(data[W], 1, I...)
     return nothing
 end
+# output
+applyrule! (generic function with 1 method)
 ```
 
 Note the `!` bang - this method alters the state of `data`.
@@ -196,12 +285,14 @@ would cause bugs.
 It there are multiple write grids, you will need to get the grid keys from
 type parameters, here `W1` and `W2`:
 
-```julia
-function applyrule(data, rule::YourSetCellRule{R,Tuple{W1,W2}}, state, I) where {R,W1,W2}
-     add!(data[W1], 1, I...)
-     add!(data[W2], 2, I...)
-     return nothing
+```jldoctest SetCellRule
+function applyrule(data, rule::MySetCellRule{R,Tuple{W1,W2}}, state, I) where {R,W1,W2}
+    add!(data[W1], 1, I...)
+    add!(data[W2], 2, I...)
+    return nothing
 end
+# output
+applyrule (generic function with 1 method)
 ```
 
 DynamicGrids guarantees that:
@@ -209,12 +300,59 @@ DynamicGrids guarantees that:
 - values written to anywhere on the grid do not affect other cells in
     the same rule at the same timestep.
 - values written to anywhere on the grid are available to the next rule in the
-    sequence, or the next timestep.
-- if atomic operators are always used, race conditions will not occur on any hardware.
+    sequence, or in the next timestep if there are no remaining rules.
+- if atomic operators like `add!` and `sub!` are always used to write to the grid,
+    race conditions will not occur on any hardware.
 """
 abstract type SetCellRule{R,W} <: SetRule{R,W} end
 
 ruletype(::SetCellRule) = SetCellRule
+
+"""
+    SetCell <: SetCellRule
+
+    SetCell(f)
+    SetCell{R,W}(f)
+
+A [`SetCellRule`](@ref) to manually write to the array where you need to.
+`f` is passed a [`AbstractSimData`](@ref) object, the grid state or `Tuple` of grid 
+states for the cell and a `Tuple{Int,Int}` index of the current cell.
+
+To update the grid, you can use: [`add!`](@ref), [`sub!`](@ref) for `Number`,
+and [`and!`](@ref), [`or!`](@ref) for `Bool`. These methods safely combined
+writes from all grid cells - directly using `setindex!` would cause bugs.
+
+## Example
+
+Choose a destination cell and if it is in the grid, update it based on the 
+state of both grids:
+
+```jldoctest SetCell
+using DynamicGrids
+rule = SetCell{Tuple{:a,:b},:b}() do data, (a, b), I 
+    dest = your_dest_pos_func(I)
+    if isinbounds(data, dest)
+        destval = your_dest_val_func(a, b)
+        add!(data[:b], destval, dest...)
+    end
+end
+
+# output
+SetCell{Tuple{:a, :b},:b} :
+    f = var"#1#2"
+```
+"""
+struct SetCell{R,W,F} <: SetCellRule{R,W}
+    "Function to apply to data, index and read grid values"
+    f::F
+end
+SetCell{R,W}(; kw...) where {R,W} = _nofunctionerror(Set)
+
+@inline function applyrule!(data, rule::SetCell, read, I)
+    let data=data, rule=rule, read=read, I=I
+        rule.f(data, read, I)
+    end
+end
 
 """
     NeighborhoodRule <: Rule
@@ -223,7 +361,7 @@ A Rule that only accesses a neighborhood centered around the current cell.
 `NeighborhoodRule` is applied with the method:
 
 ```julia
-applyrule(data::AbstractSimData, rule::YourNeighborhoodRule, state, I::Tuple{Int,Int})
+applyrule(data::AbstractSimData, rule::MyNeighborhoodRule, state, I::Tuple{Int,Int})
 ```
 
 `NeighborhoodRule` must have a `neighborhood` method or field, that holds
@@ -260,6 +398,116 @@ _buffer(rule::NeighborhoodRule) = _buffer(neighborhood(rule))
 radius(rule::NeighborhoodRule, args...) = radius(neighborhood(rule))
 
 """
+    Neighbors <: NeighborhoodRule
+
+    Neighbors(f, neighborhood=Moor(1))
+    Neighbors{R,W}(f, neighborhood=Moore())
+
+A [`NeighborhoodRule`](@ref) that receives a [`Neighborhood`](@ref) object 
+for the first `R` grid, followed by the cell value/s for the required grids, 
+as with [`Cell`](@ref).
+
+Returned value(s) are written to the `W` grid/s.
+
+As with all [`NeighborhoodRule`](@ref), you do not have to check bounds at
+grid edges, that is handled for you internally.
+
+Using [`SparseOpt`](@ref) may improve neighborhood performance
+when a specific value (often zero) is common and can be safely ignored.
+
+## Example
+
+Runs a game of life glider on grid `:a`:
+
+```jldoctest
+using DynamicGrids
+const sum_states = (0, 0, 1, 0, 0, 0, 0, 0, 0), 
+                   (0, 0, 1, 1, 0, 0, 0, 0, 0)
+life = Neighbors{:a}(Moore(1)) do data, hood, a, I
+    sum_states[a + 1][sum(hood) + 1]
+end
+init = Bool[
+     0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+     0 0 0 0 0 1 1 1 0 0 0 0 0 0 0
+     0 0 0 0 0 0 0 1 0 0 0 0 0 0 0
+     0 0 0 0 0 0 1 0 0 0 0 0 0 0 0
+     0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+]
+output = REPLOutput((; a=init); fps=25, tspan=1:50)
+sim!(output, Life{:a}(); boundary=Wrap())
+output[end][:a]
+
+# output
+5×15 Matrix{Bool}:
+ 0  0  1  0  1  0  0  0  0  0  0  0  0  0  0
+ 0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+ 0  0  0  0  0  0  0  0  0  0  0  0  0  0  0
+ 0  0  0  1  0  0  0  0  0  0  0  0  0  0  0
+ 0  0  0  1  1  0  0  0  0  0  0  0  0  0  0
+
+```
+"""
+struct Neighbors{R,W,F,N} <: NeighborhoodRule{R,W}
+    "Function to apply to the neighborhood and R grid values"
+    f::F
+    "Defines the neighborhood of cells around the central cell"
+    neighborhood::N
+end
+Neighbors{R,W}(; kw...) where {R,W} = _nofunctionerror(Neighbors)
+Neighbors{R,W}(f; neighborhood=Moore(1)) where {R,W} =
+    Neighbors{R,W}(f, neighborhood)
+
+@inline function applyrule(data, rule::Neighbors, read, I)
+    let rule=rule, hood=neighborhood(rule), read=read, I=I
+        rule.f(data, hood, read, I)
+    end
+end
+
+"""
+    Convolution <: NeighborhoodRule
+
+    Convolution(kernel::AbstractArray)
+    Convolution{R,W}(kernel::AbstractArray)
+
+A [`NeighborhoodRule`](@ref) that runs a convolution kernel over the grid.
+
+`kernel` must be a square matrix.
+
+## Performance
+
+Small radius convolutions in DynamicGrids.jl will be comparable or even faster than using
+DSP.jl or ImageConvolutions.jl. As the radius increases these packages will be a lot faster.
+
+But `Convolution` is convenient to chain into a simulation, and combined with some other
+rules. It should perform reasonably well with all but very large kernels.
+
+Values are not normalised, so make sure the kernel sums to `1` if you need that.
+
+## Example
+
+A streaking convolution that looks a bit like sand blowing.
+
+Swap out the matrix values to change the pattern.
+
+```julia 
+using DynamicGrids, DynamicGridsGtk
+streak = Convolution([0.0 0.01 0.48; 
+                      0.0 0.5  0.01; 
+                      0.0 0.0  0.0])
+output = GtkOutput(rand(500, 500); tspan = 1:1000, fps=100)
+sim!(output, streak; boundary=Wrap())
+```
+"""
+struct Convolution{R,W,N} <: NeighborhoodRule{R,W}
+    "The neighborhood of cells around the central cell"
+    neighborhood::N
+end
+Convolution{R,W}(A::AbstractArray) where {R,W} = Convolution{R,W}(Kernel(SMatrix{size(A)...}(A)))
+Convolution{R,W}(; neighborhood) where {R,W} = Convolution{R,W}(neighborhood)
+
+@inline applyrule(data, rule::Convolution, read, I) = kernelproduct(neighborhood(rule))
+
+"""
     SetNeighborhoodRule <: SetRule
 
 A [`SetRule`](@ref) that only writes to its neighborhood, and does not need to bounds-check.
@@ -282,198 +530,6 @@ positions(rule::SetNeighborhoodRule, args...) = positions(neighborhood(rule), ar
 radius(rule::SetNeighborhoodRule, args...) = radius(neighborhood(rule))
 neighborhoodkey(rule::SetNeighborhoodRule{R,W}) where {R,W} = R
 neighborhoodkey(rule::SetNeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
-
-
-"""
-    SetGridRule <: Rule
-
-A `Rule` applies to whole grids. This is used for operations that don't benefit from
-having neighborhood buffering or looping over the grid handled for them, or any specific
-optimisations. Best suited to simple functions like `rand!(grid)` or using convolutions
-from other packages like DSP.jl. They may also be useful for doing other custom things that
-don't fit into the DynamicGrids.jl framework during the simulation.
-
-Grid rules specify the grids they want and are sequenced just like any other grid.
-
-```julia
-struct YourSetGridRule{R,W} <: SetGridRule{R,W} end
-```
-
-And applied as:
-
-```julia
-function applyrule!(data::AbstractSimData, rule::YourSetGridRule{R,W}) where {R,W}
-    rand!(data[W])
-end
-```
-"""
-abstract type SetGridRule{R,W} <: Rule{R,W} end
-
-ruletype(::SetGridRule) = SetGridRule
-
-"""
-    SetGrid{R,W}(f)
-
-Apply a function `f` to fill whole grid/s.
-
-## Example
-
-This example sets grid `a` to equal grid `b`:
-
-```julia
-rule = SetGrid{:a,:b}() do a, b
-    b .= a
-end
-```
-"""
-struct SetGrid{R,W,F} <: SetGridRule{R,W}
-    "Function to apply to the read values"
-    f::F
-end
-SetGrid{R,W}(; kw...) where {R,W} = _nofunctionerror(SetGrid)
-
-@inline function applyrule!(data, rule::SetGrid{R,W}) where {R,W}
-    let data = data, rule=rule
-        read = map(r -> source(getindex(data, r)), _asiterable(R))
-        write = map(w -> source(getindex(data, w)), _asiterable(W))
-        rule.f(read..., write...)
-    end
-end
-
-
-"""
-    Call <: CellRule
-
-    Cell(f)
-    Cell{R,W}(f)
-
-A [`CellRule`](@ref) that applies a function `f` to the `R` grid value, 
-or `Tuple` of values, and returns the `W` grid value or `Tuple` of values.
-
-Especially convenient with `do` notation.
-
-## Example
-
-Double the cell value in grid `:a`:
-
-```julia
-simplerule = Cell{Tuple{:a}() do a
-    2a
-end
-```
-
-If you need to use multiple grids (a and b), use the `R`
-and `W` type parameters. If you want to use external variables,
-wrap the whole thing in a `let` block, for performance. This
-rule sets the new value of `b` to the value of `a` to `b` times scalar `y`:
-
-```julia
-rule = let y = y
-    rule = Cell{Tuple{:a,:b},:b}() do (a, b)
-        a + b * y
-    end
-end
-```
-"""
-struct Cell{R,W,F} <: CellRule{R,W}
-    "Function to apply to the R grid values"
-    f::F
-end
-Cell{R,W}(; kw...) where {R,W} = _nofunctionerror(Cell)
-
-@inline function applyrule(data, rule::Cell, read, I)
-    let data=data, rule=rule, read=read, I=I
-        rule.f(data, read, I)
-    end
-end
-
-"""
-    Neighbors <: NeighborhoodRule
-
-    Neighbors(f, neighborhood=Moor(1))
-    Neighbors{R,W}(f, neighborhood=Moore())
-
-A [`NeighborhoodRule`](@ref) that receives a [`Neighborhood`](@ref) object 
-for the first `R` grid, followed by the cell value/s for the required grids, 
-as with [`Cell`](@ref).
-
-Returned value(s) are written to the `W` grid/s.
-
-As with all [`NeighborhoodRule`](@ref), you do not have to check bounds at
-grid edges, that is handled for you internally.
-
-Using [`SparseOpt`](@ref) may improve neighborhood performance
-when a specific value (often zero) is common and can be safely ignored.
-
-## Example
-
-Runs the game of life on grid `:a`:
-
-```julia
-const sum_states = (0, 0, 1, 0, 0, 0, 0, 0, 0), 
-                   (0, 0, 1, 1,  0, 0, 0, 0, 0)
-life = Neighbors{:a}(Moore(1)) do hood, a
-    sum_states[a + 1][sum(hood) + 1]
-end
-```
-"""
-struct Neighbors{R,W,F,N} <: NeighborhoodRule{R,W}
-    "Function to apply to the neighborhood and R grid values"
-    f::F
-    "Defines the neighborhood of cells around the central cell"
-    neighborhood::N
-end
-Neighbors{R,W}(; kw...) where {R,W} = _nofunctionerror(Neighbors)
-Neighbors{R,W}(f; neighborhood=Moore(1)) where {R,W} =
-    Neighbors{R,W}(f, neighborhood)
-
-@inline function applyrule(data, rule::Neighbors, read, I)
-    let rule=rule, hood=neighborhood(rule), read=read, I=I
-        rule.f(data, hood, read, I)
-    end
-end
-
-"""
-    SetCell <: SetCellRule
-
-    SetCell(f)
-    SetCell{R,W}(f)
-
-A [`SetCellRule`](@ref) to manually write to the array where you need to.
-`f` is passed a [`AbstractSimData`](@ref) object, the grid state or `Tuple` of grid 
-states for the cell and a `Tuple{Int,Int}` index of the current cell.
-
-To update the grid, you can use: [`add!`](@ref), [`sub!`](@ref) for `Number`,
-and [`and!`](@ref), [`or!`](@ref) for `Bool`. These methods safely combined
-writes from all grid cells - directly using `setindex!` would cause bugs.
-
-## Example
-
-Choose a destination cell and if it is in the grid, update it based on the 
-state of both grids:
-
-```julia
-rule = SetCell{Tuple{:a,:b},:b}() do data, (a, b), I 
-    dest = your_dest_pos_func(I)
-    if isinbounds(data, dest)
-        destval = your_dest_val_func(a, b)
-        add!(data[:b], destval, dest...)
-    end
-end
-```
-"""
-struct SetCell{R,W,F} <: SetCellRule{R,W}
-    "Function to apply to data, index and read grid values"
-    f::F
-end
-SetCell{R,W}(; kw...) where {R,W} = _nofunctionerror(Set)
-
-@inline function applyrule!(data, rule::SetCell, read, I)
-    let data=data, rule=rule, read=read, I=I
-        rule.f(data, read, I)
-    end
-end
-
 
 """
     SetNeighbors <: SetNeighborhoodRule
@@ -504,13 +560,19 @@ then it can be guaranteed that any writes from othe grid cells reach the same re
 
 This example adds a value to all neighbors:
 
-```julia
+```jldoctest
+using DynamicGrids
+
 rule = SetNeighbors{:a}() do data, neighborhood, a, I
     add_to_neighbors = your_func(a)
     for pos in positions(neighborhood)
         add!(data[:b], add_to_neighbors, pos...)
     end
 end
+# output
+SetNeighbors{:a,:a} :
+    f = var"#1#2"
+    neighborhood = Moore{1, 8, Nothing}
 ```
 """
 struct SetNeighbors{R,W,F,N} <: SetNeighborhoodRule{R,W}
@@ -528,39 +590,68 @@ SetNeighbors{R,W}(f; neighborhood=Moore(1)) where {R,W} = SetNeighbors{R,W}(f, n
     end
 end
 
+"""
+    SetGridRule <: Rule
+
+A `Rule` applies to whole grids. This is used for operations that don't benefit from
+having neighborhood buffering or looping over the grid handled for them, or any specific
+optimisations. Best suited to simple functions like `rand!(grid)` or using convolutions
+from other packages like DSP.jl. They may also be useful for doing other custom things that
+don't fit into the DynamicGrids.jl framework during the simulation.
+
+Grid rules specify the grids they want and are sequenced just like any other grid.
+
+```julia
+struct MySetGridRule{R,W} <: SetGridRule{R,W} end
+```
+
+And applied as:
+
+```julia
+function applyrule!(data::AbstractSimData, rule::MySetGridRule{R,W}) where {R,W}
+    rand!(data[W])
+end
+```
+"""
+abstract type SetGridRule{R,W} <: Rule{R,W} end
+
+ruletype(::SetGridRule) = SetGridRule
 
 """
-    Convolution <: NeighborhoodRule
+    SetGrid{R,W}(f)
 
-    Convolution(kernel::AbstractArray)
-    Convolution{R,W}(kernel::AbstractArray)
+Apply a function `f` to fill whole grid/s.
 
-A [`NeighborhoodRule`](@ref) that runs a convolution kernel over the grid.
-
-`kernel` must be a square matrix.
-
-## Performance
-
-Small radius convolutions in DynamicGrids.jl will be comparable or even faster than using
-DSP.jl or ImageConvolutions.jl. As the radius increases these packages will be a lot faster.
-
-But `Convolution` is convenient to chain into a simulation, and combined with some other
-rules. It should perform reasonably well with all but very large kernels.
+Broadcasting is a good way to update values.
 
 ## Example
 
-```julia 
-rule = Convolution([0.05 0.1 0.05; 0.1 0.4 0.1; 0.05 0.1 0.05])
+This example simply sets grid `a` to equal grid `b`:
+
+```jldoctest
+using DynamicGrids
+rule = SetGrid{:a,:b}() do a, b
+    b .= a
+end
+
+# output
+SetGrid{:a,:b} :
+    f = var"#1#2"
 ```
 """
-struct Convolution{R,W,N} <: NeighborhoodRule{R,W}
-    "The neighborhood of cells around the central cell"
-    neighborhood::N
+struct SetGrid{R,W,F} <: SetGridRule{R,W}
+    "Function to apply to the read values"
+    f::F
 end
-Convolution{R,W}(A::AbstractArray) where {R,W} = Convolution{R,W}(Kernel(SMatrix{size(A)...}(A)))
-Convolution{R,W}(; neighborhood) where {R,W} = Convolution{R,W}(neighborhood)
+SetGrid{R,W}(; kw...) where {R,W} = _nofunctionerror(SetGrid)
 
-@inline applyrule(data, rule::Convolution, read, I) = kernelproduct(neighborhood(rule))
+@inline function applyrule!(data, rule::SetGrid{R,W}) where {R,W}
+    let data = data, rule=rule
+        read = map(r -> source(getindex(data, r)), _asiterable(R))
+        write = map(w -> source(getindex(data, w)), _asiterable(W))
+        rule.f(read..., write...)
+    end
+end
 
 # Utils
 

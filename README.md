@@ -196,16 +196,17 @@ Performance of DynamicGrids.jl is dominated by cache interactions, so reducing
 memory use has positive effects.
 
 
-## Example
+## Example: Forest Fire
 
 This example implements the classic stochastic forest fire model in a few
-different ways, and benchmarks them.
+different ways, and benchmarks them. Note you will need ImageMagick.jl
+installed for `.gif` output to work.
 
 First we will define a Forest Fire algorithm that sets the current cell to
 burning, if a neighbor is burning. Dead cells can come back to life, and living
 cells can spontaneously catch fire:
 
-```julia
+```@example forestfire
 using DynamicGrids, ColorSchemes, Colors, BenchmarkTools
 
 const DEAD, ALIVE, BURNING = 1, 2, 3
@@ -247,10 +248,11 @@ Timing the simulation for 200 steps, the performance is quite good. This
 particular CPU has six cores, and we get a 5.25x speedup by using all of them,
 which indicates good scaling:
 
-```julia
+```@example forestfire
 bench_output = ResultOutput(init; tspan=1:200)
 
-julia> @btime sim!($bench_output, $neighbors_rule);
+julia> 
+@btime sim!($bench_output, $neighbors_rule);
   477.183 ms (903 allocations: 2.57 MiB)
 
 julia> @btime sim!($bench_output, $neighbors_rule; proc=ThreadedCPU());
@@ -260,7 +262,7 @@ julia> @btime sim!($bench_output, $neighbors_rule; proc=ThreadedCPU());
 We can also _invert_ the algorithm, setting cells in the neighborhood to burning
 if the current cell is burning, by using the `SetNeighbors` rule:
 
-```julia
+```@example forestfire
 setneighbors_rule = let prob_combustion=0.0001, prob_regrowth=0.01
     SetNeighbors(Moore(1)) do data, neighborhood, cell, I
         if cell == DEAD
@@ -290,7 +292,7 @@ matter if this happens multiple times, the result is the same._
 
 And in this case (a fairly sparse simulation), this rule is faster:
 
-```julia
+```juliia
 julia> @btime sim!($bench_output, $setneighbors_rule);
   261.969 ms (903 allocations: 2.57 MiB)
 
@@ -301,11 +303,14 @@ julia> @btime sim!($bench_output, $setneighbors_rule; proc=ThreadedCPU());
 But the scaling is not quite as good, at 3.9x for 6 cores. The first
 method may be better on a machine with a lot of cores.
 
-Last, we can slightly rewrite these rules for GPU, as `rand` is not available
-within a GPU kernel (it will be very soon). Instead we call `CUDA.rand!` on the
-entire parent array of the `:rand` grid, using a `SetGrid` rule:
+Last, we slightly rewrite these rules for GPU, as `rand` was not available
+within a GPU kernel. It is now, but it turns out that this method is faster!
+and interesting to demonstrate using multiple grids and `SetGrid`.
 
-```julia
+This way we call `CUDA.rand!` on the entire parent array of the `:rand` grid,
+using a `SetGrid` rule:
+
+```@example forestfire
 using CUDAKernels, CUDA
 
 randomiser = SetGrid{Tuple{},:rand}() do randgrid
@@ -316,7 +321,7 @@ end
 Now we define a Neighbors version for GPU, using the `:rand` grid values
 instead of `rand()`:
 
-```julia
+```@example forestfire
 neighbors_gpu = let prob_combustion=0.0001, prob_regrowth=0.01
     Neighbors{Tuple{:ff,:rand},:ff}(Moore(1)) do data, neighborhood, (cell, rand), I
         if cell == ALIVE
@@ -336,7 +341,7 @@ end
 
 And a SetNeighbors version for GPU:
 
-```julia
+```@example forestfire
 setneighbors_gpu = let prob_combustion=0.0001, prob_regrowth=0.01
     SetNeighbors{Tuple{:ff,:rand},:ff}(Moore(1)) do data, neighborhood, (cell, rand), I
         if cell == DEAD
@@ -359,7 +364,7 @@ setneighbors_gpu = let prob_combustion=0.0001, prob_regrowth=0.01
 end
 ```
 
-Now we benchmark both version on a GTX 1080. Despite the overhead of reading and
+Now benchmark both version on a GTX 1080 GPU. Despite the overhead of reading and
 writing two grids, this turns out to be even faster again:
 
 ```julia
@@ -374,4 +379,4 @@ julia> @btime sim!($bench_output_rand, $randomiser, $setneighbors_gpu; proc=CuGP
 
 That is, we are running the rule at a rate of _1.4 billion times per second_.
 These timings could be improved (maybe 10-20%) by using grids of `Int32` or
-`Int16` to use less memory and cache. But we will stop here!
+`Int16` to use less memory and cache. But we will stop here.

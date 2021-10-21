@@ -3,17 +3,17 @@
 
 Write the output array to a gif.
 
+# Arguments
+
+- `filename`: File path to save the gif file to.
+- `output`: An [`Output`](@ref) object. Note that to make a gif, the output should stores
+    frames, and run with `store=true`, and `@assert DynamicGrids.istored(o)` should pass.
+
 # Keywords
 
-- `fps`: `Real` frames persecond. Defaults to the `fps` of the output, or `25`.
-- `minval`: Minimum value in the grid(s) to normalise for conversion to an RGB pixel. 
-    `Number` or `Tuple` for multiple grids. 
-- `maxval`: Maximum value in the grid(s) to normalise for conversion to an RGB pixel. 
-    `Number` or `Tuple` for multiple grids. 
-- `font`: `String` name of font to search for. A default will be guessed.
-- `text`: [`TextConfig`](@ref) or `nothing` for no text. Default is `TextConfig(; font=font)`.
-- `scheme`: ColorSchemes.jl scheme, [`ObjectScheme`](@ref) or [`Greyscale`](@ref)
-- `renderer`: [`Renderer`](@ref) such as [`Image`](@ref) or [`Layout`](@ref). Will be detected automatically
+[`ImageConfig`](@ref) keywords:
+
+$IMAGECONFIG_KEYWORDS
 """
 function savegif(filename::String, o::Output, ruleset=Ruleset(); 
     minval=minval(o), maxval=maxval(o), 
@@ -47,22 +47,15 @@ end
 Output that stores the simulation as images and saves a Gif file on completion.
 
 # Arguments:
-- `init`: initialisation `Array` or `NamedTuple` of `Array`
+
+- `init`: initialisation `AbstractArrayArray` or `NamedTuple` of `AbstractArrayArray`.
 
 # Keywords
 
+Storing the gif:
 - `filename`: File path to save the gif file to.
-- `tspan`: `AbstractRange` timespan for the simulation
-- `aux`: NamedTuple of arbitrary input data. Use `get(data, Aux(:key), I...)` 
-    to access from a `Rule` in a type-stable way.
-- `mask`: `BitArray` for defining cells that will/will not be run.
-- `padval`: padding value for grids with neighborhood rules. The default is `zero(eltype(init))`.
-- `font`: `String` font name, used in default `TextConfig`. A default will be guessed.
-- `text`: [`TextConfig`](@ref) object or `nothing` for no text.
-- `scheme`: ColorSchemes.jl scheme, or `Greyscale()`
-- `renderer`: [`Renderer`](@ref)
-- `minval`: minimum value(s) to set colour maximum
-- `maxval`: maximum values(s) to set colour minimum
+
+$IMAGEOUTPUT_KEYWORDS
 """
 mutable struct GifOutput{T,F<:AbstractVector{T},E,GC,IC,G,N} <: ImageOutput{T,F}
     frames::F

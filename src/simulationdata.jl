@@ -16,6 +16,7 @@ funciton applyrule(data::AbstractSimData, rule::SomeRule{Tuple{A,B}},W}, (a, b),
     grid_a = data[A]
     grid_b = data[B]
     ...
+end
 ```
 
 In single-grid simulations `AbstractSimData` objects can be indexed directly as 
@@ -197,7 +198,9 @@ end
 [`AbstractSimData`](@ref) object that is passed to rules. 
 Basically a trimmed-down version of [`SimData`](@ref).
 
-Passing a smaller object to rules leads to faster GPU compilation.
+The simplified object actually passed to rules with the current design.
+
+Passing a smaller object than `SimData` to rules leads to faster GPU compilation.
 """
 struct RuleData{S<:Tuple,G<:NamedTuple,E,Se,F,CF,AF} <: AbstractSimData{S}
     grids::G
