@@ -51,8 +51,12 @@ export add!, sub!, min!, max!, and!, or!, xor!
 export Rule, NeighborhoodRule, CellRule, SetCellRule, SetNeighborhoodRule, SetGridRule
 
 export Cell, Neighbors, SetNeighbors, SetCell, Convolution, SetGrid, Life, CopyTo
+
 export RuleWrapper, Chain, RunIf, RunAt
+
 export AbstractRuleset, Ruleset, StaticRuleset
+
+export AbstractSimData
 
 export Neighborhood, RadialNeighborhood, Window, AbstractKernelNeighborhood, Kernel,
        Moore, AbstractPositionalNeighborhood, Positional, VonNeumann, LayeredPositional

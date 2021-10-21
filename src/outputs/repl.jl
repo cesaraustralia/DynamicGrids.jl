@@ -13,21 +13,18 @@ An output that is displayed directly in the REPL. It can either store or discard
 simulation frames.
 
 # Arguments:
-- `init`: initialisation `Array` or `NamedTuple` of `Array`s.
+
+- `init`: initialisation `AbstractArrayArray` or `NamedTuple` of `AbstractArrayArray`.
 
 # Keywords
 
-- `tspan`: `AbstractRange` timespan for the simulation
-- `mask`: `BitArray` for defining cells that will/will not be run.
-- `aux`: `NamedTuple` of arbitrary input data. Use `get(data, Aux(:key), I...)` 
-    to access from a `Rule` in a type-stable way.
-- `padval`: padding value for grids with neighborhood rules. The default is `zero(eltype(init))`.
-- `fps`: `Real` frames per second to display the simulation
-- `store`: `Bool` whether ot store the simulation frames for later use
 - `color`: a color from Crayons.jl
 - `cutoff`: `Real` cutoff point to display a full or empty cell. Default is `0.5`
 - `style`: `CharStyle` `Block()` or `Braile()` printing. `Braile` uses 1/4 the screen space of `Block`.
 
+$GRAPHICOUTPUT_KEYWORDS
+
+A `GraphicConfig` object can be also passed to the `graphicconfig` keyword, and other keywords will be ignored.
 """
 mutable struct REPLOutput{T,F<:AbstractVector{T},E,GC,Co,St,Cu} <: GraphicOutput{T,F}
     frames::F
@@ -46,10 +43,13 @@ function REPLOutput(;
 end
 
 function showframe(frame::AbstractArray, o::REPLOutput, data::AbstractSimData)
-    # Print the frame
-    _print_to_repl((0, 0), o.color, _replframe(o, frame))
+    showframe(frame, o)
     # Print the timestamp in the top right corner
     _print_to_repl((0, 0), o.color, string("Time $(currenttime(data))"))
+end
+function showframe(frame::AbstractArray, o::REPLOutput)
+    # Print the frame
+    _print_to_repl((0, 0), o.color, _replframe(o, frame))
 end
 
 # Terminal commands

@@ -1,3 +1,19 @@
+
+const IMAGECONFIG_KEYWORDS = """
+- `minval`: Minimum value in the grid(s) to normalise for conversion to an RGB pixel. 
+    A `Vector/Matrix` for multiple grids, matching the `layout` array. 
+    Note: The default is `0`, and will not be updated automatically for the simulation.
+- `maxval`: Maximum value in the grid(s) to normalise for conversion to an RGB pixel. 
+    A `Vector/Matrix` for multiple grids, matching the `layout` array. 
+    Note: The default is `1`, and will not be updated automatically for the simulation.
+- `font`: `String` name of font to search for. A default will be guessed.
+- `text`: `TextConfig()` or `nothing` for no text. Default is `TextConfig(; font=font)`.
+- `scheme`: ColorSchemes.jl scheme(s), or `Greyscale()`. ObjectScheme() by default.
+    A `Vector/Matrix` for multiple grids, matching the `layout` array. 
+- `renderer`: [`Renderer`](@ref) like [`Image`](@ref) or [`Layout`](@ref). Will be detected 
+    automatically. A `Vector/Matrix` for multiple grids, matching the `layout` array. 
+"""
+
 """
     ImageConfig
 
@@ -5,19 +21,13 @@
 
 Common configuration component for all [`ImageOutput`](@ref).
 
-# Keywords
+# Arguments
 
 - `init` output init object, used to generate other arguments automatically.
-- `minval`: Minimum value in the grid(s) to normalise for conversion to an RGB pixel. 
-    A `Vector/Matrix` for multiple grids, matching the `layout` array. 
-- `maxval`: Maximum value in the grid(s) to normalise for conversion to an RGB pixel. 
-    A `Vector/Matrix` for multiple grids, matching the `layout` array. 
-- `font`: `String` name of font to search for. A default will be guessed.
-- `text`: `TextConfig()` or `nothing` for no text. Default is `TextConfig(; font=font)`.
-- `scheme`: ColorSchemes.jl scheme(s), or `Greyscale()`. ObjectScheme() by default.
-    A `Vector/Matrix` for multiple grids, matching the `layout` array. 
-- `renderer`: [`Renderer`](@ref) like [`Image`](@ref) or [`Layout`](@ref) Will be detected 
-    automatically. A `Vector/Matrix` for multiple grids, matching the `layout` array. 
+
+# Keywords
+
+$IMAGECONFIG_KEYWORDS
 """
 struct ImageConfig{IB,Min,Max,Bu,TC}
     renderer::IB
@@ -43,6 +53,15 @@ maxval(ic::ImageConfig) = ic.maxval
 imagebuffer(ic::ImageConfig) = ic.imagebuffer
 textconfig(ic::ImageConfig) = ic.textconfig
 
+const IMAGEOUTPUT_KEYWORDS = """
+$GRAPHICOUTPUT_KEYWORDS
+
+## [`ImageConfig`](@ref) keywords:
+$IMAGECONFIG_KEYWORDS
+
+An `ImageConfig` object can be also passed to the `imageconfig` keyword, and other keywords will be ignored.
+"""
+
 """
     ImageOutput <: GraphicOutput
 
@@ -59,6 +78,27 @@ heavy dependencies on graphics libraries. See
 [DynamicGridsGtk.jl](https://github.com/cesaraustralia/DynamicGridsGtk.jl)
 and [DynamicGridsInteract.jl](https://github.com/cesaraustralia/DynamicGridsInteract.jl)
 for implementations.
+
+# User Arguments for all `GraphicOutput`:
+
+- `init`: initialisation `AbstractArray` or `NamedTuple` of `AbstractArray`
+
+# Minimum user keywords for all `ImageOutput`:
+
+$IMAGEOUTPUT_KEYWORDS
+
+## Internal keywords for constructors of objects extending `GraphicOutput`: 
+
+The default constructor will generate these objects and pass them to the inheriting 
+object constructor, which must accept the following keywords:
+
+- `frames`: a `Vector` of simulation frames (`NamedTuple` or `Array`). 
+- `running`: A `Bool`.
+- `extent` an [`Extent`](@ref) object.
+- `graphicconfig` a [`GraphicConfig`](@ref)object.
+- `imageconfig` a [`ImageConfig`](@ref)object.
+
+Users can also pass in these entire objects if required.
 """
 abstract type ImageOutput{T,F} <: GraphicOutput{T,F} end
 

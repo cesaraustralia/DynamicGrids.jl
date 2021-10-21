@@ -1,9 +1,21 @@
+
+const GRAPHICCONFIG_KEYWORDS = """
+- `fps::Real`: Frames per second.
+- `store::Bool`: Whether to store frames like `ArrayOutput` or to disgard
+    them after visualising. Very long simulation runs may fill available 
+    memory when `store=true`.
+"""
+
 """
     GraphicConfig
 
     GraphicConfig(; fps=25.0, store=false)
 
 Config and variables for graphic outputs.
+
+# Keywords
+
+$GRAPHICCONFIG_KEYWORDS
 """
 mutable struct GraphicConfig{FPS,TS}
     fps::FPS
@@ -27,6 +39,18 @@ end
 
 setstoppedframe!(gc::GraphicConfig, frame::Int) = gc.stoppedframe = frame
 
+const GRAPHICOUTPUT_KEYWORDS = """
+## [`Extent`](@ref) keywords:
+$EXTENT_KEYWORDS
+
+An `Extent` object can be also passed to the `extent` keyword, and other keywords will be ignored.
+
+## [`GraphicConfig`](@ref) keywords:
+$GRAPHICCONFIG_KEYWORDS
+
+A `GraphicConfig` object can be also passed to the `graphicconfig` keyword, and other keywords will be ignored.
+"""
+
 """
     GraphicOutput <: Output
 
@@ -37,16 +61,25 @@ and define a [`showframe`](@ref) method.
 
 See [`REPLOutput`](@ref) for an example.
 
-## Keywords: 
+# User Arguments for all `GraphicOutput`:
 
-The default constructor will generate these objects from other keyword arguments 
-and pass them to the object constructor, which must accept the following:
+- `init`: initialisation `AbstractArray` or `NamedTuple` of `AbstractArray`
+
+# Minimum user keywords for all `GraphicOutput`:
+
+$GRAPHICOUTPUT_KEYWORDS
+
+## Internal keywords for constructors of objects extending `GraphicOutput`: 
+
+The default constructor will generate these objects and pass them to the inheriting 
+object constructor, which must accept the following keywords:
 
 - `frames`: a `Vector` of simulation frames (`NamedTuple` or `Array`). 
 - `running`: A `Bool`.
 - `extent` an [`Extent`](@ref) object.
 - `graphicconfig` a [`GraphicConfig`](@ref)object.
 
+Users can also pass in these entire objects if required.
 """
 abstract type GraphicOutput{T,F} <: Output{T,F} end
 

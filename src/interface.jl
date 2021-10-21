@@ -44,14 +44,33 @@ function applyrule! end
 Precalculates rule fields at each timestep. Define this method if a [`Rule`](@ref)
 has fields that need to be updated over time.
 
-`Rule`s are usually immutable (it's faster), so `modifyrule` is expected to returns a
-new rule object with changes applied to it. Setfield.jl or Acessors.jl may help
-with updating the immutable struct.
+`Rule`s are immutable (it's faster and works on GPU), so `modifyrule` is
+expected to return a new rule object with changes applied to it. Setfield.jl or
+Acessors.jl may help with updating the immutable struct.
 
-The default behaviour is to return the existing rule without change.
+The default behaviour is to return the existing rule without change. Updated rules
+are discarded after use, and the `rule` argument is always the original object passed in.
 
-Updated rules are discarded after use, and the `rule` argument is always the
-original object passed in.
+# Example
+
+We define a rule with a parameter that is the total sum of the grids current,
+and update it for each time-step using `modifyrule`.
+
+This could be used to simulate top-down control e.g. a market mechanism in a
+geographic model that includes agricultural economics.
+
+```jldoctest 
+using DynamicGrids, Setfield
+struct MySummedRule{R,W,T} <: CellRule{R,W}
+    gridsum::T
+end
+function modifyrule(rule::MySummedRule{R,W}, data::AbstractSimData) where {R,W}
+    Setfield.@set rule.gridsum = sum(data[R])
+end
+
+# output
+modifyrule (generic function with 1 method)
+```
 """
 function modifyrule end
 
@@ -117,14 +136,18 @@ Add the value `x` to a grid cell.
 
 ## Example useage
 
-```julia
-function applyrule!(data::AbstractSimData, rule::My{A,B}, state, cellindex) where {A,B}
-
+```jldoctest
+using DynamicGrids
+rule = SetCell{:a}() do data, a, cellindex
     dest, is_inbounds = inbounds(data, (jump .+ cellindex)...)
 
     # Update spotted cell if it's on the grid
-    is_inbounds && add!(data[W], state, dest...)
+    is_inbounds && add!(data[:a], state, dest...)
 end
+
+# output
+SetCell{:a,:a} :
+    f = var"#1#2"
 ```
 """
 function add! end

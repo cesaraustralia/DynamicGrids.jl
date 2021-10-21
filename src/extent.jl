@@ -16,6 +16,17 @@ padval(e::AbstractExtent) = e.padval
 tspan(e::AbstractExtent) = e.tspan # Never type-stable, only access in `modifyrule` methods
 gridsize(extent::AbstractExtent) = gridsize(init(extent))
 
+
+const EXTENT_KEYWORDS = """
+- `init`: initialisation `Array`/`NamedTuple` for grid/s.
+- `mask`: `BitArray` for defining cells that will/will not be run.
+- `aux`: NamedTuple of arbitrary input data. Use `aux(data, Aux(:key))` to access from
+    a `Rule` in a type-stable way.
+- `padval`: padding value for grids with neighborhood rules. The default is 
+    `zero(eltype(init))`.
+- `tspan`: Time span range. Never type-stable, only access this in `modifyrule` methods
+"""
+
 """
     Extent <: AbstractExtent
 
@@ -31,13 +42,7 @@ to `Output` constructors instead of `init`, `mask`, `aux` and `tspan`.
 
 # Arguments/Keywords
 
-- `init`: initialisation `Array`/`NamedTuple` for grid/s.
-- `mask`: `BitArray` for defining cells that will/will not be run.
-- `aux`: NamedTuple of arbitrary input data. Use `aux(data, Aux(:key))` to access from
-    a `Rule` in a type-stable way.
-- `padval`: padding value for grids with neighborhood rules. The default is 
-    `zero(eltype(init))`.
-- `tspan`: Time span range. Never type-stable, only access this in `modifyrule` methods
+$EXTENT_KEYWORDS
 """
 mutable struct Extent{I<:Union{AbstractArray,NamedTuple},
                       M<:Union{AbstractArray,Nothing},

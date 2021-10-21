@@ -213,7 +213,7 @@ SomeRule(;
     someparam=Delay(:grid_a, Month(3))
     otherparam=1.075
 )
-`` `
+```
 
 $EXPERIMENTAL
 """
@@ -260,10 +260,10 @@ frame.
 
 ```julia
 SomeRule(;
-    someparam=Delay(:grid_a, Month(3))
+    someparam=Lag(:grid_a, Month(3))
     otherparam=1.075
 )
-`` `
+```
 
 $EXPERIMENTAL
 """
