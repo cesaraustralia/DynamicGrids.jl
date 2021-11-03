@@ -29,9 +29,10 @@ using Adapt,
 
 import ModelParameters.Flatten
 
+using DimensionalData.LookupArrays, DimensionalData.Dimensions
+
 const DG = DynamicGrids
 const DD = DimensionalData
-
 
 using Base: tail, @propagate_inbounds
 

@@ -1,5 +1,5 @@
 using DynamicGrids, OffsetArrays, Test, Dates
-using DynamicGrids: initdata!, data, init, mask, boundary, source, dest, 
+using DynamicGrids: initdata!, init, mask, boundary, source, dest, 
     sourcestatus, deststatus, gridsize, ruleset, grids, SimData, Extent,
     _updatetime, WritableGridData, tspan, extent
 

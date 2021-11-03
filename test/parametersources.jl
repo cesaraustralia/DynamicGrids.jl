@@ -24,7 +24,7 @@ const DG = DynamicGrids
 
         @testset "the correct frame is calculated for aux data" begin
             dimz = X(1:2), Y(1:2), Ti(15d:5d:25d)
-            seq = DimensionalArray(a, dimz)
+            seq = DimArray(a, dimz)
             init = zero(seq[Ti(1)])
             sd = SimData(Extent(init=init, aux=(seq=seq,), tspan=1d:1d:100d), Ruleset())
             @test DynamicGrids.boundscheck_aux(sd, Aux{:seq}()) == true
@@ -38,8 +38,8 @@ const DG = DynamicGrids
         end
 
         @testset "boundscheck_aux" begin
-            seq = DimensionalArray(a, (X(1:2), Y(1:2), Ti(15d:5d:25d)))
-            bigseq = DimensionalArray(zeros(5, 2, 3), (X(1:5), Y(1:2), Ti(15d:5d:25d)))
+            seq = DimArray(a, (X(1:2), Y(1:2), Ti(15d:5d:25d)))
+            bigseq = DimArray(zeros(5, 2, 3), (X(1:5), Y(1:2), Ti(15d:5d:25d)))
             init = zero(seq[Ti(1)])
             sd = SimData(Extent(init=init, aux=(seq=seq, bigseq=bigseq), tspan=1d:1d:100d), Ruleset())
             @test DynamicGrids.boundscheck_aux(sd, Aux{:seq}()) == true
@@ -49,7 +49,7 @@ const DG = DynamicGrids
 
         @testset "correct values are returned by get" begin
             dimz = X(1:2), Y(1:2), Ti(Date(2001, 1, 15):Day(5):Date(2001, 1, 25))
-            seq = DimensionalArray(a, dimz)
+            seq = DimArray(a, dimz)
             init = zero(seq[Ti(1)])
             data = SimData(Extent(init=init, aux=(seq=seq,), tspan=Date(2001):Day(1):Date(2001, 3)), Ruleset())
             data1 = DG._updatetime(data, 1)

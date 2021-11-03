@@ -31,7 +31,7 @@ end
     simdata, ruletype::Val{<:Rule}, condition::RunIf, rkeys, wkeys, I...
 )
     readval = _readcell(simdata, rkeys, I...)
-    if condition.f(data, readval, I)
+    if condition.f(simdata, readval, I)
         writeval = applyrule(simdata, rule(condition), readval, I)
         _writecell!(simdata, ruletype, wkeys, writeval, I...)
     else

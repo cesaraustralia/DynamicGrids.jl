@@ -1,5 +1,6 @@
 using DynamicGrids, DimensionalData, Dates, Test
 using DynamicGrids: isshowable, frameindex, storeframe!, SimData, stoppedframe
+using DimensionalData.LookupArrays, DimensionalData.Dimensions
 
 # Mostly outputs are tested in integration.jl
 @testset "Output construction" begin
@@ -22,11 +23,11 @@ using DynamicGrids: isshowable, frameindex, storeframe!, SimData, stoppedframe
     @testset "DimensionalData interface" begin
         @test output isa AbstractDimArray{<:Array,1,<:Tuple{<:Ti}}
         @test dims(output) isa Tuple{<:Ti}
-        @test DimensionalData.name(output) == NoName()
+        @test DimensionalData.name(output) == Symbol("")
         @test metadata(output) == NoMetadata()
         da = output[Ti(Between(Date(2002), Date(2003)))]
         @test da isa DimArray{<:Array,1,<:Tuple{<:Ti}}
-        @test index(da) == (Date(2002):Year(1):Date(2002),)
+        @test lookup(da) == (Date(2002):Year(1):Date(2002),)
     end
 
     @testset "errors" begin

@@ -34,10 +34,10 @@ Base.step(o::Output) = step(tspan(o))
 function DimensionalData.dims(o::Output)
     ts = tspan(o)
     val = isstored(o) ? ts : ts[end]:step(ts):ts[end]
-    (Ti(val; mode=Sampled(Ordered(), Regular(step(ts)), Intervals(Start()))),)
+    (Ti(Sampled(val; order=ForwardOrdered(), span=Regular(step(ts)), sampling=Intervals(Start()))),)
 end
 DimensionalData.refdims(o::Output) = ()
-DimensionalData.name(o::Output) = NoName()
+DimensionalData.name(o::Output) = Symbol("")
 DimensionalData.metadata(o::Output) = NoMetadata()
 # Output bebuild just returns a DimArray
 DimensionalData.rebuild(o::Output, data, dims::Tuple, refdims, name, metadata) = 
