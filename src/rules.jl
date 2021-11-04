@@ -226,7 +226,7 @@ rule = let y = y
     end
 end
 # output
-Cell{Tuple{a, b},:b} :
+Cell{Tuple{:a, :b},:b} :
     f = var"#3#4"{Float64}
 ```
 """
@@ -338,7 +338,7 @@ rule = SetCell{Tuple{:a,:b},:b}() do data, (a, b), I
 end
 
 # output
-SetCell{Tuple{a, b},:b} :
+SetCell{Tuple{:a, :b},:b} :
     f = var"#1#2"
 ```
 """
