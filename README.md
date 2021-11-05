@@ -86,20 +86,20 @@ The `init` grid/s contain whatever initialisation data is required to start
 a simulation: the array type, size and element type, as well as providing the
 initial conditions:
 
-```juli
+```julia
 init = rand(Float32, 100, 100)
 ```
 
 An `init` grid can be attached to an `Output`: 
 
-```
+```julia
 output = ArrayOutput(init; tspan=1:100)
 ```
 
 or passed in to `sim!`, where it will take preference over the `init`
 attached to the `Output`, but must be the same type and size:
 
-```
+```julia
 sim!(output, ruleset; init=init)
 ```
 
@@ -145,7 +145,7 @@ about their behaviours that can greatly improve performance through more efficie
 use of caches and parallelisation. Rules can be collected in a `Ruleset`, with some 
 additional arguments to control the simulation:
 
-```
+```julia
 ruleset = Ruleset(Life(2, 3); opt=SparseOpt(), proc=CuGPU())
 ```
 
@@ -206,7 +206,7 @@ First we will define a Forest Fire algorithm that sets the current cell to
 burning, if a neighbor is burning. Dead cells can come back to life, and living
 cells can spontaneously catch fire:
 
-```@example forestfire
+```julia
 using DynamicGrids, ColorSchemes, Colors, BenchmarkTools
 
 const DEAD, ALIVE, BURNING = 1, 2, 3
@@ -248,7 +248,7 @@ Timing the simulation for 200 steps, the performance is quite good. This
 particular CPU has six cores, and we get a 5.25x speedup by using all of them,
 which indicates good scaling:
 
-```@example forestfire
+```julia
 bench_output = ResultOutput(init; tspan=1:200)
 
 julia> 
@@ -262,7 +262,7 @@ julia> @btime sim!($bench_output, $neighbors_rule; proc=ThreadedCPU());
 We can also _invert_ the algorithm, setting cells in the neighborhood to burning
 if the current cell is burning, by using the `SetNeighbors` rule:
 
-```@example forestfire
+```julia
 setneighbors_rule = let prob_combustion=0.0001, prob_regrowth=0.01
     SetNeighbors(Moore(1)) do data, neighborhood, cell, I
         if cell == DEAD
@@ -292,7 +292,7 @@ matter if this happens multiple times, the result is the same._
 
 And in this case (a fairly sparse simulation), this rule is faster:
 
-```juliia
+```julia
 julia> @btime sim!($bench_output, $setneighbors_rule);
   261.969 ms (903 allocations: 2.57 MiB)
 
@@ -310,7 +310,7 @@ and interesting to demonstrate using multiple grids and `SetGrid`.
 This way we call `CUDA.rand!` on the entire parent array of the `:rand` grid,
 using a `SetGrid` rule:
 
-```@example forestfire
+```julia
 using CUDAKernels, CUDA
 
 randomiser = SetGrid{Tuple{},:rand}() do randgrid
@@ -321,7 +321,7 @@ end
 Now we define a Neighbors version for GPU, using the `:rand` grid values
 instead of `rand()`:
 
-```@example forestfire
+```julia
 neighbors_gpu = let prob_combustion=0.0001, prob_regrowth=0.01
     Neighbors{Tuple{:ff,:rand},:ff}(Moore(1)) do data, neighborhood, (cell, rand), I
         if cell == ALIVE
@@ -341,7 +341,7 @@ end
 
 And a SetNeighbors version for GPU:
 
-```@example forestfire
+```julia
 setneighbors_gpu = let prob_combustion=0.0001, prob_regrowth=0.01
     SetNeighbors{Tuple{:ff,:rand},:ff}(Moore(1)) do data, neighborhood, (cell, rand), I
         if cell == DEAD
