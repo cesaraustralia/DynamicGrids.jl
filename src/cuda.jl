@@ -57,7 +57,7 @@ _copyto_output!(outgrid, grid::GridData, proc::GPU) = copyto!(outgrid, gridview(
 for (f, op) in atomic_ops
     atomic_f = Symbol(:atomic_, f)
     @eval begin
-        @propagate_inbounds function ($f)(d::WritableGridData{<:Any,R}, ::CuGPU, x, I...) where R
+        function ($f)(d::WritableGridData{<:Any,R}, ::CuGPU, x, I...) where R
             A = parent(dest(d))
             i = Base._to_linear_index(A, (I .+ R)...)
             (CUDA.$atomic_f)(pointer(A, i), x)
