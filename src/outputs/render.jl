@@ -52,7 +52,7 @@ function render!(
 end
 function render!(
     imagebuffer, ig::SingleGridRenderer, o::ImageOutput, 
-    data::AbstractSimData{S}, grid::AbstractArray;
+    data::AbstractSimData{S}, grid::AbstractArray{<:Any,2};
     name=nothing, time=currenttime(data), accessor=nothing,
     minval=minval(o), maxval=maxval(o),
 ) where S<:Tuple{Y,X} where {Y,X}
@@ -68,7 +68,7 @@ function render!(
 end
 function render!(
     imagebuffer, ig::SingleGridRenderer, o::ImageOutput, 
-    data::AbstractSimData{S}, grid::AbstractArray;
+    data::AbstractSimData{S}, grid::AbstractArray{<:Any,1};
     name=nothing, time=currenttime(data), accessor=nothing,
     minval=minval(o), maxval=maxval(o),
 ) where S<:Tuple{L} where {L}

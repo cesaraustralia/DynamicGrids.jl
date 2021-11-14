@@ -38,13 +38,14 @@ _buffer(hood::Neighborhood) = hood._buffer
 #         i + (j - 1) * (2R + 1) 
 #     end
 # end
-@inline function bufindices(hood::Neighborhood{R}) where R
+@inline bufindices(hood::Neighborhood) = bufindices(hood, _buffer(hood)) 
+@inline function bufindices(hood::Neighborhood{R}, buffer::AbstractArray{<:Any,N}) where {R,N}
     # Offsets can be anywhere in the buffer, specified with
     # all dimensions. Here we transform them to a linear index.
     map(offsets(hood)) do o
         # Calculate strides
         S = 2R + 1
-        strides = ntuple(i -> S^(i-1), S)
+        strides = ntuple(i -> S^(i-1), N)
         # offesets indices are centered, we want them as regular array indices
         # Return the linear index in the square buffer
         return sum(map((i, s) -> (i + R) * s, o, strides)) + 1
@@ -91,7 +92,7 @@ Moore{R,L}(_buffer::B=nothing) where {R,L,B} = Moore{R,L,B}(_buffer)
     end
     return exp
 end
-offsets(hood::Moore{R}) = _offsets(hood, _buffer(hood))
+offsets(hood::Moore) = _offsets(hood, _buffer(hood))
 @generated function _offsets(hood::Moore{R}, buffer::AbstractArray{<:Any,N}) where {R,N}
     exp = Expr(:tuple)
     for I in CartesianIndices(ntuple(_-> -R:R, N))
@@ -293,7 +294,7 @@ end
 A convenience wrapper to build Von-Neumann neighborhoods as
 a [`Positional`](@ref) neighborhood.
 """
-function VonNeumann(radius=1; ndims=2, _buffer=nothing)
+function VonNeumann(radius=1, _buffer=nothing; ndims=2)
     offsets = Tuple{Int,Int}[]
     rng = -radius:radius
     for j in rng, i in rng
