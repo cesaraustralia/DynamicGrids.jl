@@ -50,8 +50,8 @@ end
 function maprule!(data::AbstractSimData, proc::CPU, opt, ruletype::Val, rule, rkeys, wkeys)
     let data=data, proc=proc, opt=opt, rule=rule,
         rkeys=rkeys, wkeys=wkeys, ruletype=ruletype
-        optmap(data, proc, opt, ruletype, rkeys) do i, j
-            cell_kernel!(data, ruletype, rule, rkeys, wkeys, i, j)
+        optmap(data, proc, opt, ruletype, rkeys) do I 
+            cell_kernel!(data, ruletype, rule, rkeys, wkeys, I...)
         end
     end
 end
@@ -112,7 +112,7 @@ function optmap(
                 istart, jstart  = max(istart, 1), max(jstart, 1)
                 for j in jstart:jstop 
                     @simd for i in istart:istop
-                        f(i, j)
+                        f((i, j))
                     end
                 end
             end
@@ -126,19 +126,21 @@ function optmap(
 ) where S<:Tuple{Y,X} where {Y,X}
     procmap(proc, 1:X) do j
         for i in 1:Y
-            f(i, j) # Run rule for each row in column j
+            f((i, j)) # Run rule for each row in column j
         end
     end
 end
+# Use @simd for CellRule
 function optmap(
     f, simdata::AbstractSimData{S}, proc, ::NoOpt, ::Val{<:CellRule}, rkeys
 ) where S<:Tuple{Y,X} where {Y,X}
     procmap(proc, 1:X) do j
         @simd for i in 1:Y
-            f(i, j) # Run rule for each row in column j
+            f((i, j)) # Run rule for each row in column j
         end
     end
 end
+
 # procmap
 # Map kernel over the grid, specialising on Processor
 # Looping over cells or blocks on CPU

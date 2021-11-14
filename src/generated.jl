@@ -64,12 +64,23 @@ end
 # grid, which is 10x or more faster than using a view. 
 # We could possible just use this instead of _update_buffers
 # for the sake of simplicity, with some performance loss.
-@generated function _getwindow(tile::AbstractArray{T}, ::Neighborhood{R}, i, j) where {T,R}
+# @generated function _getwindow(tile::AbstractArray{T,2}, ::Neighborhood{R}, i, j) where {T,R}
+#     S = 2R+1
+#     L = S^2
+#     vals = Expr(:tuple)
+#     for jj in 1:S, ii in 1:S 
+#         push!(vals.args, :(@inbounds tile[$ii + i - 1, $jj + j - 1]))
+#     end
+#     return :(SMatrix{$S,$S,$T,$L}($vals))
+# end
+@generated function _getwindow(tile::AbstractArray{T,N}, ::Neighborhood{R}, I...) where {T,R,N}
     S = 2R+1
-    L = S^2
+    L = S^N
     vals = Expr(:tuple)
-    for jj in 1:S, ii in 1:S 
-        push!(vals.args, :(@inbounds tile[$ii + i - 1, $jj + j - 1]))
+    nh = CartesianIndices(nuple(_ -> OneTo(S), N))
+    for i in 1:L 
+        nhI = map((i1, i2) -> i1 + i2 - 1, I, Tuple(nh[i]))
+        push!(vals.args, :(@inbounds tile[$cI...]))
     end
     return :(SMatrix{$S,$S,$T,$L}($vals))
 end

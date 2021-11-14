@@ -55,16 +55,18 @@ function render!(
     data::AbstractSimData{S}, grid::AbstractArray;
     name=nothing, time=currenttime(data), accessor=nothing,
     minval=minval(o), maxval=maxval(o),
-) where S<:Tuple{Y,X} where {Y,X}
-    for j in 1:X, i in 1:Y
-        @inbounds val = grid[i, j]
-        val = if accessor isa Nothing
-            _access_grid_object(DynamicGrids.accessor(ig), val)
-        else
-            _access_grid_object(accessor, val)
-        end
-        pixel = to_rgb(cell_to_pixel(ig, mask(o), minval, maxval, data, val, (i, j)))
-        @inbounds imagebuffer[i, j] = pixel
+) where S<:Tuple
+    for I in CartesianIndices(map(Base.OneTo, S))
+        # If there is a specific accessor function, use it. This is used in 
+        # visualisations where multiple images come form a single grid holding
+        # multi-field objects
+        accessor = accessor isa Nothing ? DynamicGrids.accessor(ig) : accessor
+        # Get a value from the grid object, maybe with an accessor function
+        @inbounds grid_obj = grid[I]
+        val = _access_grid_object(accessor, grid_obj)
+        # Creta and rgb pixel for the cell.
+        pixel = to_rgb(cell_to_pixel(ig, mask(o), minval, maxval, data, val, Tuple(I)))
+        @inbounds imagebuffer[I] = pixel
     end
     _rendertext!(imagebuffer, textconfig(o), name, time)
     return imagebuffer
@@ -75,7 +77,7 @@ end
 
     Image(f=identity; scheme=ObjectScheme(), zerocolor=nothing, maskcolor=nothing)
 
-Converts output grids to a colorsheme.
+Converts output grids to an image with a colorsheme.
 
 # Arguments
 
