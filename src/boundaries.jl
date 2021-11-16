@@ -31,9 +31,15 @@ end
 # Reset or wrap boundary where required. This allows us to ignore 
 # bounds checks on neighborhoods and still use a wraparound grid.
 _updateboundary!(grids::Tuple) = map(_updateboundary!, grids)
-function _updateboundary!(g::GridData{S,R}) where {S<:Tuple{Y,X},R} where {Y,X}
+function _updateboundary!(g::GridData{<:Any,R}) where R
     R < 1 && return g
     return _updateboundary!(g, boundary(g))
+end
+function _updateboundary!(g::GridData{S,R}, ::Remove) where {S<:Tuple{L},R} where {L}
+    src = parent(source(g))
+    @inbounds src[1:R] .= Ref(padval(g))
+    @inbounds src[L+R+1:L+2R] .= Ref(padval(g))
+    return g
 end
 function _updateboundary!(g::GridData{S,R}, ::Remove) where {S<:Tuple{Y,X},R} where {Y,X}
     src = parent(source(g))
@@ -46,6 +52,16 @@ function _updateboundary!(g::GridData{S,R}, ::Remove) where {S<:Tuple{Y,X},R} wh
     # Bottom middle
     @inbounds src[Y+R+1:Y+2R, R+1:X+R] .= Ref(padval(g))
     status = sourcestatus(g)
+    return g
+end
+function _updateboundary!(g::GridData{S,R}, ::Wrap) where {S<:Tuple{L},R} where {L}
+    src = parent(source(g))
+    startpad = 1:R
+    endpad = L+R+1:L+2R
+    startvals = R+1:2R+1
+    endvals = L:L+R
+    @inbounds copyto!(src, CartesianIndices((startpad,)), src, CartesianIndices((endvals,)))
+    @inbounds copyto!(src, CartesianIndices((endpad,)), src, CartesianIndices((startvals,)))
     return g
 end
 function _updateboundary!(g::GridData{S,R}, ::Wrap) where {S<:Tuple{Y,X},R} where {Y,X}

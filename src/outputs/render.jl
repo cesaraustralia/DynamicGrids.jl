@@ -12,7 +12,14 @@ abstract type Renderer end
 imagesize(p::Renderer, init::NamedTuple) = imagesize(p, first(init))
 imagesize(::Renderer, init::AbstractArray) = size(init)
 
-_allocimage(p::Renderer, init) = fill(ARGB32(0), imagesize(p, init)...)
+# 1D : timespan y axis gets filled during the simulation
+function _allocimage(p::Renderer, init::AbstractArray{<:Any,1}, tspan)
+    fill(ARGB32(0), length(tspan), imagesize(p, init)...)
+end
+# 2D
+function _allocimage(p::Renderer, init::AbstractArray{<:Any,2}, tspan)
+    fill(ARGB32(0), imagesize(p, init)...)
+end
 
 # render!
 # Converts grid/s to an image for viewing.
@@ -219,8 +226,11 @@ renderers(l::Layout) = l.renderers
 
 imagesize(l::Layout, init::NamedTuple) = imagesize(l, first(init))
 imagesize(l::Layout, init::AbstractArray) = imagesize(size(init), size(l.layout))
-imagesize(gs::NTuple{2}, ls::NTuple{2}) = gs .* ls
-imagesize(gs::NTuple{2}, ls::NTuple{1}) = gs .* (first(ls), 1)
+# 1D
+imagesize(gsize::NTuple{1}, lsize::NTuple{1}) = gsize .* lsize
+# 2D
+imagesize(gsize::NTuple{2}, lsize::NTuple{2}) = gsize .* lsize
+imagesize(gsize::NTuple{2}, lsize::NTuple{1}) = gsize .* (first(lsize), 1)
 
 _asrenderer(r::Renderer) = r
 _asrenderer(x) = Image(x)

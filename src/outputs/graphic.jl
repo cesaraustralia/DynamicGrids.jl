@@ -85,7 +85,7 @@ abstract type GraphicOutput{T,F} <: Output{T,F} end
 
 # Generic ImageOutput constructor. Converts an init array to vector of arrays.
 function (::Type{T})(
-    init::Union{NamedTuple,AbstractMatrix}; 
+    init::Union{NamedTuple,AbstractArray}; 
     extent=nothing, graphicconfig=nothing, kw...
 ) where T <: GraphicOutput
     extent = extent isa Nothing ? Extent(; init=init, kw...) : extent

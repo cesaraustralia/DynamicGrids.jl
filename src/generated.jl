@@ -76,13 +76,23 @@ end
 @generated function _getwindow(tile::AbstractArray{T,N}, ::Neighborhood{R}, I...) where {T,R,N}
     S = 2R+1
     L = S^N
+    sze = ntuple(_ -> S, N)
     vals = Expr(:tuple)
-    nh = CartesianIndices(nuple(_ -> OneTo(S), N))
+    vals.args
+    nh = CartesianIndices(map(Base.OneTo, sze))
     for i in 1:L 
-        nhI = map((i1, i2) -> i1 + i2 - 1, I, Tuple(nh[i]))
-        push!(vals.args, :(@inbounds tile[$cI...]))
+        @show i
+        Iargs = map((Tuple(nh[i]))..., 1:N) do nhi, n
+            m = nhi - 1
+            :(I[$n] + $m)
+        end
+        Iexp = Expr(:tuple, Iargs...)
+        exp = :(@inbounds tile[$Iexp...])
+        push!(vals.args, exp)
     end
-    return :(SMatrix{$S,$S,$T,$L}($vals))
+
+    sze_exp = Expr(:curly, :Tuple, sze...)
+    return :(SArray{$sze_exp,$T,$N,$L}($vals))
 end
 
 # _readcell

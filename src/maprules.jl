@@ -80,6 +80,18 @@ function _mapneighborhoodrule!(
     end
     return nothing
 end
+function _mapneighborhoodrule!(
+    data, hoodgrid::GridData{<:Tuple,R}, proc, opt, ruletype, rule, rkeys, wkeys 
+) where {R}
+    for I in CartesianIndices(hoodgrid) 
+        tI = Tuple(I)
+        # Loop over the COLUMN of buffers covering the block
+        buffer = _getwindow(hoodgrid, neighborhood(rule), tI...)
+        @inbounds bufrule = _setbuffer(rule, buffer)
+        cell_kernel!(data, ruletype, bufrule, rkeys, wkeys, tI...)
+    end
+    return nothing
+end
 
 
 ### Rules that don't need a neighborhood buffer ####################
@@ -155,15 +167,15 @@ end
 
 # cell_kernel!
 # runs a rule for the current cell
-@inline function cell_kernel!(simdata, ruletype::Val{<:Rule}, rule, rkeys, wkeys, i, j)
-    readval = _readcell(simdata, rkeys, i, j)
-    writeval = applyrule(simdata, rule, readval, (i, j))
-    _writecell!(simdata, ruletype, wkeys, writeval, i, j)
+@inline function cell_kernel!(simdata, ruletype::Val{<:Rule}, rule, rkeys, wkeys, I...)
+    readval = _readcell(simdata, rkeys, I...)
+    writeval = applyrule(simdata, rule, readval, I)
+    _writecell!(simdata, ruletype, wkeys, writeval, I...)
     writeval
 end
-@inline function cell_kernel!(simdata, ::Val{<:SetRule}, rule, rkeys, wkeys, i, j)
-    readval = _readcell(simdata, rkeys, i, j)
-    applyrule!(simdata, rule, readval, (i, j))
+@inline function cell_kernel!(simdata, ::Val{<:SetRule}, rule, rkeys, wkeys, I...)
+    readval = _readcell(simdata, rkeys, I...)
+    applyrule!(simdata, rule, readval, I)
     nothing
 end
 

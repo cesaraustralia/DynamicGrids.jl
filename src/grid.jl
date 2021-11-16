@@ -119,16 +119,28 @@ end
 # Find the maximum radius required by all rules
 # Add padding around the original init array, offset into the negative
 # So that the first real cell is still 1, 1
-function _addpadding(init::AbstractArray{T,N}, r, padval) where {T,N}
+function _addpadding(init::AbstractArray{T,1}, r, padval) where T
+    l = length(init)
+    paddedsize = l + 2r
+    paddedaxis = -r + 1:l + r
+    sourceparent = fill(convert(T, padval), paddedsize)
+    source = OffsetArray(sourceparent, paddedaxis)
+    # Copy the init array to the middle section of the source array
+    for i in 1:l
+        @inbounds source[i] = init[i]
+    end
+    return source
+end
+function _addpadding(init::AbstractArray{T,2}, r, padval) where T
     h, w = size(init)
     paddedsize = h + 4r, w + 2r
-    paddedindices = -r + 1:h + 3r, -r + 1:w + r
+    paddedaxes = -r + 1:h + 3r, -r + 1:w + r
     pv = convert(eltype(init), padval)
     sourceparent = similar(init, typeof(pv), paddedsize...)
     sourceparent .= Ref(pv)
-    _padless_view(sourceparent, axes(init), r) .= init
-    source = OffsetArray(sourceparent, paddedindices...)
     # Copy the init array to the middle section of the source array
+    _padless_view(sourceparent, axes(init), r) .= init
+    source = OffsetArray(sourceparent, paddedaxes...)
     return source
 end
 

@@ -38,12 +38,12 @@ struct ImageConfig{IB,Min,Max,Bu,TC}
 end
 function ImageConfig(init; 
     font=autofont(), text=TextConfig(; font=font), textconfig=text, 
-    renderer=nothing, minval=0, maxval=1, kw...
+    renderer=nothing, minval=0, maxval=1, tspan=nothing, kw...
 ) 
     # Generate a renderer automatically if it is not passed in
     renderer = renderer isa Nothing ? autorenderer(init; kw...) : renderer
     # Allocate an image buffer based on the renderer and init grids
-    imagebuffer = _allocimage(renderer, init)
+    imagebuffer = _allocimage(renderer, init, tspan)
     ImageConfig(renderer, minval, maxval, imagebuffer, textconfig)
 end
 
@@ -121,7 +121,7 @@ end
 
 # All other keyword arguments are passed to these constructors. 
 # Unused or mis-spelled keyword arguments are ignored.
-function (::Type{T})(init::Union{NamedTuple,AbstractMatrix}; 
+function (::Type{T})(init::Union{NamedTuple,AbstractArray}; 
     extent=nothing, graphicconfig=nothing, imageconfig=nothing, kw...
 ) where T <: ImageOutput
     extent = extent isa Nothing ? Extent(; init=init, kw...) : extent
