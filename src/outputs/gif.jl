@@ -77,7 +77,9 @@ gif(o::GifOutput) = o.gif
 
 # Output/ImageOutput interface methods
 maybesleep(output::GifOutput, f) = nothing
-showimage(image, o::GifOutput, data::AbstractSimData) = gif(o)[:, :, currentframe(data)] .= image 
+function showimage(image, o::GifOutput, data::AbstractSimData)
+    gif(o)[:, :, currentframe(data)] .= image 
+end
 finalisegraphics(o::GifOutput, data::AbstractSimData) = savegif(o)
 
 # The gif is already generated, just save it again if neccessary
@@ -88,9 +90,6 @@ end
 
 # Preallocate the 3 dimensional gif array
 _allocgif(i::ImageConfig, e::Extent) = _allocgif(renderer(i), i::ImageConfig, e::Extent) 
-function _allocgif(::Renderer, i::ImageConfig, e::Extent)
-    zeros(ARGB32, gridsize(e)..., length(tspan(e)))
-end
-function _allocgif(p::Layout, i::ImageConfig, e::Extent)
-    zeros(ARGB32, (gridsize(e) .* size(p.layout))..., length(tspan(e)))
+function _allocgif(r::Renderer, i::ImageConfig, e::Extent)
+    zeros(ARGB32, imagesize(r, e)..., length(tspan(e)))
 end

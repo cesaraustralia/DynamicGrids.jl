@@ -16,6 +16,10 @@ padval(e::AbstractExtent) = e.padval
 tspan(e::AbstractExtent) = e.tspan # Never type-stable, only access in `modifyrule` methods
 gridsize(extent::AbstractExtent) = gridsize(init(extent))
 
+Base.ndims(e::AbstractExtent{<:AbstractArray}) = ndims(init(e))
+Base.ndims(e::AbstractExtent{<:NamedTuple}) = ndims(first(init(e)))
+Base.size(e::AbstractExtent{<:AbstractArray}) = size(init(e))
+Base.size(e::AbstractExtent{<:NamedTuple}) = size(first(init(e)))
 
 const EXTENT_KEYWORDS = """
 - `init`: initialisation `Array`/`NamedTuple` for grid/s.

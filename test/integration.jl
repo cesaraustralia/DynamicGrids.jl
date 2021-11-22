@@ -415,3 +415,38 @@ end
     sim!(output, set_hood, clearcell; opt=SparseOpt())
     @test all(output[3] .=== 0.0)
 end
+
+
+@testset "Single dimension rules" begin
+    init = zeros(Int, 12)
+    init[10] = true
+    rule110 = Neighbors(Moore(1; ndims=1)) do data, hood, C, I
+        L, R = neighbors(hood)
+        (C + R + C * R + L * C * R) % 2
+    end
+    REPLOutput(init; store=false, tspan=1:5, fps=100)
+    output = REPLOutput(init; tspan=1:5, fps=100)
+    @test DynamicGrids.isstored(output)
+    sim!(output, rule110)
+
+    tests = (
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0],
+        [0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0],
+        [0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0],
+        [0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+    )
+    map(tests, output) do t, o
+        @test t == o 
+    end
+
+    init = zeros(Int, 200)
+    init[150] = true
+    filename = "test_1d_gifoutput.gif"
+    output = GifOutput(init; filename=filename, text=nothing, tspan=1:50)
+    sim!(output, rule110)
+    simgif = load(filename)
+    @test simgif == RGB.(output.gif)
+    rm(filename)
+end
+

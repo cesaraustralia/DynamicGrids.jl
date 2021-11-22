@@ -9,16 +9,13 @@ image for display. Frames may be a single grid or a `NamedTuple` of multiple gri
 """
 abstract type Renderer end
 
-imagesize(p::Renderer, init::NamedTuple) = imagesize(p, first(init))
-imagesize(::Renderer, init::AbstractArray) = size(init)
+imagesize(r::Renderer, e::Extent) = imagesize(r, init(e), tspan(e))
+imagesize(r::Renderer, init::NamedTuple, tspan) = imagesize(r, first(init), tspan)
+imagesize(::Renderer, init::AbstractArray, tspan) = (length(tspan), size(init)...)
 
 # 1D : timespan y axis gets filled during the simulation
-function _allocimage(p::Renderer, init::AbstractArray{<:Any,1}, tspan)
-    fill(ARGB32(0), length(tspan), imagesize(p, init)...)
-end
-# 2D
-function _allocimage(p::Renderer, init::AbstractArray{<:Any,2}, tspan)
-    fill(ARGB32(0), imagesize(p, init)...)
+function _allocimage(r::Renderer, init::AbstractArray, tspan)
+    fill(ARGB32(0), imagesize(r, init, tspan)...)
 end
 
 # render!
@@ -224,13 +221,14 @@ end
 layout(l::Layout) = l.layout
 renderers(l::Layout) = l.renderers
 
-imagesize(l::Layout, init::NamedTuple) = imagesize(l, first(init))
-imagesize(l::Layout, init::AbstractArray) = imagesize(size(init), size(l.layout))
+imagesize(l::Layout, init::NamedTuple, tspan) = imagesize(l, first(init), tspan)
+imagesize(l::Layout, init::AbstractArray, tspan) =
+    (length(tspan), _imagesize(size(init), size(l.layout))...)
 # 1D
-imagesize(gsize::NTuple{1}, lsize::NTuple{1}) = gsize .* lsize
+_imagesize(gsize::NTuple{1}, lsize::NTuple{1}) = gsize .* lsize
 # 2D
-imagesize(gsize::NTuple{2}, lsize::NTuple{2}) = gsize .* lsize
-imagesize(gsize::NTuple{2}, lsize::NTuple{1}) = gsize .* (first(lsize), 1)
+_imagesize(gsize::NTuple{2}, lsize::NTuple{2}) = gsize .* lsize
+_imagesize(gsize::NTuple{2}, lsize::NTuple{1}) = gsize .* (first(lsize), 1)
 
 _asrenderer(r::Renderer) = r
 _asrenderer(x) = Image(x)
