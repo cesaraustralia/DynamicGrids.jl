@@ -1,8 +1,8 @@
 using DynamicGrids, Test, Dates
 import DynamicGrids: Remove, NoOpt
 
-life = Life() 
-@test occursin("Life{:_default_,:_default_}", sprint((io, s) -> show(io, MIME"text/plain"(), s), life))
+life = Life()
+@test occursin("Life", sprint((io, s) -> show(io, MIME"text/plain"(), s), life))
 
 rs = Ruleset(; 
     rules=(Life(),), 
@@ -10,8 +10,9 @@ rs = Ruleset(;
     boundary=Remove(),
     opt=NoOpt(),
 )
-@test occursin("Ruleset =", sprint((io, s) -> show(io, MIME"text/plain"(), s), rs))
-@test occursin("Life{:_default_,:_default_}", sprint((io, s) -> show(io, MIME"text/plain"(), s), rs))
+rs
+@test occursin("Ruleset", sprint((io, s) -> show(io, MIME"text/plain"(), s), rs))
+@test occursin("Life", sprint((io, s) -> show(io, MIME"text/plain"(), s), rs))
 @test occursin(r"opt = .*NoOpt()", "nopt = DynamicGrids.NoOpt()")
 @test occursin(r"boundary = .*Remove()", sprint((io, s) -> show(io, MIME"text/plain"(), s), rs))
 
@@ -27,6 +28,6 @@ end
 
 chain = Chain(rule1, rule2)
 
-@test occursin("Chain{Tuple{:a,:b,:d},Tuple{:b,:c}}", sprint((io, s) -> show(io, MIME"text/plain"(), s), chain))
-@test occursin("    Cell{:a,:b}", sprint((io, s) -> show(io, MIME"text/plain"(), s), chain))
-@test occursin("    Cell{Tuple{:b,:d},:c}", sprint((io, s) -> show(io, MIME"text/plain"(), s), chain))
+@test occursin("Chain{Tuple{:a, :b, :d},Tuple{:b, :c}}", sprint((io, s) -> show(io, MIME"text/plain"(), s), chain))
+@test occursin("Cell{:a,:b}", sprint((io, s) -> show(io, MIME"text/plain"(), s), chain))
+@test occursin("Cell{Tuple{:b, :d},:c}", sprint((io, s) -> show(io, MIME"text/plain"(), s), chain))
