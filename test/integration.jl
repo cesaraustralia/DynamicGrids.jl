@@ -5,15 +5,14 @@ using DynamicGrids: Extent, SimData, gridview
 if CUDAKernels.CUDA.has_cuda_gpu()
     CUDAKernels.CUDA.allowscalar(false)
     hardware = (SingleCPU(), ThreadedCPU(), CPUGPU())
-    # hardware = (CPUGPU(),) 
 else
     hardware = (SingleCPU(), ThreadedCPU(), CPUGPU())
 end
 opts = (NoOpt(), SparseOpt())
 
-proc = CPUGPU()
+# proc = CPUGPU()
 proc = SingleCPU()
-opt = SparseOpt()
+# opt = SparseOpt()
 opt = NoOpt()
 
 # life glider sims
@@ -133,9 +132,7 @@ test5_6 = (
             ]
 )
 
-test = test5_6
-proc = SingleCPU()
-proc = CPUGPU()
+# test = test5_6
 
 @testset "Life simulation Wrap" begin
     # Test on two sizes to test half blocks on both axes
@@ -152,7 +149,6 @@ proc = CPUGPU()
                     opt=opt,
                 )
                 @testset "$(nameof(typeof(proc))) $(nameof(typeof(opt))) results match glider behaviour" begin
-                    rule = Life(neighborhood=Moore{1}())
                     output = ArrayOutput(test[:init], tspan=tspan)
                     sim!(output, ruleset)
                     @test output[2] == test[:test2]
@@ -167,16 +163,17 @@ proc = CPUGPU()
                     # Need Array here to copy from GPU to CPU
                     @test Array(gridview(first(simdata))) == test[:init]
                     simdata = step!(simdata)
-                    @test Array(gridview(first(simdata))) == test[:test2] # || (println("s2"); display(Array(gridview(first(simdata)))); display(test[:test2]))
+                    Array(gridview(first(simdata)))
+                    @test Array(gridview(first(simdata))) == test[:test2] || (println("s2"); display(Array(gridview(first(simdata)))); display(test[:test2]))
                     simdata = step!(simdata)
-                    @test Array(gridview(first(simdata))) == test[:test3] # || (println("s3"); display(Array(gridview(first(simdata)))); display(test[:test3]))
+                    @test Array(gridview(first(simdata))) == test[:test3] || (println("s3"); display(Array(gridview(first(simdata)))); display(test[:test3]))
                     simdata = step!(simdata)
-                    @test Array(gridview(first(simdata))) == test[:test4] # || (println("s4"); display(Array(gridview(first(simdata)))); display(test[:test4]))
+                    @test Array(gridview(first(simdata))) == test[:test4] || (println("s4"); display(Array(gridview(first(simdata)))); display(test[:test4]))
                     simdata = step!(simdata)
-                    @test Array(gridview(first(simdata))) == test[:test5] # || (println("s5"); display(Array(gridview(first(simdata)))); display(test[:test5]))
+                    @test Array(gridview(first(simdata))) == test[:test5] || (println("s5"); display(Array(gridview(first(simdata)))); display(test[:test5]))
                     simdata = step!(simdata)
                     simdata = step!(simdata)
-                    @test Array(gridview(first(simdata))) == test[:test7] # || (println("s7"); display(Array(gridview(first(simdata)))); display(test[:test7]))
+                    @test Array(gridview(first(simdata))) == test[:test7] || (println("s7"); display(Array(gridview(first(simdata)))); display(test[:test7]))
                 end
             end
             cyclej!(test)
@@ -247,6 +244,11 @@ end
         output = ArrayOutput((a=init_,); tspan=1:7)
         for proc in hardware, opt in opts
             sim!(output, rule; boundary=Remove(), proc=proc, opt=opt)
+            output[2][:a]
+            output[3][:a]
+            output[4][:a]
+            output[5][:a]
+            output[7][:a]
             @test output[2][:a] == test2_rem
             @test output[3][:a] == test3_rem
             @test output[4][:a] == test4_rem
@@ -267,6 +269,7 @@ end
         sim!(remove_output_ref, remove_rs_ref)
         sim!(wrap_output_ref, wrap_rs_ref)
         for proc in hardware, opt in opts
+
             @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
                 @testset "Wrap" begin
                     wrap_rs = Ruleset(rule; boundary=Wrap(), proc=proc, opt=opt)
@@ -290,6 +293,7 @@ end
                     @test remove_output_ref[100] == remove_output[100]
                 end
             end
+
         end
     end
 
@@ -416,13 +420,12 @@ end
     @test all(output[3] .=== 0.0)
 end
 
-
 @testset "Single dimension rules" begin
-    init = zeros(Int, 12)
-    init[10] = true
-    rule110 = Neighbors(Moore(1; ndims=1)) do data, hood, C, I
-        L, R = neighbors(hood)
-        (C + R + C * R + L * C * R) % 2
+    init = zeros(Int, 7)
+    init[6] = true
+    rule110 = Neighbors(Moore(1; ndims=1)) do data, hood, c, I
+        l, r = neighbors(hood)
+        (c + r + c * r + l * c * r) % 2
     end
     REPLOutput(init; store=false, tspan=1:5, fps=100)
     output = REPLOutput(init; tspan=1:5, fps=100)
@@ -430,18 +433,18 @@ end
     sim!(output, rule110)
 
     tests = (
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0],
-        [0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0],
-        [0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0],
-        [0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+        [0, 0, 0, 0, 0, 1, 0,],
+        [0, 0, 0, 0, 1, 1, 0,],
+        [0, 0, 0, 1, 1, 1, 0,],
+        [0, 0, 1, 1, 0, 1, 0,],
+        [0, 1, 1, 1, 1, 1, 0,],
     )
     map(tests, output) do t, o
         @test t == o 
     end
 
-    init = zeros(Int, 200)
-    init[150] = true
+    init = zeros(Int, 50)
+    init[50] = true
     filename = "test_1d_gifoutput.gif"
     output = GifOutput(init; filename=filename, text=nothing, tspan=1:50)
     sim!(output, rule110)

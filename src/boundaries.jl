@@ -51,7 +51,6 @@ function _updateboundary!(g::GridData{S,R}, ::Remove) where {S<:Tuple{Y,X},R} wh
     @inbounds src[1:R, R+1:X+R] .= Ref(padval(g))
     # Bottom middle
     @inbounds src[Y+R+1:Y+2R, R+1:X+R] .= Ref(padval(g))
-    status = sourcestatus(g)
     return g
 end
 function _updateboundary!(g::GridData{S,R}, ::Wrap) where {S<:Tuple{L},R} where {L}
@@ -104,35 +103,9 @@ function _updateboundary!(g::GridData{S,R}, ::Wrap) where {S<:Tuple{Y,X},R} wher
     @inbounds copyto!(src, CartesianIndices((endpadrow, endpadcol)),
                       src, CartesianIndices((startrow, startcol)))
 
-    _wrapstatus!(sourcestatus(g))
+    _wrapopt!(g)
     return g
 end
 
-# _wrapstatus!
-# Copies status from opposite sides/corners in Wrap boundary mode
-_wrapstatus!(status::Nothing) = nothing
-function _wrapstatus!(status::AbstractArray)
-    # !!! The end row/column is always empty !!!
-    # Its padding for block opt. So we work with end-1 and end-2
-    
-    # This could be further optimised by not copying the end-2 
-    # block column/row when the blocks are aligned at both ends.
-    
-    # Sides
-    status[1, :] .|= status[end-1, :] .| status[end-2, :]
-    status[:, 1] .|= status[:, end-1] .| status[:, end-2]
-    status[end-1, :] .|= status[1, :]
-    status[:, end-1] .|= status[:, 1]
-    status[end-2, :] .|= status[1, :]
-    status[:, end-2] .|= status[:, 1]
-
-    # Corners
-    status[1, 1] |= status[end-1, end-1] | status[end-2, end-1] | 
-                    status[end-1, end-2] | status[end-2, end-2]
-    status[end-1, 1] |= status[1, end-1] | status[1, end-2]
-    status[end-2, 1] |= status[1, end-1] | status[1, end-2]
-    status[1, end-1] |= status[end-1, 1] | status[end-2, 1]
-    status[1, end-2] |= status[end-1, 1] | status[end-2, 1]
-    status[end-1, end-1] |= status[1, 1] 
-    status[end-2, end-2] |= status[1, 1] 
-end
+_wrapopt!(g) = _wrapopt!(g, opt(g))
+_wrapopt!(g, ::PerformanceOpt) = g

@@ -20,14 +20,10 @@ end
 @time @safetestset "condition" begin include("condition.jl") end
 @time @safetestset "outputs" begin include("outputs.jl") end
 @time @safetestset "transformed" begin include("transformed.jl") end
-@time @safetestset "chain" begin include("chain.jl") end
 @time @safetestset "integration" begin include("integration.jl") end
 @time @safetestset "objectgrids" begin include("objectgrids.jl") end
 @time @safetestset "parametersources" begin include("parametersources.jl") end
-# TODO move these tests to 1.6 syntax, or test both?
-if VERSION >= v"1.5.0" && VERSION < v"1.6.0"
-    @time @safetestset "show" begin include("show.jl") end
-end
+@time @safetestset "show" begin include("show.jl") end
 # ImageMagick breaks in windows travis for some reason
 if !Sys.iswindows() 
     @time @safetestset "image" begin include("image.jl") end

@@ -11,7 +11,7 @@ function Base.show(io::IO, mime::MIME"text/plain", ruleset::Ruleset)
     end
     print(io, indent * ")\n")
     _showsettings(ctx, mime, settings(ruleset))
-    print(io, ")\n")
+    print(io, ")\n\n")
     ModelParameters.printparams(io, ruleset)
 end
 

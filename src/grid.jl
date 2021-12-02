@@ -19,8 +19,7 @@ for optimisations.
 abstract type GridData{S,R,T,N} <: StaticArray{S,T,N} end
 
 function (::Type{G})(d::GridData{S,R,T,N}) where {G<:GridData,S,R,T,N}
-    args = source(d), dest(d), mask(d), proc(d), opt(d), boundary(d), padval(d),
-        sourcestatus(d), deststatus(d)
+    args = source(d), dest(d), mask(d), proc(d), opt(d), boundary(d), padval(d), optdata(d)
     G{S,R,T,N,map(typeof, args)...}(args...)
 end
 function ConstructionBase.constructorof(::Type{T}) where T<:GridData{S,R} where {S,R}
@@ -32,12 +31,11 @@ radius(d::GridData{<:Any,R}) where R = R
 mask(d::GridData) = d.mask
 proc(d::GridData) = d.proc
 opt(d::GridData) = d.opt
+optdata(d::GridData) = d.optdata
 boundary(d::GridData) = d.boundary
 padval(d::GridData) = d.padval
 source(d::GridData) = d.source
 dest(d::GridData) = d.dest
-sourcestatus(d::GridData) = d.sourcestatus
-deststatus(d::GridData) = d.deststatus
 
 # Get the size of the grid
 gridsize(d::GridData) = size(d)
@@ -68,8 +66,7 @@ dest_array_or_view(d::GridData) = dest(d) isa OffsetArray ? destview(d) : dest(d
 function Base.copy!(grid::GridData{<:Any,R}, A::AbstractArray) where R
     pad_axes = map(ax -> ax .+ R, axes(A))
     copyto!(parent(source(grid)), CartesianIndices(pad_axes), A, CartesianIndices(A))
-    _updatestatus!(grid)
-    return grid
+    return _update_optdata!(grid)
 end
 function Base.copy!(A::AbstractArray, grid::GridData{<:Any,R}) where R
     pad_axes = map(ax -> ax .+ R, axes(A))
@@ -98,22 +95,7 @@ end
     getindex(source(d), i1, I...)
 end
 
-
 # Local utility methods
-
-# _swapsource => ReadableGridData
-# Swap source and dest arrays of a grid
-_swapsource(d::Tuple) = map(_swapsource, d)
-function _swapsource(grid::GridData)
-    src = grid.source
-    dst = grid.dest
-    @set! grid.dest = src
-    @set! grid.source = dst
-    srcstatus = grid.sourcestatus
-    dststatus = grid.deststatus
-    @set! grid.deststatus = srcstatus
-    return @set grid.sourcestatus = dststatus
-end
 
 # _addpadding => OffsetArray{T,N}
 # Find the maximum radius required by all rules
@@ -144,41 +126,23 @@ function _addpadding(init::AbstractArray{T,2}, r, padval) where T
     return source
 end
 
-
-# SparseOpt methods
-
-# _build_status => (Matrix{Bool}, Matrix{Bool})
-# Build block-status arrays
-# We add an additional block that is never used so we can 
-# index into it in the block loop without checking
-function _build_status(opt::SparseOpt, source, r)
-    hoodsize = 2r + 1
-    blocksize = 2r
-    nblocs = _indtoblock.(size(source), blocksize) .+ 1
-    sourcestatus = zeros(Bool, nblocs)
-    deststatus = zeros(Bool, nblocs)
-    sourcestatus, deststatus
+# _swapsource => ReadableGridData
+# Swap source and dest arrays of a grid
+_swapsource(d::Tuple) = map(_swapsource, d)
+function _swapsource(grid::GridData)
+    src = grid.source
+    dst = grid.dest
+    @set! grid.dest = src
+    @set! grid.source = dst
+    _swapoptdata(opt(grid), grid)
 end
-_build_status(opt::PerformanceOpt, init, r) = nothing, nothing
 
-# _updatestatus!
-# Initialise the block status array.
-# This tracks whether anything has to be done in an area of the main array.
-_updatestatus!(grid::GridData) = _updatestatus!(opt(grid), grid)
-function _updatestatus!(opt::SparseOpt, grid)
-    blocksize = 2 * radius(grid)
-    src = parent(source(grid))
-    for I in CartesianIndices(src)
-        # Mark the status block (by default a non-zero value)
-        if _isactive(src[I], opt)
-            bi = _indtoblock.(Tuple(I), blocksize)
-            @inbounds sourcestatus(grid)[bi...] = true
-            @inbounds deststatus(grid)[bi...] = true
-        end
-    end
-    return nothing
-end
-_updatestatus!(opt, grid) = nothing
+_swapoptdata(opt::PerformanceOpt, grid::GridData) = grid
+
+_build_optdata(opt::PerformanceOpt, init, r) = nothing
+
+_update_optdata!(grid::GridData) = _update_optdata!(grid, opt(grid))
+_update_optdata!(grid, opt) = grid
 
 # _indtoblock
 # Convert regular index to block index
@@ -186,7 +150,7 @@ _updatestatus!(opt, grid) = nothing
 
 # _blocktoind
 # Convert block index to regular index
-@inline _blocktoind(x, blocksize) = (x - 1) * blocksize + 1
+@inline _blocktoind(x::Int, blocksize::Int) = (x - 1) * blocksize + 1
 
 """
     ReadableGridData <: GridData
@@ -198,7 +162,7 @@ _updatestatus!(opt, grid) = nothing
 Reads are always from the `source` array.
 """
 struct ReadableGridData{
-    S<:Tuple,R,T,N,Sc,D,M,P<:Processor,Op<:PerformanceOpt,Bo,PV,SSt,DSt
+    S<:Tuple,R,T,N,Sc,D,M,P<:Processor,Op<:PerformanceOpt,Bo,PV,OD
 } <: GridData{S,R,T,N}
     source::Sc
     dest::D
@@ -207,15 +171,14 @@ struct ReadableGridData{
     opt::Op
     boundary::Bo
     padval::PV
-    sourcestatus::SSt
-    deststatus::DSt
+    optdata::OD
 end
 function ReadableGridData{S,R}(
     source::Sc, dest::D, mask::M, proc::P, opt::Op, boundary::Bo, 
-    padval::PV, sourcestatus::SSt, deststatus::DSt
-) where {S,R,Sc<:AbstractArray{T,N},D,M,P,Op,Bo,PV,SSt,DSt} where {T,N}
-    ReadableGridData{S,R,T,N,Sc,D,M,P,Op,Bo,PV,SSt,DSt}(
-        source, dest, mask, proc, opt, boundary, padval, sourcestatus, deststatus
+    padval::PV, optdata::OD
+) where {S,R,Sc<:AbstractArray{T,N},D,M,P,Op,Bo,PV,OD} where {T,N}
+    ReadableGridData{S,R,T,N,Sc,D,M,P,Op,Bo,PV,OD}(
+        source, dest, mask, proc, opt, boundary, padval, optdata
     )
 end
 @inline function ReadableGridData{S,R}(
@@ -226,20 +189,15 @@ end
         source = _addpadding(init, R, padval)
         dest = _addpadding(init, R, padval)
     else
-        # TODO: SparseOpt with no radius
-        if opt isa SparseOpt
-            opt = NoOpt()
-        end
         source = deepcopy(init)
         dest = deepcopy(init)
     end
-    sourcestatus, deststatus = _build_status(opt, source, R)
+    optdata = _build_optdata(opt, source, R)
 
     grid = ReadableGridData{S,R}(
-        source, dest, mask, proc, opt, boundary, padval, sourcestatus, deststatus
+        source, dest, mask, proc, opt, boundary, padval, optdata
     )
-    _updatestatus!(grid)
-    return grid
+    return _update_optdata!(grid)
 end
 
 function Base.parent(d::ReadableGridData{S,<:Any,T,N}) where {S,T,N}
@@ -262,7 +220,7 @@ This means that using e.g. `+=` is not supported. Instead use `add!`.
 """
 struct WritableGridData{
     S<:Tuple,R,T,N,Sc<:AbstractArray{T,N},D<:AbstractArray{T,N},
-    M,P<:Processor,Op<:PerformanceOpt,Bo,PV,SSt,DSt
+    M,P<:Processor,Op<:PerformanceOpt,Bo,PV,OD
 } <: GridData{S,R,T,N}
     source::Sc
     dest::D
@@ -271,15 +229,14 @@ struct WritableGridData{
     opt::Op
     boundary::Bo
     padval::PV
-    sourcestatus::SSt
-    deststatus::DSt
+    optdata::OD
 end
 function WritableGridData{S,R}(
     source::Sc, dest::D, mask::M, proc::P, opt::Op, 
-    boundary::Bo, padval::PV, sourcestatus::SSt, deststatus::DSt
-) where {S,R,Sc<:AbstractArray{T,N},D<:AbstractArray{T,N},M,P,Op,Bo,PV,SSt,DSt} where {T,N}
+    boundary::Bo, padval::PV, optdata::OD
+) where {S,R,Sc<:AbstractArray{T,N},D<:AbstractArray{T,N},M,P,Op,Bo,PV,OD} where {T,N}
     WritableGridData{S,R,T,N,Sc,D,M,P,Op,Bo,PV,SSt,DSt}(
-        source, dest, mask, proc, opt, boundary, padval, sourcestatus, deststatus
+        source, dest, mask, proc, opt, boundary, padval, optdata
     )
 end
 
@@ -299,29 +256,21 @@ end
     _setindex!(d, proc(d), x, i1, I...)
 end
 
-@propagate_inbounds function _setindex!(d::WritableGridData, opt::SingleCPU, x, I...)
+@propagate_inbounds function _setindex!(d::WritableGridData, proc::SingleCPU, x, I...)
     @boundscheck checkbounds(dest(d), I...)
-    @inbounds _setdeststatus!(d, x, I...)
+    @inbounds _setoptindex!(d, x, I...)
     @inbounds dest(d)[I...] = x
 end
 @propagate_inbounds function _setindex!(d::WritableGridData, proc::ThreadedCPU, x, I...)
     # Dest status is not threadsafe, even if the 
     # setindex itself is safe. So we LOCK
     lock(proc)
-    @inbounds _setdeststatus!(d, x, I...)
+    @inbounds _setoptindex!(d, x, I...)
     unlock(proc)
     @inbounds dest(d)[I...] = x
 end
 
-# _setdeststatus!
-# Sets the status of the destination block that the current index is in.
-# It can't turn of block status as the block is larger than the cell
-# But should be used inside a LOCK
-_setdeststatus!(d::WritableGridData{<:Any,R}, x, I...) where R = 
-    _setdeststatus!(d, opt(d), x, I...)
-function _setdeststatus!(d::WritableGridData{<:Any,R}, opt::SparseOpt, x, I...) where R
-    blockindex = _indtoblock.(I .+ R, 2R)
-    @inbounds deststatus(d)[blockindex...] |= !(opt.f(x))
-    return nothing
-end
-_setdeststatus!(d::WritableGridData{<:Any,R}, opt::PerformanceOpt, x, I...) where R = nothing
+# _setoptindex!
+# Do anything the optimisation needs on `setindex`
+_setoptindex!(d::WritableGridData{<:Any,R}, x, I...) where R = _setoptindex!(d, opt(d), x, I...)
+_setoptindex!(d::WritableGridData{<:Any,R}, opt::PerformanceOpt, x, I...) where R = nothing

@@ -24,41 +24,25 @@ kernel_setup(::CPUGPU) = KernelAbstractions.CPU(), 1
 function maprule!(
     data::AbstractSimData, proc::GPU, opt, ruletype::Val{<:Rule}, rule, rkeys, wkeys
 )
-    kernel! = ka_cell_kernel!(kernel_setup(proc)...)
+    kernel! = ka_rule_kernel!(kernel_setup(proc)...)
     kernel!(data, ruletype, rule, rkeys, wkeys; ndrange=gridsize(data)) |> wait
-end
-function maprule!(
-    data::AbstractSimData, proc::GPU, opt, 
-    ruletype::Val{<:NeighborhoodRule}, rule, rkeys, wkeys
-)
-    kernel! = ka_neighborhood_kernel!(kernel_setup(proc)...)
-    kernel!(data, opt, ruletype, rule, rkeys, wkeys, ndrange=gridsize(data)) |> wait
     return nothing
 end
 
-# ka_neighborhood_kernel!
+# ka_rule_kernel!
 # Runs cell_kernel! on GPU after retrieving the global index
 # and setting the neighborhood buffer to a SArray window retrieved 
 # from the first (neighborhood) grid
-@kernel function ka_neighborhood_kernel!(
-    data, opt, ruletype::Val{<:NeighborhoodRule}, rule, rkeys, wkeys
-)
+@kernel function ka_rule_kernel!(data, ruletype::Val{<:NeighborhoodRule}, rule, rkeys, wkeys)
     I = @index(Global, NTuple)
-    src = parent(source(_firstgrid(data, rkeys)))
-    buf = _getwindow(src, neighborhood(rule), I...)
-    bufrule = _setbuffer(rule, buf)
-    cell_kernel!(data, ruletype, bufrule, rkeys, wkeys, I...)
+    neighborhood_kernel!(data, _firstgrid(data, rkeys), ruletype, rule, rkeys, wkeys, I...)
     nothing
 end
-
-# ka_cell_kernel!
-# Runs cell_kernel! on GPU after retrieving the global index
-@kernel function ka_cell_kernel!(data, ruletype::Val, rule, rkeys, wkeys)
+@kernel function ka_rule_kernel!(data, ruletype::Val, rule, rkeys, wkeys)
     I = @index(Global, NTuple)
     cell_kernel!(data, ruletype, rule, rkeys, wkeys, I...)
     nothing
 end
-
 
 ### Indexing. UNSAFE / LOCKS required
 

@@ -222,7 +222,7 @@ end
     grey = Greyscale()
     multiinit = (a=init, b=2init)
     rndr = Layout([:a nothing :b], [grey nothing leonardo])
-    @test DynamicGrids.imagesize(rndr, init) == (2, 6)
+    @test DynamicGrids.imagesize(rndr, init, 1:1) == (2, 6)
 
     output = NoDisplayImageOutput(multiinit; 
         tspan=DateTime(2001):Year(1):DateTime(2002), 
@@ -306,7 +306,7 @@ end
     @testset "Layout is the default for NamedTuple of grids" begin
         output = NoDisplayImageOutput(multiinit; tspan=1:10)
         @test renderer(output) isa Layout
-        @test DynamicGrids.imagesize(renderer(output), multiinit) == (2, 4)
+        @test DynamicGrids.imagesize(renderer(output), multiinit, 1:1) == (2, 4)
     end
 end
 

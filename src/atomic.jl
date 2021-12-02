@@ -11,7 +11,7 @@ for (f, op) in atomic_ops
         @propagate_inbounds ($f)(d::WritableGridData{<:Any,R}, x, I...) where R = ($f)(d, proc(d), x, I...)
         @propagate_inbounds function ($f)(d::WritableGridData{<:Any,R}, ::Processor, x, I...) where R
             @boundscheck checkbounds(dest(d), I...)
-            @inbounds _setdeststatus!(d, x, I...)
+            @inbounds _setoptindex!(d, x, I...)
             @inbounds dest(d)[I...] = ($op)(dest(d)[I...], x)
         end
         @propagate_inbounds function ($f)(

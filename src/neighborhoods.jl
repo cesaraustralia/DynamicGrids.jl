@@ -58,7 +58,6 @@ Base.length(hood::Neighborhood{<:Any,<:Any,L}) where L = L
 Base.ndims(hood::Neighborhood{<:Any,N}) where N = N
 Base.iterate(hood::Neighborhood, args...) = iterate(neighbors(hood), args...)
 Base.getindex(hood::Neighborhood, i) = getindex(_buffer(hood), bufindices(hood)[i])
-Base.ndims(hood::Neighborhood) = ndims(_buffer(hood))
 
 """
     RadialNeighborhood <: Neighborhood
@@ -83,7 +82,6 @@ struct Moore{R,N,L,B} <: RadialNeighborhood{R,N,L}
 end
 # Buffer is updated later during the simulation.
 Moore(radius::Int=1; ndims=2) = Moore{radius,ndims}()
-Moore(; radius=1, ndims=2) = Moore{radius,ndims}()
 Moore(args...; radius=1, ndims=2) = Moore{radius,ndims}(args...)
 Moore{R}(_buffer=nothing; ndims=2) where R = Moore{R,ndims,}(_buffer)
 Moore{R,N}(_buffer=nothing) where {R,N} = Moore{R,N,(2R+1)^N-1}(_buffer)
@@ -101,7 +99,7 @@ Moore{R,N,L}(_buffer::B=nothing) where {R,N,L,B} = Moore{R,N,L,B}(_buffer)
     return exp
 end
 offsets(hood::Moore) = _offsets(hood, _buffer(hood))
-@generated function _offsets(hood::Moore{R,N}, buffer::AbstractArray{<:Any,N}) where {R,N}
+@generated function _offsets(hood::Moore{R,N}, buffer) where {R,N}
     exp = Expr(:tuple)
     for I in CartesianIndices(ntuple(_-> -R:R, N))
         if !all(map(iszero, Tuple(I)))
@@ -136,6 +134,7 @@ struct Window{R,N,L,B} <: RadialNeighborhood{R,N,L}
 end
 Window(args...; radius=1, ndims=2) = Window{radius,ndims}(args...)
 Window(R::Int, args...; ndims=2) = Window{R,ndims}(args...)
+Window{R}(_buffer=nothing; ndims=2) where {R} = Window{R,ndims}(_buffer)
 Window{R,N}(_buffer=nothing) where {R,N} = Window{R,N,(2R+1)^N}(_buffer)
 Window{R,N,L}(_buffer::B=nothing) where {R,N,L,B} = Window{R,N,L,B}(_buffer)
 Window(A::AbstractArray) = Window{(size(A, 1) - 1) ÷ 2,ndims(A)}()
@@ -205,7 +204,6 @@ struct Kernel{R,N,L,H,K} <: AbstractKernelNeighborhood{R,N,L}
 end
 Kernel(A::AbstractMatrix) = Kernel(Window(A), A)
 function Kernel(hood::H, kernel::K) where {H<:Neighborhood{R,N,L},K} where {R,N,L}
-    @show length(hood) hood
     length(hood) == length(kernel) || _kernel_length_error(hood, kernel)
     Kernel{R,N,L,H,K}(hood, kernel)
 end

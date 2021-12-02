@@ -64,17 +64,15 @@ end
 # grid, which is 10x or more faster than using a view. 
 # We could possible just use this instead of _update_buffers
 # for the sake of simplicity, with some performance loss.
-@generated function _getwindow(tile::AbstractArray{T,N}, ::Neighborhood{R}, I...) where {T,R,N}
-    R = 1; N=1
+@generated function _getwindow(tile::AbstractArray{T,N}, ::Neighborhood{R,N,L}, I...) where {T,R,N,L}
+    R = 1
     S = 2R+1
     L = S^N
     sze = ntuple(_ -> S, N)
     vals = Expr(:tuple)
-    vals.args
     nh = CartesianIndices(map(Base.OneTo, sze))
-    for i in 1:L 
-        @show i
-        Iargs = map((Tuple(nh[i]))..., 1:N) do nhi, n
+    for i in 1:L
+        Iargs = map(Tuple(nh[i]), 1:N) do nhi, n
             m = nhi - 1
             :(I[$n] + $m)
         end
