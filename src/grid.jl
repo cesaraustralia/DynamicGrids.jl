@@ -48,9 +48,17 @@ gridsize(nt::NamedTuple{(),Tuple{}}) = 0, 0
 # Get a view of the grid, without padding
 gridview(d::GridData) = sourceview(d)
 # Get a view of the grid source, without padding
-sourceview(d::GridData) = view(parent(source(d)), map(a -> a .+ radius(d), axes(d))...)
+sourceview(d::GridData) = _padless_view(source(d), axes(d), radius(d))
 # Get a view of the grid dest, without padding
-destview(d::GridData) = view(parent(dest(d)), map(a -> a .+ radius(d), axes(d))...)
+destview(d::GridData) = _padless_view(dest(d), axes(d), radius(d))
+
+_padless_view(A::OffsetArray, axes, radius) = _padless_view(parent(A), axes, radius)
+function _padless_view(A::AbstractArray, axes, radius)
+    ranges = map(axes) do axis
+        axis .+ radius
+    end
+    return view(A, ranges...)
+end
 # Get an a view of the source, preferring the underlying array if it is not a padded OffsetArray
 source_array_or_view(d::GridData) = source(d) isa OffsetArray ? sourceview(d) : source(d)
 # Get an a view of the dest, preferring the underlying array if it is not a padded OffsetArray
@@ -77,8 +85,8 @@ function Base.copy!(grid::GridData{<:Any,R}, A::AbstractDimArray{T,N}) where {R,
     return grid
 end
 function Base.copy!(dst::GridData{<:Any,RD}, src::GridData{<:Any,RS}) where {RD,RS}
-    dst_axes = map(s -> RD:s + RD, gridsize(dst))
-    src_axes = map(s -> RS:s + RS, gridsize(src))
+    dst_axes = map(s -> RD:s + RD, size(dst))
+    src_axes = map(s -> RS:s + RS, size(src))
     copyto!(parent(source(dst)), CartesianIndices(dst_axes), 
             parent(source(src)), CartesianIndices(src_axes)
     )
@@ -115,12 +123,12 @@ function _addpadding(init::AbstractArray{T,N}, r, padval) where {T,N}
     h, w = size(init)
     paddedsize = h + 4r, w + 2r
     paddedindices = -r + 1:h + 3r, -r + 1:w + r
-    sourceparent = fill(convert(eltype(init), padval), paddedsize)
+    pv = convert(eltype(init), padval)
+    sourceparent = similar(init, typeof(pv), paddedsize...)
+    sourceparent .= Ref(pv)
+    _padless_view(sourceparent, axes(init), r) .= init
     source = OffsetArray(sourceparent, paddedindices...)
     # Copy the init array to the middle section of the source array
-    for j in 1:size(init, 2), i in 1:size(init, 1)
-        @inbounds source[i, j] = init[i, j]
-    end
     return source
 end
 
@@ -222,7 +230,9 @@ end
     return grid
 end
 
-Base.parent(d::ReadableGridData{S,<:Any,T,N}) where {S,T,N} = SizedArray{S,T,N}(sourceview(d))
+function Base.parent(d::ReadableGridData{S,<:Any,T,N}) where {S,T,N}
+    SizedArray{S,T,N}(source_array_or_view(d))
+end
 
 """
     WritableGridData <: GridData
