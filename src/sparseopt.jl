@@ -309,5 +309,10 @@ function cell_to_pixel(p::SparseOptInspector, mask, minval, maxval, data::Abstra
     end
 end
 
-
-
+# Custom SimSettings constructor: SparseOpt does not work on GPU
+function SimSettings(
+    boundary::B, proc::P, opt::SparseOpt, cellsize::C, timestep::T
+) where {B,P<:GPU,C,T}
+    @info "SparseOpt does not work on GPU. Using NoOp instead."
+    SimSettings{B,P,NoOpt,C,T}(boundary, proc, NoOpt(), cellsize, timestep)
+end

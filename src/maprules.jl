@@ -64,23 +64,23 @@ function maprule!(
 end
 
 # 2 dimensional (with procesess and optimisations)
-# function _mapneighborhoodrule!(
-#     data, hoodgrid::GridData{<:Tuple{Y,X},R}, proc, opt, ruletype, rule, rkeys, wkeys 
-# ) where {Y,X,R}
-#     let data=data, hoodgrid=hoodgrid, proc=proc, opt=opt, ruletyp=ruletype, rule=rule, rkeys=rkeys, wkeys=wkeys
-#         B = 2R
-#         # UNSAFE: we must avoid sharing status blocks, it could cause race conditions 
-#         # when setting status from different threads. So we split the grid in 2 interleaved
-#         # sets of rows, so that we never run adjacent rows simultaneously
-#         procmap(proc, 1:2:_indtoblock(Y, B)) do bi
-#             row_kernel!(data, hoodgrid, proc, opt, ruletype, rule, rkeys, wkeys, bi)
-#         end
-#         procmap(proc, 2:2:_indtoblock(Y, B)) do bi
-#             row_kernel!(data, hoodgrid, proc, opt, ruletype, rule, rkeys, wkeys, bi)
-#         end
-#     end
-#     return nothing
-# end
+function _mapneighborhoodrule!(
+    data, hoodgrid::GridData{<:Tuple{Y,X},R}, proc, opt, ruletype, rule, rkeys, wkeys 
+) where {Y,X,R}
+    let data=data, hoodgrid=hoodgrid, proc=proc, opt=opt, ruletyp=ruletype, rule=rule, rkeys=rkeys, wkeys=wkeys
+        B = 2R
+        # UNSAFE: we must avoid sharing status blocks, it could cause race conditions 
+        # when setting status from different threads. So we split the grid in 2 interleaved
+        # sets of rows, so that we never run adjacent rows simultaneously
+        procmap(proc, 1:2:_indtoblock(Y, B)) do bi
+            row_kernel!(data, hoodgrid, proc, opt, ruletype, rule, rkeys, wkeys, bi)
+        end
+        procmap(proc, 2:2:_indtoblock(Y, B)) do bi
+            row_kernel!(data, hoodgrid, proc, opt, ruletype, rule, rkeys, wkeys, bi)
+        end
+    end
+    return nothing
+end
 # Arbitrary dimensions, no proc/opt selection
 function _mapneighborhoodrule!(
     data, hoodgrid::GridData{<:Tuple,R}, proc, opt, ruletype, rule, rkeys, wkeys 
@@ -163,32 +163,29 @@ end
 # access only a single new column of data with the height of 4R, and move the existing
 # data in the neighborhood buffers array across by one column. This saves on reads
 # from the main array.
-# function row_kernel!(
-#     simdata::AbstractSimData, grid::GridData{<:Tuple{Y,X},R}, proc, opt::NoOpt,
-#     ruletype::Val, rule::Rule, rkeys, wkeys, bi
-# ) where {Y,X,R}
-#     B = 2R
-#     i = _blocktoind(bi, B)
-#     i > Y && return nothing
-#     # Loop along the block ROW.
-#     src = parent(source(grid))
-#     buffers = _initialise_buffers(src, Val{R}(), i, 1)
-#     blocklen = min(Y, i + B - 1) - i + 1
-#     for j = 1:X
-#         buffers = _update_buffers(buffers, src, Val{R}(), i, j)
-#         # Loop over the COLUMN of buffers covering the block
-#         for b in 1:blocklen
-#             @inbounds bufrule = _setbuffer(rule, buffers[b])
-#             cell_kernel!(simdata, ruletype, bufrule, rkeys, wkeys, i + b - 1, j)
-#         end
-#     end
-#     return nothing
-# end
+function row_kernel!(
+    simdata::AbstractSimData, grid::GridData{<:Tuple{Y,X},R}, proc, opt::NoOpt,
+    ruletype::Val, rule::Rule, rkeys, wkeys, bi
+) where {Y,X,R}
+    B = 2R
+    i = _blocktoind(bi, B)
+    i > Y && return nothing
+    # Loop along the block ROW.
+    src = parent(source(grid))
+    buffers = _initialise_buffers(src, Val{R}(), i, 1)
+    blocklen = min(Y, i + B - 1) - i + 1
+    for j = 1:X
+        buffers = _update_buffers(buffers, src, Val{R}(), i, j)
+        # Loop over the COLUMN of buffers covering the block
+        for b in 1:blocklen
+            @inbounds bufrule = _setbuffer(rule, buffers[b])
+            cell_kernel!(simdata, ruletype, bufrule, rkeys, wkeys, i + b - 1, j)
+        end
+    end
+    return nothing
+end
 
 #### Utils
-
-@inline _firstgrid(simdata, ::Val{K}) where K = simdata[K]
-@inline _firstgrid(simdata, ::Tuple{Val{K},Vararg}) where K = simdata[K]
 
 _to_readonly(data::Tuple) = map(ReadableGridData, data)
 _to_readonly(data::WritableGridData) = ReadableGridData(data)

@@ -235,7 +235,7 @@ function WritableGridData{S,R}(
     source::Sc, dest::D, mask::M, proc::P, opt::Op, 
     boundary::Bo, padval::PV, optdata::OD
 ) where {S,R,Sc<:AbstractArray{T,N},D<:AbstractArray{T,N},M,P,Op,Bo,PV,OD} where {T,N}
-    WritableGridData{S,R,T,N,Sc,D,M,P,Op,Bo,PV,SSt,DSt}(
+    WritableGridData{S,R,T,N,Sc,D,M,P,Op,Bo,PV,OD}(
         source, dest, mask, proc, opt, boundary, padval, optdata
     )
 end

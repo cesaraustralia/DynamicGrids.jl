@@ -115,3 +115,7 @@ end
 _unwrap(x) = x
 _unwrap(::Val{X}) where X = X
 _unwrap(::Type{<:Val{X}}) where X = X
+
+
+@inline _firstgrid(simdata, ::Val{K}) where K = simdata[K]
+@inline _firstgrid(simdata, ::Tuple{Val{K},Vararg}) where K = simdata[K]
