@@ -146,8 +146,9 @@ rule = SetCell{:a}() do data, a, cellindex
 end
 
 # output
-SetCell{:a,:a} :
+SetCell{:a,:a}(
     f = var"#1#2"
+)
 ```
 """
 function add! end

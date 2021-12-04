@@ -88,7 +88,6 @@ function _updatetime(simdata::AbstractSimData, f::Integer)
     @set simdata.auxframe = _calc_auxframe(simdata)
 end
 
-
 """
     SimData <: AbstractSimData
 
@@ -129,7 +128,9 @@ end
 function SimData(extent::AbstractExtent, ruleset::AbstractRuleset, frames=nothing)
     SimData(_asnamedtuple(extent), ruleset) 
 end
-function SimData(extent::AbstractExtent{<:NamedTuple{Keys}}, ruleset::AbstractRuleset, frames=nothing) where Keys
+function SimData(
+    extent::AbstractExtent{<:NamedTuple{Keys}}, ruleset::AbstractRuleset, frames=nothing
+) where Keys
     # Calculate the neighborhood radus (and grid padding) for each grid
     S = Val{Tuple{gridsize(extent)...}}()
     radii = map(k-> Val{get(radius(ruleset), k, 0)}(), Keys)
@@ -140,7 +141,7 @@ function SimData(extent::AbstractExtent{<:NamedTuple{Keys}}, ruleset::AbstractRu
 end
 function SimData(
     grids::G, extent::AbstractExtent, ruleset::AbstractRuleset, frames
-) where {G<:Union{NamedTuple{<:Any,<:Tuple{GridData,Vararg}},GridData}}
+) where {G<:Union{<:NamedTuple{<:Any,<:Tuple{<:GridData,Vararg}},<:GridData}}
     currentframe = 1; auxframe = nothing
     S = Tuple{gridsize(extent)...}
     # SimData is isbits-only, so use Static versions
@@ -226,3 +227,4 @@ settings(d::RuleData) = d.settings
 boundary(d::RuleData) = boundary(settings(d))
 proc(d::RuleData) = proc(settings(d))
 opt(d::RuleData) = opt(settings(d))
+

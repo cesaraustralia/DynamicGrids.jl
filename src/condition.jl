@@ -19,6 +19,8 @@ rule(runif::RunIf) = runif.rule
 ruletype(runif::RunIf) = ruletype(rule(runif))
 radius(runif::RunIf) = radius(rule(runif))
 neighborhoodkey(runif::RunIf) = neighborhoodkey(rule(runif))
+neighborhood(runif::RunIf) = neighborhood(rule(runif))
+neighbors(runif::RunIf) = neighbors(rule(runif))
 
 @inline function _setbuffer(runif::RunIf{R,W}, buf) where {R,W}
     f = runif.f
@@ -78,6 +80,8 @@ radius(runat::RunAt) = radius(first(rules(runat)))
 # Forward ruletype to the contained rule
 ruletype(runat::RunAt) = ruletype(first(rules(runat)))
 neighborhoodkey(runat::RunAt) = neighborhoodkey(first(rules(runat)))
+neighborhood(runat::RunAt) = neighborhood(neighborhood(rules(runat)))
+neighbors(runat::RunAt) = neighbors(rules(runat))
 
 function sequencerules!(simdata::AbstractSimData, rules::Tuple{<:RunAt,Vararg})
     runat = rules[1]

@@ -6,8 +6,7 @@ import DynamicGrids: applyrule, applyrule!, maprule!, ruletype, extent, source, 
 
 if CUDAKernels.CUDA.has_cuda_gpu()
     CUDAKernels.CUDA.allowscalar(false)
-    # hardware = (SingleCPU(), ThreadedCPU(), CPUGPU(), CuGPU())
-    hardware = (SingleCPU(), ThreadedCPU(), CPUGPU())
+    hardware = (SingleCPU(), ThreadedCPU(), CPUGPU(), CuGPU())
 else
     hardware = (SingleCPU(), ThreadedCPU(), CPUGPU())
 end
@@ -32,11 +31,11 @@ opt = NoOpt()
    @test rule1.f == identity
    rule2 = Neighbors{:a,:b}(identity; neighborhood=Moore(1))
    @test rule1 == rule2
-   @test typeof(rule1)  == Neighbors{:a,:b,typeof(identity),Moore{1,8,Nothing}}
+   @test typeof(rule1) == Neighbors{:a,:b,typeof(identity),Moore{1,2,8,Nothing}}
    rule1 = Neighbors(identity, Moore(1))
    @test rule1.f == identity
    rule2 = Neighbors(identity; neighborhood=Moore(1))
-   @test typeof(rule1)  == Neighbors{:_default_,:_default_,typeof(identity),Moore{1,8,Nothing}}
+   @test typeof(rule1)  == Neighbors{:_default_,:_default_,typeof(identity),Moore{1,2,8,Nothing}}
    @test rule1 == rule2
    @test_throws ArgumentError Neighbors()
    # @test_throws ArgumentError Neighbors(identity, identity, identity)
@@ -44,11 +43,11 @@ opt = NoOpt()
    @test rule1.f == identity
    rule2 = SetNeighbors{:a,:b}(identity; neighborhood=Moore(1))
    @test rule1 == rule2
-   @test typeof(rule1)  == SetNeighbors{:a,:b,typeof(identity),Moore{1,8,Nothing}}
+   @test typeof(rule1)  == SetNeighbors{:a,:b,typeof(identity),Moore{1,2,8,Nothing}}
    rule1 = SetNeighbors(identity, Moore(1))
    @test rule1.f == identity
    rule2 = SetNeighbors(identity; neighborhood=Moore(1))
-   @test typeof(rule1)  == SetNeighbors{:_default_,:_default_,typeof(identity),Moore{1,8,Nothing}}
+   @test typeof(rule1)  == SetNeighbors{:_default_,:_default_,typeof(identity),Moore{1,2,8,Nothing}}
    @test rule1 == rule2
    @test_throws ArgumentError Neighbors()
    # @test_throws ArgumentError Neighbors(identity, identity, identity)
@@ -96,7 +95,7 @@ end
     k = SA[1 0 1; 0 0 0; 1 0 1]
     @test Convolution{:a}(k) == Convolution{:a,:a}(; neighborhood=Kernel(Window(1), k)) 
     buf = SA[1 0 0; 0 0 1; 0 0 1]
-    hood = Window{1,9,typeof(buf)}(buf)
+    hood = Window{1,2,9,typeof(buf)}(buf)
     rule = Convolution{:a,:a}(; neighborhood=Kernel(hood, k))
     @test DynamicGrids.kernel(rule) === k 
     @test applyrule(nothing, rule, 0, (3, 3)) == k ⋅ buf
@@ -297,7 +296,7 @@ end
 struct TestSetCell{R,W} <: SetCellRule{R,W} end
 applyrule!(data, ::TestSetCell, state, index) = 0
 
-@testset "A partial rule that returns zero does nothing" begin
+@testset "A SetRule that returns zero does nothing" begin
     rule = TestSetCell()
     mask = nothing
     for proc in (SingleCPU(), ThreadedCPU()), opt in (NoOpt(), SparseOpt())

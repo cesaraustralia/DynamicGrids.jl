@@ -206,8 +206,9 @@ simplerule = Cell{:a}() do data, a, I
     2a
 end
 # output
-Cell{:a,:a} :
+Cell{:a,:a}(
     f = var"#1#2"
+)
 ```
 
 `data` is an [`AbstractSimData`](@ref) object, `a` is the cell value, and `I`
@@ -226,8 +227,9 @@ rule = let y = y
     end
 end
 # output
-Cell{Tuple{:a, :b},:b} :
+Cell{Tuple{:a, :b},:b}(
     f = var"#3#4"{Float64}
+)
 ```
 """
 struct Cell{R,W,F} <: CellRule{R,W}
@@ -338,8 +340,9 @@ rule = SetCell{Tuple{:a,:b},:b}() do data, (a, b), I
 end
 
 # output
-SetCell{Tuple{:a, :b},:b} :
+SetCell{Tuple{:a, :b},:b}(
     f = var"#1#2"
+)
 ```
 """
 struct SetCell{R,W,F} <: SetCellRule{R,W}
@@ -570,9 +573,10 @@ rule = SetNeighbors{:a}() do data, neighborhood, a, I
     end
 end
 # output
-SetNeighbors{:a,:a} :
+SetNeighbors{:a,:a}(
     f = var"#1#2"
-    neighborhood = Moore{1, 8, Nothing}
+    neighborhood = Moore{1, 2, 8, Nothing}
+)
 ```
 """
 struct SetNeighbors{R,W,F,N} <: SetNeighborhoodRule{R,W}
@@ -635,8 +639,9 @@ rule = SetGrid{:a,:b}() do a, b
 end
 
 # output
-SetGrid{:a,:b} :
+SetGrid{:a,:b}(
     f = var"#1#2"
+)
 ```
 """
 struct SetGrid{R,W,F} <: SetGridRule{R,W}

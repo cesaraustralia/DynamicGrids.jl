@@ -83,15 +83,28 @@ Users can also pass in these entire objects if required.
 """
 abstract type GraphicOutput{T,F} <: Output{T,F} end
 
-# Generic ImageOutput constructor. Converts an init array to vector of arrays.
+# Generic GraphicOutput constructor. Converts an init array to vector of arrays.
 function (::Type{T})(
-    init::Union{NamedTuple,AbstractMatrix}; 
-    extent=nothing, graphicconfig=nothing, kw...
+    init::Union{NamedTuple,AbstractArray}; 
+    extent=nothing, graphicconfig=nothing, store=nothing, kw...
 ) where T <: GraphicOutput
     extent = extent isa Nothing ? Extent(; init=init, kw...) : extent
-    graphicconfig = graphicconfig isa Nothing ? GraphicConfig(; kw...) : graphicconfig
-    T(; frames=[deepcopy(init)], running=false,
-      extent=extent, graphicconfig=graphicconfig, kw...)
+    store = check_stored(extent, store)
+    graphicconfig = graphicconfig isa Nothing ? GraphicConfig(; store, kw...) : graphicconfig
+    T(; frames=[deepcopy(init)], running=false, extent, graphicconfig, store, kw...)
+end
+
+function check_stored(extent, store) 
+    if ndims(extent) == 1 && !(store === true)
+        if store === false
+            @warn "Setting `store=false` may cause errors when visualising a 1-dimensional simulation"
+        else
+            store = true
+        end
+    else
+        store = store isa Nothing ? false : store
+    end
+    return store
 end
  
 graphicconfig(o::Output) = GraphicConfig()

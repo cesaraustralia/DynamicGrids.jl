@@ -9,10 +9,15 @@ image for display. Frames may be a single grid or a `NamedTuple` of multiple gri
 """
 abstract type Renderer end
 
-imagesize(p::Renderer, init::NamedTuple) = imagesize(p, first(init))
-imagesize(::Renderer, init::AbstractArray) = size(init)
+imagesize(r::Renderer, e::Extent) = imagesize(r, init(e), tspan(e))
+imagesize(r::Renderer, init::NamedTuple, tspan) = imagesize(r, first(init), tspan)
+imagesize(::Renderer, init::AbstractArray{<:Any,1}, tspan) = (length(tspan), size(init)...)
+imagesize(::Renderer, init::AbstractArray, tspan) = size(init)
 
-_allocimage(p::Renderer, init) = fill(ARGB32(0), imagesize(p, init)...)
+# 1D : timespan y axis gets filled during the simulation
+function _allocimage(r::Renderer, init, tspan)
+    fill(ARGB32(0), imagesize(r, init, tspan)...)
+end
 
 # render!
 # Converts grid/s to an image for viewing.
@@ -28,7 +33,7 @@ end
 """
     SingleGridRenderer <: Renderer
 
-Abstract supertype for [`Renderer`](@ref)s that convert a single grid 
+Abstract supertype for [`Renderer`](@ref)s that convert a single grid
 into an image array.
 
 The first grid will be displayed if a `SingleGridRenderer` is
@@ -37,34 +42,49 @@ used with a `NamedTuple` of grids.
 abstract type SingleGridRenderer <: Renderer end
 
 function render!(
-    imagebuffer, ig::SingleGridRenderer, o::ImageOutput, data::AbstractSimData, 
+    imagebuffer, ig::SingleGridRenderer, o::ImageOutput, data::AbstractSimData,
     grids::NamedTuple;
     name=string(first(keys(grids))), time=currenttime(data)
 )
     render!(imagebuffer, ig, o, data, first(grids); name=name, time=time)
 end
 function render!(
-    imagebuffer, ig::SingleGridRenderer, o::ImageOutput, data::AbstractSimData, 
+    imagebuffer, ig::SingleGridRenderer, o::ImageOutput, data::AbstractSimData,
     grids::NamedTuple{(DEFAULT_KEY,)};
     name=nothing, time=currenttime(data)
 )
     render!(imagebuffer, ig, o, data, first(grids); name=name, time=time)
 end
 function render!(
-    imagebuffer, ig::SingleGridRenderer, o::ImageOutput, 
-    data::AbstractSimData{S}, grid::AbstractArray;
+    imagebuffer, ig::SingleGridRenderer, o::ImageOutput,
+    data::AbstractSimData{S}, grid::AbstractArray{<:Any,2};
     name=nothing, time=currenttime(data), accessor=nothing,
     minval=minval(o), maxval=maxval(o),
 ) where S<:Tuple{Y,X} where {Y,X}
     for j in 1:X, i in 1:Y
-        @inbounds val = grid[i, j]
-        val = if accessor isa Nothing
-            _access_grid_object(DynamicGrids.accessor(ig), val)
-        else
-            _access_grid_object(accessor, val)
-        end
+        accessor = accessor isa Nothing ? DynamicGrids.accessor(ig) : accessor
+        @inbounds grid_obj = grid[i, j]
+        val = _access_grid_object(accessor, grid_obj)
         pixel = to_rgb(cell_to_pixel(ig, mask(o), minval, maxval, data, val, (i, j)))
         @inbounds imagebuffer[i, j] = pixel
+    end
+    _rendertext!(imagebuffer, textconfig(o), name, time)
+    return imagebuffer
+end
+function render!(
+    imagebuffer, ig::SingleGridRenderer, o::ImageOutput,
+    data::AbstractSimData{S}, grid::AbstractArray{<:Any,1};
+    name=nothing, time=currenttime(data), accessor=nothing,
+    minval=minval(o), maxval=maxval(o),
+) where S<:Tuple{L} where {L}
+    f = currentframe(data)
+    for i in 1:L
+        accessor = accessor isa Nothing ? DynamicGrids.accessor(ig) : accessor
+        @inbounds grid_obj = grid[i]
+        val = _access_grid_object(accessor, grid_obj)
+        pixel = to_rgb(cell_to_pixel(ig, mask(o), minval, maxval, data, val, (i,)))
+        # Image rows are simulation frames
+        @inbounds imagebuffer[f, i] = pixel
     end
     _rendertext!(imagebuffer, textconfig(o), name, time)
     return imagebuffer
@@ -129,48 +149,12 @@ Base.show(io::IO, m::MIME"image/svg+xml", p::Image) = show(io, m, scheme(p))
     end
 end
 
-"""
-    SparseOptInspector()
-
-A [`Renderer`](@ref) that checks [`SparseOpt`](@ref) visually.
-Cells that do not run show in gray. Errors show in red, but if they do there's a bug.
-"""
-struct SparseOptInspector{A} <: SingleGridRenderer 
-    accessor::A
-end
-SparseOptInspector() = SparseOptInspector(identity)
-
-accessor(p::SparseOptInspector) = p.accessor
-
-function cell_to_pixel(p::SparseOptInspector, mask, minval, maxval, data::AbstractSimData, val, I::Tuple)
-    opt(data) isa SparseOpt || error("Can only use SparseOptInspector with SparseOpt grids")
-    r = radius(first(grids(data)))
-    blocksize = 2r
-    blockindex = _indtoblock.((I[1] + r,  I[2] + r), blocksize)
-    normedval = normalise(val, minval, maxval)
-    status = sourcestatus(first(data))
-    # This is done at the start of the next frame, so wont show up in
-    # the image properly. So do it preemtively?
-    _wrapstatus!(status)
-    if status[blockindex...]
-        if normedval > 0
-            to_rgb(normedval)
-        else
-            to_rgb((0.0, 0.0, 0.0))
-        end
-    elseif normedval > 0
-        to_rgb((1.0, 0.0, 0.0)) # This (a red cell) would mean there is a bug in SparseOpt
-    else
-        to_rgb((0.5, 0.5, 0.5))
-    end
-end
-
 # Multi-grid renderers ###############################################################
 
 """
     MultiGridRenderer <: Renderer
 
-Abstract type for `Renderer`s that convert a frame containing multiple 
+Abstract type for `Renderer`s that convert a frame containing multiple
 grids into a single image.
 """
 abstract type MultiGridRenderer <: Renderer end
@@ -185,7 +169,7 @@ layout matrix and a list of [`Image`](@ref)s to be run for each.
 
 # Arguments
 
-- `layout`: A `Vector` or `Matrix` containing the keys or numbers of grids in the 
+- `layout`: A `Vector` or `Matrix` containing the keys or numbers of grids in the
     locations to display them. `nothing`, `missing` or `0` values will be skipped.
 - `renderers`: `Vector/Matrix` of [`Image`](@ref), matching the `layout`.
     Can be `nothing` or any other value for grids not in layout.
@@ -202,10 +186,15 @@ end
 layout(l::Layout) = l.layout
 renderers(l::Layout) = l.renderers
 
-imagesize(l::Layout, init::NamedTuple) = imagesize(l, first(init))
-imagesize(l::Layout, init::AbstractArray) = imagesize(size(init), size(l.layout))
-imagesize(gs::NTuple{2}, ls::NTuple{2}) = gs .* ls
-imagesize(gs::NTuple{2}, ls::NTuple{1}) = gs .* (first(ls), 1)
+imagesize(l::Layout, init::NamedTuple, tspan) = imagesize(l, first(init), tspan)
+function imagesize(l::Layout, init::AbstractArray, tspan)
+    _imagesize(size(init), size(l.layout), tspan)
+end
+# 1D
+_imagesize(gsize::NTuple{1}, lsize::NTuple{1}, tspan) = length(tspan), gsize .* lsize
+# 2D
+_imagesize(gsize::NTuple{2}, lsize::NTuple{2}, tspan) = gsize .* lsize
+_imagesize(gsize::NTuple{2}, lsize::NTuple{1}, tspan) = gsize .* (first(lsize), 1)
 
 _asrenderer(r::Renderer) = r
 _asrenderer(x) = Image(x)
@@ -236,7 +225,7 @@ function render!(
         else
             grid_id
         end
-        Itup = length(Tuple(I)) == 1 ? (Tuple(I)..., 1) : Tuple(I) 
+        Itup = length(Tuple(I)) == 1 ? (Tuple(I)..., 1) : Tuple(I)
         im_I = map(Itup, gridsize(data)) do l, gs
             (l - 1) * gs + 1:l * gs
         end
@@ -273,7 +262,7 @@ _grid_accessor(id) = nothing
 # Access a grid object with a function or index, or use it as-is
 _access_grid_object(::Nothing, obj) = obj
 _access_grid_object(f::Function, obj) = f(obj)
-_access_grid_object(i::Int, obj) = obj[i] 
+_access_grid_object(i::Int, obj) = obj[i]
 
 @noinline _grididnotinkeyserror(grid_id, grids) =
     throw(ArgumentError("$grid_id is not in $(keys(grids))"))
@@ -283,15 +272,15 @@ _access_grid_object(i::Int, obj) = obj[i]
 
 # Automatically choose an image renderer ############################################################
 
-autorenderer(init; scheme=ObjectScheme(), zerocolor=ZEROCOL, maskcolor=MASKCOL, kw...) = 
+autorenderer(init; scheme=ObjectScheme(), zerocolor=ZEROCOL, maskcolor=MASKCOL, kw...) =
     _autorenderer(init, scheme, zerocolor, maskcolor; kw...)
 
 # Single grid render
 _autorenderer(init, scheme, zerocolor, maskcolor; kw...) = _asrenderer(scheme, zerocolor, maskcolor)
 # Multi-grid renders
-function _autorenderer(init::NamedTuple, scheme, zerocolor, maskcolor; 
+function _autorenderer(init::NamedTuple, scheme, zerocolor, maskcolor;
     # If no layout argument was passed in, generate the layout from the init grids
-    layout=_autolayout(init), 
+    layout=_autolayout(init),
     # If no renders argument was passed in, generate them from the layout
     renderers=_asrenderer.(layout, _iterable(scheme), _iterable(zerocolor), _iterable(maskcolor)),
     kw...
@@ -308,7 +297,7 @@ _iterable(obj) = (obj,)
 # Use a renderer as-is or convert a colorscheme to a renderer
 _asrenderer(renderer::Renderer, zerocolor, maskcolor) = renderer
 _asrenderer(scheme, zerocolor, maskcolor) = Image(scheme, zerocolor, maskcolor)
-_asrenderer(layout, renderer, zerocolor, maskcolor) = _asrenderer(renderer, zerocolor, maskcolor) 
+_asrenderer(layout, renderer, zerocolor, maskcolor) = _asrenderer(renderer, zerocolor, maskcolor)
 
 # _autolayout
 # Generate a layout from the provided grids and their contents

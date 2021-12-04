@@ -31,7 +31,7 @@ import DynamicGrids: SimData, Extent, WritableGridData,
         @test collect(neighbors(moore)) == [0, 1, 0, 0, 1, 0, 1, 1]
         @test sum(moore) == sum(neighbors(moore)) == 4
         @test offsets(moore) == 
-            ((-1, -1), (0, -1), (1, -1), (-1, 0), (0, 0), (1, 0), (-1, 1), (0, 1), (1, 1))
+            ((-1, -1), (0, -1), (1, -1), (-1, 0), (1, 0), (-1, 1), (0, 1), (1, 1))
 
         moore1 = @set moore._buffer = buf1
         @test moore1._buffer == buf1
@@ -130,7 +130,7 @@ end
         mat = zeros(3, 3)
         @test Kernel(mat) == Kernel(Window(1), mat)
         @test_throws ArgumentError Kernel(Window(2), mat)
-        k = Kernel(Window{1,9,typeof(buf)}(buf), SMatrix{3,3}(reshape(1:9, 3, 3)))
+        k = Kernel(Window{1,2,9,typeof(buf)}(buf), SMatrix{3,3}(reshape(1:9, 3, 3)))
         @test kernelproduct(k) == sum((1:9).^2)
         @test neighbors(k) == reshape(1:9, 3, 3)
         @test offsets(k) == ((-1, -1), (0, -1), (1, -1), (-1, 0), (0, 0), 
@@ -139,12 +139,12 @@ end
                                        (2, 2), (3, 2), (1, 3), (2, 3), (3, 3))
     end
     @testset "Moore" begin
-        k = Kernel(Moore{1,8,typeof(buf)}(buf), (1:4..., 6:9...))
+        k = Kernel(Moore{1,2,8,typeof(buf)}(buf), (1:4..., 6:9...))
         @test kernelproduct(k) == sum((1:4).^2) + sum((6:9).^2)
     end
     @testset "Positional" begin
         off = ((0,-1),(-1,0),(1,0),(0,1))
-        hood = Positional{1,4,typeof(off),typeof(buf)}(off, buf)
+        hood = Positional{1,2,4,typeof(off),typeof(buf)}(off, buf)
         k = Kernel(hood, 1:4)
         @test kernelproduct(k) == 1 * 2 + 2 * 4 + 3 * 6 + 4 * 8
     end
@@ -164,41 +164,44 @@ function DynamicGrids.applyrule!(
     add!(data[W1], state[1], index...)
 end
 
+buf5x5 = zeros(5, 5)
+buf7x7 = zeros(7, 7)
+
 
 @testset "neighborhood rules" begin
-    ruleA = TestSetNeighborhoodRule{:a,:a}(Moore{3}())
-    ruleB = TestSetNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}())
+    ruleA = TestSetNeighborhoodRule{:a,:a}(Moore{3}(buf7x7))
+    ruleB = TestSetNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}(buf5x5))
     @test offsets(ruleA) isa Tuple
     @test positions(ruleA, (1, 1)) isa Tuple
-    @test neighborhood(ruleA) == Moore{3}()
-    @test neighborhood(ruleB) == Moore{2}()
+    @test neighborhood(ruleA) == Moore{3}(buf7x7)
+    @test neighborhood(ruleB) == Moore{2}(buf5x5)
     @test neighborhoodkey(ruleA) == :a
     @test neighborhoodkey(ruleB) == :b
-    ruleA = TestNeighborhoodRule{:a,:a}(Moore{3}())
-    ruleB = TestNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}())
+    ruleA = TestNeighborhoodRule{:a,:a}(Moore{3}(buf7x7))
+    ruleB = TestNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}(buf5x5))
     @test offsets(ruleA) isa Tuple
-    @test neighborhood(ruleA) == Moore{3}()
-    @test neighborhood(ruleB) == Moore{2}()
+    @test neighborhood(ruleA) == Moore{3}(buf7x7)
+    @test neighborhood(ruleB) == Moore{2}(buf5x5)
     @test neighborhoodkey(ruleA) == :a
     @test neighborhoodkey(ruleB) == :b
     @test offsets(ruleB) === 
         ((-2,-2), (-1,-2), (0,-2), (1,-2), (2,-2),
          (-2,-1), (-1,-1), (0,-1), (1,-1), (2,-1),
-         (-2,0), (-1,0), (0,0), (1,0), (2,0),
+         (-2,0), (-1,0), (1,0), (2,0),
          (-2,1), (-1,1), (0,1), (1,1), (2,1),
          (-2,2), (-1,2), (0,2), (1,2), (2,2))
     @test positions(ruleB, (10, 10)) == 
         ((8, 8), (9, 8), (10, 8), (11, 8), (12, 8), 
          (8, 9), (9, 9), (10, 9), (11, 9), (12, 9), 
-         (8, 10), (9, 10), (10, 10), (11, 10), (12, 10), 
+         (8, 10), (9, 10), (11, 10), (12, 10), 
          (8, 11), (9, 11), (10, 11), (11, 11), (12, 11), 
          (8, 12), (9, 12), (10, 12), (11, 12), (12, 12))
 end
 
 @testset "radius" begin
     init = (a=[1.0 2.0], b=[10.0 11.0])
-    ruleA = TestNeighborhoodRule{:a,:a}(Moore{3}())
-    ruleB = TestSetNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}())
+    ruleA = TestNeighborhoodRule{:a,:a}(Moore{3}(buf7x7))
+    ruleB = TestSetNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}(buf5x5))
     ruleset = Ruleset(ruleA, ruleB)
     @test radius(ruleA) == 3
     @test radius(ruleB) == 2

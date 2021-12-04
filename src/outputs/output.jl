@@ -14,7 +14,7 @@ and in many cases can be used interchangeably.
 abstract type Output{T,A} <: AbstractDimArray{T,1,Tuple{Ti},A} end
 # Generic ImageOutput constructor. Converts an init array to vector of arrays.
 function (::Type{T})(
-    init::Union{NamedTuple,AbstractMatrix}; extent=nothing, kw...
+    init::Union{NamedTuple,AbstractArray}; extent=nothing, kw...
 ) where T <: Output
     extent = extent isa Nothing ? Extent(; init=init, kw...) : extent
     T(; frames=[deepcopy(init)], running=false, extent=extent, kw...)

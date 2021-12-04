@@ -50,19 +50,20 @@ end
 function maprule!(data::AbstractSimData, proc::CPU, opt, ruletype::Val, rule, rkeys, wkeys)
     let data=data, proc=proc, opt=opt, rule=rule,
         rkeys=rkeys, wkeys=wkeys, ruletype=ruletype
-        optmap(data, proc, opt, ruletype, rkeys) do i, j
-            cell_kernel!(data, ruletype, rule, rkeys, wkeys, i, j)
+        optmap(data, proc, opt, ruletype, rkeys) do I 
+            cell_kernel!(data, ruletype, rule, rkeys, wkeys, I...)
         end
     end
 end
 function maprule!(
     data::AbstractSimData, proc::CPU, opt, ruletype::Val{<:NeighborhoodRule}, 
-    rule, args...
+    rule, rkeys, args...
 )
-    hoodgrid = data[neighborhoodkey(rule)]
-    _mapneighborhoodrule!(data, hoodgrid, proc, opt, ruletype, rule, args...)
+    hoodgrid = _firstgrid(data, rkeys)
+    _mapneighborhoodrule!(data, hoodgrid, proc, opt, ruletype, rule, rkeys, args...)
 end
 
+# 2 dimensional (with procesess and optimisations)
 function _mapneighborhoodrule!(
     data, hoodgrid::GridData{<:Tuple{Y,X},R}, proc, opt, ruletype, rule, rkeys, wkeys 
 ) where {Y,X,R}
@@ -80,6 +81,17 @@ function _mapneighborhoodrule!(
     end
     return nothing
 end
+# Arbitrary dimensions, no proc/opt selection
+function _mapneighborhoodrule!(
+    data, hoodgrid::GridData{<:Tuple,R}, proc, opt, ruletype, rule, rkeys, wkeys 
+) where {R}
+    for I in CartesianIndices(hoodgrid) 
+        tI = Tuple(I)
+        # Loop over the COLUMN of buffers covering the block
+        neighborhood_kernel!(data, hoodgrid, ruletype, rule, rkeys, wkeys, tI...)
+    end
+    return nothing
+end
 
 
 ### Rules that don't need a neighborhood buffer ####################
@@ -87,58 +99,27 @@ end
 # optmap
 # Map kernel over the grid, specialising on PerformanceOpt.
 
-# Run kernels with SparseOpt, block by block:
-function optmap(
-    f, simdata::AbstractSimData{S}, proc, ::SparseOpt, ruletype::Val{<:Rule}, rkeys
-) where {S<:Tuple{Y,X}} where {Y,X}
-    # Only use SparseOpt for single-grid rules with grid radii > 0
-    grid = _firstgrid(simdata, rkeys)
-    R = radius(grid)
-    if R == 0
-        optmap(f, simdata, proc, NoOpt(), ruletype, rkeys)
-        return nothing
-    end
-    B = 2R
-    status = sourcestatus(grid)
-    let f=f, proc=proc, status=status
-        procmap(proc, 1:_indtoblock(X+R, B)) do bj
-            for  bi in 1:_indtoblock(Y+R, B)
-                status[bi, bj] || continue
-                # Convert from padded block to init dimensions
-                istart, jstart = _blocktoind(bi, B) - R, _blocktoind(bj, B) - R
-                # Stop at the init row/column size, not the padding or block multiple
-                istop, jstop = min(istart + B - 1, Y), min(jstart + B - 1, X)
-                # Skip the padding
-                istart, jstart  = max(istart, 1), max(jstart, 1)
-                for j in jstart:jstop 
-                    @simd for i in istart:istop
-                        f(i, j)
-                    end
-                end
-            end
-        end
-    end
-    return nothing
-end
 # Run kernel over the whole grid, cell by cell:
 function optmap(
     f, simdata::AbstractSimData{S}, proc, ::NoOpt, ::Val{<:Rule}, rkeys
 ) where S<:Tuple{Y,X} where {Y,X}
     procmap(proc, 1:X) do j
         for i in 1:Y
-            f(i, j) # Run rule for each row in column j
+            f((i, j)) # Run rule for each row in column j
         end
     end
 end
+# Use @simd for CellRule
 function optmap(
     f, simdata::AbstractSimData{S}, proc, ::NoOpt, ::Val{<:CellRule}, rkeys
 ) where S<:Tuple{Y,X} where {Y,X}
     procmap(proc, 1:X) do j
         @simd for i in 1:Y
-            f(i, j) # Run rule for each row in column j
+            f((i, j)) # Run rule for each row in column j
         end
     end
 end
+
 # procmap
 # Map kernel over the grid, specialising on Processor
 # Looping over cells or blocks on CPU
@@ -153,16 +134,28 @@ end
 
 # cell_kernel!
 # runs a rule for the current cell
-@inline function cell_kernel!(simdata, ruletype::Val{<:Rule}, rule, rkeys, wkeys, i, j)
-    readval = _readcell(simdata, rkeys, i, j)
-    writeval = applyrule(simdata, rule, readval, (i, j))
-    _writecell!(simdata, ruletype, wkeys, writeval, i, j)
+@inline function cell_kernel!(simdata, ruletype::Val{<:Rule}, rule, rkeys, wkeys, I...)
+    readval = _readcell(simdata, rkeys, I...)
+    writeval = applyrule(simdata, rule, readval, I)
+    _writecell!(simdata, ruletype, wkeys, writeval, I...)
     writeval
 end
-@inline function cell_kernel!(simdata, ::Val{<:SetRule}, rule, rkeys, wkeys, i, j)
-    readval = _readcell(simdata, rkeys, i, j)
-    applyrule!(simdata, rule, readval, (i, j))
+@inline function cell_kernel!(simdata, ::Val{<:SetRule}, rule, rkeys, wkeys, I...)
+    readval = _readcell(simdata, rkeys, I...)
+    applyrule!(simdata, rule, readval, I)
     nothing
+end
+
+# neighborhood_kernel!
+# Runs a rule for the current cell/neighborhood, when there is no
+# row-based optimisation
+@inline function neighborhood_kernel!(
+    data, hoodgrid, ruletype::Val{<:NeighborhoodRule}, rule, rkeys, wkeys, I...
+)
+    src = parent(source(hoodgrid))
+    buf = _getwindow(src, neighborhood(rule), I...)
+    bufrule = _setbuffer(rule, buf)
+    cell_kernel!(data, ruletype, bufrule, rkeys, wkeys, I...)
 end
 
 # row_kernel!
@@ -191,108 +184,8 @@ function row_kernel!(
     end
     return nothing
 end
-function row_kernel!(
-    simdata::AbstractSimData, grid::GridData{<:Tuple{Y,X},R}, proc, opt::SparseOpt,
-    ruletype::Val, rule::Rule, rkeys, wkeys, bi
-) where {Y,X,R}
-    B = 2R
-    S = 2R + 1
-    nblockcols = _indtoblock(X+R, B)
-    src = parent(source(grid))
-    srcstatus, dststatus = sourcestatus(grid), deststatus(grid)
-
-    # Blocks ignore padding! the first block contains padding.
-    i = _blocktoind(bi, B)
-    i > Y && return nothing
-    # Get current bloc
-    skippedlastblock = true
-
-    # Initialise block status for the start of the row
-    # The first column always runs, it's buggy otherwise.
-    @inbounds bs11, bs12 = true, true
-    @inbounds bs21, bs22 = true, true
-    # New block status
-    newbs12 = false
-    newbs22 = false
-    buffers = _initialise_buffers(src, Val{R}(), i, 1)
-    for bj = 1:nblockcols
-        # Shuffle current buffer status
-        bs11, bs21 = bs12, bs22
-        @inbounds bs12, bs22 = srcstatus[bi, bj + 1], srcstatus[bi + 1, bj + 1]
-        # Skip this block if it and the neighboring blocks are inactive
-        if !(bs11 | bs12 | bs21 | bs22)
-            skippedlastblock = true
-            # Run the rest of the chain if it exists and more than 1 grid is used
-            if rule isa Chain && length(rule) > 1 && length(rkeys) > 1
-                # Loop over the grid COLUMNS inside the block
-                jstart = _blocktoind(bj, B)
-                jstop = min(jstart + B - 1, X)
-                for j in jstart:jstop
-                    # Loop over the grid ROWS inside the block
-                    blocklen = min(Y, i + B - 1) - i + 1
-                    for b in 1:blocklen
-                        cell_kernel!(simdata, ruletype, rule, rkeys, wkeys, i + b - 1, j)
-                    end
-                end
-            end
-            continue
-        end
-        # Define area to loop over with the block.
-        # It's variable because the last block may be partial
-        jstart = _blocktoind(bj, B)
-        jstop = min(jstart + B - 1, X)
-
-        # Reinitialise neighborhood buffers if we have skipped a section of the array
-        if skippedlastblock
-            buffers = _initialise_buffers(src, Val{R}(), i, jstart)
-            skippedlastblock = false
-        end
-        # Shuffle new buffer status
-        newbs11 = newbs12
-        newbs21 = newbs22
-        newbs12 = newbs22 = false
-
-        # Loop over the grid COLUMNS inside the block
-        for j in jstart:jstop
-            # Update buffers unless feshly populated
-            buffers = _update_buffers(buffers, src, Val{R}(), i, j)
-            # Which block column are we in, 1 or 2
-            curblockj = (j - jstart) ÷ R + 1
-            # Loop over the COLUMN of buffers covering the block
-            blocklen = min(Y, i + B - 1) - i + 1
-            for b in 1:blocklen
-                # Set rule buffer
-                bufrule = _setbuffer(rule, buffers[b])
-                # Run the rule kernel for the cell
-                writeval = cell_kernel!(simdata, ruletype, bufrule, rkeys, wkeys, i + b - 1, j)
-                # Update the status for the current block
-                cs = _cellstatus(opt, wkeys, writeval)
-                curblocki = R == 1 ? b : (b - 1) ÷ R + 1
-                if curblocki == 1
-                    curblockj == 1 ? (newbs11 |= cs) : (newbs12 |= cs)
-                else
-                    curblockj == 1 ? (newbs21 |= cs) : (newbs22 |= cs)
-                end
-            end
-
-            # Combine new block status with deststatus array
-            @inbounds dststatus[bi, bj] |= newbs11
-            @inbounds dststatus[bi+1, bj] |= newbs21
-            @inbounds dststatus[bi, bj+1] |= newbs12
-            @inbounds dststatus[bi+1, bj+1] |= newbs22
-        end
-    end
-    return nothing
-end
-
 
 #### Utils
-
-@inline _cellstatus(opt::SparseOpt, wkeys::Tuple, writeval) = _isactive(writeval[1], opt)
-@inline _cellstatus(opt::SparseOpt, wkeys, writeval) = _isactive(writeval, opt)
-
-@inline _firstgrid(simdata, ::Val{K}) where K = simdata[K]
-@inline _firstgrid(simdata, ::Tuple{Val{K},Vararg}) where K = simdata[K]
 
 _to_readonly(data::Tuple) = map(ReadableGridData, data)
 _to_readonly(data::WritableGridData) = ReadableGridData(data)
@@ -318,11 +211,6 @@ function _maybemask!(
 end
 
 # _cleardest!
-# Clear the destination grid and its status for SparseOpt.
-# NoOpt writes to every cell, so this is not required
+# only needed with optimisations
 _cleardest!(grid) = _cleardest!(grid, opt(grid))
-function _cleardest!(grid, opt::SparseOpt)
-    dest(grid) .= source(grid)
-    deststatus(grid) .= false
-end
 _cleardest!(grid, opt) = nothing

@@ -6,39 +6,6 @@ Abstract supertype for performance optimisation flags.
 abstract type PerformanceOpt end
 
 """
-    SparseOpt <: PerformanceOpt
-
-    SparseOpt()
-
-An optimisation flag that ignores all zero values in the grid.
-
-For low-density simulations performance may improve by
-orders of magnitude, as only used cells are run.
-
-This is complicated for optimising neighborhoods - they
-must run if they contain just one non-zero cell.
-
-Specifiy with:
-
-```julia
-ruleset = Ruleset(rule; opt=SparseOpt())
-# or
-output = sim!(output, rule; opt=SparseOpt())
-```
-
-`SparseOpt` is best demonstrated with this simulation, where the grey areas do not
-run except where the neighborhood partially hangs over an area that is not grey:
-
-![SparseOpt demonstration](https://raw.githubusercontent.com/cesaraustralia/DynamicGrids.jl/media/complexlife_spareseopt.gif)
-"""
-struct SparseOpt{F<:Function} <: PerformanceOpt
-    f::F
-end
-SparseOpt() = SparseOpt(==(0))
-
-@inline _isactive(val, opt::SparseOpt{<:Function}) = !opt.f(val)
-
-"""
     NoOpt <: PerformanceOpt
 
     NoOpt()

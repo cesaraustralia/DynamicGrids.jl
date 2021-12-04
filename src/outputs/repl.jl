@@ -24,7 +24,7 @@ simulation frames.
 
 $GRAPHICOUTPUT_KEYWORDS
 
-A `GraphicConfig` object can be also passed to the `graphicconfig` keyword, and other keywords will be ignored.
+e `GraphicConfig` object can be also passed to the `graphicconfig` keyword, and other keywords will be ignored.
 """
 mutable struct REPLOutput{T,F<:AbstractVector{T},E,GC,Co,St,Cu} <: GraphicOutput{T,F}
     frames::F
@@ -39,17 +39,16 @@ function REPLOutput(;
     frames, running, extent, graphicconfig,
     color=:white, cutoff=0.5, style=Block(), kw...
 )
+    if store(graphicconfig)
+        append!(frames, _zerogrids(init(extent), length(tspan(extent))-1))
+    end
     REPLOutput(frames, running, extent, graphicconfig, color, style, cutoff)
 end
 
 function showframe(frame::AbstractArray, o::REPLOutput, data::AbstractSimData)
-    showframe(frame, o)
+    _print_to_repl((0, 0), o.color, _replframe(o, frame, currentframe(data)))
     # Print the timestamp in the top right corner
     _print_to_repl((0, 0), o.color, string("Time $(currenttime(data))"))
-end
-function showframe(frame::AbstractArray, o::REPLOutput)
-    # Print the frame
-    _print_to_repl((0, 0), o.color, _replframe(o, frame))
 end
 
 # Terminal commands
@@ -82,17 +81,36 @@ _chartype(o::REPLOutput) = _chartype(o.style)
 _chartype(s::Braile) = YBRAILE, XBRAILE, brailize
 _chartype(s::Block) = YBLOCK, XBLOCK, blockize
 
-# Generate a text frame to show in the repl, matching the available size
-function _replframe(o, frame)
+function _replframe(o, frame::AbstractArray{<:Any,N}, currentframe) where N
     ystep, xstep, charfunc = _chartype(o)
 
     # Limit output area to available terminal size.
     dispy, dispx = displaysize(stdout)
-    youtput, xoutput = outputsize = size(frame)
-    yoffset, xoffset = (0, 0)
 
-    yrange = max(1, ystep * yoffset):min(youtput, ystep * (dispy + yoffset - 1))
-    xrange = max(1, xstep * xoffset):min(xoutput, xstep * (dispx + xoffset - 1))
-    window = view(adapt(Array, frame), yrange, xrange) # TODO make this more efficient on GPU
-    charfunc(window, o.cutoff)
+    if N === 1
+        offset = 0
+        rnge = max(1, xstep * offset):min(length(frame))
+        f = currentframe
+        nrows = min(f, dispy) 
+        # For 1D we show all the rows every time
+        tlen = length(tspan(o))
+        rowstrings = map(f - nrows + 1:f) do i
+            framewindow1 = view(adapt(Array, frames(o)[i]), rnge) 
+            framewindow2 = if i == tlen
+                framewindow1
+            else
+                view(adapt(Array, frames(o)[i]), rnge) 
+            end
+            charfunc(PermutedDimsArray(hcat(framewindow1, framewindow2), (2, 1)), o.cutoff)
+        end
+        return join(rowstrings, "\n")
+    else
+        youtput, xoutput = outputsize = size(frame)
+        yoffset, xoffset = (0, 0)
+
+        yrange = max(1, ystep * yoffset):min(youtput, ystep * (dispy + yoffset - 1))
+        xrange = max(1, xstep * xoffset):min(xoutput, xstep * (dispx + xoffset - 1))
+        framewindow = view(adapt(Array, frame), yrange, xrange) # TODO make this more efficient on GPU
+        return charfunc(framewindow, o.cutoff)
+    end
 end
