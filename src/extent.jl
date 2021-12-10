@@ -21,6 +21,8 @@ Base.ndims(e::AbstractExtent{<:NamedTuple}) = ndims(first(init(e)))
 Base.size(e::AbstractExtent{<:AbstractArray}) = size(init(e))
 Base.size(e::AbstractExtent{<:NamedTuple}) = size(first(init(e)))
 
+(::Type{T})(e::AbstractExtent) where T<:AbstractExtent = T(init(e), mask(e), aux(e), padval(e), tspan(e))
+
 const EXTENT_KEYWORDS = """
 - `init`: initialisation `Array`/`NamedTuple` for grid/s.
 - `mask`: `BitArray` for defining cells that will/will not be run.
@@ -76,6 +78,7 @@ mutable struct Extent{I<:Union{AbstractArray,NamedTuple},
 end
 Extent(; init, mask=nothing, aux=nothing, padval=_padval(init), tspan, kw...) =
     Extent(init, mask, aux, padval, tspan)
+Extent(init::Union{AbstractArray,NamedTuple}; kw...) = Extent(; init, kw...)
 
 settspan!(e::Extent, tspan) = e.tspan = tspan
 
@@ -93,4 +96,6 @@ struct StaticExtent{I<:Union{AbstractArray,NamedTuple},
     padval::PV
     tspan::T
 end
-StaticExtent(e::Extent) = StaticExtent(init(e), mask(e), aux(e), padval(e), tspan(e))
+StaticExtent(; init, mask=nothing, aux=nothing, padval=_padval(init), tspan, kw...) =
+    StaticExtent(init, mask, aux, padval, tspan)
+StaticExtent(init::Union{AbstractArray,NamedTuple}; kw...) = Extent(; init, kw...)

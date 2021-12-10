@@ -75,61 +75,6 @@ modifyrule (generic function with 1 method)
 function modifyrule end
 
 """
-    neighbors(x::Union{Neighborhood,NeighborhoodRule}}) -> iterable
-
-Returns an indexable iterator for all cells in the neighborhood, 
-either a `Tuple` of values or a range.
-
-Custom `Neighborhood`s must define this method.
-"""
-function neighbors end
-
-"""
-    neighborhood(x::Union{NeighborhoodRule,SetNeighborhoodRule}}) -> Neighborhood
-
-Returns a rules neighborhood object
-"""
-function neighborhood end
-
-"""
-    kernel(hood::AbstractKernelNeighborhood) => iterable
-
-Returns the kernel object, an array or iterable matching the length
-of the neighborhood.
-"""
-function kernel end
-
-"""
-    kernelproduct(rule::NeighborhoodRule})
-    kernelproduct(hood::AbstractKernelNeighborhood)
-    kernelproduct(hood::Neighborhood, kernel)
-
-Returns the vector dot product of the neighborhood and the kernel,
-although differing from `dot` in that the dot product is not take for 
-vector members of the neighborhood - they are treated as scalars.
-"""
-function kernelproduct end
-
-"""
-    offsets(x::Union{Neighborhood,NeighborhoodRule}}) -> iterable
-
-Returns an indexable iterable over all cells, containing `Tuple`s of 
-the index offset from the central cell.
-
-Custom `Neighborhood`s must define this method.
-"""
-function offsets end
-
-"""
-    positions(x::Union{Neighborhood,NeighborhoodRule}}, cellindex::Tuple) -> iterable
-
-Returns an indexable iterable, over all cells as `Tuple`s of each 
-index in the main array. Useful in [`SetNeighborhoodRule`](@ref) for 
-setting neighborhood values, or for getting values in an Aux array.
-"""
-function positions end
-
-"""
     add!(data::WritableGridData, x, I...)
 
 Add the value `x` to a grid cell.
@@ -224,13 +169,6 @@ Check that a coordinate is within the grid, usually in [`SetCellRule`](@ref).
 Unlike [`inbounds`](@ref), [`BoundaryCondition`](@ref) status is ignored.
 """
 function isinbounds end
-
-"""
-    radius(rule, [key]) -> Int
-
-Return the radius of a rule or ruleset if it has one, otherwise zero.
-"""
-function radius end
 
 """
     init(obj) -> Union{AbstractArray,NamedTUple}

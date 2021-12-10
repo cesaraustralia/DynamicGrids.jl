@@ -41,13 +41,15 @@ import Base: show, getindex, setindex!, lastindex, size, length, push!, append!,
 
 export sim!, resume!, step!, savegif, isinferred
 
-export rules, neighbors, neighborhood, kernel, kernelproduct, offsets, positions, radius 
+export rules
 
 export inbounds, isinbounds 
 
 export gridsize, currentframe, currenttime, currenttimestep, timestep
 
 export add!, sub!, min!, max!, and!, or!, xor!
+
+export Extent, StaticExtent
 
 export Rule, NeighborhoodRule, CellRule, SetCellRule, SetNeighborhoodRule, SetGridRule
 
@@ -58,9 +60,6 @@ export RuleWrapper, Chain, RunIf, RunAt
 export AbstractRuleset, Ruleset, StaticRuleset
 
 export AbstractSimData
-
-export Neighborhood, RadialNeighborhood, Window, AbstractKernelNeighborhood, Kernel,
-       Moore, AbstractPositionalNeighborhood, Positional, VonNeumann, LayeredPositional
 
 export Processor, SingleCPU, ThreadedCPU, CPUGPU
 
@@ -84,6 +83,11 @@ export ObjectScheme, Greyscale, Grayscale
 
 export CharStyle, Block, Braile
 
+# From Neighborhoods module
+export Neighborhood, Window, AbstractKernelNeighborhood, Kernel,
+       Moore, VonNeumann, Positional, LayeredPositional
+
+export neighbors, neighborhood, kernel, kernelproduct, offsets, positions, radius, distances
 
 const DEFAULT_KEY = :_default_
 
@@ -92,17 +96,15 @@ const EXPERIMENTAL = """
         and may not be 100% reliable in all cases. Please file github issues if problems occur.
         """
 
+include("Neighborhoods/Neighborhoods.jl")
 
-function __init__()
-    global terminal
-    terminal = REPL.Terminals.TTYTerminal(get(ENV, "TERM", Base.Sys.iswindows() ? "" : "dumb"), stdin, stdout, stderr)
-
-    @require CUDAKernels = "72cfdca4-0801-4ab0-bf6a-d52aa10adc57" include("cuda.jl")
-end
+using .Neighborhoods
+import .Neighborhoods: neighbors, neighborhood, kernel, kernelproduct, offsets, positions,
+    radius, distances, readwindow, setwindow, unsafe_readwindow,
+    updatewindow, unsafe_updatewindow
 
 include("interface.jl")
 include("flags.jl")
-include("neighborhoods.jl")
 include("rules.jl")
 include("settings.jl")
 include("rulesets.jl")
@@ -137,5 +139,12 @@ include("copyto.jl")
 include("life.jl")
 include("adapt.jl")
 include("show.jl")
+
+function __init__()
+    global terminal
+    terminal = REPL.Terminals.TTYTerminal(get(ENV, "TERM", Base.Sys.iswindows() ? "" : "dumb"), stdin, stdout, stderr)
+
+    @require CUDAKernels = "72cfdca4-0801-4ab0-bf6a-d52aa10adc57" include("cuda.jl")
+end
 
 end

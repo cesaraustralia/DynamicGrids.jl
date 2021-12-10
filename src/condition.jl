@@ -22,9 +22,9 @@ neighborhoodkey(runif::RunIf) = neighborhoodkey(rule(runif))
 neighborhood(runif::RunIf) = neighborhood(rule(runif))
 neighbors(runif::RunIf) = neighbors(rule(runif))
 
-@inline function _setbuffer(runif::RunIf{R,W}, buf) where {R,W}
+@inline function setwindow(runif::RunIf{R,W}, win) where {R,W}
     f = runif.f
-    r = _setbuffer(rule(runif), buf)
+    r = setwindow(rule(runif), win)
     RunIf{R,W,typeof(f),typeof(r)}(f, r)
 end
 

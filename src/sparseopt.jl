@@ -4,13 +4,11 @@
 
     SparseOpt()
 
-An optimisation flag that ignores all zero values in the grid.
+An optimisation flag that ignores all padding valuesin the grid,
+by default zeros.
 
 For low-density simulations performance may improve by
 orders of magnitude, as only used cells are run.
-
-This is complicated for optimising neighborhoods - they
-must run if they contain just one non-zero cell.
 
 Specifiy with:
 
@@ -96,9 +94,9 @@ function row_kernel!(
     # New block status
     newbs12 = false
     newbs22 = false
-    buffers = _initialise_buffers(src, Val{R}(), i, 1)
+    windows = _initialise_windows(src, Val{R}(), i, 1)
     for bj = 1:nblockcols
-        # Shuffle current buffer status
+        # Shuffle current window status
         bs11, bs21 = bs12, bs22
         @inbounds bs12, bs22 = srcstatus[bi, bj + 1], srcstatus[bi + 1, bj + 1]
         # Skip this block if it and the neighboring blocks are inactive
@@ -124,29 +122,29 @@ function row_kernel!(
         jstart = _blocktoind(bj, B)
         jstop = min(jstart + B - 1, X)
 
-        # Reinitialise neighborhood buffers if we have skipped a section of the array
+        # Reinitialise neighborhood windows if we have skipped a section of the array
         if skippedlastblock
-            buffers = _initialise_buffers(src, Val{R}(), i, jstart)
+            windows = _initialise_windows(src, Val{R}(), i, jstart)
             skippedlastblock = false
         end
-        # Shuffle new buffer status
+        # Shuffle new window status
         newbs11 = newbs12
         newbs21 = newbs22
         newbs12 = newbs22 = false
 
         # Loop over the grid COLUMNS inside the block
         for j in jstart:jstop
-            # Update buffers unless feshly populated
-            buffers = _update_buffers(buffers, src, Val{R}(), i, j)
+            # Update windows unless feshly populated
+            windows = _slide_windows(windows, src, Val{R}(), i, j)
             # Which block column are we in, 1 or 2
             curblockj = (j - jstart) ÷ R + 1
-            # Loop over the COLUMN of buffers covering the block
+            # Loop over the COLUMN of windows covering the block
             blocklen = min(Y, i + B - 1) - i + 1
             for b in 1:blocklen
-                # Set rule buffer
-                bufrule = _setbuffer(rule, buffers[b])
+                # Set rule window
+                rule1 = setwindow(rule, windows[b])
                 # Run the rule kernel for the cell
-                writeval = cell_kernel!(simdata, ruletype, bufrule, rkeys, wkeys, i + b - 1, j)
+                writeval = cell_kernel!(simdata, ruletype, rule1, rkeys, wkeys, i + b - 1, j)
                 # Update the status for the current block
                 cs = _cellstatus(opt, wkeys, writeval)
                 curblocki = R == 1 ? b : (b - 1) ÷ R + 1
@@ -309,6 +307,6 @@ end
 function SimSettings(
     boundary::B, proc::P, opt::SparseOpt, cellsize::C, timestep::T
 ) where {B,P<:GPU,C,T}
-    @info "SparseOpt does not work on GPU. Using NoOp instead."
+    @info "SparseOpt does not work on GPU. Using NoOpt instead."
     SimSettings{B,P,NoOpt,C,T}(boundary, proc, NoOpt(), cellsize, timestep)
 end

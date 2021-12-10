@@ -118,6 +118,8 @@ function SimData{S,N}(
     SimData{S,N,G,E,RS,F,CF,AF}(grids, extent, ruleset, frames, currentframe, auxframe)
 end
 SimData(o, ruleset::AbstractRuleset) = SimData(o, extent(o), ruleset)
+SimData(o, r1::Rule, rs::Rule...) = SimData(o, extent(o), Ruleset(r1, rs...))
+
 function SimData(o, extent::AbstractExtent, ruleset::AbstractRuleset)
     frames_ = if hasdelay(rules(ruleset)) 
         isstored(o) || _notstorederror()
@@ -127,6 +129,9 @@ function SimData(o, extent::AbstractExtent, ruleset::AbstractRuleset)
     end
     SimData(extent, ruleset, frames_)
 end
+# Convenience constructors
+SimData(extent::AbstractExtent, r1::Rule, rs::Rule...) = SimData(extent, (r1, rs...))
+SimData(extent::AbstractExtent, rs::Tuple{<:Rule,Vararg}) = SimData(extent, Ruleset(rs))
 # Convert grids in extent to NamedTuple
 function SimData(extent::AbstractExtent, ruleset::AbstractRuleset, frames=nothing)
     SimData(_asnamedtuple(extent), ruleset) 

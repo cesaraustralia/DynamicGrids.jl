@@ -7,6 +7,7 @@ if CUDAKernels.CUDA.has_cuda_gpu()
     hardware = (SingleCPU(), ThreadedCPU(), CPUGPU(), CuGPU())
 else
     hardware = (SingleCPU(), ThreadedCPU(), CPUGPU())
+    hardware = (SingleCPU(), ThreadedCPU(), )
 end
 opts = (NoOpt(), SparseOpt())
 
@@ -132,7 +133,7 @@ test5_6 = (
             ]
 )
 
-# test = test5_6
+test = test5_6
 
 @testset "Life simulation Wrap" begin
     # Test on two sizes to test half blocks on both axes

@@ -2,7 +2,7 @@ using DynamicGrids, ModelParameters, Setfield, Test, StaticArrays,
       LinearAlgebra, CUDAKernels
 import DynamicGrids: applyrule, applyrule!, maprule!, ruletype, extent, source, dest,
        _getreadgrids, _getwritegrids, _combinegrids, _readkeys, _writekeys,
-       SimData, WritableGridData, Rule, Extent, CPUGPU
+       SimData, WritableGridData, Rule, Extent, CPUGPU, neighborhoodkey
 
 if CUDAKernels.CUDA.has_cuda_gpu()
     CUDAKernels.CUDA.allowscalar(false)
@@ -79,26 +79,87 @@ end
 end
 
 @testset "Neighbors" begin
-    buf = [1 0 0; 0 0 1; 0 0 1]
-    rule = Neighbors(VonNeumann(1, buf)) do data, hood, state, I
+    window = [1 0 0; 0 0 1; 0 0 1]
+    rule = Neighbors(VonNeumann(1, window)) do data, hood, state, I
         sum(hood)
     end
     @test applyrule(nothing, rule, 0, (3, 3)) == 1
-    rule = Neighbors(Moore{1}(buf)) do data, hood, state, I
+    rule = Neighbors(Moore{1}(window)) do data, hood, state, I
         sum(hood)
     end
     @test applyrule(nothing, rule, 0, (3, 3)) == 3
-    @test DynamicGrids._buffer(rule) === buf
+end
+
+struct TestNeighborhoodRule{R,W,N} <: NeighborhoodRule{R,W}
+    neighborhood::N
+end
+DynamicGrids.applyrule(data, rule::TestNeighborhoodRule, state, index) = state
+
+struct TestSetNeighborhoodRule{R,W,N} <: SetNeighborhoodRule{R,W}
+    neighborhood::N
+end
+function DynamicGrids.applyrule!(
+    data, rule::TestSetNeighborhoodRule{R,Tuple{W1,}}, state, index
+) where {R,W1} 
+    add!(data[W1], state[1], index...)
+end
+
+win5x5 = zeros(5, 5)
+win7x7 = zeros(7, 7)
+
+@testset "neighborhood rules" begin
+    ruleA = TestSetNeighborhoodRule{:a,:a}(Moore{3}(win7x7))
+    ruleB = TestSetNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}(win5x5))
+    @test offsets(ruleA) isa Tuple
+    @test positions(ruleA, (1, 1)) isa Tuple
+    @test neighborhood(ruleA) == Moore{3}(win7x7)
+    @test neighborhood(ruleB) == Moore{2}(win5x5)
+    @test neighborhoodkey(ruleA) == :a
+    @test neighborhoodkey(ruleB) == :b
+    ruleA = TestNeighborhoodRule{:a,:a}(Moore{3}(win7x7))
+    ruleB = TestNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}(win5x5))
+    @test offsets(ruleA) isa Tuple
+    @test neighborhood(ruleA) == Moore{3}(win7x7)
+    @test neighborhood(ruleB) == Moore{2}(win5x5)
+    @test neighborhoodkey(ruleA) == :a
+    @test neighborhoodkey(ruleB) == :b
+    @test offsets(ruleB) === 
+        ((-2,-2), (-1,-2), (0,-2), (1,-2), (2,-2),
+         (-2,-1), (-1,-1), (0,-1), (1,-1), (2,-1),
+         (-2,0), (-1,0), (1,0), (2,0),
+         (-2,1), (-1,1), (0,1), (1,1), (2,1),
+         (-2,2), (-1,2), (0,2), (1,2), (2,2))
+    @test positions(ruleB, (10, 10)) == 
+        ((8, 8), (9, 8), (10, 8), (11, 8), (12, 8), 
+         (8, 9), (9, 9), (10, 9), (11, 9), (12, 9), 
+         (8, 10), (9, 10), (11, 10), (12, 10), 
+         (8, 11), (9, 11), (10, 11), (11, 11), (12, 11), 
+         (8, 12), (9, 12), (10, 12), (11, 12), (12, 12))
+end
+
+@testset "radius" begin
+    init = (a=[1.0 2.0], b=[10.0 11.0])
+    ruleA = TestNeighborhoodRule{:a,:a}(Moore{3}(win7x7))
+    ruleB = TestSetNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}(win5x5))
+    ruleset = Ruleset(ruleA, ruleB)
+    @test radius(ruleA) == 3
+    @test radius(ruleB) == 2
+    @test radius(ruleset) == (a=3, b=2)
+    @test radius(Ruleset()) == NamedTuple()
+
+    output = ArrayOutput(init; tspan=1:3)
+    sim!(output, ruleset)
+    # TODO make sure 2 radii can coexist
 end
 
 @testset "Convolution" begin
     k = SA[1 0 1; 0 0 0; 1 0 1]
     @test Convolution{:a}(k) == Convolution{:a,:a}(; neighborhood=Kernel(Window(1), k)) 
-    buf = SA[1 0 0; 0 0 1; 0 0 1]
-    hood = Window{1,2,9,typeof(buf)}(buf)
+    window = SA[1 0 0; 0 0 1; 0 0 1]
+    hood = Window{1,2,9,typeof(window)}(window)
     rule = Convolution{:a,:a}(; neighborhood=Kernel(hood, k))
     @test DynamicGrids.kernel(rule) === k 
-    @test applyrule(nothing, rule, 0, (3, 3)) == k ⋅ buf
+    @test applyrule(nothing, rule, 0, (3, 3)) == k ⋅ window
     output = ArrayOutput((a=init,); tspan=1:2)
     sim!(output, rule)
 end

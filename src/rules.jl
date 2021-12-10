@@ -395,10 +395,16 @@ positions(rule::NeighborhoodRule, args...) = positions(neighborhood(rule), args.
 neighborhoodkey(rule::NeighborhoodRule{R,W}) where {R,W} = R
 # The first argument is for the neighborhood grid
 neighborhoodkey(rule::NeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
-_buffer(rule::NeighborhoodRule) = _buffer(neighborhood(rule))
-@inline _setbuffer(rule::NeighborhoodRule, _buffer) =
-    @set rule.neighborhood = _setbuffer(rule.neighborhood, _buffer)
 radius(rule::NeighborhoodRule, args...) = radius(neighborhood(rule))
+@inline function setwindow(rule, window)
+    @set rule.neighborhood = setwindow(neighborhood(rule), window)
+end
+@inline function unsafe_updatewindow(rule::NeighborhoodRule, A::AbstractArray, I...)
+    setwindow(rule, unsafe_readwindow(neighborhood(rule), A, I...))
+end
+@inline function unsafe_readwindow(rule::Rule, A::AbstractArray, I...)
+    unsafe_readwindow(neighborhood(rule), A, I)
+end
 
 """
     Neighbors <: NeighborhoodRule
@@ -672,3 +678,5 @@ end
 # @noinline function _fielderror(T, args)
     # throw(ArgumentError("$T has $(length(fieldnames(T))) fields: $(fieldnames(T)), you have used $(length(args))"))
 # end
+
+

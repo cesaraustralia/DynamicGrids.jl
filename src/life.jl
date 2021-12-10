@@ -60,8 +60,10 @@ struct Life{R,W,N,B,S,L} <: NeighborhoodRule{R,W}
     survive::S
     lookup::L
 end
-function Life{R,W}(neighborhood::N, born::B, survive::S, lookup_) where {R,W,N,B,S}
-    lookup = Tuple(i in born for i in 0:8), Tuple(i in survive for i in 0:8)
+function Life{R,W}(
+    neighborhood::N, born::B, survive::S, lookup_
+) where {R,W,N<:Neighborhood{<:Any,<:Any,L},B,S} where L
+    lookup = ntuple(i -> (i - 1) in born, L+1), ntuple(i -> (i - 1) in survive, L+1)
     Life{R,W,N,B,S,typeof(lookup)}(neighborhood, born, survive, lookup)
 end
 function Life{R,W}(neighborhood, born, survive) where {R,W}
@@ -75,9 +77,9 @@ function Life{R,W}(;
     Life{R,W}(neighborhood, born, survive, nothing)
 end
 
-function _setbuffer(r::Life{R,W,N,B,S,L}, buffer) where {R,W,N,B,S,L} 
-    hood = _setbuffer(r.neighborhood, buffer)
-    Life{R,W,typeof(hood),B,S,L}(hood, r.born, r.survive, r.lookup)
+function setwindow(r::Life{R,W,N,B,S,LU}, buffer) where {R,W,N,B,S,LU} 
+    hood = setwindow(r.neighborhood, buffer)
+    Life{R,W,typeof(hood),B,S,LU}(hood, r.born, r.survive, r.lookup)
 end
 
 function applyrule(data, rule::Life, state, I)
