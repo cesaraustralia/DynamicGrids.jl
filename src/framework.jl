@@ -132,7 +132,6 @@ function resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
     extent = Extent(; init=_asnamedtuple(init), mask=mask(output), aux=aux(output), tspan=new_tspan)
     simdata = initdata!(simdata, output, extent, ruleset)
     initialise!(output, simdata)
-    initialisegraphics(output, simdata)
     setrunning!(output, true) || error("Could not start the simulation with this output")
     return runsim!(output, simdata, ruleset, fspan)
 end
@@ -181,7 +180,6 @@ function simloop!(output::Output, simdata, ruleset, fspan)
             showframe(output, simdata)
             setstoppedframe!(output, f)
             finalise!(output, simdata)
-            finalisegraphics(output, simdata)
             break
         end
     end

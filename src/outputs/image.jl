@@ -8,8 +8,7 @@ const IMAGECONFIG_KEYWORDS = """
     Note: The default is `1`, and will not be updated automatically for the simulation.
 - `font`: `String` name of font to search for. A default will be guessed.
 - `text`: `TextConfig()` or `nothing` for no text. Default is `TextConfig(; font=font)`.
-- `scheme`: ColorSchemes.jl scheme(s), or `Greyscale()`. ObjectScheme() by default.
-    A `Vector/Matrix` for multiple grids, matching the `layout` array. 
+$IMAGE_RENDERER_KEYWORDS
 - `renderer`: [`Renderer`](@ref) like [`Image`](@ref) or [`Layout`](@ref). Will be detected 
     automatically. A `Vector/Matrix` for multiple grids, matching the `layout` array. 
 """
