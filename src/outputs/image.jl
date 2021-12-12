@@ -10,7 +10,8 @@ const IMAGECONFIG_KEYWORDS = """
 - `text`: `TextConfig()` or `nothing` for no text. Default is `TextConfig(; font=font)`.
 $IMAGE_RENDERER_KEYWORDS
 - `renderer`: [`Renderer`](@ref) like [`Image`](@ref) or [`Layout`](@ref). Will be detected 
-    automatically. A `Vector/Matrix` for multiple grids, matching the `layout` array. 
+    automatically, and use `scheme`, `zerocolor` and `maskcolor` keywords if available.
+    Can be a `Vector/Matrix` for multiple grids, matching the `layout` array. 
 """
 
 """
