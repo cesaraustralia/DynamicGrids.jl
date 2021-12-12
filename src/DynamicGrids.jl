@@ -135,6 +135,7 @@ include("sparseopt.jl")
 include("utils.jl")
 include("copyto.jl")
 include("life.jl")
+include("adapt.jl")
 include("show.jl")
 
 end
