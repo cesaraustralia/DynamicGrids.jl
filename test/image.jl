@@ -328,4 +328,5 @@ end
     gif = load("test2.gif")
     @test gif[:, :, 1] == RGB.(cat(output...; dims=3))[:, :, 1]
     rm("test2.gif")
+    savegif("test2.gif", output; zerocolor=RGB(0.0))
 end

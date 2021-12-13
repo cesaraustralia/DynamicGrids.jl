@@ -21,10 +21,10 @@ end
 
 # render!
 # Converts grid/s to an image for viewing.
-function render!(o::ImageOutput, data::AbstractSimData)
+function render!(o::Output, data::AbstractSimData)
     render!(o, data, grids(data))
 end
-function render!(o::ImageOutput, data::AbstractSimData, grids)
+function render!(o::Output, data::AbstractSimData, grids)
     render!(imagebuffer(o), renderer(o), o, data, grids)
 end
 
@@ -42,21 +42,21 @@ used with a `NamedTuple` of grids.
 abstract type SingleGridRenderer <: Renderer end
 
 function render!(
-    imagebuffer, ig::SingleGridRenderer, o::ImageOutput, data::AbstractSimData,
+    imagebuffer, ig::SingleGridRenderer, o::Output, data::AbstractSimData,
     grids::NamedTuple;
     name=string(first(keys(grids))), time=currenttime(data)
 )
     render!(imagebuffer, ig, o, data, first(grids); name=name, time=time)
 end
 function render!(
-    imagebuffer, ig::SingleGridRenderer, o::ImageOutput, data::AbstractSimData,
+    imagebuffer, ig::SingleGridRenderer, o::Output, data::AbstractSimData,
     grids::NamedTuple{(DEFAULT_KEY,)};
     name=nothing, time=currenttime(data)
 )
     render!(imagebuffer, ig, o, data, first(grids); name=name, time=time)
 end
 function render!(
-    imagebuffer, ig::SingleGridRenderer, o::ImageOutput,
+    imagebuffer, ig::SingleGridRenderer, o::Output,
     data::AbstractSimData{S}, grid::AbstractArray{<:Any,2};
     name=nothing, time=currenttime(data), accessor=nothing,
     minval=minval(o), maxval=maxval(o),
@@ -72,7 +72,7 @@ function render!(
     return imagebuffer
 end
 function render!(
-    imagebuffer, ig::SingleGridRenderer, o::ImageOutput,
+    imagebuffer, ig::SingleGridRenderer, o::GraphicOutput,
     data::AbstractSimData{S}, grid::AbstractArray{<:Any,1};
     name=nothing, time=currenttime(data), accessor=nothing,
     minval=minval(o), maxval=maxval(o),
@@ -90,6 +90,14 @@ function render!(
     return imagebuffer
 end
 
+const IMAGE_RENDERER_KEYWORDS = """
+- `scheme`: a ColorSchemes.jl colorscheme, [`ObjectScheme`](@ref) or object that defines
+    `Base.get(obj, val)` and returns a `Color` or a value that can be converted to `Color`
+    using `ARGB32(val)`.
+- `zerocolor`: a `Col` to use when values are zero, or `nothing` to ignore.
+- `maskcolor`: a `Color` to use when cells are masked, or `nothing` to ignore.
+"""
+
 """
     Image <: SingleGridRenderer
 
@@ -106,11 +114,7 @@ Converts output grids to a colorsheme.
 
 # Keywords
 
-- `scheme`: a ColorSchemes.jl colorscheme, [`ObjectScheme`](@ref) or object that defines
-    `Base.get(obj, val)` and returns a `Color` or a value that can be converted to `Color`
-    using `ARGB32(val)`.
-- `zerocolor`: a `Col` to use when values are zero, or `nothing` to ignore.
-- `maskcolor`: a `Color` to use when cells are masked, or `nothing` to ignore.
+$IMAGE_RENDERER_KEYWORDS
 """
 struct Image{A,S,Z,M} <: SingleGridRenderer
     accessor::A
@@ -200,7 +204,7 @@ _asrenderer(r::Renderer) = r
 _asrenderer(x) = Image(x)
 
 function render!(
-    imagebuffer, l::Layout, o::ImageOutput, data::AbstractSimData, grids::NamedTuple
+    imagebuffer, l::Layout, o::Output, data::AbstractSimData, grids::NamedTuple
 )
     npanes = length(layout(l))
     minv, maxv = minval(o), maxval(o)

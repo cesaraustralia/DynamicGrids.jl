@@ -15,19 +15,20 @@ Write the output array to a gif.
 
 $IMAGECONFIG_KEYWORDS
 """
-function savegif(filename::String, o::Output, ruleset=Ruleset(); 
-    minval=minval(o), maxval=maxval(o), 
-    scheme=ObjectScheme(), renderer=autorenderer(init(o), scheme), 
+function savegif(filename::String, o::Output, ruleset=Ruleset();
+    minval=minval(o), maxval=maxval(o),
+    scheme=ObjectScheme(), zerocolor=ZEROCOL, maskcolor=MASKCOL,
+    renderer=autorenderer(init(o); scheme, zerocolor, maskcolor),
     font=autofont(), text=TextConfig(font=font), textconfig=text, kw...
 )
-    im_o = NoDisplayImageOutput(o; 
-        imageconfig=ImageConfig(init(o); 
+    im_o = NoDisplayImageOutput(o;
+        imageconfig=ImageConfig(init(o);
             minval=minval, maxval=maxval, renderer=renderer, textconfig=textconfig
         )
     )
-    savegif(filename, im_o, ruleset; kw...) 
+    savegif(filename, im_o, ruleset; kw...)
 end
-function savegif(filename::String, o::ImageOutput, ruleset=Ruleset(); fps=fps(o), kw...) 
+function savegif(filename::String, o::ImageOutput, ruleset=Ruleset(); fps=fps(o), kw...)
     length(o) == 1 && @warn "The output has length 1: the saved gif will be a single image"
     simdata = SimData(o, ruleset)
     images = map(firstindex(o):lastindex(o)) do f
@@ -36,7 +37,7 @@ function savegif(filename::String, o::ImageOutput, ruleset=Ruleset(); fps=fps(o)
     end
     array = cat(images..., dims=3)
     FileIO.save(filename, array; fps=fps, kw...)
-    array
+    return filename
 end
 
 """
@@ -59,7 +60,7 @@ $IMAGEOUTPUT_KEYWORDS
 """
 mutable struct GifOutput{T,F<:AbstractVector{T},E,GC,IC,G,N} <: ImageOutput{T,F}
     frames::F
-    running::Bool 
+    running::Bool
     extent::E
     graphicconfig::GC
     imageconfig::IC
@@ -78,7 +79,7 @@ gif(o::GifOutput) = o.gif
 # Output/ImageOutput interface methods
 maybesleep(output::GifOutput, f) = nothing
 function showimage(image, o::GifOutput, data::AbstractSimData)
-    gif(o)[:, :, currentframe(data)] .= image 
+    gif(o)[:, :, currentframe(data)] .= image
 end
 finalisegraphics(o::GifOutput, data::AbstractSimData) = savegif(o)
 
@@ -89,7 +90,7 @@ function savegif(filename::String, o::GifOutput, fps=fps(o); kw...)
 end
 
 # Preallocate the 3 dimensional gif array
-_allocgif(i::ImageConfig, e::Extent) = _allocgif(renderer(i), i::ImageConfig, e::Extent) 
+_allocgif(i::ImageConfig, e::Extent) = _allocgif(renderer(i), i::ImageConfig, e::Extent)
 function _allocgif(r::Renderer, i::ImageConfig, e::Extent)
     zeros(ARGB32, imagesize(r, e)..., length(tspan(e)))
 end
