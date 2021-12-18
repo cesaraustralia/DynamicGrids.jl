@@ -17,9 +17,6 @@ Base.@kwdef struct SimSettings{B,P,O,C,T} <: AbstractSimSettings
     cellsize::C = 1
     timestep::T = nothing
 end
-function SimSettings(boundary::B, proc::P, opt::O, cellsize::C, timestep::T) where {B,P,O,C,T}
-    SimSettings{B,P,O,C,T}(boundary, proc, opt, cellsize, timestep)
-end
 
 boundary(s::AbstractSimSettings) = s.boundary
 proc(s::AbstractSimSettings) = s.proc

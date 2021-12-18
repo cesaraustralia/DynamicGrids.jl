@@ -30,13 +30,14 @@ function savegif(filename::String, o::Output, ruleset=Ruleset();
 end
 function savegif(filename::String, o::ImageOutput, ruleset=Ruleset(); fps=fps(o), kw...)
     length(o) == 1 && @warn "The output has length 1: the saved gif will be a single image"
-    simdata = SimData(o, ruleset)
-    images = map(firstindex(o):lastindex(o)) do f
-        @set! simdata.currentframe = f
-        Array(render!(o, simdata, o[f]))
+    data = SimData(o, ruleset)
+    imsize = size(first(grids(data)))
+    gif = Array{ARGB32}(undef, imsize..., length(o))
+    foreach(firstindex(o):lastindex(o)) do f
+        @set! data.currentframe = f
+        render!(view(gif, :, :, f), renderer(o), o, data, o[f])
     end
-    array = cat(images..., dims=3)
-    FileIO.save(filename, array; fps=fps, kw...)
+    FileIO.save(File{format"GIF"}(filename), gif; fps=fps, kw...)
     return filename
 end
 
@@ -86,7 +87,7 @@ finalisegraphics(o::GifOutput, data::AbstractSimData) = savegif(o)
 # The gif is already generated, just save it again if neccessary
 savegif(o::GifOutput) = savegif(filename(o), o)
 function savegif(filename::String, o::GifOutput, fps=fps(o); kw...)
-    FileIO.save(filename, gif(o); fps=fps, kw...)
+    FileIO.save(File{format"GIF"}(filename), gif(o); fps=fps, kw...)
 end
 
 # Preallocate the 3 dimensional gif array

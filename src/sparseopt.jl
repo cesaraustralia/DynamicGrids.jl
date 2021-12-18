@@ -35,7 +35,6 @@ SparseOpt() = SparseOpt(==(0))
 sourcestatus(d::GridData) = optdata(d).sourcestatus
 deststatus(d::GridData) = optdata(d).deststatus
 
-
 # Run kernels with SparseOpt, block by block:
 function optmap(
     f, simdata::AbstractSimData{S}, proc, ::SparseOpt, ruletype::Val{<:Rule}, rkeys
@@ -170,9 +169,6 @@ end
 
 @inline _cellstatus(opt::SparseOpt, wkeys::Tuple, writeval) = _isactive(writeval[1], opt)
 @inline _cellstatus(opt::SparseOpt, wkeys, writeval) = _isactive(writeval, opt)
-
-sourcestatus(d::GridData) = optdata(d).sourcestatus
-deststatus(d::GridData) = optdata(d).deststatus
 
 # SparseOpt methods
 
