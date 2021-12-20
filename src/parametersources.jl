@@ -1,8 +1,8 @@
 """
     ParameterSource
 
-Abstract supertypes for parameter source wrappers such as [`Aux`](@ref), 
-[`Grid`](@ref) and [`Delay`](@ref). These allow flexibility in that parameters 
+Abstract supertypes for parameter source wrappers such as [`Aux`](@ref),
+[`Grid`](@ref) and [`Delay`](@ref). These allow flexibility in that parameters
 can be retreived from various data sources not specified when the rule is written.
 """
 abstract type ParameterSource end
@@ -11,14 +11,16 @@ abstract type ParameterSource end
     get(data::AbstractSimData, source::ParameterSource, I...)
     get(data::AbstractSimData, source::ParameterSource, I::Union{Tuple,CartesianIndex})
 
-Allows parameters to be taken from a single value or a [`ParameterSource`](@ref) 
+Allows parameters to be taken from a single value or a [`ParameterSource`](@ref)
 such as another [`Grid`](@ref), an [`Aux`](@ref) array, or a [`Delay`](@ref).
 
 Other `source` objects are used as-is without indexing with `I`.
 """
 @propagate_inbounds Base.get(data::AbstractSimData, val, I...) = val
-@propagate_inbounds Base.get(data::AbstractSimData, key::ParameterSource, I...) = get(data, key, I)
-@propagate_inbounds Base.get(data::AbstractSimData, key::ParameterSource, I::CartesianIndex) = get(data, key, Tuple(I))
+@propagate_inbounds Base.get(data::AbstractSimData, key::ParameterSource, I...) =
+    get(data, key, I)
+@propagate_inbounds Base.get(data::AbstractSimData, key::ParameterSource, I::CartesianIndex) =
+    get(data, key, Tuple(I))
 
 """
     Aux <: ParameterSource
@@ -45,10 +47,10 @@ If the array is a DimensionalData.jl `DimArray` with a `Ti` (time)
 dimension, the correct interval will be selected automatically,
 precalculated for each timestep so it has no significant overhead.
 
-Currently this is cycled by default. Note that cycling may be incorrect 
-when the simulation timestep (e.g. `Week`) does not fit 
+Currently this is cycled by default. Note that cycling may be incorrect
+when the simulation timestep (e.g. `Week`) does not fit
 equally into the length of the time dimension (e.g. `Year`).
-This will reuire a `Cyclic` index mode in DimensionalData.jl in future 
+This will reuire a `Cyclic` index mode in DimensionalData.jl in future
 to correct this problem.
 """
 struct Aux{K} <: ParameterSource end
@@ -59,35 +61,66 @@ _unwrap(::Type{<:Aux{X}}) where X = X
 
 @inline aux(nt::NamedTuple, ::Aux{Key}) where Key = nt[Key]
 
-@propagate_inbounds Base.get(data::AbstractSimData, key::Aux, I::Tuple) = _getaux(data, key, I)
+@propagate_inbounds function Base.get(data::AbstractSimData, key::Aux, I::Tuple)
+    _getaux(data, key, I)
+end
 
 # _getaux
-# Get the value of an auxilliary array at index I
-# Get the aux array to index into
-@propagate_inbounds function _getaux(data::AbstractSimData, key::Union{Aux,Symbol}, I::Tuple) 
+# Get the value of an auxilliary array at index I and/or the synchonised time-step
+@propagate_inbounds function _getaux(
+    data::AbstractSimData, key::Union{Aux,Symbol}, I::Tuple
+)
     _getaux(aux(data, key), data, key, I)
 end
-# For a matrix just return the value for the index
-@propagate_inbounds function _getaux(A::AbstractMatrix, data::AbstractSimData, key::Union{Aux,Symbol}, I::Tuple)
+# For an Array just return the value for the index
+@propagate_inbounds function _getaux(
+    A::AbstractArray, data::AbstractSimData, key::Union{Aux,Symbol}, I::Tuple
+)
     A[I...]
 end
-# For a DimArray with a third (time) dimension we return the data at the current auxframe
-function _getaux(A::AbstractDimArray{<:Any,3}, data::AbstractSimData, key::Union{Aux,Symbol}, I::Tuple)
-    A[I..., auxframe(data, key)]
+# For a DimArray with a time dimension we return the value at the
+# current auxframe, also using the index `I` if aux is multidimensional.
+@propagate_inbounds function _getaux(
+    A::AbstractDimArray{<:Any,1}, data::AbstractSimData, key::Union{Aux,Symbol}, I::Tuple
+)
+    hasdim(A, TimeDim) ? A[auxframe(data, key)] : A[I...]
+end
+@propagate_inbounds function _getaux(
+    A::AbstractDimArray, data::AbstractSimData, key::Union{Aux,Symbol}, I::Tuple
+)
+    if hasdim(A, TimeDim)
+        last(dims(A)) isa TimeDim || throw(ArgumentError("The time dimensions in aux data must be the last dimension"))
+        A[I..., auxframe(data, key)]
+    else
+        A[I...]
+    end
 end
 
 
 # boundscheck_aux
 # Bounds check the aux arrays ahead of time
-function boundscheck_aux(data::AbstractSimData, auxkey::Aux{Key}) where Key
-    a = aux(data)
-    (a isa NamedTuple && haskey(a, Key)) || _auxmissingerror(Key, a)
-    gsize = gridsize(data)
-    asize = size(a[Key], 1), size(a[Key], 2)
-    if asize != gsize
-        _auxsizeerror(Key, asize, gsize)
+function boundscheck_aux(data::AbstractSimData, key::Aux)
+    boundscheck_aux(data, aux(data), key)
+end
+function boundscheck_aux(data::AbstractSimData, A::Nothing, key::Aux{Key}) where Key
+    _auxmissingerror(Key, a)
+end
+function boundscheck_aux(data::AbstractSimData, aux::NamedTuple, key::Aux{Key}) where Key
+    boundscheck_aux(data, aux[_unwrap(key)], key)
+end
+function boundscheck_aux(data::AbstractSimData, A::AbstractArray, key::Aux{Key}) where Key
+    size(A) === size(data) || _auxsizeerror(Key, size(A), size(data))
+end
+function boundscheck_aux(data::AbstractSimData, A::AbstractDimArray{<:Any,1}, key::Aux{Key}) where Key
+    hasdim(A, TimeDim) || size(data) === size(A) || _auxsizeerror(Key, size(A), size(data))
+end
+function boundscheck_aux(data::AbstractSimData, A::AbstractDimArray, key::Aux{Key}) where Key
+    if hasdim(A, TimeDim)
+        asize = size(otherdims(A, TimeDim))
+        asize == size(data) || _auxsizeerror(Key, asize, size(data))
+    else
+        size(A) == size(data) || _auxsizeerror(Key, size(A), size(data))
     end
-    return true
 end
 
 # _calc_auxframe
@@ -100,12 +133,12 @@ function _calc_auxframe(aux::NamedTuple, data::AbstractSimData)
     map(A -> _calc_auxframe(A, data), aux)
 end
 function _calc_auxframe(A::AbstractDimArray, data)
-    hasdim(A, Ti) || return nothing
+    hasdim(A, TimeDim) || return nothing
     curtime = currenttime(data)
     firstauxtime = first(dims(A, TimeDim))
     auxstep = step(dims(A, TimeDim))
-    # Use julias range objects to calculate the distance between the 
-    # current time and the start of the aux 
+    # Use julias range objects to calculate the distance between the
+    # current time and the start of the aux
     i = if curtime >= firstauxtime
         length(firstauxtime:auxstep:curtime)
     else
@@ -113,7 +146,7 @@ function _calc_auxframe(A::AbstractDimArray, data)
     end
     # TODO use a cyclic mode DimensionalArray
     # and handle the mismatch of e.g. weeks and years
-    _cyclic_index(i, size(A, 3))
+    return _cyclic_index(i, size(A, Ti))
 end
 _calc_auxframe(aux, data) = nothing
 
@@ -157,7 +190,8 @@ Grid(key::Symbol) = Grid{key}()
 _unwrap(::Grid{X}) where X = X
 _unwrap(::Type{<:Grid{X}}) where X = X
 
-@propagate_inbounds Base.get(data::AbstractSimData, key::Grid{K}, I::Tuple) where K = data[K][I...]
+@propagate_inbounds Base.get(data::AbstractSimData, key::Grid{K}, I::Tuple) where K =
+    data[K][I...]
 
 
 """
@@ -172,7 +206,9 @@ abstract type AbstractDelay{K} <: ParameterSource end
 
 @inline frame(delay::AbstractDelay) = delay.frame
 
-@propagate_inbounds function Base.get(data::AbstractSimData, delay::AbstractDelay{K}, I::Tuple) where K
+@propagate_inbounds function Base.get(
+    data::AbstractSimData, delay::AbstractDelay{K}, I::Tuple
+) where K
     _getdelay(frames(data)[frame(delay, data)], delay, I)
 end
 
@@ -180,7 +216,9 @@ end
 @propagate_inbounds function _getdelay(frame::AbstractArray, ::AbstractDelay, I::Tuple)
     frame[I...]
 end
-@propagate_inbounds function _getdelay(frame::NamedTuple, delay::AbstractDelay{K}, I::Tuple) where K
+@propagate_inbounds function _getdelay(
+    frame::NamedTuple, delay::AbstractDelay{K}, I::Tuple
+) where K
     _getdelay(frame[K], delay, I)
 end
 
@@ -189,11 +227,11 @@ end
 
     Delay{K}(steps)
 
-`Delay` allows using a [`Grid`](@ref) from previous timesteps as a parameter source as 
+`Delay` allows using a [`Grid`](@ref) from previous timesteps as a parameter source as
 a field in any `Rule` that uses `get` to retrieve it's parameters.
 
-It must be coupled with an output that stores all frames, so that `@assert 
-DynamicGrids.isstored(output) == true`.  With [`GraphicOutput`](@ref)s this may be 
+It must be coupled with an output that stores all frames, so that `@assert
+DynamicGrids.isstored(output) == true`.  With [`GraphicOutput`](@ref)s this may be
 acheived by using the keyword argument `store=true` when constructing the output object.
 
 # Type Parameters
@@ -202,8 +240,8 @@ acheived by using the keyword argument `store=true` when constructing the output
 
 # Arguments
 
-- `steps`: As a user supplied parameter, this is a multiple of the step size of the output 
-    `tspan`. This is automatically replaced with an integer for each step. Used within the 
+- `steps`: As a user supplied parameter, this is a multiple of the step size of the output
+    `tspan`. This is automatically replaced with an integer for each step. Used within the
     code in a rule, it must be an `Int` number of frames, for performance.
 
 # Example
@@ -241,11 +279,11 @@ end
 """
     Lag <: AbstractDelay
 
-    Lag{K}(frames::Int) 
+    Lag{K}(frames::Int)
 
-`Lag` allows using a [`Grid`](@ref) from a specific previous frame from within a rule, 
-using `get`. It is similar to [`Delay`](@ref), but an integer amount of frames should be 
-used, instead of a quantity related to the simulation `tspan`. The lower bound is the first 
+`Lag` allows using a [`Grid`](@ref) from a specific previous frame from within a rule,
+using `get`. It is similar to [`Delay`](@ref), but an integer amount of frames should be
+used, instead of a quantity related to the simulation `tspan`. The lower bound is the first
 frame.
 
 # Type Parameter
@@ -282,9 +320,9 @@ end
 """
     Frame <: AbstractDelay
 
-    Frame{K}(frame) 
+    Frame{K}(frame)
 
-`Frame` allows using a [`Grid`](@ref) from a specific previous timestep from within 
+`Frame` allows using a [`Grid`](@ref) from a specific previous timestep from within
 a rule, using `get`. It should only be used within rule code, not as a parameter.
 
 # Type Parameter
@@ -330,8 +368,8 @@ needsdelay(rule::Rule) = false
 _getdelays(rules::Tuple) = Flatten.flatten(rules, AbstractDelay, DELAY_IGNORE)
 
 # _setdelays
-# Update any AbstractDelay anywhere in the rules Tuple. 
-# These are converted to Frame objects so the calculation 
+# Update any AbstractDelay anywhere in the rules Tuple.
+# These are converted to Frame objects so the calculation
 # happens only once for each timestep, instead of for each cell.
 function _setdelays(rules::Tuple, data::AbstractSimData)
     delays = _getdelays(rules)
@@ -342,13 +380,13 @@ function _setdelays(rules::Tuple, data::AbstractSimData)
         rules
     end
 end
-_setdelays(rules::Tuple, delays::Tuple) = 
+_setdelays(rules::Tuple, delays::Tuple) =
     Flatten.reconstruct(rules, delays, AbstractDelay, DELAY_IGNORE)
 
 # Errors
-@noinline _notstorederror() = 
+@noinline _notstorederror() =
     throw(ArgumentError("Output does not store frames, which is needed for a Delay. Use ArrayOutput or any GraphicOutput with `store=true` keyword"))
-@noinline _delaysteperror(delay::Delay{K}, simstep) where K = 
+@noinline _delaysteperror(delay::Delay{K}, simstep) where K =
     throw(ArgumentError("Delay $K size $(steps(delay)) is not a multiple of simulations step $simstep"))
 @noinline _auxmissingerror(key, aux) = error("Aux data $key is not present in aux")
 @noinline _auxsizeerror(key, asize, gsize) =

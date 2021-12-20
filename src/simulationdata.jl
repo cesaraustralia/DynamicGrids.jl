@@ -46,7 +46,7 @@ only in specific contexts, which is discouraged.
 - `radius(data)` : returns the `Int` radius used on the grid,
     which is also the amount of border padding.
 """
-abstract type AbstractSimData{S} end
+abstract type AbstractSimData{S,N} end
 
 # Getters
 extent(d::AbstractSimData) = d.extent
@@ -77,9 +77,12 @@ Base.values(d::AbstractSimData) = values(grids(d))
 Base.first(d::AbstractSimData) = first(grids(d))
 Base.last(d::AbstractSimData) = last(grids(d))
 Base.getindex(d::AbstractSimData, key::Symbol) = getindex(grids(d), key)
+Base.ndims(d::AbstractSimData{<:Any,N}) where N = N
+Base.size(d::AbstractSimData{S}) where S = Tuple(StaticArrays.Size(S))
 
 # Indexing forwarded to the first grid
-@propagate_inbounds Base.setindex!(d::AbstractSimData, x, I...) = setindex!(first(grids(d)), x, I...)
+@propagate_inbounds Base.setindex!(d::AbstractSimData, x, I...) =
+    setindex!(first(grids(d)), x, I...)
 @propagate_inbounds Base.getindex(d::AbstractSimData, I...) = getindex(first(grids(d)), I...)
 
 # Uptate timestamp
@@ -101,7 +104,7 @@ Additional methods not found in [`AbstractSimData`](@ref):
 - `rules(d::SimData)` : get the simulation rules.
 - `ruleset(d::SimData)` : get the simulation [`AbstractRuleset`](@ref).
 """
-struct SimData{S<:Tuple,G<:NamedTuple,E,RS,F,CF,AF} <: AbstractSimData{S}
+struct SimData{S<:Tuple,N,G<:NamedTuple,E,RS,F,CF,AF} <: AbstractSimData{S,N}
     grids::G
     extent::E
     ruleset::RS
@@ -109,10 +112,10 @@ struct SimData{S<:Tuple,G<:NamedTuple,E,RS,F,CF,AF} <: AbstractSimData{S}
     currentframe::CF
     auxframe::AF
 end
-function SimData{S}(
+function SimData{S,N}(
     grids::G, extent::E, ruleset::RS, frames::F, currentframe::CF, auxframe::AF
-) where {S,G,E,RS,F,CF,AF}
-    SimData{S,G,E,RS,F,CF,AF}(grids, extent, ruleset, frames, currentframe, auxframe)
+) where {S,N,G,E,RS,F,CF,AF}
+    SimData{S,N,G,E,RS,F,CF,AF}(grids, extent, ruleset, frames, currentframe, auxframe)
 end
 SimData(o, ruleset::AbstractRuleset) = SimData(o, extent(o), ruleset)
 function SimData(o, extent::AbstractExtent, ruleset::AbstractRuleset)
@@ -143,11 +146,12 @@ function SimData(
     grids::G, extent::AbstractExtent, ruleset::AbstractRuleset, frames
 ) where {G<:Union{<:NamedTuple{<:Any,<:Tuple{<:GridData,Vararg}},<:GridData}}
     currentframe = 1; auxframe = nothing
-    S = Tuple{gridsize(extent)...}
+    S = Tuple{size(extent)...}
+    N = ndims(extent)
     # SimData is isbits-only, so use Static versions
     s_extent = StaticExtent(extent)
     s_ruleset = StaticRuleset(ruleset)
-    SimData{S}(grids, s_extent, s_ruleset, frames, currentframe, auxframe)
+    SimData{S,N}(grids, s_extent, s_ruleset, frames, currentframe, auxframe)
 end
 
 # Build the grids for the simulation from the exebnt, ruleset, init and padval
@@ -162,7 +166,7 @@ function _buildgrids(extent, ruleset, ::Val{S}, ::Val{R}, init, padval) where {S
     )
 end
 
-ConstructionBase.constructorof(::Type{<:SimData{S}}) where S = SimData{S}
+ConstructionBase.constructorof(::Type{<:SimData{S,N}}) where {S,N} = SimData{S,N}
 
 # Getters
 ruleset(d::SimData) = d.ruleset
@@ -203,7 +207,7 @@ The simplified object actually passed to rules with the current design.
 
 Passing a smaller object than `SimData` to rules leads to faster GPU compilation.
 """
-struct RuleData{S<:Tuple,G<:NamedTuple,E,Se,F,CF,AF} <: AbstractSimData{S}
+struct RuleData{S<:Tuple,N,G<:NamedTuple,E,Se,F,CF,AF} <: AbstractSimData{S,N}
     grids::G
     extent::E
     settings::Se
@@ -211,16 +215,16 @@ struct RuleData{S<:Tuple,G<:NamedTuple,E,Se,F,CF,AF} <: AbstractSimData{S}
     currentframe::CF
     auxframe::AF
 end
-function RuleData{S}(
+function RuleData{S,N}(
     grids::G, extent::E, settings::Se, frames::F, currentframe::CF, auxframe::AF
-) where {S,G,E,Se,F,CF,AF}
-    RuleData{S,G,E,Se,F,CF,AF}(grids, extent, settings, frames, currentframe, auxframe)
+) where {S,N,G,E,Se,F,CF,AF}
+    RuleData{S,N,G,E,Se,F,CF,AF}(grids, extent, settings, frames, currentframe, auxframe)
 end
-function RuleData(d::AbstractSimData{S}) where S
-    RuleData{S}(grids(d), extent(d), settings(d), frames(d), currentframe(d), auxframe(d))
+function RuleData(d::AbstractSimData{S,N}) where {S,N}
+    RuleData{S,N}(grids(d), extent(d), settings(d), frames(d), currentframe(d), auxframe(d))
 end
 
-ConstructionBase.constructorof(::Type{<:RuleData{S}}) where {S} = RuleData{S}
+ConstructionBase.constructorof(::Type{<:RuleData{S,N}}) where {S,N} = RuleData{S,N}
 
 # Getters
 settings(d::RuleData) = d.settings
