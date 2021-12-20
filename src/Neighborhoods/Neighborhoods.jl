@@ -11,7 +11,7 @@ export setwindow, updatewindow, unsafe_updatewindow
 
 export pad_axes, unpad_axes
 
-export mapneighborhood
+export broadcast_neighborhood, broadcast_neighborhood!
 
 """
     Neighborhood
@@ -24,7 +24,7 @@ The main kinds of neighborhood are demonstrated below:
 
 ![Neighborhoods](https://raw.githubusercontent.com/cesaraustralia/DynamicGrids.jl/media/Neighborhoods.png)
 
-Neighborhoods can be used in [`NeighborhoodRule`](@ref) and [`SetNeighborhoodRule`](@ref) -
+Neighborhoods can be used in `NeighborhoodRule` and `SetNeighborhoodRule` -
 the same shapes with different purposes. In a `NeighborhoodRule` the neighborhood specifies
 which cells around the current cell are returned as an iterable from the `neighbors` function.
 These can be counted, summed, compared, or multiplied with a kernel in an
@@ -87,7 +87,7 @@ _window(hood::Neighborhood) = hood._window
     positions(x::Union{Neighborhood,NeighborhoodRule}}, cellindex::Tuple) -> iterable
 
 Returns an indexable iterable, over all cells as `Tuple`s of each
-index in the main array. Useful in [`SetNeighborhoodRule`](@ref) for
+index in the main array. Useful in `SetNeighborhoodRule` for
 setting neighborhood values, or for getting values in an Aux array.
 """
 function positions end
@@ -558,6 +558,11 @@ Base.@pure function tuple_contents(::Type{X}) where {X<:Tuple}
 end
 tuple_contents(xs::Tuple) = xs
 
+"""
+    unsafe_readwindow(hood::Neighborhood, A::AbstractArray, I) => SArray
+
+Get a single window square from an array, as an `SArray`, checking bounds.
+"""
 readwindow(hood::Neighborhood, A::AbstractArray, I::Int...) = readwindow(hood, A, I)
 @inline function readwindow(hood::Neighborhood{R,N}, A::AbstractArray, I) where {R,N}
     for O in ntuple(_ -> (-R, R), N)
@@ -570,7 +575,7 @@ end
 """
     unsafe_readwindow(hood::Neighborhood, A::AbstractArray, I) => SArray
 
-Get a single window square from an array, as an `SArray`.
+Get a single window square from an array, as an `SArray`, without checking bounds.
 """
 @inline unsafe_readwindow(hood::Neighborhood, A::AbstractArray, I::CartesianIndex) =
     unsafe_readwindow(hood, A, Tuple(I))
@@ -603,6 +608,7 @@ end
     throw(DimensionMismatch("neighborhood has $N1 dimensions while array has $N2 and index has $N3"))
 end
 
+# Reading windows without padding
 # struct Padded{S,V}
 #     padval::V
 # end
@@ -634,7 +640,7 @@ end
 # end
 
 """
-    setwindow(x, A::AbstractArray, I...) => Neighborhood
+    updatewindow(x, A::AbstractArray, I...) => Neighborhood
 
 Set the window of a neighborhood to values from the array A around index `I`.
 
@@ -656,38 +662,57 @@ No bounds checks occur, ensure that A has padding of at least the neighborhood r
 end
 
 """
-    mapneighborhood(f, A, hood::Neighborhood{R})
+    broadcast_neighborhood(f, hood::Neighborhood, As...)
 
-Simple neighborhood application.
+Simple neighborhood application, where `f` is passed 
+each neighborhood in `A`, returning a new array.
+
+The result is smaller than `A` on all sides, by the neighborhood radius.
 """
-function mapneighborhood(f, src, hood::Neighborhood)
-    ax = unpad_axes(src, hood)
-    srcview = view(src, ax...)
-    broadcast(srcview, CartesianIndices(ax)) do v, I
-        f(unsafe_updatewindow(hood, src, I))
+function broadcast_neighborhood(f, hood::Neighborhood, sources...)
+    checksizes(sources...)
+    ax = unpad_axes(first(sources), hood)
+    sourceview = view(first(sources), ax...)
+    broadcast(sourceview, CartesianIndices(ax)) do _, I
+        applyneighborhood(f, sources, I)
     end
 end
 
 """
-    mapneighborhood!(f, dst, src, hood::Neighborhood{R})
+    broadcast_neighborhood!(f, hood::Neighborhood{R}, dest, sources...)
 
-Simple neighborhood application, writing to `dst`.
+Simple neighborhood broadcast where `f` is passed each neighborhood
+of `src` (except padding), writing the result of `f` to `dest`.
 
-`dst` must be smaller than `src` by the radius padding `R` on all sides,
-or the same size (where it is assumed to also be padded).
+`dest` must either be smaller than `src` by the neighborhood radius on all
+sides, or be the same size, in which case it is assumed to also be padded.
 """
-function mapneighborhood!(f, dst, src, hood::Neighborhood; padded=true)
-    if axes(dst) === axes(src)
+function broadcast_neighborhood!(f, hood::Neighborhood, dest, sources)
+    checksizes(sources...)
+    if axes(dest) === axes(src)
         ax = unpad_axes(src, hood)
-        dstview = view(dst, ax...)
-        broadcast!(dstview, CartesianIndices(ax)) do I
-            f(unsafe_updatewindow(hood, A, I))
+        destview = view(dest, ax...)
+        broadcast!(destview, CartesianIndices(ax)) do I
+            applyneighborhood(f, sources, I)
         end
     else
-        broadcast!(dst, CartesianIndices(unpad_axes(src, hood))) do I
-            f(unsafe_updatewindow(hood, A, I))
+        broadcast!(dest, CartesianIndices(unpad_axes(src, hood))) do I
+            applyneighborhood(f, sources, I)
         end
     end
+end
+
+function checksizes(sources...)
+    map(sources) do s
+        size(s) === size(first(sources)) || throw(ArgumentError("Source array sizes must match"))
+    end
+end
+
+function applyneighborhood(f, sources, I)
+    hoods = map(sources) do s
+        unsafe_updatewindow(hood, s, I)
+    end
+    f(hoods...)
 end
 
 """

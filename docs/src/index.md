@@ -153,12 +153,11 @@ DynamicGrids.SimSettings
 
 ```@docs
 Neighborhood
-RadialNeighborhood
 Moore
-Window
-AbstractPositionalNeighborhood
-Positional
 VonNeumann
+Window
+DynamicGrids.AbstractPositionalNeighborhood
+Positional
 LayeredPositional
 ```
 
@@ -167,6 +166,7 @@ LayeredPositional
 ```@docs
 neighborhood
 radius
+distances
 ```
 
 Useful with [`NeighborhoodRule`](@ref):
@@ -191,7 +191,28 @@ kernel
 kernelproduct
 ```
 
-### Atomic methods for SetCellRule and SetNeighborhoodRule
+### Low level use of neighborhoods
+
+```@docs
+DynamicGrids.Neighborhoods.readwindow
+DynamicGrids.Neighborhoods.unsafe_readwindow
+DynamicGrids.Neighborhoods.updatewindow
+DynamicGrids.Neighborhoods.unsafe_updatewindow
+DynamicGrids.Neighborhoods.pad_axes
+DynamicGrids.Neighborhoods.unpad_axes
+```
+
+### Generic neighborhood applicators 
+
+These can be used without the full simulation mechanisms, like `broadcast`.
+
+```@docs
+DynamicGrids.Neighborhoods.broadcast_neighborhood
+DynamicGrids.Neighborhoods.broadcast_neighborhood!
+```
+
+
+## Atomic methods for SetCellRule and SetNeighborhoodRule
 
 Using these methods to modify grid values ensures cell independence,
 and also prevent race conditions with [`ThreadedCPU`](@ref) or [`CuGPU`].
