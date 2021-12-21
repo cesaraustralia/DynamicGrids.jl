@@ -40,8 +40,8 @@ function isinferred(simdata::AbstractSimData,
     r = max(1, radius(rule))
     T = eltype(grid)
     S = 2r + 1
-    buffer = SArray{Tuple{S,S},T,2,S^2}(Tuple(zero(T) for i in 1:S^2))
-    rule = _setbuffer(rule, buffer)
+    window = SArray{Tuple{S,S},T,2,S^2}(Tuple(zero(T) for i in 1:S^2))
+    rule = setwindow(rule, window)
     return _isinferred(simdata, rule)
 end
 function isinferred(simdata::AbstractSimData, rule::SetCellRule)

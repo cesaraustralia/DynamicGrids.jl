@@ -1,37 +1,12 @@
 
 # Low-level generated functions for working with grids
 
-# _update_buffers => NTuple{N,SMatrix}
-# Generate an SArray from the main array and the last SArray
-@generated function _update_buffers(
-    buffers::Tuple, src::AbstractArray{T}, ::Val{R}, i, j
-) where {T,R}
-    B = 2R; S = 2R + 1; L = S^2
-    newvals = Expr[]
-    for n in 0:2B-1
-        push!(newvals, :(@inbounds src[i + $n, j + 2R]))
-    end
-    newbuffers = Expr(:tuple)
-    for b in 1:B
-        bufvals = Expr(:tuple)
-        for n in S+1:L
-            push!(bufvals.args, :(@inbounds buffers[$b][$n]))
-        end
-        for n in b:b+B
-            push!(bufvals.args, newvals[n])
-        end
-        push!(newbuffers.args, :(SArray{Tuple{$S,$S},$T,2,$L}($bufvals)))
-    end
-    return quote
-        return $newbuffers
-    end
-end
-
-# _initialise_buffers => NTuple{N,SMatrix}
+# _initialise_windows => NTuple{N,SMatrix}
 # Generate an SArray from the main array
-@generated function _initialise_buffers(src::AbstractArray{T}, ::Val{R}, i, j) where {T,R}
+@generated function _initialise_windows(src::AbstractArray{T}, ::Val{R}, i, j) where {T,R}
     B = 2R; S = 2R + 1; L = S^2
     columns = []
+    # This column is never used, so fill with zeros 
     zerocol = Expr[]
     for r in 1:2B
         push!(zerocol, :(zero(T)))
@@ -44,45 +19,44 @@ end
         end
         push!(columns, newcol)
     end
-    newbuffers = Expr(:tuple)
+    newwindows = Expr(:tuple)
     for b in 1:B
-        bufvals = Expr(:tuple)
+        winvals = Expr(:tuple)
         for c in 1:S, r in b:b+B
             exp = columns[c][r]
-            push!(bufvals.args, exp)
+            push!(winvals.args, exp)
         end
-        push!(newbuffers.args, :(SArray{Tuple{$S,$S},$T,2,$L}($bufvals)))
+        push!(newwindows.args, :(SArray{Tuple{$S,$S},$T,2,$L}($winvals)))
     end
     return quote
-        return $newbuffers
+        return $newwindows
     end
 end
 
-# _getwindow => SMatrix
-# Get a single window square from an array, as an SMatrix.
-# We use this on GPUs to get a neighborhood window from the main 
-# grid, which is 10x or more faster than using a view. 
-# We could possible just use this instead of _update_buffers
-# for the sake of simplicity, with some performance loss.
-@generated function _getwindow(tile::AbstractArray{T,N}, ::Neighborhood{R,N,L}, I...) where {T,R,N,L}
-    R = 1
-    S = 2R+1
-    L = S^N
-    sze = ntuple(_ -> S, N)
-    vals = Expr(:tuple)
-    nh = CartesianIndices(map(Base.OneTo, sze))
-    for i in 1:L
-        Iargs = map(Tuple(nh[i]), 1:N) do nhi, n
-            m = nhi - 1
-            :(I[$n] + $m)
-        end
-        Iexp = Expr(:tuple, Iargs...)
-        exp = :(@inbounds tile[$Iexp...])
-        push!(vals.args, exp)
+# _slide_windows => NTuple{N,SMatrix}
+# Generate a tuple of SArrays from the main array and the previous SArrays
+@generated function _slide_windows(
+    windows::Tuple, src::AbstractArray{T}, ::Val{R}, i, j
+) where {T,R}
+    B = 2R; S = 2R + 1; L = S^2
+    newvals = Expr[]
+    for n in 0:2B-1
+        push!(newvals, :(@inbounds src[i + $n, j + 2R]))
     end
-
-    sze_exp = Expr(:curly, :Tuple, sze...)
-    return :(SArray{$sze_exp,$T,$N,$L}($vals))
+    newwindows = Expr(:tuple)
+    for b in 1:B
+        winvals = Expr(:tuple)
+        for n in S+1:L
+            push!(winvals.args, :(@inbounds windows[$b][$n]))
+        end
+        for n in b:b+B
+            push!(winvals.args, newvals[n])
+        end
+        push!(newwindows.args, :(SArray{Tuple{$S,$S},$T,2,$L}($winvals)))
+    end
+    return quote
+        return $newwindows
+    end
 end
 
 # _readcell

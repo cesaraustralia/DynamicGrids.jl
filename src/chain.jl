@@ -30,8 +30,8 @@ radius(chain::Chain) = radius(chain[1])
 neighborhoodkey(chain::Chain) = neighborhoodkey(chain[1])
 neighborhood(chain::Chain) = neighborhood(chain[1])
 neighbors(chain::Chain) = neighbors(chain[1])
-@inline function _setbuffer(chain::Chain{R,W}, buf) where {R,W}
-    rules = (_setbuffer(chain[1], buf), tail(chain.rules)...)
+@inline function setwindow(chain::Chain{R,W}, win) where {R,W}
+    rules = (setwindow(chain[1], win), tail(chain.rules)...)
     Chain{R,W,typeof(rules)}(rules)
 end
 

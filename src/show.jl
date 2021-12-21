@@ -9,7 +9,7 @@ function Base.show(io::IO, mime::MIME"text/plain", ruleset::Ruleset)
         show(rulectx, mime, rule)
         print(io, ",\n")
     end
-    print(io, indent * ")\n")
+    print(io, indent * "),\n")
     _showsettings(ctx, mime, settings(ruleset))
     print(io, ")\n\n")
     ModelParameters.printparams(io, ruleset)

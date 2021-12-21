@@ -57,6 +57,8 @@ function _padless_view(A::AbstractArray, axes, radius)
     end
     return view(A, ranges...)
 end
+
+
 # Get an a view of the source, preferring the underlying array if it is not a padded OffsetArray
 source_array_or_view(d::GridData) = source(d) isa OffsetArray ? sourceview(d) : source(d)
 # Get an a view of the dest, preferring the underlying array if it is not a padded OffsetArray

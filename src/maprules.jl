@@ -47,7 +47,10 @@ function maprule!(data::AbstractSimData, ruletype::Val, rule, rkeys, wkeys)
     maprule!(data, proc(data), opt(data), ruletype, rule, rkeys, wkeys)
 end
 
-function maprule!(data::AbstractSimData, proc::CPU, opt, ruletype::Val, rule, rkeys, wkeys)
+
+# Most Rules
+# 2 dimensional, with processor selection and optimisations in `optmap`
+function maprule!(data::AbstractSimData{<:Tuple{Y,X}}, proc::CPU, opt, ruletype::Val, rule, rkeys, wkeys) where {Y,X}
     let data=data, proc=proc, opt=opt, rule=rule,
         rkeys=rkeys, wkeys=wkeys, ruletype=ruletype
         optmap(data, proc, opt, ruletype, rkeys) do I 
@@ -55,20 +58,25 @@ function maprule!(data::AbstractSimData, proc::CPU, opt, ruletype::Val, rule, rk
         end
     end
 end
-function maprule!(
-    data::AbstractSimData, proc::CPU, opt, ruletype::Val{<:NeighborhoodRule}, 
-    rule, rkeys, args...
-)
-    hoodgrid = _firstgrid(data, rkeys)
-    _mapneighborhoodrule!(data, hoodgrid, proc, opt, ruletype, rule, rkeys, args...)
+# Arbitrary dimensions, no proc/opt selection beyond CPU/GPU
+function maprule!(data::AbstractSimData, proc::CPU, opt, ruletype::Val, rule, rkeys, wkeys)
+    let data=data, proc=proc, opt=opt, rule=rule,
+        rkeys=rkeys, wkeys=wkeys, ruletype=ruletype
+        for I in CartesianIndices(first(grids(data)))
+            cell_kernel!(data, ruletype, rule, rkeys, wkeys, Tuple(I)...)
+        end
+    end
 end
 
-# 2 dimensional (with procesess and optimisations)
-function _mapneighborhoodrule!(
-    data, hoodgrid::GridData{<:Tuple{Y,X},R}, proc, opt, ruletype, rule, rkeys, wkeys 
-) where {Y,X,R}
+# Neighborhood rules
+# 2 dimensional, with processor selection and optimisations
+function maprule!(
+    data::AbstractSimData{<:Tuple{Y,X}}, proc::CPU, opt, ruletype::Val{<:NeighborhoodRule}, 
+    rule, rkeys, wkeys
+) where {Y,X}
+    hoodgrid = _firstgrid(data, rkeys)
     let data=data, hoodgrid=hoodgrid, proc=proc, opt=opt, ruletyp=ruletype, rule=rule, rkeys=rkeys, wkeys=wkeys
-        B = 2R
+        B = 2radius(hoodgrid)
         # UNSAFE: we must avoid sharing status blocks, it could cause race conditions 
         # when setting status from different threads. So we split the grid in 2 interleaved
         # sets of rows, so that we never run adjacent rows simultaneously
@@ -81,20 +89,19 @@ function _mapneighborhoodrule!(
     end
     return nothing
 end
-# Arbitrary dimensions, no proc/opt selection
-function _mapneighborhoodrule!(
-    data, hoodgrid::GridData{<:Tuple,R}, proc, opt, ruletype, rule, rkeys, wkeys 
-) where {R}
+# Arbitrary dimensions, no proc/opt selection beyond CPU/GPU
+function maprule!(
+    data::AbstractSimData, proc::CPU, opt, ruletype::Val{<:NeighborhoodRule}, rule, rkeys, wkeys
+)
+    hoodgrid = _firstgrid(data, rkeys)
     for I in CartesianIndices(hoodgrid) 
-        tI = Tuple(I)
-        # Loop over the COLUMN of buffers covering the block
-        neighborhood_kernel!(data, hoodgrid, ruletype, rule, rkeys, wkeys, tI...)
+        neighborhood_kernel!(data, hoodgrid, ruletype, rule, rkeys, wkeys, Tuple(I)...)
     end
     return nothing
 end
 
 
-### Rules that don't need a neighborhood buffer ####################
+### Rules that don't need a neighborhood window ####################
 
 # optmap
 # Map kernel over the grid, specialising on PerformanceOpt.
@@ -152,16 +159,14 @@ end
 @inline function neighborhood_kernel!(
     data, hoodgrid, ruletype::Val{<:NeighborhoodRule}, rule, rkeys, wkeys, I...
 )
-    src = parent(source(hoodgrid))
-    buf = _getwindow(src, neighborhood(rule), I...)
-    bufrule = _setbuffer(rule, buf)
-    cell_kernel!(data, ruletype, bufrule, rkeys, wkeys, I...)
+    rule1 = unsafe_updatewindow(rule, source(hoodgrid), I...)
+    cell_kernel!(data, ruletype, rule1, rkeys, wkeys, I...)
 end
 
 # row_kernel!
 # Run a NeighborhoodRule rule row by row. When we move along a row by one cell, we 
 # access only a single new column of data with the height of 4R, and move the existing
-# data in the neighborhood buffers array across by one column. This saves on reads
+# data in the neighborhood windows array across by one column. This saves on reads
 # from the main array.
 function row_kernel!(
     simdata::AbstractSimData, grid::GridData{<:Tuple{Y,X},R}, proc, opt::NoOpt,
@@ -172,14 +177,14 @@ function row_kernel!(
     i > Y && return nothing
     # Loop along the block ROW.
     src = parent(source(grid))
-    buffers = _initialise_buffers(src, Val{R}(), i, 1)
+    windows = _initialise_windows(src, Val{R}(), i, 1)
     blocklen = min(Y, i + B - 1) - i + 1
     for j = 1:X
-        buffers = _update_buffers(buffers, src, Val{R}(), i, j)
-        # Loop over the COLUMN of buffers covering the block
+        windows = _slide_windows(windows, src, Val{R}(), i, j)
+        # Loop over the COLUMN of windows covering the block
         for b in 1:blocklen
-            @inbounds bufrule = _setbuffer(rule, buffers[b])
-            cell_kernel!(simdata, ruletype, bufrule, rkeys, wkeys, i + b - 1, j)
+            @inbounds rule1 = setwindow(rule, windows[b])
+            cell_kernel!(simdata, ruletype, rule1, rkeys, wkeys, i + b - 1, j)
         end
     end
     return nothing
