@@ -67,7 +67,7 @@ either a `Tuple` of values or a range.
 Custom `Neighborhood`s must define this method.
 """
 function neighbors end
-neighbors(hood::Neighborhood) = begin
+function neighbors(hood::Neighborhood)
     map(i -> _window(hood)[i], window_indices(hood))
 end
 
@@ -91,7 +91,9 @@ index in the main array. Useful in `SetNeighborhoodRule` for
 setting neighborhood values, or for getting values in an Aux array.
 """
 function positions end
-@inline positions(hood::Neighborhood, I::CartesianIndex) = positions(hood, Tuple(I))
+@inline function positions(hood::Neighborhood, I::CartesianIndex)
+     positions(hood, CartesianIndex(Tuple(I)))
+end
 @inline positions(hood::Neighborhood, I::Int...) = positions(hood, I)
 @inline positions(hood::Neighborhood, I::Tuple) = map(o -> o .+ I, offsets(hood))
 
@@ -148,7 +150,6 @@ Base.size(hood::Neighborhood{R,N}) where {R,N} = ntuple(_ -> 2R+1, N)
 Base.axes(hood::Neighborhood{R,N}) where {R,N} = ntuple(_ -> SOneTo{2R+1}(), N)
 Base.iterate(hood::Neighborhood, args...) = iterate(neighbors(hood), args...)
 Base.getindex(hood::Neighborhood, i) = begin
-    # @show _window(hood) window_indices(hood)
     getindex(_window(hood), window_indices(hood)[i])
 end
 
@@ -559,17 +560,18 @@ end
 tuple_contents(xs::Tuple) = xs
 
 """
-    unsafe_readwindow(hood::Neighborhood, A::AbstractArray, I) => SArray
+    readwindow(hood::Neighborhood, A::AbstractArray, I) => SArray
 
 Get a single window square from an array, as an `SArray`, checking bounds.
 """
 readwindow(hood::Neighborhood, A::AbstractArray, I::Int...) = readwindow(hood, A, I)
+readwindow(hood::Neighborhood, A::AbstractArray, I::CartesianIndex) = readwindow(hood, A, Tuple(I))
 @inline function readwindow(hood::Neighborhood{R,N}, A::AbstractArray, I) where {R,N}
     for O in ntuple(_ -> (-R, R), N)
         edges = Tuple(I) .+ O
         map(I -> checkbounds(A, I...), edges)
     end
-    return unsafe_readwindow(hood, A, I...)
+    return unsafe_readwindow(hood, A, I)
 end
 
 """
@@ -584,7 +586,6 @@ Get a single window square from an array, as an `SArray`, without checking bound
 @generated function unsafe_readwindow(
     ::Neighborhood{R,N}, A::AbstractArray{T,N}, I::NTuple{N,Int}
 ) where {T,R,N}
-    R = 1
     S = 2R+1
     L = S^N
     sze = ntuple(_ -> S, N)
