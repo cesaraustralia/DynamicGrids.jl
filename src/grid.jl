@@ -26,6 +26,13 @@ function ConstructionBase.constructorof(::Type{T}) where T<:GridData{S,R} where 
     T.name.wrapper{S,R}
 end
 
+# Return a SizedArray with similar, instead of a StaticArray
+Base.similar(A::GridData) = similar(sourceview(A))
+Base.similar(A::GridData, ::Type{T}) where T = similar(sourceview(A), T)
+Base.similar(A::GridData, I::Tuple{Int,Vararg{Int}}) = similar(sourceview(A), I)
+Base.similar(A::GridData, ::Type{T}, I::Tuple{Int,Vararg{Int}}) where T =
+    similar(sourceview(A), T, I)
+
 # Getters
 radius(d::GridData{<:Any,R}) where R = R
 mask(d::GridData) = d.mask
@@ -211,7 +218,7 @@ end
 
     WritableGridData(grid::GridData)
 
-[`GridData`](@ref) object passed to rules as write grids, and can be written 
+[`GridData`](@ref) objet passed to rules as write grids, and can be written 
 to directly as an array, or preferably using `add!` etc. All writes handle 
 updates to `SparseOpt()` and writing to the correct source/dest array.
 
@@ -242,7 +249,9 @@ function WritableGridData{S,R}(
     )
 end
 
-Base.parent(d::WritableGridData{S}) where {S} = SizedArray{S}(destview(d))
+function Base.parent(d::WritableGridData{S,<:Any,T,N}) where {S,T,N}
+    SizedArray{S,T,N}(dest_array_or_view(d))
+end
 
 
 ### UNSAFE / LOCKS required
