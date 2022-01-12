@@ -584,7 +584,6 @@ Get a single window square from an array, as an `SArray`, without checking bound
 @generated function unsafe_readwindow(
     ::Neighborhood{R,N}, A::AbstractArray{T,N}, I::NTuple{N,Int}
 ) where {T,R,N}
-    R = 1
     S = 2R+1
     L = S^N
     sze = ntuple(_ -> S, N)
