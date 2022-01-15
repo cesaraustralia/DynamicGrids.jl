@@ -8,7 +8,7 @@ Text configuration for printing timestep and grid name on the image.
 
 # Arguments / Keywords
 
-- `font`: `String` font name.
+- `font`: `FreeTypeAbstraction.FTFont` (direct), or `String` (font name to look for).
 - `namepixels` and `timepixels`: the pixel size of the font.
 - `timepos` and `namepos`: tuples that set the label positions, in `Int` pixels.
 - `fcolor` and `bcolor`: the foreground and background colors, as `ARGB32`.
@@ -28,7 +28,9 @@ function TextConfig(;
     timepos=(2timepixels, timepixels),
     fcolor=ARGB32(1.0), bcolor=ZEROCOL,
 )
-    if font isa AbstractString
+    if font isa FreeTypeAbstraction.FTFont
+	    face = font
+    elseif font isa AbstractString
         face = FreeTypeAbstraction.findfont(font)
         face isa Nothing && _fontnotfounderror(font)
     else
