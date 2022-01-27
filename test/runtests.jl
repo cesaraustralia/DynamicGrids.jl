@@ -24,6 +24,7 @@ end
 @time @safetestset "objectgrids" begin include("objectgrids.jl") end
 @time @safetestset "parametersources" begin include("parametersources.jl") end
 @time @safetestset "show" begin include("show.jl") end
+@time @safetestset "textconfig" begin include("textconfig.jl") end
 # ImageMagick breaks in windows travis for some reason
 if !Sys.iswindows() 
     @time @safetestset "image" begin include("image.jl") end

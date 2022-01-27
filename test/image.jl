@@ -300,8 +300,6 @@ end
         )
         simdata = SimData(output, Ruleset(Life()))
         @test_throws ArgumentError render!(output, simdata)
-        @test_throws ArgumentError TextConfig(; font="not_a_font")
-        @test_throws ArgumentError TextConfig(; font=:not_a_string)
     end
     @testset "Layout is the default for NamedTuple of grids" begin
         output = NoDisplayImageOutput(multiinit; tspan=1:10)
