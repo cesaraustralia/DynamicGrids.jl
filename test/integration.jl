@@ -7,7 +7,6 @@ if CUDAKernels.CUDA.has_cuda_gpu()
     hardware = (SingleCPU(), ThreadedCPU(), CPUGPU(), CuGPU())
 else
     hardware = (SingleCPU(), ThreadedCPU(), CPUGPU())
-    hardware = (SingleCPU(), ThreadedCPU(), )
 end
 opts = (NoOpt(), SparseOpt())
 
