@@ -40,16 +40,16 @@ function TextConfig(;
 end
 
 function autofont()
-    fonts = if Sys.islinux()
+    names = if Sys.islinux()
         ("cantarell", "sans-serif", "Bookman")
     else
         ("arial", "sans-serif") 
     end
-    for font in fonts
-        face = FreeTypeAbstraction.findfont(font)
+    for name in names
+        face = FreeTypeAbstraction.findfont(name)
         face isa Nothing || return face
     end
-    _nodefaultfonterror(fonts)
+    _nodefaultfonterror(names)
 end
 
 @noinline _fontnotstring(font) = throw(ArgumentError("font $font is not a String"))
