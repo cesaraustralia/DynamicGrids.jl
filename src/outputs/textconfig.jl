@@ -47,7 +47,7 @@ function autofont()
     end
     for font in fonts
         face = FreeTypeAbstraction.findfont(font)
-        face isa Nothing || return font
+        face isa Nothing || return face
     end
     _nodefaultfonterror(fonts)
 end

@@ -1,9 +1,9 @@
 using DynamicGrids, FreeTypeAbstraction, Test
 
 @testset "Fonts" begin
-	@test DynamicGrids.autofont() isa String
-	name = DynamicGrids.autofont()
-	face = FreeTypeAbstraction.findfont(name)
+	@test DynamicGrids.autofont() isa FreeTypeAbstraction.FTFont
+	face = DynamicGrids.autofont()
+	name = face.family_name
  	@testset "TextConfig accepts font as String" begin
 		@test name isa String
 		textconfig = TextConfig(; font=name)
