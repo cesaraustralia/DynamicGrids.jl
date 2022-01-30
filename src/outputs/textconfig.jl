@@ -39,7 +39,7 @@ function TextConfig(;
     TextConfig(face, namepixels, namepos, timepixels, timepos, fcolor, bcolor)
 end
 
-function autofont()
+function _autofont()
     names = if Sys.islinux()
         ("cantarell", "sans-serif", "Bookman")
     else
@@ -68,6 +68,22 @@ end
         name `String` with the keyword-argument `font`, for the `Output` or `ImageConfig`.
         """
     )
+
+# isbits(FreeTypeAbstraction.FTFont) == false,
+# hence isassigned can tell whether the cache has been initialized
+const _default_font_ref = Ref{FreeTypeAbstraction.FTFont}()
+
+function autofont()
+	if isassigned(_default_font_ref)
+		return _default_font_ref[]
+	else
+		return _default_font_ref[] = _autofont()
+	end
+end
+
+function set_default_font(font)
+	_default_font_ref[] = font
+end
 
 # Render time `name` and `t` as text onto the image, following config settings.
 function _rendertime! end
