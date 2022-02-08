@@ -39,19 +39,6 @@ function TextConfig(;
     TextConfig(face, namepixels, namepos, timepixels, timepos, fcolor, bcolor)
 end
 
-function _autofont()
-    names = if Sys.islinux()
-        ("cantarell", "sans-serif", "Bookman")
-    else
-        ("arial", "sans-serif") 
-    end
-    for name in names
-        face = FreeTypeAbstraction.findfont(name)
-        face isa Nothing || return face
-    end
-    _nodefaultfonterror(names)
-end
-
 @noinline _fontnotstring(font) = throw(ArgumentError("font $font is not a String"))
 
 @noinline _fontnotfounderror(font) =
@@ -74,11 +61,23 @@ end
 const _default_font_ref = Ref{FreeTypeAbstraction.FTFont}()
 
 function autofont()
-	if isassigned(_default_font_ref)
-		return _default_font_ref[]
-	else
-		return _default_font_ref[] = _autofont()
-	end
+    if isassigned(_default_font_ref)
+        return _default_font_ref[]
+    else
+        names = if Sys.islinux()
+            ("cantarell", "sans-serif", "Bookman")
+        else
+            ("arial", "sans-serif")
+        end
+        for name in names
+            face = FreeTypeAbstraction.findfont(name)
+            if face isa FreeTypeAbstraction.FTFont
+                _default_font_ref[] = face
+                return face
+            end
+        end
+        _nodefaultfonterror(names)
+    end
 end
 
 function set_default_font(font)
