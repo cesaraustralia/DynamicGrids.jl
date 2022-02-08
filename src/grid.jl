@@ -185,7 +185,7 @@ end
 function ReadableGridData{S,R}(
     source::Sc, dest::D, mask::M, proc::P, opt::Op, boundary::Bo, 
     padval::PV, optdata::OD
-) where {S,R,Sc<:AbstractArray{T,N},D,M,P,Op,Bo,PV,OD} where {T,N}
+) where {S,R,Sc<:AbstractArray{T,N},D<:AbstractArray{T,N},M,P,Op,Bo,PV,OD} where {T,N}
     ReadableGridData{S,R,T,N,Sc,D,M,P,Op,Bo,PV,OD}(
         source, dest, mask, proc, opt, boundary, padval, optdata
     )
@@ -228,8 +228,7 @@ between cells - the order of cells the rule is applied to does not matter.
 This means that using e.g. `+=` is not supported. Instead use `add!`.
 """
 struct WritableGridData{
-    S<:Tuple,R,T,N,Sc<:AbstractArray{T,N},D<:AbstractArray{T,N},
-    M,P<:Processor,Op<:PerformanceOpt,Bo,PV,OD
+    S<:Tuple,R,T,N,Sc,D,M,P<:Processor,Op<:PerformanceOpt,Bo,PV,OD
 } <: GridData{S,R,T,N}
     source::Sc
     dest::D
