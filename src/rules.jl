@@ -146,11 +146,14 @@ radius(rules::Tuple{Vararg{<:Rule}}, key::Symbol) =
 radius(rule::Rule, args...) = 0
 
 """
-    RuleWrapper <: Rule
+    ReturnRule <: Rule
 
-A `Rule` that wraps other rules, altering their behaviour or how they are run.
+Abstract supertype for rules that return value/s.
+
+These must define methods of [`applyrule`](@ref).
 """
-abstract type RuleWrapper{R,W} <: Rule{R,W} end
+abstract type ReturnRule{R,W} <: Rule{R,W} end
+
 
 """
     Cellrule <: Rule
@@ -181,7 +184,7 @@ applyrule (generic function with 1 method)
 
 As the index `I` is provided in `applyrule`, you can use it to look up [`Aux`](@ref) data. 
 """
-abstract type CellRule{R,W} <: Rule{R,W} end
+abstract type CellRule{R,W} <: ReturnRule{R,W} end
 
 ruletype(::CellRule) = CellRule
 
@@ -382,7 +385,7 @@ For neighborhood rules with multiple read grids, the first is always
 the one used for the neighborhood, the others are passed in as additional
 state for the cell. Any grids can be written to, but only for the current cell.
 """
-abstract type NeighborhoodRule{R,W} <: Rule{R,W} end
+abstract type NeighborhoodRule{R,W} <: ReturnRule{R,W} end
 
 ruletype(::NeighborhoodRule) = NeighborhoodRule
 

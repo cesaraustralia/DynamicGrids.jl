@@ -1,6 +1,6 @@
 module Neighborhoods
 
-using ConstructionBase, StaticArrays
+using ConstructionBase, StaticArrays, OffsetArrays
 
 export Neighborhood, Window, AbstractKernelNeighborhood, Kernel,
        Moore, VonNeumann, AbstractPositionalNeighborhood, Positional, LayeredPositional
@@ -9,7 +9,7 @@ export neighbors, neighborhood, kernel, kernelproduct, offsets, positions, radiu
 
 export setwindow, updatewindow, unsafe_updatewindow
 
-export pad_axes, unpad_axes
+export pad_axes, unpad_axes, padless_view
 
 export broadcast_neighborhood, broadcast_neighborhood!
 
@@ -38,17 +38,6 @@ abstract type Neighborhood{R,N,L} end
 
 ConstructionBase.constructorof(::Type{<:T}) where T <: Neighborhood{R,N,L} where {R,N,L} =
     T.name.wrapper{R,N,L}
-
-"""
-    kernelproduct(rule::NeighborhoodRule})
-    kernelproduct(hood::AbstractKernelNeighborhood)
-    kernelproduct(hood::Neighborhood, kernel)
-
-Returns the vector dot product of the neighborhood and the kernel,
-although differing from `dot` in that the dot product is not take for
-vector members of the neighborhood - they are treated as scalars.
-"""
-function kernelproduct end
 
 """
     radius(rule, [key]) -> Int
@@ -345,15 +334,17 @@ Returns a neighborhood object.
 function neighborhood end
 neighborhood(hood::AbstractKernelNeighborhood) = hood.neighborhood
 
+
 """
+    kernelproduct(rule::NeighborhoodRule})
     kernelproduct(hood::AbstractKernelNeighborhood)
     kernelproduct(hood::Neighborhood, kernel)
 
-Take the vector dot produce of the neighborhood and the kernel,
-without recursion into the values of either. Essentially `Base.dot`
-without recursive calls on the contents, as these are rarely what is
-intended.
+Returns the vector dot product of the neighborhood and the kernel,
+although differing from `dot` in that the dot product is not taken
+recursively for members of the neighborhood - they are treated as scalars.
 """
+function kernelproduct end
 function kernelproduct(hood::AbstractKernelNeighborhood)
     kernelproduct(neighborhood(hood), kernel(hood))
 end
@@ -385,6 +376,10 @@ struct Kernel{R,N,L,H,K} <: AbstractKernelNeighborhood{R,N,L,H}
     kernel::K
 end
 Kernel(A::AbstractMatrix) = Kernel(Window(A), A)
+function Kernel(f, neighborhood::Neighborhood, eltype=Float64) 
+    kernel = map(f, distances(neighborhood))
+    Kernel(neighborhood, kernel)
+end
 function Kernel(hood::H, kernel::K) where {H<:Neighborhood{R,N,L},K} where {R,N,L}
     length(hood) == length(kernel) || _kernel_length_error(hood, kernel)
     Kernel{R,N,L,H,K}(hood, kernel)
@@ -650,7 +645,7 @@ Bounds checks will reduce performance, aim to use `unsafe_setwindow` directly.
 end
 
 """
-    unsafe_setwindow(x, A::AbstractArray, I...) => Neighborhood
+    unsafe_updatewindow(x, A::AbstractArray, I...) => Neighborhood
 
 Set the window of a neighborhood to values from the array A around index `I`.
 
@@ -721,9 +716,11 @@ end
 Add padding to axes.
 """
 pad_axes(A, hood::Neighborhood{R}) where R = pad_axes(A, R)
-function pad_axes(A, radius::Int)
-    map(axes(A)) do axis
-        firstindex(axis) - radius:lastindex(axis) + radius
+pad_axes(A::AbstractArray{<:Any,N}, radius::Int) where N = pad_axes(A, _axis_radii(N, r))
+pad_axes(A::AbstractArray, radii::Tuple) = pad_axes(axes(A), radii)
+function pad_axes(axes::Tuple, radii::Tuple)
+    map(axes, radii) do axis, r
+        firstindex(axis) - r[1]:lastindex(axis) + r[2]
     end
 end
 
@@ -734,11 +731,48 @@ end
 Remove padding from axes.
 """
 unpad_axes(A, hood::Neighborhood{R}) where R = unpad_axes(A, R)
-function unpad_axes(A, radius::Int)
-    map(axes(A)) do axis
-        firstindex(axis) + radius:lastindex(axis) - radius
+unpad_axes(A::AbstractArray{<:Any,N}, r::Int) where N = unpad_axes(A, _axis_radii(N, r))
+unpad_axes(A, radii::Tuple) = unpad_axes(axes(A), radii)
+function unpad_axes(axes::Tuple, radii::Tuple)
+    map(axes, radii) do axis, r
+        firstindex(axis) + r[1]:lastindex(axis) - r[2]
     end
 end
 
+
+"""
+    padd_array(A, radius; [padval=zero(eltype(A))]) => OffsetArray
+
+Add padding around an array, with indices offset 
+so that the first real cell is still 1, 1.
+"""
+pad_array(A::AbstractArray, hood::Neighborhood; kw...) = pad_array(A, radius(hood); kw...)
+pad_array(A::AbstractArray{<:Any,N}, r::Int; kw...) where N = pad_array(A, _axis_radii(N, r); kw...)
+function pad_array(A::AbstractArray{T,2}, radii::Tuple; padval=zero(T)) where T
+    rh, rw = radii
+    paddedaxes = pad_axes(A, radii) 
+    paddedsize = map(length, paddedaxes)
+    pv = convert(eltype(A), padval)
+    newA = similar(A, typeof(pv), paddedsize...)
+    newA .= Ref(pv)
+    # Copy the A array to the middle section of the source array
+    padless_view(newA, radii) .= A
+    return OffsetArray(newA, paddedaxes...)
+end
+
+_axis_radii(N::Int, r::Int) = ntuple(_ -> (r, r), N)
+
+padless_view(A::OffsetArray, r::Int) = padless_view(parent(A), r)
+padless_view(A::OffsetArray, r::Tuple) = padless_view(parent(A), r)
+padless_view(A::AbstractArray{<:Any,N}, r::Int) where N = padless_view(A, _axis_radii(N, r))
+function padless_view(A::AbstractArray, radii::Tuple)
+    ranges = map(axes(A), radii) do axis, r
+        (first(axis) + r[1]):(last(axis) - r[2])
+    end
+    v = view(A, ranges...)
+    return v
+end
+
 end # Module Neighborhoods
+
 

@@ -157,6 +157,8 @@ end
 # functional style, as they are used in inner loops where immutability improves
 # performance.
 function simloop!(output::Output, simdata, ruleset, fspan)
+    # Generate any initialisation data the rules need
+    rule_initialisation = initialiserules(simdata)
     # Set the frame timestamp for fps calculation
     settimestamp!(output, first(fspan))
     # Initialise types etc

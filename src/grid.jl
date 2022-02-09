@@ -53,17 +53,9 @@ gridsize(nt::NamedTuple{(),Tuple{}}) = 0, 0
 # Get a view of the grid, without padding
 gridview(d::GridData) = sourceview(d)
 # Get a view of the grid source, without padding
-sourceview(d::GridData) = _padless_view(source(d), axes(d), radius(d))
+sourceview(d::GridData) = padless_view(source(d), radius(d))
 # Get a view of the grid dest, without padding
-destview(d::GridData) = _padless_view(dest(d), axes(d), radius(d))
-
-_padless_view(A::OffsetArray, axes, radius) = _padless_view(parent(A), axes, radius)
-function _padless_view(A::AbstractArray, axes, radius)
-    ranges = map(axes) do axis
-        axis .+ radius
-    end
-    return view(A, ranges...)
-end
+destview(d::GridData) = padless_view(dest(d), radius(d))
 
 
 # Get an a view of the source, preferring the underlying array if it is not a padded OffsetArray
@@ -124,13 +116,14 @@ function _addpadding(init::AbstractArray{T,1}, r, padval) where T
 end
 function _addpadding(init::AbstractArray{T,2}, r, padval) where T
     h, w = size(init)
-    paddedsize = h + 4r, w + 2r
-    paddedaxes = -r + 1:h + 3r, -r + 1:w + r
+    radii = (r, 3r), (r, r)
+    paddedaxes = pad_axes(init, radii)
+    paddedsize = map(length, paddedaxes)
     pv = convert(eltype(init), padval)
     sourceparent = similar(init, typeof(pv), paddedsize...)
     sourceparent .= Ref(pv)
     # Copy the init array to the middle section of the source array
-    _padless_view(sourceparent, axes(init), r) .= init
+    padless_view(sourceparent, radii) .= init
     source = OffsetArray(sourceparent, paddedaxes...)
     return source
 end
