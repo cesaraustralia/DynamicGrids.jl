@@ -673,7 +673,7 @@ function broadcast_neighborhood(f, hood::Neighborhood, sources...)
     ax = unpad_axes(first(sources), hood)
     sourceview = view(first(sources), ax...)
     broadcast(sourceview, CartesianIndices(ax)) do _, I
-        applyneighborhood(f, sources, I)
+        applyneighborhood(f, hood, sources, I)
     end
 end
 
@@ -692,11 +692,11 @@ function broadcast_neighborhood!(f, hood::Neighborhood, dest, sources)
         ax = unpad_axes(src, hood)
         destview = view(dest, ax...)
         broadcast!(destview, CartesianIndices(ax)) do I
-            applyneighborhood(f, sources, I)
+            applyneighborhood(f, hood, sources, I)
         end
     else
         broadcast!(dest, CartesianIndices(unpad_axes(src, hood))) do I
-            applyneighborhood(f, sources, I)
+            applyneighborhood(f, hood, sources, I)
         end
     end
 end
@@ -707,7 +707,7 @@ function checksizes(sources...)
     end
 end
 
-function applyneighborhood(f, sources, I)
+function applyneighborhood(f, hood, sources, I)
     hoods = map(sources) do s
         unsafe_updatewindow(hood, s, I)
     end
@@ -726,6 +726,7 @@ function pad_axes(A, radius::Int)
         firstindex(axis) - radius:lastindex(axis) + radius
     end
 end
+
 """
     unpad_axes(A, hood::Neighborhood{R})
     unpad_axes(A, radius::Int)
