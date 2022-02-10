@@ -60,6 +60,27 @@ end
 # hence isassigned can tell whether the cache has been initialized
 const _default_font_ref = Ref{FreeTypeAbstraction.FTFont}()
 
+"""
+Set default font.
+
+# Examples
+Using `findfont` to get the font by name:
+```julia
+using DynamicGrids
+using FreeTypeAbstraction: findfont
+
+font = findfont("Times")
+DynamicGrids.set_default_font(font)
+```
+Or giving the font path directly:
+```julia
+using DynamicGrids
+using FreeTypeAbstraction: FTFont
+
+font = FTFont("/usr/share/fonts/truetype/Adobe-Times-Regular.otb")
+DynamicGrids.set_default_font(font)
+```
+"""
 function set_default_font(font)
 	_default_font_ref[] = font
 end
