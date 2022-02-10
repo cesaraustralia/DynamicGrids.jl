@@ -8,7 +8,8 @@ Text configuration for printing timestep and grid name on the image.
 
 # Arguments / Keywords
 
-- `font`: A `FreeTypeAbstraction.FTFont`, or a `String` with the font name to look for. The `FTFont` may load more quickly.
+- `font`: A `FreeTypeAbstraction.FTFont`, or a `String` with the font name to look for.
+    The `FTFont` may load more quickly. See also [`set_default_font`](@ref).
 - `namepixels` and `timepixels`: the pixel size of the font.
 - `timepos` and `namepos`: tuples that set the label positions, in `Int` pixels.
 - `fcolor` and `bcolor`: the foreground and background colors, as `ARGB32`.
@@ -62,6 +63,8 @@ const _default_font_ref = Ref{FreeTypeAbstraction.FTFont}()
 
 """
 Set default font.
+
+See also [`TextConfig`](@ref)
 
 # Examples
 Using `findfont` to get the font by name:

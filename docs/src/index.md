@@ -268,6 +268,7 @@ Greyscale
 
 ```@docs
 TextConfig
+DynamicGrids.set_default_font
 ```
 
 
