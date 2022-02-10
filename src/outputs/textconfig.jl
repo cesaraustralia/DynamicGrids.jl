@@ -60,6 +60,10 @@ end
 # hence isassigned can tell whether the cache has been initialized
 const _default_font_ref = Ref{FreeTypeAbstraction.FTFont}()
 
+function set_default_font(font)
+	_default_font_ref[] = font
+end
+
 function autofont()
     if isassigned(_default_font_ref)
         return _default_font_ref[]
@@ -72,16 +76,12 @@ function autofont()
         for name in names
             face = FreeTypeAbstraction.findfont(name)
             if face isa FreeTypeAbstraction.FTFont
-                _default_font_ref[] = face
+                set_default_font(face)
                 return face
             end
         end
         _nodefaultfonterror(names)
     end
-end
-
-function set_default_font(font)
-	_default_font_ref[] = font
 end
 
 # Render time `name` and `t` as text onto the image, following config settings.
