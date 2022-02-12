@@ -35,12 +35,18 @@ function TextConfig(;
         face = FreeTypeAbstraction.findfont(font)
         face isa Nothing && _fontnotfounderror(font)
     else
-        _fontnotstring(font)
+        _fontwrongtype(font)
     end
     TextConfig(face, namepixels, namepos, timepixels, timepos, fcolor, bcolor)
 end
 
-@noinline _fontnotstring(font) = throw(ArgumentError("font $font is not a String"))
+@noinline _fontwrongtype(font) =
+    throw(ArgumentError(
+        """
+        font must be either a String or a FreeTypeAbstraction.FTFont,
+        got `$font` which is a `$(typeof(font))`.
+        """
+    ))
 
 @noinline _fontnotfounderror(font) =
     throw(ArgumentError(
