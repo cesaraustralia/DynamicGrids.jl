@@ -52,8 +52,9 @@ end
 @noinline _nodefaultfonterror(font) =
     error(
         """
-        Your system does not contain the default font $font. Specify an existing font 
-        name `String` with the keyword-argument `font`, for the `Output` or `ImageConfig`.
+        Your system does not contain any of the default fonts
+        $font.
+        Use DynamicGrids.set_default_font first.
         """
     )
 
