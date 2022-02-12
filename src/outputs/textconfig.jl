@@ -40,32 +40,6 @@ function TextConfig(;
     TextConfig(face, namepixels, namepos, timepixels, timepos, fcolor, bcolor)
 end
 
-@noinline _fontwrongtype(font) =
-    throw(ArgumentError(
-        """
-        font must be either a String or a FreeTypeAbstraction.FTFont,
-        got `$font` which is a `$(typeof(font))`.
-        """
-    ))
-
-@noinline _fontnotfounderror(font) =
-    throw(ArgumentError(
-        """
-        Font "$font" wasn't found in this system.
-        Specify an existing font with the `font` keyword,
-        or call DynamicGrids.set_default_font first,
-        or use `text=nothing` to display no text.
-        """
-    ))
-@noinline _nodefaultfonterror(font) =
-    error(
-        """
-        Your system does not contain any of the default fonts
-        $font.
-        Use DynamicGrids.set_default_font first.
-        """
-    )
-
 # isbits(FreeTypeAbstraction.FTFont) == false,
 # hence isassigned can tell whether the cache has been initialized
 const _default_font_ref = Ref{FreeTypeAbstraction.FTFont}()
@@ -148,3 +122,31 @@ end
 _rendertime!(img, config::Nothing, t) = img
 _rendertime!(img, config::TextConfig, t::Nothing) = img
 _rendertime!(img, config::Nothing, t::Nothing) = img
+
+
+@noinline _fontwrongtype(font) =
+    throw(ArgumentError(
+        """
+        font must be either a String or a FreeTypeAbstraction.FTFont,
+        got `$font` which is a `$(typeof(font))`.
+        """
+    ))
+
+@noinline _fontnotfounderror(font) =
+    throw(ArgumentError(
+        """
+        Font "$font" wasn't found in this system.
+        Specify an existing font with the `font` keyword,
+        or call DynamicGrids.set_default_font first,
+        or use `text=nothing` to display no text.
+        """
+    ))
+
+@noinline _nodefaultfonterror(font) =
+    error(
+        """
+        Your system does not contain any of the default fonts
+        $font.
+        Use DynamicGrids.set_default_font first.
+        """
+    )
