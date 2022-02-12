@@ -45,8 +45,10 @@ end
 @noinline _fontnotfounderror(font) =
     throw(ArgumentError(
         """
-        Font "$font" wasn't be found in this system. Specify an existing font name 
-        with the `font` keyword, or use `text=nothing` to display no text."
+        Font "$font" wasn't found in this system.
+        Specify an existing font with the `font` keyword,
+        or call DynamicGrids.set_default_font first,
+        or use `text=nothing` to display no text.
         """
     ))
 @noinline _nodefaultfonterror(font) =
