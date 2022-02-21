@@ -8,7 +8,8 @@ Text configuration for printing timestep and grid name on the image.
 
 # Arguments / Keywords
 
-- `font`: A `FreeTypeAbstraction.FTFont`, or a `String` with the font name to look for. The `FTFont` may load more quickly.
+- `font`: A `FreeTypeAbstraction.FTFont`, or a `String` with the font name to look for.
+    The `FTFont` may load more quickly. See also [`set_default_font`](@ref).
 - `namepixels` and `timepixels`: the pixel size of the font.
 - `timepos` and `namepos`: tuples that set the label positions, in `Int` pixels.
 - `fcolor` and `bcolor`: the foreground and background colors, as `ARGB32`.
@@ -34,40 +35,61 @@ function TextConfig(;
         face = FreeTypeAbstraction.findfont(font)
         face isa Nothing && _fontnotfounderror(font)
     else
-        _fontnotstring(font)
+        _fontwrongtype(font)
     end
     TextConfig(face, namepixels, namepos, timepixels, timepos, fcolor, bcolor)
 end
 
-function autofont()
-    names = if Sys.islinux()
-        ("cantarell", "sans-serif", "Bookman")
-    else
-        ("arial", "sans-serif") 
-    end
-    for name in names
-        face = FreeTypeAbstraction.findfont(name)
-        face isa Nothing || return face
-    end
-    _nodefaultfonterror(names)
+# isbits(FreeTypeAbstraction.FTFont) == false,
+# hence isassigned can tell whether the cache has been initialized
+const _default_font_ref = Ref{FreeTypeAbstraction.FTFont}()
+
+"""
+Set default font.
+
+See also [`TextConfig`](@ref)
+
+# Examples
+Using `findfont` to get the font by name:
+```julia
+using DynamicGrids
+using FreeTypeAbstraction: findfont
+
+font = findfont("Times")
+DynamicGrids.set_default_font(font)
+```
+Or giving the font path directly:
+```julia
+using DynamicGrids
+using FreeTypeAbstraction: FTFont
+
+font = FTFont("/usr/share/fonts/truetype/Adobe-Times-Regular.otb")
+DynamicGrids.set_default_font(font)
+```
+"""
+function set_default_font(font)
+	_default_font_ref[] = font
 end
 
-@noinline _fontnotstring(font) = throw(ArgumentError("font $font is not a String"))
-
-@noinline _fontnotfounderror(font) =
-    throw(ArgumentError(
-        """
-        Font "$font" wasn't be found in this system. Specify an existing font name 
-        with the `font` keyword, or use `text=nothing` to display no text."
-        """
-    ))
-@noinline _nodefaultfonterror(font) =
-    error(
-        """
-        Your system does not contain the default font $font. Specify an existing font 
-        name `String` with the keyword-argument `font`, for the `Output` or `ImageConfig`.
-        """
-    )
+function autofont()
+    if isassigned(_default_font_ref)
+        return _default_font_ref[]
+    else
+        names = if Sys.islinux()
+            ("cantarell", "sans-serif", "Bookman")
+        else
+            ("arial", "sans-serif")
+        end
+        for name in names
+            face = FreeTypeAbstraction.findfont(name)
+            if face isa FreeTypeAbstraction.FTFont
+                set_default_font(face)
+                return face
+            end
+        end
+        _nodefaultfonterror(names)
+    end
+end
 
 # Render time `name` and `t` as text onto the image, following config settings.
 function _rendertime! end
@@ -100,3 +122,28 @@ end
 _rendertime!(img, config::Nothing, t) = img
 _rendertime!(img, config::TextConfig, t::Nothing) = img
 _rendertime!(img, config::Nothing, t::Nothing) = img
+
+
+@noinline _fontwrongtype(font) = throw(ArgumentError(
+    """
+    font must be either a String or a FreeTypeAbstraction.FTFont,
+    got `$font` which is a `$(typeof(font))`.
+    """
+))
+
+@noinline _fontnotfounderror(font) = throw(ArgumentError(
+    """
+    Font "$font" wasn't found in this system.
+    Specify an existing font with the `font` keyword,
+    or call DynamicGrids.set_default_font first,
+    or use `text=nothing` to display no text.
+    """
+))
+
+@noinline _nodefaultfonterror(font) = error(
+    """
+    Your system does not contain any of the default fonts
+    $font.
+    Use DynamicGrids.set_default_font first.
+    """
+)
