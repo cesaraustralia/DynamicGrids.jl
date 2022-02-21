@@ -713,6 +713,9 @@ function applyneighborhood(f, sources, I)
     end
     f(hoods...)
 end
+function applyneighborhood(f, hood, source::AbstractArray, I)
+    f(unsafe_updatewindow(hood, source, I))
+end
 
 """
     pad_axes(A, hood::Neighborhood{R})
