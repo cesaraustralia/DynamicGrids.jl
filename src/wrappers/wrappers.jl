@@ -28,7 +28,7 @@ modifyrule(rule::MultiRuleWrapper, data) = @set runif.rules = _modifyrules(rules
 end
 
 # Base interface
-Base.tail(rule::MultiRuleWrapper) = @set rule.rules = tail(rules(chain))
+Base.tail(rule::MultiRuleWrapper) = @set rule.rules = tail(rules(rule))
 Base.getindex(rule::MultiRuleWrapper, i) = getindex(rules(rule), i)
 Base.iterate(rule::MultiRuleWrapper) = iterate(rules(rule))
 Base.iterate(rule::MultiRuleWrapper, nothing) = iterate(rules(rule), nothing)

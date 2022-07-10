@@ -4,7 +4,7 @@
     Combine(f, rules::Tuple)
     Combine(f, rules...)
 
-Combine the results of multiple rules with the function `f`.
+Combine the results of multiple independent rules with the function `f`.
 
 Only `ReturnRule` like `CellRule` and `NeighborhoodRule` can be used in `Combine`.
 """
