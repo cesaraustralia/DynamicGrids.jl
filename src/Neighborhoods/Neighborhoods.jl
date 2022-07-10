@@ -9,7 +9,7 @@ export neighbors, neighborhood, kernel, kernelproduct, offsets, positions, radiu
 
 export setwindow, updatewindow, unsafe_updatewindow
 
-export pad_axes, unpad_axes, padless_view
+export pad_axes, unpad_axes
 
 export broadcast_neighborhood, broadcast_neighborhood!
 
@@ -40,6 +40,17 @@ ConstructionBase.constructorof(::Type{<:T}) where T <: Neighborhood{R,N,L} where
     T.name.wrapper{R,N,L}
 
 """
+    kernelproduct(rule::NeighborhoodRule})
+    kernelproduct(hood::AbstractKernelNeighborhood)
+    kernelproduct(hood::Neighborhood, kernel)
+
+Returns the vector dot product of the neighborhood and the kernel,
+although differing from `dot` in that the dot product is not take for
+vector members of the neighborhood - they are treated as scalars.
+"""
+function kernelproduct end
+
+"""
     radius(rule, [key]) -> Int
 
 Return the radius of a rule or ruleset if it has one, otherwise zero.
@@ -57,7 +68,8 @@ Custom `Neighborhood`s must define this method.
 """
 function neighbors end
 neighbors(hood::Neighborhood) = begin
-    map(i -> _window(hood)[i], window_indices(hood))
+    w = _window(hood)
+    map(i -> w[i], window_indices(hood))
 end
 
 """
@@ -135,9 +147,9 @@ Base.ndims(hood::Neighborhood{<:Any,N}) where N = N
 # in the area covered by `size` and `axes`.
 Base.size(hood::Neighborhood{R,N}) where {R,N} = ntuple(_ -> 2R+1, N)
 Base.axes(hood::Neighborhood{R,N}) where {R,N} = ntuple(_ -> SOneTo{2R+1}(), N)
-Base.iterate(hood::Neighborhood, args...) = iterate(neighbors(hood), args...)
+Base.iterate(hood::Neighborhood) = hood[1], 2
+Base.iterate(hood::Neighborhood, i::Int) = i > length(hood) ? nothing : (hood[i], i + 1)
 Base.getindex(hood::Neighborhood, i) = begin
-    # @show _window(hood) window_indices(hood)
     getindex(_window(hood), window_indices(hood)[i])
 end
 
@@ -334,17 +346,15 @@ Returns a neighborhood object.
 function neighborhood end
 neighborhood(hood::AbstractKernelNeighborhood) = hood.neighborhood
 
-
 """
-    kernelproduct(rule::NeighborhoodRule})
     kernelproduct(hood::AbstractKernelNeighborhood)
     kernelproduct(hood::Neighborhood, kernel)
 
-Returns the vector dot product of the neighborhood and the kernel,
-although differing from `dot` in that the dot product is not taken
-recursively for members of the neighborhood - they are treated as scalars.
+Take the vector dot produce of the neighborhood and the kernel,
+without recursion into the values of either. Essentially `Base.dot`
+without recursive calls on the contents, as these are rarely what is
+intended.
 """
-function kernelproduct end
 function kernelproduct(hood::AbstractKernelNeighborhood)
     kernelproduct(neighborhood(hood), kernel(hood))
 end
@@ -376,10 +386,6 @@ struct Kernel{R,N,L,H,K} <: AbstractKernelNeighborhood{R,N,L,H}
     kernel::K
 end
 Kernel(A::AbstractMatrix) = Kernel(Window(A), A)
-function Kernel(f, neighborhood::Neighborhood, eltype=Float64) 
-    kernel = map(f, distances(neighborhood))
-    Kernel(neighborhood, kernel)
-end
 function Kernel(hood::H, kernel::K) where {H<:Neighborhood{R,N,L},K} where {R,N,L}
     length(hood) == length(kernel) || _kernel_length_error(hood, kernel)
     Kernel{R,N,L,H,K}(hood, kernel)
@@ -645,7 +651,7 @@ Bounds checks will reduce performance, aim to use `unsafe_setwindow` directly.
 end
 
 """
-    unsafe_updatewindow(x, A::AbstractArray, I...) => Neighborhood
+    unsafe_setwindow(x, A::AbstractArray, I...) => Neighborhood
 
 Set the window of a neighborhood to values from the array A around index `I`.
 
@@ -663,12 +669,22 @@ each neighborhood in `A`, returning a new array.
 
 The result is smaller than `A` on all sides, by the neighborhood radius.
 """
-function broadcast_neighborhood(f, hood::Neighborhood, sources...)
-    checksizes(sources...)
+broadcast_neighborhood(f, hood::Neighborhood, s1, s2, sources...) = 
+    broadcast_neighborhood(f, hood::Neighborhood, (s1, s2, sources...))
+function broadcast_neighborhood(f, hood::Neighborhood, source::Tuple)
+    checksizes(sources)
     ax = unpad_axes(first(sources), hood)
     sourceview = view(first(sources), ax...)
+    # Broadcasting over sourceview just gives us the right return type
     broadcast(sourceview, CartesianIndices(ax)) do _, I
-        applyneighborhood(f, hood, sources, I)
+        applyneighborhood(f, hood, source, I)
+    end
+end
+function broadcast_neighborhood(f, hood::Neighborhood, source::AbstractArray)
+    ax = unpad_axes(source, hood)
+    sourceview = view(source, ax...)
+    broadcast(sourceview, CartesianIndices(ax)) do _, I
+        applyneighborhood(f, hood, source, I)
     end
 end
 
@@ -681,8 +697,8 @@ of `src` (except padding), writing the result of `f` to `dest`.
 `dest` must either be smaller than `src` by the neighborhood radius on all
 sides, or be the same size, in which case it is assumed to also be padded.
 """
-function broadcast_neighborhood!(f, hood::Neighborhood, dest, sources)
-    checksizes(sources...)
+function broadcast_neighborhood!(f, hood::Neighborhood, dest, sources...)
+    checksizes(sources)
     if axes(dest) === axes(src)
         ax = unpad_axes(src, hood)
         destview = view(dest, ax...)
@@ -696,17 +712,20 @@ function broadcast_neighborhood!(f, hood::Neighborhood, dest, sources)
     end
 end
 
-function checksizes(sources...)
+function checksizes(sources::Tuple)
     map(sources) do s
         size(s) === size(first(sources)) || throw(ArgumentError("Source array sizes must match"))
     end
+    return nothing
 end
 
-function applyneighborhood(f, hood, sources, I)
-    hoods = map(sources) do s
-        unsafe_updatewindow(hood, s, I)
-    end
-    f(hoods...)
+function applyneighborhood(f, hood, sources::Tuple, I)
+    hoods = map(s -> unsafe_updatewindow(hood, s, I), sources)
+    vals = map(s -> s[I], sources)
+    f(hoods, vals)
+end
+function applyneighborhood(f, hood, source::AbstractArray, I)
+    f(unsafe_updatewindow(hood, source, I), source[I])
 end
 
 """
@@ -716,11 +735,9 @@ end
 Add padding to axes.
 """
 pad_axes(A, hood::Neighborhood{R}) where R = pad_axes(A, R)
-pad_axes(A::AbstractArray{<:Any,N}, radius::Int) where N = pad_axes(A, _axis_radii(N, r))
-pad_axes(A::AbstractArray, radii::Tuple) = pad_axes(axes(A), radii)
-function pad_axes(axes::Tuple, radii::Tuple)
-    map(axes, radii) do axis, r
-        firstindex(axis) - r[1]:lastindex(axis) + r[2]
+function pad_axes(A, radius::Int)
+    map(axes(A)) do axis
+        firstindex(axis) - radius:lastindex(axis) + radius
     end
 end
 
@@ -731,48 +748,42 @@ end
 Remove padding from axes.
 """
 unpad_axes(A, hood::Neighborhood{R}) where R = unpad_axes(A, R)
-unpad_axes(A::AbstractArray{<:Any,N}, r::Int) where N = unpad_axes(A, _axis_radii(N, r))
-unpad_axes(A, radii::Tuple) = unpad_axes(axes(A), radii)
-function unpad_axes(axes::Tuple, radii::Tuple)
-    map(axes, radii) do axis, r
-        firstindex(axis) + r[1]:lastindex(axis) - r[2]
+function unpad_axes(A, radius::Int)
+    map(axes(A)) do axis
+        firstindex(axis) + radius:lastindex(axis) - radius
     end
 end
 
-
-"""
-    padd_array(A, radius; [padval=zero(eltype(A))]) => OffsetArray
-
-Add padding around an array, with indices offset 
-so that the first real cell is still 1, 1.
-"""
-pad_array(A::AbstractArray, hood::Neighborhood; kw...) = pad_array(A, radius(hood); kw...)
-pad_array(A::AbstractArray{<:Any,N}, r::Int; kw...) where N = pad_array(A, _axis_radii(N, r); kw...)
-function pad_array(A::AbstractArray{T,2}, radii::Tuple; padval=zero(T)) where T
-    rh, rw = radii
-    paddedaxes = pad_axes(A, radii) 
-    paddedsize = map(length, paddedaxes)
-    pv = convert(eltype(A), padval)
-    newA = similar(A, typeof(pv), paddedsize...)
-    newA .= Ref(pv)
-    # Copy the A array to the middle section of the source array
-    padless_view(newA, radii) .= A
-    return OffsetArray(newA, paddedaxes...)
+function addpadding(A, r; padval=zero(eltype(A)))
+    _addpadding(A, r, padval)
 end
 
-_axis_radii(N::Int, r::Int) = ntuple(_ -> (r, r), N)
-
-padless_view(A::OffsetArray, r::Int) = padless_view(parent(A), r)
-padless_view(A::OffsetArray, r::Tuple) = padless_view(parent(A), r)
-padless_view(A::AbstractArray{<:Any,N}, r::Int) where N = padless_view(A, _axis_radii(N, r))
-function padless_view(A::AbstractArray, radii::Tuple)
-    ranges = map(axes(A), radii) do axis, r
-        (first(axis) + r[1]):(last(axis) - r[2])
+# Handle either specific pad radius for each edge or single Int radius
+function _addpadding(A::AbstractArray, r::Int, padval)
+    _addpadding(A, _radii(A, r), padval)
+end
+function _addpadding(A::AbstractArray{T}, rs::Tuple, padval) where T
+    paddedaxis = map(size(A), rs) do s, r
+        -r[1] + 1:s + r[2]
     end
-    v = view(A, ranges...)
-    return v
+    T1 = promote_type(T, typeof(padval))
+    sourceparent = similar(A, T1, length.(paddedaxis)...)
+    sourceparent .= Ref(padval)
+    source = OffsetArray(sourceparent, paddedaxis)
+    _padless_view(sourceparent, axes(A), rs) .= A
+    return source
 end
+
+_padless_view(A::OffsetArray, axes, r) = _padless_view(parent(A), axes, r)
+_padless_view(A::AbstractArray, axes, r::Int) = _padless_view(A, axes, _radii(A, r))
+function _padless_view(A::AbstractArray, axes, rs::Tuple)
+    ranges = map(axes, rs) do axis, r
+        # Add the start padding, ignore the end padding r[2]
+        axis .+ r[1]
+    end
+    return view(A, ranges...)
+end
+
+_radii(A::AbstractArray{<:Any,N}, r) where N = ntuple(_ -> (r, r), N)
 
 end # Module Neighborhoods
-
-
