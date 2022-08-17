@@ -53,18 +53,9 @@ gridsize(nt::NamedTuple{(),Tuple{}}) = 0, 0
 # Get a view of the grid, without padding
 gridview(d::GridData) = sourceview(d)
 # Get a view of the grid source, without padding
-sourceview(d::GridData) = _padless_view(source(d), axes(d), radius(d))
+sourceview(d::GridData) = Neighborhoods.unpad_view(source(d), radius(d))
 # Get a view of the grid dest, without padding
-destview(d::GridData) = _padless_view(dest(d), axes(d), radius(d))
-
-_padless_view(A::OffsetArray, axes, radius) = _padless_view(parent(A), axes, radius)
-function _padless_view(A::AbstractArray, axes, radius)
-    ranges = map(axes) do axis
-        axis .+ radius
-    end
-    return view(A, ranges...)
-end
-
+destview(d::GridData) = Neighborhoods.unpad_view(dest(d), radius(d))
 
 # Get an a view of the source, preferring the underlying array if it is not a padded OffsetArray
 source_array_or_view(d::GridData) = source(d) isa OffsetArray ? sourceview(d) : source(d)

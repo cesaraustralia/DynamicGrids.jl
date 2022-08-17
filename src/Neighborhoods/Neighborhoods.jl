@@ -106,7 +106,7 @@ diagonally adjacent cell has a distance of `sqrt(2.0)`.
 Vales are calculated at compile time, so `distances` can be used inside rules with little
 overhead.
 """
-@generated function distances(hood::Neighborhood{N,R,L}) where {N,R,L}
+@generated function distances(hood::Neighborhood{R,N,L}) where {R,N,L}
     expr = Expr(:tuple, ntuple(i -> :(bd[bi[$i]]), L)...)
     return quote
         bd = window_distances(hood)
@@ -138,6 +138,8 @@ end
         return $x
     end
 end
+
+cartesian_offsets(hood::Neighborhood{R,N,L}) where {R,N,L} = map(CartesianIndex, offsets(hood))
 
 Base.eltype(hood::Neighborhood) = eltype(_window(hood))
 Base.length(hood::Neighborhood{<:Any,<:Any,L}) where L = L
@@ -735,54 +737,54 @@ end
 Add padding to axes.
 """
 pad_axes(A, hood::Neighborhood{R}) where R = pad_axes(A, R)
-function pad_axes(A, radius::Int)
-    map(axes(A)) do axis
-        firstindex(axis) - radius:lastindex(axis) + radius
+pad_axes(A, r::Int) = pad_axes(A, _radii(A, r))
+function pad_axes(A, rs::Tuple)
+    map(axes(A), rs) do axis, r
+        firstindex(axis) - r[1]:lastindex(axis) + r[2]
     end
 end
 
 """
     unpad_axes(A, hood::Neighborhood{R})
     unpad_axes(A, radius::Int)
+    unpad_axes(A, radius::NTuple{N,Tuple{Int,Int})
 
-Remove padding from axes.
+Remove padding of `radius` from axes.
 """
 unpad_axes(A, hood::Neighborhood{R}) where R = unpad_axes(A, R)
-function unpad_axes(A, radius::Int)
-    map(axes(A)) do axis
-        firstindex(axis) + radius:lastindex(axis) - radius
+unpad_axes(A, r::Int) = unpad_axes(A, _radii(A, r))
+function unpad_axes(A, rs::Tuple)
+    map(axes(A), rs) do axis, r
+        (first(axis) + r[1]):(last(axis) - r[2])
     end
 end
 
-function addpadding(A, r; padval=zero(eltype(A)))
-    _addpadding(A, r, padval)
+function pad_array(A, r; padval=zero(eltype(A)))
+    _pad_array(A, r, padval)
 end
 
 # Handle either specific pad radius for each edge or single Int radius
-function _addpadding(A::AbstractArray, r::Int, padval)
-    _addpadding(A, _radii(A, r), padval)
+function _pad_array(A::AbstractArray, r::Int, padval)
+    _pad_array(A, _radii(A, r), padval)
 end
-function _addpadding(A::AbstractArray{T}, rs::Tuple, padval) where T
-    paddedaxis = map(size(A), rs) do s, r
-        -r[1] + 1:s + r[2]
-    end
+function _pad_array(A::AbstractArray{T}, rs::Tuple, padval) where T
+    paddedaxes = pad_axes(A, rs)
     T1 = promote_type(T, typeof(padval))
-    sourceparent = similar(A, T1, length.(paddedaxis)...)
-    sourceparent .= Ref(padval)
-    source = OffsetArray(sourceparent, paddedaxis)
-    _padless_view(sourceparent, axes(A), rs) .= A
-    return source
+    paddedparent = similar(A, T1, length.(paddedaxes)...)
+    paddedparent .= Ref(padval)
+    padded = OffsetArray(paddedparent, paddedaxes)
+    unpad_view(paddedparent, rs) .= A
+    return padded
 end
 
-_padless_view(A::OffsetArray, axes, r) = _padless_view(parent(A), axes, r)
-_padless_view(A::AbstractArray, axes, r::Int) = _padless_view(A, axes, _radii(A, r))
-function _padless_view(A::AbstractArray, axes, rs::Tuple)
-    ranges = map(axes, rs) do axis, r
-        # Add the start padding, ignore the end padding r[2]
-        axis .+ r[1]
-    end
-    return view(A, ranges...)
+unpad_view(A::AbstractArray, r::Int) = unpad_view(A, _radii(A, r))
+function unpad_view(A::OffsetArray, rs::Tuple) 
+    o_pad = map(a -> -(first(a) - 1), axes(A)) 
+    r_pad = map(first, rs)
+    o_pad == r_pad || throw(ArgumentError("OffsetArray padding $opad does not match radii padding $r_pad"))
+    return unpad_view(parent(A), rs)
 end
+unpad_view(A::AbstractArray, rs::Tuple) = view(A, unpad_axes(A, rs)...)
 
 _radii(A::AbstractArray{<:Any,N}, r) where N = ntuple(_ -> (r, r), N)
 
