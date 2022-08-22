@@ -53,11 +53,11 @@ gridsize(nt::NamedTuple{(),Tuple{}}) = 0, 0
 # Get a view of the grid, without padding
 gridview(d::GridData) = sourceview(d)
 # Get a view of the grid source, without padding
-sourceview(d::GridData) = _grid_view(source(d), d)
+sourceview(d::GridData) = _unpad_view(source(d), d)
 # Get a view of the grid dest, without padding
-destview(d::GridData) = _grid_view(dest(d), d)
+destview(d::GridData) = _unpad_view(dest(d), d)
 
-_grid_view(A, d::GridData) = view(A, axes(d)...)
+_unpad_view(A, d::GridData) = view(A, axes(d)...)
 
 # Get an a view of the source, preferring the underlying array if it is not a padded OffsetArray
 source_array_or_view(d::GridData) = source(d) isa OffsetArray ? sourceview(d) : source(d)
