@@ -22,6 +22,8 @@ neighborhoodkey(runif::RunIf) = neighborhoodkey(rule(runif))
 neighborhood(runif::RunIf) = neighborhood(rule(runif))
 neighbors(runif::RunIf) = neighbors(rule(runif))
 
+modifyrule(runif::RunIf, data::AbstractSimData) = @set runif.rule = modifyrule(runif.rule, data)
+
 @inline function setwindow(runif::RunIf{R,W}, win) where {R,W}
     f = runif.f
     r = setwindow(rule(runif), win)
@@ -32,9 +34,9 @@ end
 @inline function cell_kernel!(
     simdata, ruletype::Val{<:Rule}, condition::RunIf, rkeys, wkeys, I...
 )
-    readval = _readcell(simdata, rkeys, I...)
-    if condition.f(simdata, readval, I)
-        writeval = applyrule(simdata, rule(condition), readval, I)
+    readstate = _readcell(simdata, rkeys, I...)
+    if condition.f(simdata, readstate, I)
+        writeval = applyrule(simdata, rule(condition), readstate, I)
         _writecell!(simdata, ruletype, wkeys, writeval, I...)
     else
         # Otherwise copy source to dest without change
@@ -46,13 +48,12 @@ end
 @inline function cell_kernel!(
     simdata, ::Type{<:SetRule}, condition::RunIf, rkeys, wkeys, I...
 )
-    readval = _readcell(simdata, rkeys, I...)
-    if condition.f(data, readval, I)
-        applyrule!(simdata, rule(condition), readval, I)
+    readstate = _readcell(simdata, rkeys, I...)
+    if condition.f(data, readstate, I)
+        applyrule!(simdata, rule(condition), readstate, I)
     end
     return nothing
 end
-
 
 """
     RunAt(rules...)
@@ -62,7 +63,7 @@ end
 than the main simulation, using a `range` matching the main `tspan` but with a larger
 span, or specific events - by using a vector of arbitrary times in `tspan`.
 """
-struct RunAt{R,W,Ru<:Tuple,Ti<:AbstractVector} <: RuleWrapper{R,W}
+struct RunAt{R,W,Ru<:Tuple,Ti<:AbstractVector} <: MultiRuleWrapper{R,W}
     rules::Ru
     times::Ti
 end
@@ -74,15 +75,6 @@ function RunAt(rules::Tuple, times)
     RunAt{rkeys,wkeys,typeof(rules),typeof(times)}(rules, times)
 end
 
-rules(runat::RunAt) = runat.rules
-# Only the first rule in runat can be a NeighborhoodRule, but this seems annoying...
-radius(runat::RunAt) = radius(first(rules(runat)))
-# Forward ruletype to the contained rule
-ruletype(runat::RunAt) = ruletype(first(rules(runat)))
-neighborhoodkey(runat::RunAt) = neighborhoodkey(first(rules(runat)))
-neighborhood(runat::RunAt) = neighborhood(neighborhood(rules(runat)))
-neighbors(runat::RunAt) = neighbors(rules(runat))
-
 function sequencerules!(simdata::AbstractSimData, rules::Tuple{<:RunAt,Vararg})
     runat = rules[1]
     if currenttime(simdata) in runat.times
@@ -90,16 +82,5 @@ function sequencerules!(simdata::AbstractSimData, rules::Tuple{<:RunAt,Vararg})
         simdata = sequencerules!(simdata, DynamicGrids.rules(runat))
     end
     # Run the rest of the rules recursively
-    sequencerules!(simdata, tail(rules))
+    return sequencerules!(simdata, tail(rules))
 end
-
-function Base.tail(runat::RunAt{R,W}) where {R,W}
-    rulestail = tail(rules(runat))
-    RunAt{R,W,typeof(rulestail),typeof(runat.times)}(rulestail, runat.times)
-end
-Base.getindex(runat::RunAt, i) = getindex(rules(runat), i)
-Base.iterate(runat::RunAt) = iterate(rules(runat))
-Base.iterate(runat::RunAt, nothing) = iterate(rules(runat), nothing)
-Base.length(runat::RunAt) = length(rules(runat))
-Base.firstindex(runat::RunAt) = firstindex(rules(runat))
-Base.lastindex(runat::RunAt) = lastindex(rules(runat))

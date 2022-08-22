@@ -16,8 +16,9 @@ end
 @time @safetestset "neighborhoods" begin include("neighborhoods.jl") end
 @time @safetestset "simulationdata" begin include("simulationdata.jl") end
 @time @safetestset "utils" begin include("utils.jl") end
-@time @safetestset "chain" begin include("chain.jl") end
-@time @safetestset "condition" begin include("condition.jl") end
+@time @safetestset "wrappers" begin include("wrappers/chain.jl") end
+@time @safetestset "wrappers" begin include("wrappers/condition.jl") end
+@time @safetestset "wrappers" begin include("wrappers/combine.jl") end
 @time @safetestset "outputs" begin include("outputs.jl") end
 @time @safetestset "transformed" begin include("transformed.jl") end
 @time @safetestset "integration" begin include("integration.jl") end

@@ -24,16 +24,12 @@ using DynamicGrids: SimData, radius, rules, _readkeys, _writekeys,
     # These aren't actually used yet, they just build SimData
     agrid = [1 0 0
              0 0 2]
-
     bgrid = [0 0 0
              0 0 0]
-
     cgrid = [0 0 0
              0 0 0]
-
     dgrid = [0 0 0
              0 0 0]
-
     egrid = [0 0 0
              0 0 0]
 

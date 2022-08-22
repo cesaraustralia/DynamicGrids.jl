@@ -13,39 +13,20 @@ or [`NeighborhoodRule`](@ref) followed by [`CellRule`](@ref).
 
 ![Chain rule diagram](https://raw.githubusercontent.com/cesaraustralia/DynamicGrids.jl/media/Chain.png)
 """
-struct Chain{R,W,T<:Union{Tuple{},Tuple{Union{<:NeighborhoodRule,<:CellRule},Vararg{<:CellRule}}}} <: RuleWrapper{R,W}
+struct Chain{R,W,T<:Tuple{Vararg{<:ReturnRule}}} <: MultiRuleWrapper{R,W}
     rules::T
 end
 Chain(rules...) = Chain(rules)
-Chain(rules::Tuple) = begin
+function Chain(rules::Tuple)
     rkeys = Tuple{union(map(k -> _asiterable(_readkeys(k)), rules)...)...}
     wkeys = Tuple{union(map(k -> _asiterable(_writekeys(k)), rules)...)...}
     Chain{rkeys,wkeys,typeof(rules)}(rules)
 end
 
-# Getter
-rules(chain::Chain) = chain.rules
-# Only the first rule in a chain can be a NeighborhoodRule
-radius(chain::Chain) = radius(chain[1])
-neighborhoodkey(chain::Chain) = neighborhoodkey(chain[1])
-neighborhood(chain::Chain) = neighborhood(chain[1])
-neighbors(chain::Chain) = neighbors(chain[1])
 @inline function setwindow(chain::Chain{R,W}, win) where {R,W}
     rules = (setwindow(chain[1], win), tail(chain.rules)...)
     Chain{R,W,typeof(rules)}(rules)
 end
-
-function Base.tail(chain::Chain{R,W}) where {R,W}
-    chaintail = tail(rules(chain))
-    Chain{R,W,typeof(chaintail)}(chaintail)
-end
-Base.getindex(chain::Chain, i) = getindex(rules(chain), i)
-Base.iterate(chain::Chain) = iterate(rules(chain))
-Base.length(chain::Chain) = length(rules(chain))
-Base.firstindex(chain::Chain) = firstindex(rules(chain))
-Base.lastindex(chain::Chain) = lastindex(rules(chain))
-
-ruletype(chain::Chain) = ruletype(first(chain))
 
 @generated function applyrule(data::AbstractSimData, chain1::Chain{R,W,T}, state1, index) where {R,W,T}
     expr = Expr(:block)
@@ -72,32 +53,7 @@ ruletype(chain::Chain) = ruletype(first(chain))
         push!(expr.args, rule_expr)
     end
     laststate = Symbol("state$(nrules+1)")
-    push!(expr.args, :(_filter_writestate(chain1, $laststate)))
-    expr
-end
-
-function modifyrule(chain::Chain{R,W}, simdata) where {R,W}
-    Chain{R,W}(_modifyrules(rules(chain), simdata))
-end
-
-# Get the state to pass to the specific rule as a `NamedTuple` or single value
-@generated function _filter_readstate(::Rule{R,W}, state::NamedTuple) where {R<:Tuple,W}
-    expr = Expr(:tuple)
-    keys = Tuple(R.parameters)
-    for k in keys
-        push!(expr.args, :(state[$(QuoteNode(k))]))
-    end
-    :(NamedTuple{$keys}($expr))
-end
-@inline _filter_readstate(::Rule{R,W}, state::NamedTuple) where {R,W} = state[R]
-
-# Get the state to write for the specific rule
-@generated function _filter_writestate(::Rule{R,W}, state::NamedTuple) where {R<:Tuple,W<:Tuple}
-    expr = Expr(:tuple)
-    keys = Tuple(W.parameters)
-    for k in keys
-        push!(expr.args, :(state[$(QuoteNode(k))]))
-    end
+    push!(expr.args, :(_filter_writestate(data, chain1, $laststate)))
     expr
 end
 

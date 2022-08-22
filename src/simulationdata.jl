@@ -46,7 +46,7 @@ only in specific contexts, which is discouraged.
 - `radius(data)` : returns the `Int` radius used on the grid,
     which is also the amount of border padding.
 """
-abstract type AbstractSimData{S,N} end
+abstract type AbstractSimData{S,N,G} end
 
 # Getters
 extent(d::AbstractSimData) = d.extent
@@ -73,6 +73,7 @@ currenttimestep(d::AbstractSimData) = currenttime(d) + timestep(d) - currenttime
 
 # Base methods forwarded to grids NamedTuple
 Base.keys(d::AbstractSimData) = keys(grids(d))
+Base.keys(d::Type{<:AbstractSimData{<:Any,<:Any,<:NamedTuple{<:K}}}) where K = K
 Base.values(d::AbstractSimData) = values(grids(d))
 Base.first(d::AbstractSimData) = first(grids(d))
 Base.last(d::AbstractSimData) = last(grids(d))
@@ -104,7 +105,7 @@ Additional methods not found in [`AbstractSimData`](@ref):
 - `rules(d::SimData)` : get the simulation rules.
 - `ruleset(d::SimData)` : get the simulation [`AbstractRuleset`](@ref).
 """
-struct SimData{S<:Tuple,N,G<:NamedTuple,E,RS,F,CF,AF} <: AbstractSimData{S,N}
+struct SimData{S<:Tuple,N,G<:NamedTuple,E,RS,F,CF,AF} <: AbstractSimData{S,N,G}
     grids::G
     extent::E
     ruleset::RS
@@ -212,7 +213,7 @@ The simplified object actually passed to rules with the current design.
 
 Passing a smaller object than `SimData` to rules leads to faster GPU compilation.
 """
-struct RuleData{S<:Tuple,N,G<:NamedTuple,E,Se,F,CF,AF} <: AbstractSimData{S,N}
+struct RuleData{S<:Tuple,N,G<:NamedTuple,E,Se,F,CF,AF} <: AbstractSimData{S,N,G}
     grids::G
     extent::E
     settings::Se

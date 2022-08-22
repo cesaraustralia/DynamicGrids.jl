@@ -20,3 +20,12 @@ _modifyrules(rules::Tuple{}, simdata) = ()
 
 # The default `modifyrule` returns the rule unchanged.
 modifyrule(rule, simdata) = rule
+
+
+function initialiserules(simdata)
+    map(rules(simdata)) do rule
+        initialiserule(simdata, rule)
+    end
+end
+
+initialiserule(simdata, rule) = nothing
