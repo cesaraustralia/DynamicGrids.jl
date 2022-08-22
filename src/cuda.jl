@@ -28,7 +28,9 @@ kernel_setup(::CuGPU{N}) where N = CUDAKernels.CUDADevice(), (N, N)
     Adapt.adapt(CuArray, simdata)
 end
 
-_copyto_output!(outgrid, grid::GridData, proc::GPU) = copyto!(outgrid, gridview(grid))
+function _copyto_output!(outgrid, grid::GridData, proc::GPU)
+    copyto!(outgrid, view(grid, axes(outgrid)...))
+end
 
 
 # Thread-safe CUDA atomic ops
