@@ -53,18 +53,11 @@ gridsize(nt::NamedTuple{(),Tuple{}}) = 0, 0
 # Get a view of the grid, without padding
 gridview(d::GridData) = sourceview(d)
 # Get a view of the grid source, without padding
-sourceview(d::GridData) = _padless_view(source(d), axes(d), radius(d))
+sourceview(d::GridData) = _grid_view(source(d), d)
 # Get a view of the grid dest, without padding
-destview(d::GridData) = _padless_view(dest(d), axes(d), radius(d))
+destview(d::GridData) = _grid_view(dest(d), d)
 
-_padless_view(A::OffsetArray, axes, radius) = _padless_view(parent(A), axes, radius)
-function _padless_view(A::AbstractArray, axes, radius)
-    ranges = map(axes) do axis
-        axis .+ radius
-    end
-    return view(A, ranges...)
-end
-
+_grid_view(A, d::GridData) = view(A, axes(d)...)
 
 # Get an a view of the source, preferring the underlying array if it is not a padded OffsetArray
 source_array_or_view(d::GridData) = source(d) isa OffsetArray ? sourceview(d) : source(d)
@@ -102,37 +95,6 @@ end
 @propagate_inbounds Base.getindex(d::GridData{s}, I...) where s = getindex(source(d), I...)
 @propagate_inbounds function Base.getindex(d::GridData{s}, i1::Int, I::Int...) where s 
     getindex(source(d), i1, I...)
-end
-
-# Local utility methods
-
-# _addpadding => OffsetArray{T,N}
-# Find the maximum radius required by all rules
-# Add padding around the original init array, offset into the negative
-# So that the first real cell is still 1, 1
-function _addpadding(init::AbstractArray{T,1}, r, padval) where T
-    l = length(init)
-    paddedsize = l + 2r
-    paddedaxis = -r + 1:l + r
-    sourceparent = fill(convert(T, padval), paddedsize)
-    source = OffsetArray(sourceparent, paddedaxis)
-    # Copy the init array to the middle section of the source array
-    for i in 1:l
-        @inbounds source[i] = init[i]
-    end
-    return source
-end
-function _addpadding(init::AbstractArray{T,2}, r, padval) where T
-    h, w = size(init)
-    paddedsize = h + 4r, w + 2r
-    paddedaxes = -r + 1:h + 3r, -r + 1:w + r
-    pv = convert(eltype(init), padval)
-    sourceparent = similar(init, typeof(pv), paddedsize...)
-    sourceparent .= Ref(pv)
-    # Copy the init array to the middle section of the source array
-    _padless_view(sourceparent, axes(init), r) .= init
-    source = OffsetArray(sourceparent, paddedaxes...)
-    return source
 end
 
 # _swapsource => ReadableGridData
@@ -191,12 +153,20 @@ function ReadableGridData{S,R}(
     )
 end
 @inline function ReadableGridData{S,R}(
-    init::AbstractArray, mask, proc, opt, boundary, padval
-) where {S,R}
+    init::AbstractArray{<:Any,N}, mask, proc, opt, boundary, padval
+) where {S,R,N}
     # If the grid radius is larger than zero we pad it as an OffsetArray
     if R > 0
-        source = _addpadding(init, R, padval)
-        dest = _addpadding(init, R, padval)
+        # Blocks (only used for 2d sims) need additional vertical padding.
+        # TODO: this needs clarification.
+        if N == 2
+            r = (R, 3R), (R, R)
+            source = Neighborhoods.pad_array(init, r; padval)
+            dest = Neighborhoods.pad_array(init, r; padval)
+        else
+            source = Neighborhoods.pad_array(init, R; padval)
+            dest = Neighborhoods.pad_array(init, R; padval)
+        end
     else
         source = deepcopy(init)
         dest = deepcopy(init)
