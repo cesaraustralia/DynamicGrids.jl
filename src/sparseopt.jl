@@ -78,7 +78,6 @@ function row_kernel!(
     B = 2R
     S = 2R + 1
     nblockcols = _indtoblock(X+R, B)
-    src = parent(source(grid))
     srcstatus, dststatus = sourcestatus(grid), deststatus(grid)
 
     # Blocks ignore padding! the first block contains padding.
@@ -94,7 +93,6 @@ function row_kernel!(
     # New block status
     newbs12 = false
     newbs22 = false
-    windows = _initialise_windows(src, Val{R}(), i, 1)
     for bj = 1:nblockcols
         # Shuffle current window status
         bs11, bs21 = bs12, bs22
@@ -124,7 +122,6 @@ function row_kernel!(
 
         # Reinitialise neighborhood windows if we have skipped a section of the array
         if skippedlastblock
-            windows = _initialise_windows(src, Val{R}(), i, jstart)
             skippedlastblock = false
         end
         # Shuffle new window status
@@ -135,14 +132,13 @@ function row_kernel!(
         # Loop over the grid COLUMNS inside the block
         for j in jstart:jstop
             # Update windows unless feshly populated
-            windows = _slide_windows(windows, src, Val{R}(), i, j)
             # Which block column are we in, 1 or 2
             curblockj = (j - jstart) ÷ R + 1
             # Loop over the COLUMN of windows covering the block
             blocklen = min(Y, i + B - 1) - i + 1
             for b in 1:blocklen
                 # Set rule window
-                rule1 = setwindow(rule, windows[b])
+                rule1 = setneighbors(rule, unsafe_neighbors(grid, CartesianIndex(i, j)))
                 # Run the rule kernel for the cell
                 writeval = cell_kernel!(simdata, ruletype, rule1, rkeys, wkeys, i + b - 1, j)
                 # Update the status for the current block
@@ -184,14 +180,9 @@ function _build_optdata(opt::SparseOpt, source, r::Int)
     return (; sourcestatus, deststatus)
 end
 
-function _swapoptdata(opt::SparseOpt, grid::GridData)
-    isnothing(optdata(grid)) && return grid
-    od = optdata(grid)
-    srcstatus = od.sourcestatus
-    dststatus = od.deststatus
-    @set! od.deststatus = srcstatus
-    @set! od.sourcestatus = dststatus
-    return @set grid.optdata = od
+Neighborhoods.switch(::SparseOpt, ::Nothing) = nothing
+function Neighborhoods.switch(::SparseOpt, optdata)
+    (sourcestatus=optdata.deststatus, deststatus=optdata.sourcestatus)
 end
 
 
@@ -233,7 +224,7 @@ end
 
 # _wrapopt!
 # Copies status from opposite sides/corners in Wrap boundary mode
-function _wrapopt!(grid, ::SparseOpt)
+function after_update_boundary!(grid, ::SparseOpt)
     isnothing(optdata(grid)) && return grid
 
     status = sourcestatus(grid)
@@ -288,7 +279,7 @@ function cell_to_pixel(p::SparseOptInspector, mask, minval, maxval, data::Abstra
     normedval = normalise(val, minval, maxval)
     # This is done at the start of the next frame, so wont show up in
     # the image properly. So do it preemtively?
-    _wrapopt!(first(data))
+    after_update_boundary!(first(data))
     status = sourcestatus(first(data))
     if status[blockindex...]
         if normedval > 0

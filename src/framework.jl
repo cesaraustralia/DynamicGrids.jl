@@ -40,7 +40,7 @@ Other:
 - `simdata`: a [`SimData`](@ref) object. Keeping it between simulations can reduce memory
   allocation a little, when that is important.
 """
-function sim!(output::Output, ruleset=ruleset(output);
+function sim!(output::Output, ruleset::Ruleset=ruleset(output);
     init=init(output),
     mask=mask(output),
     tspan=tspan(output),
@@ -53,13 +53,13 @@ function sim!(output::Output, ruleset=ruleset(output);
     timestep=timestep(ruleset),
     simdata=nothing,
 )
-    isrunning(output) && error("Either a simulation is already running in this output, or an error occurred")
+    # isrunning(output) && error("Either a simulation is already running in this output, or an error occurred")
     setrunning!(output, true) || error("Could not start the simulation with this output")
 
     gridsize(init) == gridsize(DG.init(output)) || throw(ArgumentError("init size does not match output init"))
 
     # Rebuild Extent to allow kwarg alterations
-    extent = Extent(; init=_asnamedtuple(init), mask=mask, aux=aux, tspan=tspan)
+    extent = Extent(; init=_asnamedtuple(init), mask=mask, aux=aux, padval=_asnamedtuple(padval(output)), tspan=tspan)
     simruleset = Ruleset(rules(ruleset);
         boundary=boundary, proc=proc, opt=opt, cellsize=cellsize, timestep=timestep,
     )

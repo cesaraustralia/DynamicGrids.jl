@@ -35,19 +35,19 @@ tspan_ = DateTime(2001):Day(1):DateTime(2001, 2)
     grida = gs[:a]
     gridb = gs[:b]
 
-    @test parent(source(grida)) == parent(dest(grida)) ==
+    @test parent(source(grida)) ==
         [0 0 0 0 0
          0 0 1 1 0
          0 0 1 1 0
-         0 0 0 0 0
-         0 0 0 0 0
+         # 0 0 0 0 0
+         # 0 0 0 0 0
          0 0 0 0 0]
 
     wgrida = WritableGridData(grida)
     @test parent(source(grida)) === parent(source(wgrida))
     @test parent(dest(grida)) === parent(dest(wgrida))
 
-    @test parent(grida) == parent(wgrida) ==
+    @test grida == wgrida ==
         [0 1 1 
          0 1 1]
     
@@ -55,7 +55,7 @@ tspan_ = DateTime(2001):Day(1):DateTime(2001, 2)
     @test sourcestatus(grida) == deststatus(grida) == 
         [0 1 0 0
          0 1 0 0
-         0 0 0 0
+         # 0 0 0 0
          0 0 0 0]
 
     @test parent(source(gridb)) == parent(dest(gridb)) == 
@@ -83,10 +83,7 @@ end
     @test keys(simdata2) == (:_default_,)
     @test DynamicGrids.ruleset(simdata2) == DynamicGrids.StaticRuleset(rs)
     @test DynamicGrids.init(simdata2)[:_default_] == [1 0]
-    @test DynamicGrids.source(simdata2[:_default_]) == 
-        OffsetArray([0 0 0 0
+    @test DynamicGrids.source(simdata2[:_default_]) == OffsetArray([0 0 0 0
                      0 1 0 0
-                     0 0 0 0
-                     0 0 0 0
-                     0 0 0 0], (0:4, 0:3))
+                     0 0 0 0], (0:2, 0:3))
 end

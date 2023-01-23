@@ -24,9 +24,9 @@ neighbors(runif::RunIf) = neighbors(rule(runif))
 
 modifyrule(runif::RunIf, data::AbstractSimData) = @set runif.rule = modifyrule(runif.rule, data)
 
-@inline function setwindow(runif::RunIf{R,W}, win) where {R,W}
+@inline function Neighborhoods.setneighbors(runif::RunIf{R,W}, win) where {R,W}
     f = runif.f
-    r = setwindow(rule(runif), win)
+    r = setneighbors(rule(runif), win)
     RunIf{R,W,typeof(f),typeof(r)}(f, r)
 end
 

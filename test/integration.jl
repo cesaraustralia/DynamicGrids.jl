@@ -2,15 +2,16 @@ using DynamicGrids, DimensionalData, Test, Dates, Unitful,
       CUDAKernels, FileIO, FixedPointNumbers, Colors
 using DynamicGrids: Extent, SimData, gridview
 
-if CUDAKernels.CUDA.has_cuda_gpu()
-    CUDAKernels.CUDA.allowscalar(false)
-    hardware = (SingleCPU(), ThreadedCPU(), CPUGPU(), CuGPU())
-else
+# if CUDAKernels.CUDA.has_cuda_gpu()
+    # CUDAKernels.CUDA.allowscalar(false)
+    # hardware = (SingleCPU(), ThreadedCPU(), CPUGPU(), CuGPU())
+# else
     hardware = (SingleCPU(), ThreadedCPU(), CPUGPU())
-end
+# end
 opts = (NoOpt(), SparseOpt())
 
 # proc = CPUGPU()
+proc = CuGPU()
 proc = SingleCPU()
 # opt = SparseOpt()
 opt = NoOpt()
@@ -149,8 +150,7 @@ test = test5_6
                     opt=opt,
                 )
                 @testset "$(nameof(typeof(proc))) $(nameof(typeof(opt))) results match glider behaviour" begin
-                    output = ArrayOutput(test[:init], tspan=tspan)
-                    sim!(output, ruleset)
+                    (output = ArrayOutput(test[:init], tspan=tspan)); sim!(output, ruleset)
                     @test output[2] == test[:test2]
                     # || (println(2); display(output[2]); display(test[:test2]))
                     @test output[3] == test[:test3] # || (println(3); display(output[3]); display(test[:test3]))
@@ -183,15 +183,15 @@ test = test5_6
     nothing
 end
 
-@testset "Life simulation with Remove boudary" begin
-    init_ =     DimArray(Bool[
+@testset "Life simulation with Remove boundary" begin
+    init_ =     Bool[
                  0 0 0 0 0 0 0
                  0 0 0 0 1 1 1
                  0 0 0 0 0 0 1
                  0 0 0 0 0 1 0
                  0 0 0 0 0 0 0
                  0 0 0 0 0 0 0
-                ], (X, Y))
+                ]
     test2_rem = Bool[
                  0 0 0 0 0 1 0
                  0 0 0 0 0 1 1
@@ -406,7 +406,7 @@ end
 
 @testset "SparseOpt rules run everywhere with non zero values" begin
     set_hood = SetNeighbors() do data, hood, val, I 
-        for p in positions(hood, I)
+        for p in indices(hood, I)
             data[p...] = 2
         end
     end

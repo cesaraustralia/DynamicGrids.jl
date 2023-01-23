@@ -40,8 +40,9 @@ function isinferred(simdata::AbstractSimData,
     r = max(1, radius(rule))
     T = eltype(grid)
     S = 2r + 1
-    window = SArray{Tuple{S,S},T,2,S^2}(Tuple(zero(T) for i in 1:S^2))
-    rule = setwindow(rule, window)
+    L = length(neighborhood(rule))
+    nbrs = SVector{L,T}(Tuple(zero(T) for i in 1:L))
+    rule = setneighbors(rule, nbrs)
     return _isinferred(simdata, rule)
 end
 function isinferred(simdata::AbstractSimData, rule::SetCellRule)
@@ -95,10 +96,12 @@ _zerogrids(initgrids::NamedTuple, length) =
 # Returns a NamedTuple given a NamedTuple or an Array.
 # the Array will be called _default_.
 @inline _asnamedtuple(x::NamedTuple) = x
-@inline _asnamedtuple(x::AbstractArray) = (_default_=x,)
+@inline _asnamedtuple(x) = (_default_=x,)
 @inline function _asnamedtuple(e::Extent) 
-    @set! e.init = _asnamedtuple(init(e))
-    @set e.padval = _samenamedtuple(init(e), padval(e))
+    init_nt = _asnamedtuple(init(e))
+    e = @set e.init = init_nt
+    pv = _samenamedtuple(init_nt, padval(e))
+    return @set e.padval = pv
 end
 
 # _samenamedtuple => NamedTuple

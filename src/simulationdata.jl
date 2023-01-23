@@ -31,7 +31,7 @@ if they are a `Matrix`.
 - `tspan(data)`: get the simulation time span, an `AbstractRange`.
 - `timestep(data)`: get the simulaiton time step.
 - `boundary(data)` : returns the [`BoundaryCondition`](@ref) - `Remove` or `Wrap`.
-- `padval(data)` : returns the value to use as grid border padding.
+- `padding(data)` : returns the value to use as grid border padding.
 
 These are also available, but you probably shouldn't use them and their behaviour
 is not guaranteed in furture versions. Using them will also mean a rule is useful 
@@ -135,16 +135,12 @@ SimData(extent::AbstractExtent, r1::Rule, rs::Rule...) = SimData(extent, (r1, rs
 SimData(extent::AbstractExtent, rs::Tuple{<:Rule,Vararg}) = SimData(extent, Ruleset(rs))
 # Convert grids in extent to NamedTuple
 function SimData(extent::AbstractExtent, ruleset::AbstractRuleset, frames=nothing)
-    SimData(_asnamedtuple(extent), ruleset) 
+    nt_extent = _asnamedtuple(extent)
+    SimData(nt_extent, ruleset, frames) 
 end
-function SimData(
-    extent::AbstractExtent{<:NamedTuple{Keys}}, ruleset::AbstractRuleset, frames=nothing
-) where Keys
-    # Calculate the neighborhood radus (and grid padding) for each grid
-    S = Val{Tuple{gridsize(extent)...}}()
-    radii = map(k-> Val{get(radius(ruleset), k, 0)}(), Keys)
-    radii = NamedTuple{Keys}(radii)
-    grids = _buildgrids(extent, ruleset, S, radii)
+function SimData(extent::AbstractExtent{<:NamedTuple}, ruleset::AbstractRuleset, frames=nothing)
+    # Calculate the neighborhood array for each grid
+    grids = _buildgrids(extent, ruleset)
     # Construct the SimData for each grid
     SimData(grids, extent, ruleset, frames)
 end
@@ -160,17 +156,29 @@ function SimData(
     SimData{S,N}(grids, s_extent, s_ruleset, frames, currentframe, auxframe)
 end
 
-# Build the grids for the simulation from the exebnt, ruleset, init and padval
-function _buildgrids(extent, ruleset, s, radii::NamedTuple)
+# Build the grids for the simulation from the extent, ruleset, init and padding
+function _buildgrids(extent::AbstractExtent{<:NamedTuple{Keys}}, ruleset) where Keys
+    S = Val{Tuple{size(extent)...}}()
+    radii = map(k-> Val{get(radius(ruleset), k, 0)}(), Keys)
+    radii = NamedTuple{Keys}(radii)
+    _buildgrids(extent, ruleset, S, radii)
+end
+function _buildgrids(extent, ruleset, s::Val, radii::NamedTuple)
     map(radii, init(extent), padval(extent)) do r, in, pv
         _buildgrids(extent, ruleset, s, r, in, pv)
     end
 end
 function _buildgrids(extent, ruleset, ::Val{S}, ::Val{R}, init, padval) where {S,R}
+    hood = Window{R}() 
+    pad = Halo{:out}() # We always pad out in DynamicGrids - it should pay back for multiple time steps?
+    bc = _boundary(boundary(ruleset), padval)
     ReadableGridData{S,R}(
-        init, mask(extent), proc(ruleset), opt(ruleset), boundary(ruleset), padval 
+        init, hood, bc, pad, proc(ruleset), opt(ruleset), mask(extent)
     )
 end
+
+_boundary(::Wrap, padval) = Wrap()
+_boundary(::Remove, padval) = Remove(padval)
 
 ConstructionBase.constructorof(::Type{<:SimData{S,N}}) where {S,N} = SimData{S,N}
 
@@ -198,7 +206,7 @@ function initdata!(
         isstored(o) || _not_stored_delay_error()
         @set! simdata.frames = frames(o) 
     end
-    simdata
+    return simdata
 end
 
 """

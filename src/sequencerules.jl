@@ -1,6 +1,6 @@
 
 # Sequence rules over the [`SimData`](@ref) object,
-# calling [`maprule!`](@ref) for each individual `Rule`.
+# calling [`broadcast_rule!`](@ref) for each individual `Rule`.
 function sequencerules!(simdata::AbstractSimData)
     newsimdata = sequencerules!(simdata, rules(simdata))
     # We run masking here to mask out cells that are `false` in the 
@@ -12,8 +12,8 @@ end
 function sequencerules!(simdata::AbstractSimData, rules::Tuple)
     rule = rules[1]
     rest = tail(rules)
-    # Run the first rules
-    newsimdata = maprule!(simdata, rule)
+    # Run the first rule
+    newsimdata = broadcast_rule!(simdata, rule)
     # Run the rest of the rules recursively
     sequencerules!(newsimdata, rest)
 end
