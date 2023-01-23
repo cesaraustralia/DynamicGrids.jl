@@ -77,8 +77,8 @@ function Life{R,W}(;
     Life{R,W}(neighborhood, born, survive, nothing)
 end
 
-function setwindow(r::Life{R,W,N,B,S,LU}, buffer) where {R,W,N,B,S,LU} 
-    hood = setwindow(r.neighborhood, buffer)
+function Neighborhoods.setneighbors(r::Life{R,W,N,B,S,LU}, neighbors::AbstractArray) where {R,W,N,B,S,LU} 
+    hood = setneighbors(r.neighborhood, neighbors)
     Life{R,W,typeof(hood),B,S,LU}(hood, r.born, r.survive, r.lookup)
 end
 

@@ -21,7 +21,7 @@ Base.Threads.unlock(opt::CPUGPU) = unlock(opt.spinlock)
 
 kernel_setup(::CPUGPU) = KernelAbstractions.CPU(), 1
 
-function maprule!(
+function broadcast_rule!(
     data::AbstractSimData, proc::GPU, opt, ruletype::Val{<:Rule}, rule, rkeys, wkeys
 )
     kernel! = ka_rule_kernel!(kernel_setup(proc)...)

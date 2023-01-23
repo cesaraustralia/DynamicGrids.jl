@@ -216,13 +216,13 @@ end
 end
 
 @testset "Layout Renderer" begin
-    init = [8.0 10.0;
+    init_ = [8.0 10.0;
             0.0  5.0]
     z0 = DynamicGrids.ZEROCOL
     grey = Greyscale()
-    multiinit = (a=init, b=2init)
+    multiinit = (a=init_, b=2init_)
     rndr = Layout([:a nothing :b], [grey nothing leonardo])
-    @test DynamicGrids.imagesize(rndr, init, 1:1) == (2, 6)
+    @test DynamicGrids.imagesize(rndr, init_, 1:1) == (2, 6)
 
     output = NoDisplayImageOutput(multiinit; 
         tspan=DateTime(2001):Year(1):DateTime(2002), 

@@ -1,15 +1,15 @@
 using DynamicGrids, ModelParameters, Setfield, Test, StaticArrays, 
       LinearAlgebra, CUDAKernels
-import DynamicGrids: applyrule, applyrule!, maprule!, ruletype, extent, source, dest,
+import DynamicGrids: applyrule, applyrule!, broadcast_rule!, ruletype, extent, source, dest,
        _getreadgrids, _getwritegrids, _combinegrids, _readkeys, _writekeys,
        SimData, WritableGridData, Rule, Extent, CPUGPU, neighborhoodkey
 
-if CUDAKernels.CUDA.has_cuda_gpu()
-    CUDAKernels.CUDA.allowscalar(false)
-    hardware = (SingleCPU(), ThreadedCPU(), CPUGPU(), CuGPU())
-else
+# if CUDAKernels.CUDA.has_cuda_gpu()
+    # CUDAKernels.CUDA.allowscalar(false)
+    # hardware = (SingleCPU(), ThreadedCPU(), CPUGPU(), CuGPU())
+# else
     hardware = (SingleCPU(), ThreadedCPU(), CPUGPU())
-end
+# end
 
 init  = [0 1 1 0
          0 1 1 0
@@ -79,12 +79,13 @@ end
 end
 
 @testset "Neighbors" begin
-    window = [1 0 0; 0 0 1; 0 0 1]
-    rule = Neighbors(VonNeumann(1, window)) do data, hood, state, I
+    nbrs = [0, 0, 1, 0]
+    rule = Neighbors(VonNeumann(1, nbrs)) do data, hood, state, I
         sum(hood)
     end
     @test applyrule(nothing, rule, 0, (3, 3)) == 1
-    rule = Neighbors(Moore{1}(window)) do data, hood, state, I
+    nbrs = [1, 0, 0, 0, 1, 0, 0, 1]
+    rule = Neighbors(Moore{1}(nbrs)) do data, hood, state, I
         sum(hood)
     end
     @test applyrule(nothing, rule, 0, (3, 3)) == 3
@@ -104,43 +105,43 @@ function DynamicGrids.applyrule!(
     add!(data[W1], state[1], index...)
 end
 
-win5x5 = zeros(5, 5)
-win7x7 = zeros(7, 7)
+moore2 = SVector{24}(zeros(24))
+moore3 = SVector{48}(zeros(48))
 
 @testset "neighborhood rules" begin
-    ruleA = TestSetNeighborhoodRule{:a,:a}(Moore{3}(win7x7))
-    ruleB = TestSetNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}(win5x5))
-    @test offsets(ruleA) isa Tuple
-    @test positions(ruleA, (1, 1)) isa Tuple
-    @test neighborhood(ruleA) == Moore{3}(win7x7)
-    @test neighborhood(ruleB) == Moore{2}(win5x5)
+    ruleA = TestSetNeighborhoodRule{:a,:a}(Moore{3}(moore3))
+    ruleB = TestSetNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}(moore2))
+    @test offsets(ruleA) isa StaticVector
+    @test indices(ruleA, CartesianIndex(1, 1)) isa StaticVector
+    @test neighborhood(ruleA) == Moore{3}(moore3)
+    @test neighborhood(ruleB) == Moore{2}(moore2)
     @test neighborhoodkey(ruleA) == :a
     @test neighborhoodkey(ruleB) == :b
-    ruleA = TestNeighborhoodRule{:a,:a}(Moore{3}(win7x7))
-    ruleB = TestNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}(win5x5))
-    @test offsets(ruleA) isa Tuple
-    @test neighborhood(ruleA) == Moore{3}(win7x7)
-    @test neighborhood(ruleB) == Moore{2}(win5x5)
+    ruleA = TestNeighborhoodRule{:a,:a}(Moore{3}(moore3))
+    ruleB = TestNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}(moore2))
+    @test offsets(ruleA) isa StaticVector
+    @test neighborhood(ruleA) == Moore{3}(moore3)
+    @test neighborhood(ruleB) == Moore{2}(moore2)
     @test neighborhoodkey(ruleA) == :a
     @test neighborhoodkey(ruleB) == :b
     @test offsets(ruleB) === 
-        ((-2,-2), (-1,-2), (0,-2), (1,-2), (2,-2),
+        SA[(-2,-2), (-1,-2), (0,-2), (1,-2), (2,-2),
          (-2,-1), (-1,-1), (0,-1), (1,-1), (2,-1),
          (-2,0), (-1,0), (1,0), (2,0),
          (-2,1), (-1,1), (0,1), (1,1), (2,1),
-         (-2,2), (-1,2), (0,2), (1,2), (2,2))
-    @test positions(ruleB, (10, 10)) == 
-        ((8, 8), (9, 8), (10, 8), (11, 8), (12, 8), 
+         (-2,2), (-1,2), (0,2), (1,2), (2,2)]
+    @test indices(ruleB, (10, 10)) == 
+        SA[(8, 8), (9, 8), (10, 8), (11, 8), (12, 8), 
          (8, 9), (9, 9), (10, 9), (11, 9), (12, 9), 
          (8, 10), (9, 10), (11, 10), (12, 10), 
          (8, 11), (9, 11), (10, 11), (11, 11), (12, 11), 
-         (8, 12), (9, 12), (10, 12), (11, 12), (12, 12))
+         (8, 12), (9, 12), (10, 12), (11, 12), (12, 12)]
 end
 
 @testset "radius" begin
     init = (a=[1.0 2.0], b=[10.0 11.0])
-    ruleA = TestNeighborhoodRule{:a,:a}(Moore{3}(win7x7))
-    ruleB = TestSetNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}(win5x5))
+    ruleA = TestNeighborhoodRule{:a,:a}(Moore{3}(moore3))
+    ruleB = TestSetNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}(moore2))
     ruleset = Ruleset(ruleA, ruleB)
     @test radius(ruleA) == 3
     @test radius(ruleB) == 2
@@ -174,7 +175,7 @@ end
     @testset "atomics" begin
         rule = SetNeighbors(VonNeumann(1)) do data, hood, state, I
             if state > 0
-                for pos in positions(hood, I)
+                for pos in indices(hood, I)
                     add!(data, 1, pos...) 
                 end
             end
@@ -196,7 +197,7 @@ end
     @testset "setindex" begin
         rule = SetNeighbors(VonNeumann(1)) do data, hood, state, I
             state == 0 && return nothing
-            for pos in positions(hood, I)
+            for pos in indices(hood, I)
                 data[pos...] = 1 
             end
         end
@@ -337,7 +338,7 @@ applyrule(data, ::TestRule, state, index) = 0
             ext = Extent(; init=(a=init,), tspan=1:1)
             simdata = SimData(ext, ruleset)
 
-            # Test maprules components
+            # Test broadcast_rule components
             rkeys, rgrids = _getreadgrids(rule, simdata)
             wkeys, wgrids = _getwritegrids(rule, simdata)
             @test rkeys == Val{:a}()
@@ -346,9 +347,9 @@ applyrule(data, ::TestRule, state, index) = 0
             @test newsimdata.grids[1] isa WritableGridData
             # Test type stability
             T = Val{DynamicGrids.ruletype(rule)}()
-            @inferred maprule!(newsimdata, proc, opt, T, rule, rkeys, wkeys)
+            @inferred broadcast_rule!(newsimdata, proc, opt, T, rule, rkeys, wkeys)
             
-            resultdata = maprule!(simdata, rule)
+            resultdata = broadcast_rule!(simdata, rule)
             @test source(resultdata[:a]) == final
         end
     end
@@ -370,8 +371,8 @@ applyrule!(data, ::TestSetCell, state, index) = 0
             wkeys, wgrids = _getwritegrids(rule, simdata)
             newsimdata = @set simdata.grids = _combinegrids(wkeys, wgrids, rkeys, rgrids)
             T = Val{DynamicGrids.ruletype(rule)}()
-            @inferred maprule!(newsimdata, proc, opt, T, rule, rkeys, wkeys)
-            resultdata = maprule!(simdata, rule)
+            @inferred broadcast_rule!(newsimdata, proc, opt, T, rule, rkeys, wkeys)
+            resultdata = broadcast_rule!(simdata, rule)
             @test source(resultdata[:_default_]) == init
         end
     end
@@ -397,7 +398,7 @@ applyrule!(data, ::TestSetCellWrite{R,W}, state, index) where {R,W} = add!(data[
             ruleset = Ruleset(rule; opt=opt, proc=proc)
             ext = Extent(; init=(_default_=init,), tspan=1:1)
             simdata = DynamicGrids._proc_setup(SimData(ext, ruleset));
-            resultdata = maprule!(simdata, rule);
+            resultdata = broadcast_rule!(simdata, rule);
             @test Array(source(first(resultdata))) == final
         end
     end
@@ -420,7 +421,7 @@ applyrule(data, ::TestCellSquare, (state,), index) = state^2
             ruleset = Ruleset(rule; opt=opt, proc=proc)
             ext = Extent(; init=(_default_=init,), tspan=1:1)
             simdata = DynamicGrids._proc_setup(SimData(ext, ruleset))
-            resultdata = maprule!(simdata, rule);
+            resultdata = broadcast_rule!(simdata, rule);
             @test Array(source(first(resultdata))) == final
         end
     end

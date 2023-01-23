@@ -16,6 +16,7 @@ using Adapt,
       FileIO,
       LinearAlgebra,
       KernelAbstractions,
+      Neighborhoods,
       OffsetArrays,
       REPL,
       Reexport,
@@ -84,10 +85,9 @@ export ObjectScheme, Greyscale, Grayscale
 export CharStyle, Block, Braile
 
 # From Neighborhoods module
-export Neighborhood, Window, AbstractKernelNeighborhood, Kernel,
-       Moore, VonNeumann, Positional, LayeredPositional
+export Neighborhood, Window, Kernel, Moore, VonNeumann, Positional, Layered
 
-export neighbors, neighborhood, kernel, kernelproduct, offsets, positions, radius, distances
+export neighbors, neighborhood, kernel, kernelproduct, offsets, indices, radius, distances, distance_zones
 
 const DEFAULT_KEY = :_default_
 
@@ -96,12 +96,10 @@ const EXPERIMENTAL = """
         and may not be 100% reliable in all cases. Please file github issues if problems occur.
         """
 
-include("Neighborhoods/Neighborhoods.jl")
-
-using .Neighborhoods
-import .Neighborhoods: neighbors, neighborhood, kernel, kernelproduct, offsets, positions,
-    radius, distances, readwindow, setwindow, unsafe_readwindow,
-    updatewindow, unsafe_updatewindow
+import Neighborhoods: neighbors, unsafe_neighbors, neighborhood,
+    kernel, kernelproduct, offsets, indices, radius, distances, distance_zones,
+    setneighbors, update_neighborhood, unsafe_update_neighborhood,
+    boundary, padding, source, dest, switch, padval, update_boundary!
 
 include("interface.jl")
 include("flags.jl")

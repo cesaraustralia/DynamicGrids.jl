@@ -50,6 +50,7 @@ extent(o::Output) = o.extent
 init(o::Output) = init(extent(o))
 mask(o::Output) = mask(extent(o))
 aux(o::Output, key...) = aux(extent(o), key...)
+padval(o::Output, key...) = padval(extent(o), key...)
 tspan(o::Output) = tspan(extent(o))
 timestep(o::Output) = step(tspan(o))
 

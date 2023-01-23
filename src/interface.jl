@@ -3,7 +3,7 @@
 
 Apply a rule to the cell state and return values to write to the grid(s).
 
-This is called in `maprule!` methods during the simulation,
+This is called in `broadcast_rule!` methods during the simulation,
 not by the user. Custom `Rule` implementations must define this method.
 
 ## Arguments
@@ -24,7 +24,7 @@ function applyrule end
 Apply a rule to the cell state and manually write to the grid data array.
 Used in all rules inheriting from [`SetCellRule`](@ref).
 
-This is called in internal `maprule!` methods during the simulation, not by
+This is called in internal `broadcast_rule!` methods during the simulation, not by
 the user. Custom [`SetCellRule`](@ref) implementations must define this method.
 
 Only grids specified with the `W` type parameter will be writable from `data`.

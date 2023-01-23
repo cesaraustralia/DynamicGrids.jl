@@ -391,24 +391,26 @@ abstract type NeighborhoodRule{R,W} <: ReturnRule{R,W} end
 
 ruletype(::NeighborhoodRule) = NeighborhoodRule
 
-neighbors(rule::NeighborhoodRule) = neighbors(neighborhood(rule))
-neighborhood(rule::NeighborhoodRule) = rule.neighborhood
-offsets(rule::NeighborhoodRule) = offsets(neighborhood(rule))
-kernel(rule::NeighborhoodRule) = kernel(neighborhood(rule))
-kernelproduct(rule::NeighborhoodRule) = kernelproduct(neighborhood(rule))
-positions(rule::NeighborhoodRule, args...) = positions(neighborhood(rule), args...)
+Neighborhoods.neighbors(rule::NeighborhoodRule) = neighbors(neighborhood(rule))
+Neighborhoods.neighborhood(rule::NeighborhoodRule) = rule.neighborhood
+Neighborhoods.offsets(rule::NeighborhoodRule) = offsets(neighborhood(rule))
+Neighborhoods.cartesian_offsets(rule::NeighborhoodRule) = cartesian_offsets(neighborhood(rule))
+Neighborhoods.kernel(rule::NeighborhoodRule) = kernel(neighborhood(rule))
+Neighborhoods.kernelproduct(rule::NeighborhoodRule) = kernelproduct(neighborhood(rule))
+Neighborhoods.indices(rule::NeighborhoodRule, args...) = indices(neighborhood(rule), args...)
+Neighborhoods.distances(rule::NeighborhoodRule) = distances(neighborhood(rule))
+Neighborhoods.distance_zones(rule::NeighborhoodRule) = distance_zones(neighborhood(rule))
 neighborhoodkey(rule::NeighborhoodRule{R,W}) where {R,W} = R
 # The first argument is for the neighborhood grid
 neighborhoodkey(rule::NeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
-radius(rule::NeighborhoodRule, args...) = radius(neighborhood(rule))
-@inline function setwindow(rule, window)
-    @set rule.neighborhood = setwindow(neighborhood(rule), window)
+Neighborhoods.radius(rule::NeighborhoodRule, args...) = radius(neighborhood(rule))
+Neighborhoods.unsafe_neighbors(A::Neighborhoods.AbstractNeighborhoodArray, rule::NeighborhoodRule, I::CartesianIndex) =
+    Neighborhoods.unsafe_neighbors(A, neighborhood(rule), I)
+@inline function Neighborhoods.setneighbors(rule::NeighborhoodRule, neighbors::AbstractArray)
+    @set rule.neighborhood = setneighbors(neighborhood(rule), neighbors)
 end
-@inline function unsafe_updatewindow(rule::NeighborhoodRule, A::AbstractArray, I...)
-    setwindow(rule, unsafe_readwindow(neighborhood(rule), A, I...))
-end
-@inline function unsafe_readwindow(rule::Rule, A::AbstractArray, I...)
-    unsafe_readwindow(neighborhood(rule), A, I)
+@inline function Neighborhoods.unsafe_update_neighborhood(A::AbstractArray, rule::NeighborhoodRule, I...)
+    setneighbors(rule, unsafe_neighbors(A, rule, I))
 end
 
 """
@@ -526,7 +528,7 @@ Convolution{R,W}(; neighborhood) where {R,W} = Convolution{R,W}(neighborhood)
 
 A [`SetRule`](@ref) that only writes to its neighborhood, and does not need to bounds-check.
 
-[`positions`](@ref) and [`offsets`](@ref) are useful iterators for modifying
+[`indices`](@ref) and [`offsets`](@ref) are useful iterators for modifying
 neighborhood values. 
 
 `SetNeighborhoodRule` rules must return a [`Neighborhood`](@ref) object from the function 
@@ -537,11 +539,11 @@ abstract type SetNeighborhoodRule{R,W} <: SetRule{R,W} end
 
 ruletype(::SetNeighborhoodRule) = SetNeighborhoodRule
 
-neighborhood(rule::SetNeighborhoodRule) = rule.neighborhood
-offsets(rule::SetNeighborhoodRule) = offsets(neighborhood(rule))
-kernel(rule::SetNeighborhoodRule) = kernel(neighborhood(rule))
-positions(rule::SetNeighborhoodRule, args...) = positions(neighborhood(rule), args...)
-radius(rule::SetNeighborhoodRule, args...) = radius(neighborhood(rule))
+Neighborhoods.neighborhood(rule::SetNeighborhoodRule) = rule.neighborhood
+Neighborhoods.offsets(rule::SetNeighborhoodRule) = offsets(neighborhood(rule))
+Neighborhoods.kernel(rule::SetNeighborhoodRule) = kernel(neighborhood(rule))
+Neighborhoods.indices(rule::SetNeighborhoodRule, args...) = indices(neighborhood(rule), args...)
+Neighborhoods.radius(rule::SetNeighborhoodRule, args...) = radius(neighborhood(rule))
 neighborhoodkey(rule::SetNeighborhoodRule{R,W}) where {R,W} = R
 neighborhoodkey(rule::SetNeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
 
@@ -567,7 +569,7 @@ may write to the same location in an unpredicatble order. As a rule, directly
 setting a neighborhood index should only be done if it always sets the samevalue -
 then it can be guaranteed that any writes from othe grid cells reach the same result.
 
-[`neighbors`](@ref), [`offsets`](@ref) and [`positions`](@ref) are useful methods for
+[`neighbors`](@ref), [`offsets`](@ref) and [`indices`](@ref) are useful methods for
 `SetNeighbors` rules.
 
 ## Example
@@ -579,7 +581,7 @@ using DynamicGrids
 
 rule = SetNeighbors{:a}() do data, neighborhood, a, I
     add_to_neighbors = your_func(a)
-    for pos in positions(neighborhood)
+    for pos in indices(neighborhood)
         add!(data[:b], add_to_neighbors, pos...)
     end
 end

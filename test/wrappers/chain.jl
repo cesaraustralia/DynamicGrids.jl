@@ -1,4 +1,4 @@
-using DynamicGrids, Test, BenchmarkTools
+using DynamicGrids, Test, BenchmarkTools, StaticArrays
 
 using DynamicGrids: SimData, radius, rules, _readkeys, _writekeys, 
     applyrule, neighborhood, neighborhoodkey, Extent, ruletype
@@ -90,8 +90,8 @@ end
 
 @testset "NeighborhoodRule, CellRule chain" begin
 
-    buf = reshape(1:9, 3, 3)
-    hood = Moore{1}(buf)
+    nbrs = SA[1, 2, 3, 4, 6, 7, 8, 9]
+    hood = Moore{1}(nbrs)
     hoodrule = Neighbors{:a,:a}(hood) do data, neighborhodhood, cell, I
         sum(neighborhodhood)
     end
@@ -122,6 +122,7 @@ end
     @test radius(chain) === 1
     @test ruletype(chain) == NeighborhoodRule
     @test neighborhood(chain) == hood
+
     @test Tuple(neighbors(chain)) === (1, 2, 3, 4, 6, 7, 8, 9) 
     @test neighborhoodkey(chain) === :a
     @test rules(Base.tail(chain)) === (rule,)
@@ -134,12 +135,12 @@ end
 
     ruleset = Ruleset(chain; opt=NoOpt())
     noopt_output = ArrayOutput(init; tspan=1:3)
-    @btime sim!($noopt_output, $ruleset)
+    sim!(noopt_output, ruleset)
     @test isinferred(noopt_output, ruleset)
     
     ruleset = Ruleset(Chain(hoodrule, rule); opt=SparseOpt())
     sparseopt_output = ArrayOutput(init; tspan=1:3)
-    @btime sim!($sparseopt_output, $ruleset; init=$init)
+    sim!(sparseopt_output, ruleset; init=init)
     @test isinferred(sparseopt_output, ruleset)
 
     noopt_output[2][:a] == sparseopt_output[2][:a] ==
