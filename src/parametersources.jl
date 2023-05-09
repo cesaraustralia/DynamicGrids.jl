@@ -61,6 +61,9 @@ _unwrap(::Type{<:Aux{X}}) where X = X
 
 @inline aux(nt::NamedTuple, ::Aux{Key}) where Key = nt[Key]
 
+@propagate_inbounds function Base.get(data::AbstractSimData, key, I::CartesianIndex)
+    Base.get(data, key, Tuple(I))
+end
 @propagate_inbounds function Base.get(data::AbstractSimData, key::Aux, I::Tuple)
     _getaux(data, key, I)
 end
@@ -134,9 +137,14 @@ function _calc_auxframe(aux::NamedTuple, data::AbstractSimData)
 end
 function _calc_auxframe(A::AbstractDimArray, data)
     hasdim(A, TimeDim) || return nothing
+    timedim = dims(A, TimeDim)
     curtime = currenttime(data)
-    firstauxtime = first(dims(A, TimeDim))
-    auxstep = step(dims(A, TimeDim))
+    firstauxtime = first(timedim)
+    # For Irregular we use `Contains` to get the nearest matching timestep
+    if span(timedim) isa Irregular
+        return DimensionalData.selectindices(timedim, Contains(curtime))
+    end
+    auxstep = step(timedim)
     # Use julias range objects to calculate the distance between the
     # current time and the start of the aux
     i = if curtime >= firstauxtime

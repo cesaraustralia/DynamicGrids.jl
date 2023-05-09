@@ -2,7 +2,7 @@ using DynamicGrids, ModelParameters, Setfield, Test, StaticArrays,
       LinearAlgebra, CUDAKernels
 import DynamicGrids: applyrule, applyrule!, broadcast_rule!, ruletype, extent, source, dest,
        _getreadgrids, _getwritegrids, _combinegrids, _readkeys, _writekeys,
-       SimData, WritableGridData, Rule, Extent, CPUGPU, neighborhoodkey
+       SimData, GridData, WriteMode, Rule, Extent, CPUGPU, stencilkey
 
 # if CUDAKernels.CUDA.has_cuda_gpu()
     # CUDAKernels.CUDA.allowscalar(false)
@@ -29,24 +29,24 @@ opt = NoOpt()
    #@test_throws ArgumentError Cell(identity, identity)
    rule1 = Neighbors{:a,:b}(identity, Moore(1))
    @test rule1.f == identity
-   rule2 = Neighbors{:a,:b}(identity; neighborhood=Moore(1))
+   rule2 = Neighbors{:a,:b}(identity; stencil=Moore(1))
    @test rule1 == rule2
    @test typeof(rule1) == Neighbors{:a,:b,typeof(identity),Moore{1,2,8,Nothing}}
    rule1 = Neighbors(identity, Moore(1))
    @test rule1.f == identity
-   rule2 = Neighbors(identity; neighborhood=Moore(1))
+   rule2 = Neighbors(identity; stencil=Moore(1))
    @test typeof(rule1)  == Neighbors{:_default_,:_default_,typeof(identity),Moore{1,2,8,Nothing}}
    @test rule1 == rule2
    @test_throws ArgumentError Neighbors()
    # @test_throws ArgumentError Neighbors(identity, identity, identity)
    rule1 = SetNeighbors{:a,:b}(identity, Moore(1))
    @test rule1.f == identity
-   rule2 = SetNeighbors{:a,:b}(identity; neighborhood=Moore(1))
+   rule2 = SetNeighbors{:a,:b}(identity; stencil=Moore(1))
    @test rule1 == rule2
    @test typeof(rule1)  == SetNeighbors{:a,:b,typeof(identity),Moore{1,2,8,Nothing}}
    rule1 = SetNeighbors(identity, Moore(1))
    @test rule1.f == identity
-   rule2 = SetNeighbors(identity; neighborhood=Moore(1))
+   rule2 = SetNeighbors(identity; stencil=Moore(1))
    @test typeof(rule1)  == SetNeighbors{:_default_,:_default_,typeof(identity),Moore{1,2,8,Nothing}}
    @test rule1 == rule2
    @test_throws ArgumentError Neighbors()
@@ -92,12 +92,12 @@ end
 end
 
 struct TestNeighborhoodRule{R,W,N} <: NeighborhoodRule{R,W}
-    neighborhood::N
+    stencil::N
 end
 DynamicGrids.applyrule(data, rule::TestNeighborhoodRule, state, index) = state
 
 struct TestSetNeighborhoodRule{R,W,N} <: SetNeighborhoodRule{R,W}
-    neighborhood::N
+    stencil::N
 end
 function DynamicGrids.applyrule!(
     data, rule::TestSetNeighborhoodRule{R,Tuple{W1,}}, state, index
@@ -108,22 +108,22 @@ end
 moore2 = SVector{24}(zeros(24))
 moore3 = SVector{48}(zeros(48))
 
-@testset "neighborhood rules" begin
+@testset "stencil rules" begin
     ruleA = TestSetNeighborhoodRule{:a,:a}(Moore{3}(moore3))
     ruleB = TestSetNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}(moore2))
     @test offsets(ruleA) isa StaticVector
     @test indices(ruleA, CartesianIndex(1, 1)) isa StaticVector
-    @test neighborhood(ruleA) == Moore{3}(moore3)
-    @test neighborhood(ruleB) == Moore{2}(moore2)
-    @test neighborhoodkey(ruleA) == :a
-    @test neighborhoodkey(ruleB) == :b
+    @test stencil(ruleA) == Moore{3}(moore3)
+    @test stencil(ruleB) == Moore{2}(moore2)
+    @test stencilkey(ruleA) == :a
+    @test stencilkey(ruleB) == :b
     ruleA = TestNeighborhoodRule{:a,:a}(Moore{3}(moore3))
     ruleB = TestNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}(moore2))
     @test offsets(ruleA) isa StaticVector
-    @test neighborhood(ruleA) == Moore{3}(moore3)
-    @test neighborhood(ruleB) == Moore{2}(moore2)
-    @test neighborhoodkey(ruleA) == :a
-    @test neighborhoodkey(ruleB) == :b
+    @test stencil(ruleA) == Moore{3}(moore3)
+    @test stencil(ruleB) == Moore{2}(moore2)
+    @test stencilkey(ruleA) == :a
+    @test stencilkey(ruleB) == :b
     @test offsets(ruleB) === 
         SA[(-2,-2), (-1,-2), (0,-2), (1,-2), (2,-2),
          (-2,-1), (-1,-1), (0,-1), (1,-1), (2,-1),
@@ -155,10 +155,10 @@ end
 
 @testset "Convolution" begin
     k = SA[1 0 1; 0 0 0; 1 0 1]
-    @test Convolution{:a}(k) == Convolution{:a,:a}(; neighborhood=Kernel(Window(1), k)) 
+    @test Convolution{:a}(k) == Convolution{:a,:a}(; stencil=Kernel(Window(1), k)) 
     window = SA[1 0 0; 0 0 1; 0 0 1]
     hood = Window{1,2,9,typeof(window)}(window)
-    rule = Convolution{:a,:a}(; neighborhood=Kernel(hood, k))
+    rule = Convolution{:a,:a}(; stencil=Kernel(hood, k))
     @test DynamicGrids.kernel(rule) === k 
     @test applyrule(nothing, rule, 0, (3, 3)) == k ⋅ window
     output = ArrayOutput((a=init,); tspan=1:2)
@@ -340,11 +340,11 @@ applyrule(data, ::TestRule, state, index) = 0
 
             # Test broadcast_rule components
             rkeys, rgrids = _getreadgrids(rule, simdata)
-            wkeys, wgrids = _getwritegrids(rule, simdata)
+            wkeys, wgrids = _getwritegrids(WriteMode, rule, simdata)
             @test rkeys == Val{:a}()
             @test wkeys == Val{:a}()
             newsimdata = @set simdata.grids = _combinegrids(rkeys, rgrids, wkeys, wgrids)
-            @test newsimdata.grids[1] isa WritableGridData
+            @test newsimdata.grids[1] isa GridData{WriteMode}
             # Test type stability
             T = Val{DynamicGrids.ruletype(rule)}()
             @inferred broadcast_rule!(newsimdata, proc, opt, T, rule, rkeys, wkeys)
@@ -368,7 +368,7 @@ applyrule!(data, ::TestSetCell, state, index) = 0
             ext = Extent(; init=(_default_=init,), tspan=1:1)
             simdata = SimData(ext, ruleset)
             rkeys, rgrids = _getreadgrids(rule, simdata)
-            wkeys, wgrids = _getwritegrids(rule, simdata)
+            wkeys, wgrids = _getwritegrids(WriteMode, rule, simdata)
             newsimdata = @set simdata.grids = _combinegrids(wkeys, wgrids, rkeys, rgrids)
             T = Val{DynamicGrids.ruletype(rule)}()
             @inferred broadcast_rule!(newsimdata, proc, opt, T, rule, rkeys, wkeys)
@@ -510,9 +510,9 @@ end
 
 @testset "life with generic constructors" begin
     @test Life(Moore(1), (1, 1), (5, 5)) ==
-        Life(; neighborhood=Moore(1), born=(1, 1), survive=(5, 5))
+        Life(; stencil=Moore(1), born=(1, 1), survive=(5, 5))
     @test Life{:a,:b}(Moore(1), (7, 1), (5, 3)) ==
-          Life{:a,:b}(neighborhood=Moore(1), born=(7, 1), survive=(5, 3))
+          Life{:a,:b}(stencil=Moore(1), born=(7, 1), survive=(5, 3))
     # Defaults
     @test Life() == Life(
         Moore(1), 
@@ -527,11 +527,11 @@ end
 end
 
 @testset "generic ConstructionBase compatability" begin
-    life = Life{:x,:y}(; neighborhood=Moore(2), born=(1, 1), survive=(2, 2))
+    life = Life{:x,:y}(; stencil=Moore(2), born=(1, 1), survive=(2, 2))
     @set! life.born = (5, 6)
     @test life.born == (5, 6)
     @test life.survive == (2, 2)
     @test _readkeys(life) == :x
     @test _writekeys(life) == :y
-    @test DynamicGrids.neighborhood(life) == Moore(2)
+    @test DynamicGrids.stencil(life) == Moore(2)
 end

@@ -16,7 +16,7 @@ An output that stores the result of some function `f` of the grid/s.
 - `aux`: NamedTuple of arbitrary input data. Use `get(data, Aux(:key), I...)` 
     to access from a `Rule` in a type-stable way.
 - `mask`: `BitArray` for defining cells that will/will not be run.
-- `padval`: padding value for grids with neighborhood rules. The default is `zero(eltype(init))`.
+- `padval`: padding value for grids with stencil rules. The default is `zero(eltype(init))`.
 
 $EXPERIMENTAL
 """

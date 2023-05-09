@@ -15,16 +15,16 @@ struct RunIf{R,W,F,T<:Rule{R,W}} <: RuleWrapper{R,W}
 end
 
 rule(runif::RunIf) = runif.rule
-# Forward ruletype, radius and neighborhoodkey to the contained rule
+# Forward ruletype, radius and stencilkey to the contained rule
 ruletype(runif::RunIf) = ruletype(rule(runif))
 radius(runif::RunIf) = radius(rule(runif))
-neighborhoodkey(runif::RunIf) = neighborhoodkey(rule(runif))
-neighborhood(runif::RunIf) = neighborhood(rule(runif))
+stencilkey(runif::RunIf) = stencilkey(rule(runif))
+stencil(runif::RunIf) = stencil(rule(runif))
 neighbors(runif::RunIf) = neighbors(rule(runif))
 
 modifyrule(runif::RunIf, data::AbstractSimData) = @set runif.rule = modifyrule(runif.rule, data)
 
-@inline function Neighborhoods.setneighbors(runif::RunIf{R,W}, win) where {R,W}
+@inline function Stencils.setneighbors(runif::RunIf{R,W}, win) where {R,W}
     f = runif.f
     r = setneighbors(rule(runif), win)
     RunIf{R,W,typeof(f),typeof(r)}(f, r)

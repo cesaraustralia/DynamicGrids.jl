@@ -5,6 +5,8 @@ A `Rule` that wraps other rules, altering their behaviour or how they are run.
 """
 abstract type RuleWrapper{R,W} <: Rule{R,W} end
 
+_val_ruletype(rule::RuleWrapper) = Val{ruletype(rule)}()
+
 """
     MultiRuleWrapper <: RuleWrapper
 
@@ -18,11 +20,11 @@ rules(rule::MultiRuleWrapper) = rule.rules
 radius(rule::MultiRuleWrapper) = radius(first(rules(rule)))
 # Forward ruletype to the contained rule
 ruletype(rule::MultiRuleWrapper) = ruletype(first(rules(rule)))
-neighborhoodkey(rule::MultiRuleWrapper) = neighborhoodkey(first(rules(rule)))
-neighborhood(rule::MultiRuleWrapper) = neighborhood(first(rules(rule)))
+stencilkey(rule::MultiRuleWrapper) = stencilkey(first(rules(rule)))
+stencil(rule::MultiRuleWrapper) = stencil(first(rules(rule)))
 neighbors(rule::MultiRuleWrapper) = neighbors(first(rules(rule)))
 modifyrule(rule::MultiRuleWrapper, data) = @set rule.rules = _modifyrules(rules(rule), data)
-@inline function Neighborhoods.setneighbors(rule::MultiRuleWrapper{R,W}, win) where {R,W}
+@inline function Stencils.setneighbors(rule::MultiRuleWrapper{R,W}, win) where {R,W}
     rules = map(r -> setneighbors(r, win), rules(rule))
     @set rules.rule = rules
 end

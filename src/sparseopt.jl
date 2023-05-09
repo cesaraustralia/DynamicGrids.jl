@@ -19,7 +19,7 @@ output = sim!(output, rule; opt=SparseOpt())
 ```
 
 `SparseOpt` is best demonstrated with this simulation, where the grey areas do not
-run except where the neighborhood partially hangs over an area that is not grey:
+run except where the stencil partially hangs over an area that is not grey:
 
 ![SparseOpt demonstration](https://raw.githubusercontent.com/cesaraustralia/DynamicGrids.jl/media/complexlife_spareseopt.gif)
 """
@@ -120,7 +120,7 @@ function row_kernel!(
         jstart = _blocktoind(bj, B)
         jstop = min(jstart + B - 1, X)
 
-        # Reinitialise neighborhood windows if we have skipped a section of the array
+        # Reinitialise stencil windows if we have skipped a section of the array
         if skippedlastblock
             skippedlastblock = false
         end
@@ -180,8 +180,8 @@ function _build_optdata(opt::SparseOpt, source, r::Int)
     return (; sourcestatus, deststatus)
 end
 
-Neighborhoods.switch(::SparseOpt, ::Nothing) = nothing
-function Neighborhoods.switch(::SparseOpt, optdata)
+Stencils.switch(::SparseOpt, ::Nothing) = nothing
+function Stencils.switch(::SparseOpt, optdata)
     (sourcestatus=optdata.deststatus, deststatus=optdata.sourcestatus)
 end
 
@@ -215,7 +215,7 @@ end
 # Sets the status of the destination block that the current index is in.
 # It can't turn of block status as the block is larger than the cell
 # But should be used inside a LOCK
-function _setoptindex!(grid::WritableGridData{<:Any,R}, opt::SparseOpt, x, I...) where R
+function _setoptindex!(grid::GridData{<:SwitchMode,<:Any,R}, opt::SparseOpt, x, I...) where R
     isnothing(optdata(grid)) && return grid
     blockindex = _indtoblock.(I .+ R, 2R)
     @inbounds deststatus(grid)[blockindex...] |= !(opt.f(x))
@@ -224,7 +224,7 @@ end
 
 # _wrapopt!
 # Copies status from opposite sides/corners in Wrap boundary mode
-function after_update_boundary!(grid, ::SparseOpt)
+function after_update_boundary!(grid::GridData, ::SparseOpt)
     isnothing(optdata(grid)) && return grid
 
     status = sourcestatus(grid)
@@ -279,7 +279,7 @@ function cell_to_pixel(p::SparseOptInspector, mask, minval, maxval, data::Abstra
     normedval = normalise(val, minval, maxval)
     # This is done at the start of the next frame, so wont show up in
     # the image properly. So do it preemtively?
-    after_update_boundary!(first(data))
+    Stencils.after_update_boundary!(first(data))
     status = sourcestatus(first(data))
     if status[blockindex...]
         if normedval > 0

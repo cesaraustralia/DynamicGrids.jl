@@ -21,7 +21,7 @@ _modifyrules(rules::Tuple{}, simdata) = ()
 # The default `modifyrule` returns the rule unchanged.
 modifyrule(rule, simdata) = rule
 
-
+# Generate any initialisation data the rules need
 function initialiserules(simdata)
     map(rules(simdata)) do rule
         initialiserule(simdata, rule)
@@ -29,3 +29,9 @@ function initialiserules(simdata)
 end
 
 initialiserule(simdata, rule) = nothing
+
+function _validaterules(ruleset::Ruleset, sd::AbstractSimData)
+    map(rule -> validaterule(rule, sd), rules(ruleset))
+end
+
+validaterule(rule::Rule, sd::AbstractSimData) = true

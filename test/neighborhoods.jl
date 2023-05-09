@@ -173,7 +173,7 @@ end
 end
 
 @testset "neighbors works on rule" begin
-    rule = Life(;neighborhood=Moore{1}([0 1 1; 0 0 0; 1 1 1]))
+    rule = Life(;stencil=Moore{1}([0 1 1; 0 0 0; 1 1 1]))
     @test sum(neighbors(rule)) == 5
 end
 

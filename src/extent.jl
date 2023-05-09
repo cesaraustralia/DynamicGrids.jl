@@ -28,7 +28,7 @@ const EXTENT_KEYWORDS = """
 - `mask`: `BitArray` for defining cells that will/will not be run.
 - `aux`: NamedTuple of arbitrary input data. Use `aux(data, Aux(:key))` to access from
     a `Rule` in a type-stable way.
-- `padval`: padding value for grids with neighborhood rules. The default is 
+- `padval`: padding value for grids with stencil rules. The default is 
     `zero(eltype(init))`.
 - `tspan`: Time span range. Never type-stable, only access this in `modifyrule` methods
 """
@@ -61,19 +61,22 @@ mutable struct Extent{I<:Union{AbstractArray,NamedTuple},
     tspan::AbstractRange
     function Extent(init::I, mask::M, aux::A, padval::PV, tspan::T) where {I,M,A,PV,T}
         # Check grid sizes match
-        gridsize = if init isa NamedTuple
-            size_ = size(first(init))
-            if !all(map(i -> size(i) == size_, init))
+        if init isa NamedTuple
+            gridsize = size(first(init))
+            if !all(map(i -> size(i) == gridsize, init))
                 throw(ArgumentError("`init` grid sizes do not match"))
             end
-            size_
+            # Use the same padval for everthing if there is only one
+            if !(padval isa NamedTuple)
+                padval = map(_ -> padval, init)
+            end
         else
-            size(init)
+            gridsize = size(init)
         end
         if (mask !== nothing) && (size(mask) != gridsize)
             throw(ArgumentError("`mask` size do not match `init`"))
         end
-        new{I,M,A,PV}(init, mask, aux, padval, tspan)
+        new{I,M,A,typeof(padval)}(init, mask, aux, padval, tspan)
     end
 end
 Extent(; init, mask=nothing, aux=nothing, padval=_padval(init), tspan, kw...) =
