@@ -24,30 +24,33 @@ Test if a custom rule is inferred and the return type is correct when
 Type-stability can give orders of magnitude improvements in performance.
 """
 isinferred(output::Output, rules::Rule...) = isinferred(output, rules)
-isinferred(output::Output, rules::Tuple) = isinferred(output, Ruleset(rules...))
-function isinferred(output::Output, ruleset::Ruleset)
+isinferred(output::Output, rules::Tuple) = isinferred(output, StaticRuleset(rules...))
+isinferred(output::Output, ruleset::Ruleset) = isinferred(output, StaticRuleset(ruleset))
+function isinferred(output::Output, ruleset::StaticRuleset)
     simdata = _updaterules(rules(ruleset), SimData(output, ruleset))
+    return _isinferred(simdata)
+end
+function isinferred(simdata::AbstractSimData)
     map(rules(simdata)) do rule
         isinferred(simdata, rule)
     end
-    return true
 end
-isinferred(simdata::AbstractSimData, rule::Rule) = _isinferred(simdata, rule)
-function isinferred(simdata::AbstractSimData, 
+function isinferred(simdata::AbstractSimData{<:Any,N}, 
     rule::Union{NeighborhoodRule,Chain{<:Any,<:Any,<:Tuple{<:NeighborhoodRule,Vararg}}}
-)
-    grid = simdata[neighborhoodkey(rule)]
+) where N
+    grid = simdata[stencilkey(rule)]
     r = max(1, radius(rule))
     T = eltype(grid)
     S = 2r + 1
-    L = length(neighborhood(rule))
-    nbrs = SVector{L,T}(Tuple(zero(T) for i in 1:L))
-    rule = setneighbors(rule, nbrs)
-    return _isinferred(simdata, rule)
+    hood = stencil(rule)
+    L = length(hood)
+    hood1 = unsafe_neighbors(grid, hood, CartesianIndex(ntuple(_ -> 1, N)))
+    rule1 = setneighbors(rule, hood1)
+    return _isinferred(simdata, rule1)
 end
 function isinferred(simdata::AbstractSimData, rule::SetCellRule)
     rkeys, rgrids = _getreadgrids(rule, simdata)
-    wkeys, wgrids = _getwritegrids(rule, simdata)
+    wkeys, wgrids = _getwritegrids(WriteMode, rule, simdata)
     simdata = @set simdata.grids = _combinegrids(rkeys, rgrids, wkeys, wgrids)
     readval = _readcell(simdata, rkeys, 1, 1)
     @inferred applyrule!(simdata, rule, readval, (1, 1))
@@ -56,12 +59,12 @@ end
 
 function _isinferred(simdata, rule)
     rkeys, rgrids = _getreadgrids(rule, simdata)
-    wkeys, wgrids = _getwritegrids(rule, simdata)
+    wkeys, wgrids = _getwritegrids(WriteMode, rule, simdata)
     simdata = @set simdata.grids = _combinegrids(rkeys, rgrids, wkeys, wgrids)
     readval = _readcell(simdata, rkeys, 1, 1)
 
     _example_writeval(grids::Tuple) = map(_example_writeval, grids)
-    _example_writeval(grid::WritableGridData) = grid[1, 1]
+    _example_writeval(grid::GridData{<:WriteMode}) = grid[1, 1]
 
     ex_writeval = Tuple(_example_writeval(wgrids))
     writeval = @inferred applyrule(simdata, rule, readval, (1, 1))

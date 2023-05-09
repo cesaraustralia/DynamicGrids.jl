@@ -16,7 +16,7 @@ using Adapt,
       FileIO,
       LinearAlgebra,
       KernelAbstractions,
-      Neighborhoods,
+      Stencils,
       OffsetArrays,
       REPL,
       Reexport,
@@ -84,10 +84,10 @@ export ObjectScheme, Greyscale, Grayscale
 
 export CharStyle, Block, Braile
 
-# From Neighborhoods module
+# From Stencils module
 export Neighborhood, Window, Kernel, Moore, VonNeumann, Positional, Layered
 
-export neighbors, neighborhood, kernel, kernelproduct, offsets, indices, radius, distances, distance_zones
+export neighbors, stencil, kernel, kernelproduct, offsets, indices, radius, distances, distance_zones
 
 const DEFAULT_KEY = :_default_
 
@@ -96,9 +96,9 @@ const EXPERIMENTAL = """
         and may not be 100% reliable in all cases. Please file github issues if problems occur.
         """
 
-import Neighborhoods: neighbors, unsafe_neighbors, neighborhood,
+import Stencils: neighbors, unsafe_neighbors, stencil,
     kernel, kernelproduct, offsets, indices, radius, distances, distance_zones,
-    setneighbors, update_neighborhood, unsafe_update_neighborhood,
+    setneighbors, update_stencil, unsafe_update_stencil,
     boundary, padding, source, dest, switch, padval, update_boundary!
 
 include("interface.jl")

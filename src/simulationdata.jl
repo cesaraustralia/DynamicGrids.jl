@@ -139,7 +139,7 @@ function SimData(extent::AbstractExtent, ruleset::AbstractRuleset, frames=nothin
     SimData(nt_extent, ruleset, frames) 
 end
 function SimData(extent::AbstractExtent{<:NamedTuple}, ruleset::AbstractRuleset, frames=nothing)
-    # Calculate the neighborhood array for each grid
+    # Calculate the stencil array for each grid
     grids = _buildgrids(extent, ruleset)
     # Construct the SimData for each grid
     SimData(grids, extent, ruleset, frames)
@@ -172,7 +172,7 @@ function _buildgrids(extent, ruleset, ::Val{S}, ::Val{R}, init, padval) where {S
     hood = Window{R}() 
     pad = Halo{:out}() # We always pad out in DynamicGrids - it should pay back for multiple time steps?
     bc = _boundary(boundary(ruleset), padval)
-    ReadableGridData{S,R}(
+    GridData{ReadMode,S,R}(
         init, hood, bc, pad, proc(ruleset), opt(ruleset), mask(extent)
     )
 end

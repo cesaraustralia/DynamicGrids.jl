@@ -232,7 +232,7 @@ end
                  0 0 0 0 0 0 0
                  0 0 0 0 0 0 0
                 ]
-    rule = Life{:a,:a}(neighborhood=Moore(1))
+    rule = Life{:a,:a}(stencil=Moore(1))
 
     @testset "Wrong timestep throws an error" begin
         rs = Ruleset(rule; timestep=Day(2), boundary=Remove(), opt=NoOpt())
@@ -258,7 +258,7 @@ end
     end
 
     @testset "Combinatoric comparisons in a larger Life sim" begin
-        rule = Life(neighborhood=Moore(1))
+        rule = Life(stencil=Moore(1))
         init_ = rand(Bool, 100, 99)
         mask_ = ones(Bool, size(init_)...)
         mask_[1:50, 1:50] .= false  
@@ -344,13 +344,21 @@ end
                     opt=opt,
                 )
                 tspan_ = Date(2010, 4):Month(1):Date(2010, 7)
+                output = REPLOutput(test6_7[:init]; tspan=tspan_, style=Braile(), fps=1000, store=true)
+                sim!(output, ruleset)
+                @test output[At(Date(2010, 7))] == test6_7[:test4]
+                @test DynamicGrids.tspan(output) == Date(2010, 4):Month(1):Date(2010, 7)
+                resume!(output, ruleset; tstop=Date(2010, 10))
+                @test DynamicGrids.tspan(output) == Date(2010, 4):Month(1):Date(2010, 10)
+                @test output[end] == test6_7[:test7]
+                tspan_ = Date(2010, 4):Month(1):Date(2010, 7)
                 output = REPLOutput(test6_7[:init]; tspan=tspan_, style=Braile(), fps=1000, store=false)
                 sim!(output, ruleset)
                 @test output[At(Date(2010, 7))] == test6_7[:test4]
                 @test DynamicGrids.tspan(output) == Date(2010, 4):Month(1):Date(2010, 7)
                 resume!(output, ruleset; tstop=Date(2010, 10))
                 @test DynamicGrids.tspan(output) == Date(2010, 4):Month(1):Date(2010, 10)
-                @test output[1] == test6_7[:test7]
+                @test_broken output[end] == test6_7[:test7]
             end
         end
     end

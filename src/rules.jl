@@ -1,3 +1,4 @@
+const Neighborhood = Stencils.Stencil
 
 """
     Rule
@@ -92,6 +93,16 @@ abstract type Rule{R,W} end
 
 # Rules are also traits - because we use wrapper rules
 ruletype(::Rule) = Rule
+
+# Allow specifying CartesianIndex for `I`
+@inline applyrule(data, rule, state, I) = applyrule(data, rule, state, CartesianIndex(I))
+# # Allow dropping the `data` argument
+# @inline applyrule(data, rule, state, I) = applyrule(rule, state, Tuple(I))
+# # Allow dropping the `data` argument and using CartesianIndex
+# @inline applyrule(rule, state, I) = applyrule(rule, state, CartesianIndex(I))
+# # Allow dropping the `I` argument
+# @inline applyrule(rule, state, I::CartesianIndex) = applyrule(rule, state)
+# @inline applyrule(rule, state) = applyrule(rule, state)
 
 #= Default constructors for all Rules.
 Sets both the read and write grids to `:_default`.
@@ -260,6 +271,9 @@ abstract type SetRule{R,W} <: Rule{R,W} end
 
 ruletype(::SetRule) = SetRule
 
+# Allow specifying CartesianIndex for `I`
+applyrule!(data, rule, read, I) = applyrule(data, rule, read, CartesianIndex(I))
+
 """
     SetCellRule <: Rule
 
@@ -365,59 +379,61 @@ end
 """
     NeighborhoodRule <: Rule
 
-A Rule that only accesses a neighborhood centered around the current cell.
+A Rule that only accesses a stencil centered around the current cell.
 `NeighborhoodRule` is applied with the method:
 
 ```julia
 applyrule(data::AbstractSimData, rule::MyNeighborhoodRule, state, I::Tuple{Int,Int})
 ```
 
-`NeighborhoodRule` must have a `neighborhood` method or field, that holds
+`NeighborhoodRule` must have a `stencil` method or field, that holds
 a [`Neighborhood`](@ref) object. `neighbors(rule)` returns an iterator
 over the surrounding cell pattern defined by the `Neighborhood`.
 
-For each cell in the grids the neighborhood buffer will be updated
+For each cell in the grids the stencil buffer will be updated
 for use in the `applyrule` method, managed to minimise array reads.
 
 This allows memory optimisations and the use of high-perforance routines on the
-neighborhood buffer. It also means that and no bounds checking is required in
-neighborhood code.
+stencil buffer. It also means that and no bounds checking is required in
+stencil code.
 
-For neighborhood rules with multiple read grids, the first is always
-the one used for the neighborhood, the others are passed in as additional
+For stencil rules with multiple read grids, the first is always
+the one used for the stencil, the others are passed in as additional
 state for the cell. Any grids can be written to, but only for the current cell.
 """
 abstract type NeighborhoodRule{R,W} <: ReturnRule{R,W} end
 
 ruletype(::NeighborhoodRule) = NeighborhoodRule
 
-Neighborhoods.neighbors(rule::NeighborhoodRule) = neighbors(neighborhood(rule))
-Neighborhoods.neighborhood(rule::NeighborhoodRule) = rule.neighborhood
-Neighborhoods.offsets(rule::NeighborhoodRule) = offsets(neighborhood(rule))
-Neighborhoods.cartesian_offsets(rule::NeighborhoodRule) = cartesian_offsets(neighborhood(rule))
-Neighborhoods.kernel(rule::NeighborhoodRule) = kernel(neighborhood(rule))
-Neighborhoods.kernelproduct(rule::NeighborhoodRule) = kernelproduct(neighborhood(rule))
-Neighborhoods.indices(rule::NeighborhoodRule, args...) = indices(neighborhood(rule), args...)
-Neighborhoods.distances(rule::NeighborhoodRule) = distances(neighborhood(rule))
-Neighborhoods.distance_zones(rule::NeighborhoodRule) = distance_zones(neighborhood(rule))
-neighborhoodkey(rule::NeighborhoodRule{R,W}) where {R,W} = R
-# The first argument is for the neighborhood grid
-neighborhoodkey(rule::NeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
-Neighborhoods.radius(rule::NeighborhoodRule, args...) = radius(neighborhood(rule))
-Neighborhoods.unsafe_neighbors(A::Neighborhoods.AbstractNeighborhoodArray, rule::NeighborhoodRule, I::CartesianIndex) =
-    Neighborhoods.unsafe_neighbors(A, neighborhood(rule), I)
-@inline function Neighborhoods.setneighbors(rule::NeighborhoodRule, neighbors::AbstractArray)
-    @set rule.neighborhood = setneighbors(neighborhood(rule), neighbors)
+_val_ruletype(rule::T) where T<:Rule = Val{T}()
+
+Stencils.neighbors(rule::NeighborhoodRule) = neighbors(stencil(rule))
+Stencils.stencil(rule::NeighborhoodRule) = rule.stencil
+Stencils.offsets(rule::NeighborhoodRule) = offsets(stencil(rule))
+Stencils.cartesian_offsets(rule::NeighborhoodRule) = cartesian_offsets(stencil(rule))
+Stencils.kernel(rule::NeighborhoodRule) = kernel(stencil(rule))
+Stencils.kernelproduct(rule::NeighborhoodRule) = kernelproduct(stencil(rule))
+Stencils.indices(rule::NeighborhoodRule, args...) = indices(stencil(rule), args...)
+Stencils.distances(rule::NeighborhoodRule) = distances(stencil(rule))
+Stencils.distance_zones(rule::NeighborhoodRule) = distance_zones(stencil(rule))
+stencilkey(rule::NeighborhoodRule{R,W}) where {R,W} = R
+# The first argument is for the stencil grid
+stencilkey(rule::NeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
+Stencils.radius(rule::NeighborhoodRule, args...) = radius(stencil(rule))
+Stencils.unsafe_neighbors(A::Stencils.AbstractStencilArray, rule::NeighborhoodRule, I::CartesianIndex) =
+    Stencils.unsafe_neighbors(A, stencil(rule), I)
+@inline function Stencils.setneighbors(rule::NeighborhoodRule, neighbors::AbstractArray)
+    @set rule.stencil = setneighbors(stencil(rule), neighbors)
 end
-@inline function Neighborhoods.unsafe_update_neighborhood(A::AbstractArray, rule::NeighborhoodRule, I...)
+@inline function Stencils.unsafe_update_stencil(A::AbstractArray, rule::NeighborhoodRule, I...)
     setneighbors(rule, unsafe_neighbors(A, rule, I))
 end
 
 """
     Neighbors <: NeighborhoodRule
 
-    Neighbors(f, neighborhood=Moor(1))
-    Neighbors{R,W}(f, neighborhood=Moore())
+    Neighbors(f, stencil=Moor(1))
+    Neighbors{R,W}(f, stencil=Moore())
 
 A [`NeighborhoodRule`](@ref) that receives a [`Neighborhood`](@ref) object 
 for the first `R` grid, followed by the cell value/s for the required grids, 
@@ -428,7 +444,7 @@ Returned value(s) are written to the `W` grid/s.
 As with all [`NeighborhoodRule`](@ref), you do not have to check bounds at
 grid edges, that is handled for you internally.
 
-Using [`SparseOpt`](@ref) may improve neighborhood performance
+Using [`SparseOpt`](@ref) may improve stencil performance
 when a specific value (often zero) is common and can be safely ignored.
 
 ## Example
@@ -464,17 +480,17 @@ output[end][:a]
 ```
 """
 struct Neighbors{R,W,F,N} <: NeighborhoodRule{R,W}
-    "Function to apply to the neighborhood and R grid values"
+    "Function to apply to the stencil and R grid values"
     f::F
-    "Defines the neighborhood of cells around the central cell"
-    neighborhood::N
+    "Defines the stencil of cells around the central cell"
+    stencil::N
 end
 Neighbors{R,W}(; kw...) where {R,W} = _nofunctionerror(Neighbors)
-Neighbors{R,W}(f; neighborhood=Moore(1)) where {R,W} =
-    Neighbors{R,W}(f, neighborhood)
+Neighbors{R,W}(f; stencil=Moore(1)) where {R,W} =
+    Neighbors{R,W}(f, stencil)
 
 @inline function applyrule(data, rule::Neighbors, read, I)
-    let rule=rule, hood=neighborhood(rule), read=read, I=I
+    let rule=rule, hood=stencil(rule), read=read, I=I
         rule.f(data, hood, read, I)
     end
 end
@@ -515,46 +531,46 @@ sim!(output, streak; boundary=Wrap())
 ```
 """
 struct Convolution{R,W,N} <: NeighborhoodRule{R,W}
-    "The neighborhood of cells around the central cell"
-    neighborhood::N
+    "The stencil of cells around the central cell"
+    stencil::N
 end
 Convolution{R,W}(A::AbstractArray) where {R,W} = Convolution{R,W}(Kernel(SMatrix{size(A)...}(A)))
-Convolution{R,W}(; neighborhood) where {R,W} = Convolution{R,W}(neighborhood)
+Convolution{R,W}(; stencil) where {R,W} = Convolution{R,W}(stencil)
 
-@inline applyrule(data, rule::Convolution, read, I) = kernelproduct(neighborhood(rule))
+@inline applyrule(data, rule::Convolution, read, I) = kernelproduct(stencil(rule))
 
 """
     SetNeighborhoodRule <: SetRule
 
-A [`SetRule`](@ref) that only writes to its neighborhood, and does not need to bounds-check.
+A [`SetRule`](@ref) that only writes to its stencil, and does not need to bounds-check.
 
 [`indices`](@ref) and [`offsets`](@ref) are useful iterators for modifying
-neighborhood values. 
+stencil values. 
 
 `SetNeighborhoodRule` rules must return a [`Neighborhood`](@ref) object from the function 
-`neighborhood(rule)`. By default this is `rule.neighborhood`. If this property exists, 
+`stencil(rule)`. By default this is `rule.stencil`. If this property exists, 
 no interface methods are required.
 """
 abstract type SetNeighborhoodRule{R,W} <: SetRule{R,W} end
 
 ruletype(::SetNeighborhoodRule) = SetNeighborhoodRule
 
-Neighborhoods.neighborhood(rule::SetNeighborhoodRule) = rule.neighborhood
-Neighborhoods.offsets(rule::SetNeighborhoodRule) = offsets(neighborhood(rule))
-Neighborhoods.kernel(rule::SetNeighborhoodRule) = kernel(neighborhood(rule))
-Neighborhoods.indices(rule::SetNeighborhoodRule, args...) = indices(neighborhood(rule), args...)
-Neighborhoods.radius(rule::SetNeighborhoodRule, args...) = radius(neighborhood(rule))
-neighborhoodkey(rule::SetNeighborhoodRule{R,W}) where {R,W} = R
-neighborhoodkey(rule::SetNeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
+Stencils.stencil(rule::SetNeighborhoodRule) = rule.stencil
+Stencils.offsets(rule::SetNeighborhoodRule) = offsets(stencil(rule))
+Stencils.kernel(rule::SetNeighborhoodRule) = kernel(stencil(rule))
+Stencils.indices(rule::SetNeighborhoodRule, args...) = indices(stencil(rule), args...)
+Stencils.radius(rule::SetNeighborhoodRule, args...) = radius(stencil(rule))
+stencilkey(rule::SetNeighborhoodRule{R,W}) where {R,W} = R
+stencilkey(rule::SetNeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
 
 """
     SetNeighbors <: SetNeighborhoodRule
 
-    SetNeighbors(f, neighborhood=Moor(1))
-    SetNeighbors{R,W}(f, neighborhood=Moor(1))
+    SetNeighbors(f, stencil=Moor(1))
+    SetNeighbors{R,W}(f, stencil=Moor(1))
 
 A [`SetCellRule`](@ref) to manually write to the array with the specified
-neighborhood. Indexing outside the neighborhood is undefined behaviour.
+stencil. Indexing outside the stencil is undefined behaviour.
 
 Function `f` is passed four arguments: a [`SimData`](@ref) object, the specified
 [`Neighborhood`](@ref) object, the grid state or `Tuple` of grid states for the cell, 
@@ -566,7 +582,7 @@ writes from all grid cells.
 
 Directly using `setindex!` is possible, but may cause bugs as multiple cells
 may write to the same location in an unpredicatble order. As a rule, directly
-setting a neighborhood index should only be done if it always sets the samevalue -
+setting a stencil index should only be done if it always sets the samevalue -
 then it can be guaranteed that any writes from othe grid cells reach the same result.
 
 [`neighbors`](@ref), [`offsets`](@ref) and [`indices`](@ref) are useful methods for
@@ -579,30 +595,30 @@ This example adds a value to all neighbors:
 ```jldoctest
 using DynamicGrids
 
-rule = SetNeighbors{:a}() do data, neighborhood, a, I
+rule = SetNeighbors{:a}() do data, stencil, a, I
     add_to_neighbors = your_func(a)
-    for pos in indices(neighborhood)
+    for pos in indices(stencil)
         add!(data[:b], add_to_neighbors, pos...)
     end
 end
 # output
 SetNeighbors{:a,:a}(
     f = var"#1#2"
-    neighborhood = Moore{1, 2, 8, Nothing}
+    stencil = Moore{1, 2, 8, Nothing}
 )
 ```
 """
 struct SetNeighbors{R,W,F,N} <: SetNeighborhoodRule{R,W}
     "Function to apply to the data, index and R grid values"
     f::F
-    "The neighborhood of cells around the central cell"
-    neighborhood::N
+    "The stencil of cells around the central cell"
+    stencil::N
 end
 SetNeighbors{R,W}(; kw...) where {R,W} = _nofunctionerror(SetNeighbors)
-SetNeighbors{R,W}(f; neighborhood=Moore(1)) where {R,W} = SetNeighbors{R,W}(f, neighborhood)
+SetNeighbors{R,W}(f; stencil=Moore(1)) where {R,W} = SetNeighbors{R,W}(f, stencil)
 
 @inline function applyrule!(data, rule::SetNeighbors, read, I)
-    let data=data, hood=neighborhood(rule), rule=rule, read=read, I=I
+    let data=data, hood=stencil(rule), rule=rule, read=read, I=I
         rule.f(data, hood, read, I)
     end
 end
@@ -611,7 +627,7 @@ end
     SetGridRule <: Rule
 
 A `Rule` applies to whole grids. This is used for operations that don't benefit from
-having neighborhood buffering or looping over the grid handled for them, or any specific
+having stencil buffering or looping over the grid handled for them, or any specific
 optimisations. Best suited to simple functions like `rand!(grid)` or using convolutions
 from other packages like DSP.jl. They may also be useful for doing other custom things that
 don't fit into the DynamicGrids.jl framework during the simulation.
@@ -665,9 +681,17 @@ SetGrid{R,W}(; kw...) where {R,W} = _nofunctionerror(SetGrid)
 
 @inline function applyrule!(data, rule::SetGrid{R,W}) where {R,W}
     let data = data, rule=rule
-        read = map(r -> source(getindex(data, r)), _asiterable(R))
-        write = map(w -> source(getindex(data, w)), _asiterable(W))
-        rule.f(read..., write...)
+        read = if R isa Symbol
+            gridview(getindex(data, R))
+        else
+            map(w -> gridview(getindex(data, w)), _asiterable(R))
+        end
+        write = if W isa Symbol
+            gridview(getindex(data, W))
+        else
+            map(w -> gridview(getindex(data, w)), _asiterable(W))
+        end
+        rule.f(data, read, write)
     end
 end
 

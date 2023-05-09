@@ -7,49 +7,46 @@
 # We dispatch on `ruletype(rule)` to allow wrapper rules
 # to pass through the type of the wrapped rule.
 # Putting the type in `Val` is best for performance.
-broadcast_rule!(data::AbstractSimData, rule) = begin
-    broadcast_rule!(data, Val{ruletype(rule)}(), rule)
-end
+broadcast_rule!(data::AbstractSimData, rule) =
+    broadcast_rule!(data, _val_ruletype(rule), rule)
 # Cellrule
 function broadcast_rule!(data::AbstractSimData, ruletype::Val{<:CellRule}, rule)
     rkeys, _ = _getreadgrids(rule, data)
-    wkeys, _ = _getwritegrids(rule, data)
+    wkeys, _ = _getwritegrids(WriteMode, rule, data)
     broadcast_rule!(RuleData(data), ruletype, rule, rkeys, wkeys)
     return data
 end
 # NeighborhoodRule
 function broadcast_rule!(data::AbstractSimData, ruletype::Val{<:NeighborhoodRule}, rule)
     rkeys, rgrids = _getreadgrids(rule, data)
-    wkeys, wgrids = _getwritegrids(rule, data)
-    # NeighborhoodRule will read from surrounding cells
-    # so may incorporate cells from the masked area
-    _maybemask!(rgrids)
+    wkeys, wgrids = _getwritegrids(SwitchMode, rule, data)
     # Copy or zero out boundary where needed
     _update_boundary!(rgrids)
-    _cleardest!(data[neighborhoodkey(rule)])
+    _cleardest!(data[stencilkey(rule)])
     broadcast_rule!(RuleData(data), ruletype, rule, rkeys, wkeys)
+    _maybemask!(wgrids)
     # Swap the dest/source of grids that were written to
     # and combine the written grids with the original simdata
-    new_rgrids = _to_readonly(wgrids)
-    d =  _replacegrids(data, wkeys, switch(new_rgrids))
+    new_rgrids = _to_readonly(switch(wgrids))
+    d =  _replacegrids(data, wkeys, new_rgrids)
     return d
 end
 # SetRule
 function broadcast_rule!(data::AbstractSimData, ruletype::Val{<:SetRule}, rule)
     rkeys, _ = _getreadgrids(rule, data)
-    wkeys, wgrids = _getwritegrids(rule, data)
+    wkeys, wgrids = _getwritegrids(SwitchMode, rule, data)
     map(_astuple(wkeys, wgrids)) do g
         copyto!(parent(dest(g)), parent(source(g)))
     end
     ruledata = RuleData(_combinegrids(data, wkeys, wgrids))
     broadcast_rule!(ruledata, ruletype, rule, rkeys, wkeys)
-    return _replacegrids(data, wkeys, switch(_to_readonly(wgrids)))
+    _maybemask!(wgrids)
+    return _replacegrids(data, wkeys, _to_readonly(switch(wgrids)))
 end
 # SetGridRule (not actually broadcast - it applies to the whole grid manually)
 function broadcast_rule!(data::AbstractSimData, ruletype::Val{<:SetGridRule}, rule)
     rkeys, rgrids = _getreadgrids(rule, data)
-    wkeys, wgrids = _getwritegrids(rule, data)
-    _maybemask!(rgrids) # TODO... mask wgrids?
+    wkeys, wgrids = _getwritegrids(WriteMode, rule, data)
     ruledata = RuleData(_combinegrids(data, wkeys, wgrids))
     # Run the rule
     applyrule!(ruledata, rule)
@@ -110,13 +107,13 @@ function broadcast_rule!(
 )
     hoodgrid = _firstgrid(data, rkeys)
     for I in CartesianIndices(hoodgrid) 
-        neighborhood_kernel!(data, hoodgrid, ruletype, rule, rkeys, wkeys, Tuple(I)...)
+        stencil_kernel!(data, hoodgrid, ruletype, rule, rkeys, wkeys, Tuple(I)...)
     end
     return nothing
 end
 
 
-### Rules that don't need a neighborhood window ####################
+### Rules that don't need a stencil window ####################
 
 # broadcast_with_optimisation
 # Map kernel over the grid, specialising on PerformanceOpt.
@@ -125,7 +122,7 @@ end
 function broadcast_with_optimisation(
     f, simdata::AbstractSimData{S}, proc, ::NoOpt, ::Val{<:Rule}, rkeys
 ) where S<:Tuple{Y,X} where {Y,X}
-    broacast_on_processor(proc, 1:X) do j
+    broadcast_on_processor(proc, 1:X) do j
         for i in 1:Y
             f((i, j)) # Run rule for each row in column j
         end
@@ -135,7 +132,7 @@ end
 function broadcast_with_optimisation(
     f, simdata::AbstractSimData{S}, proc, ::NoOpt, ::Val{<:CellRule}, rkeys
 ) where S<:Tuple{Y,X} where {Y,X}
-    broacast_on_processor(proc, 1:X) do j
+    broadcast_on_processor(proc, 1:X) do j
         @simd for i in 1:Y
             f((i, j)) # Run rule for each row in column j
         end
@@ -146,13 +143,13 @@ end
 # Map kernel over the grid, specialising on the processor
 #
 # Looping over cells or blocks on a single CPU
-@inline function broacast_on_processor(f, proc::SingleCPU, range)
+@inline function broadcast_on_processor(f, proc::SingleCPU, range)
     for n in range
         f(n) # Run rule over each column
     end
 end
 # Or threaded on multiple CPUs
-@inline function broacast_on_processor(f, proc::ThreadedCPU, range)
+@inline function broadcast_on_processor(f, proc::ThreadedCPU, range)
     Threads.@threads for n in range
         f(n) # Run rule over each column, threaded
     end
@@ -172,20 +169,20 @@ end
     nothing
 end
 
-# neighborhood_kernel!
-# Runs a rule for the current cell/neighborhood, when there is no
+# stencil_kernel!
+# Runs a rule for the current cell/stencil, when there is no
 # row-based optimisation
-@inline function neighborhood_kernel!(
+@inline function stencil_kernel!(
     data::AbstractSimData, hoodgrid::GridData, ruletype::Val{<:NeighborhoodRule}, rule, rkeys, wkeys, I...
 )
-    rule1 = setneighbors(rule, unsafe_neighbors(hoodgrid, neighborhood(rule), CartesianIndex(I)))
+    rule1 = setneighbors(rule, unsafe_neighbors(hoodgrid, stencil(rule), CartesianIndex(I)))
     cell_kernel!(data, ruletype, rule1, rkeys, wkeys, I...)
 end
 
 # row_kernel!
 # Run a NeighborhoodRule rule row by row. When we move along a row by one cell, we 
 # access only a single new column of data with the height of 4R, and move the existing
-# data in the neighborhood windows array across by one column. This saves on reads
+# data in the stencil windows array across by one column. This saves on reads
 # from the main array.
 function row_kernel!(
     simdata::AbstractSimData, grid::GridData{<:Tuple{Y,X},R}, proc, opt::NoOpt,
@@ -200,7 +197,7 @@ function row_kernel!(
         # windows = _slide_windows(windows, src, Val{R}(), i, j)
         # Loop over the COLUMN of windows covering the block
         for b in 1:blocklen
-            rule1 = setneighbors(rule, unsafe_neighbors(grid, neighborhood(rule), CartesianIndex(i, j)))
+            rule1 = setneighbors(rule, unsafe_neighbors(grid, stencil(rule), CartesianIndex(i, j)))
             cell_kernel!(simdata, ruletype, rule1, rkeys, wkeys, i + b - 1, j)
         end
     end
@@ -210,9 +207,9 @@ end
 
 #### Utils
 
-# Convert all WritableGridData to ReadableGridData
-_to_readonly(data::Tuple) = map(ReadableGridData, data)
-_to_readonly(data::WritableGridData) = ReadableGridData(data)
+# Convert any GridData to GridData{<:ReadMode}
+_to_readonly(data::Tuple) = map(_to_readonly, data)
+_to_readonly(data::GridData) = GridData{ReadMode}(data)
 
 # _maybemask!
 # mask the source grid with the `mask` array, if it exists
@@ -220,18 +217,40 @@ _maybemask!(wgrids::Union{Tuple,NamedTuple}) = map(_maybemask!, wgrids)
 _maybemask!(wgrid::GridData) = _maybemask!(wgrid, proc(wgrid), mask(wgrid))
 _maybemask!(wgrid::GridData, proc, mask::Nothing) = nothing
 function _maybemask!(
-    wgrid::GridData{<:Tuple{Y,X}}, proc::CPU, mask::AbstractArray
+    wgrid::GridData{<:GridMode,<:Tuple{Y,X}}, proc::CPU, mask::AbstractArray
 ) where {Y,X}
-    broacast_on_processor(proc, 1:X) do j
-        @simd for i in 1:Y
-            source(wgrid)[i, j] *= mask[i, j]
+    A = source(wgrid)
+    pv = padval(wgrid)
+    broadcast_on_processor(proc, 1:X) do j
+        if pv == 0
+            @simd for i in 1:Y
+                A[i, j] *= mask[i, j]
+            end
+        else
+            @simd for i in 1:Y
+                A[i, j] = mask[i, j] ? A[i, j] : pv
+            end
         end
     end
 end
 function _maybemask!(
-    wgrid::GridData{<:Tuple{Y,X}}, proc, mask::AbstractArray
+    wgrid::GridData{<:GridMode,<:Tuple{Y,X}}, proc, mask::AbstractArray
 ) where {Y,X}
-    sourceview(wgrid) .*= mask
+    A = source(wgrid)
+    pv = padval(wgrid)
+    if pv == 0
+        for j in 1:X
+            @simd for i in 1:Y
+                source(wgrid)[i, j] *= mask[i, j]
+            end
+        end
+    else
+        for j in 1:X
+            @simd for i in 1:Y
+                A[i, j] = mask[i, j] ? A[i, j] : pv
+            end
+        end
+    end
 end
 
 # _cleardest!

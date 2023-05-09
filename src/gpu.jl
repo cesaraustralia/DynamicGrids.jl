@@ -31,11 +31,11 @@ end
 
 # ka_rule_kernel!
 # Runs cell_kernel! on GPU after retrieving the global index
-# and setting the neighborhood buffer to a SArray window retrieved 
-# from the first (neighborhood) grid
+# and setting the stencil buffer to a SArray window retrieved 
+# from the first (stencil) grid
 @kernel function ka_rule_kernel!(data, ruletype::Val{<:NeighborhoodRule}, rule, rkeys, wkeys)
     I = @index(Global, NTuple)
-    neighborhood_kernel!(data, _firstgrid(data, rkeys), ruletype, rule, rkeys, wkeys, I...)
+    stencil_kernel!(data, _firstgrid(data, rkeys), ruletype, rule, rkeys, wkeys, I...)
     nothing
 end
 @kernel function ka_rule_kernel!(data, ruletype::Val, rule, rkeys, wkeys)
@@ -49,6 +49,9 @@ end
 # This is not safe for general use. 
 # It can be used where only identical transformations of a cell 
 # can happen from any other cell, such as setting all 1s to 2.
-@propagate_inbounds function _setindex!(d::WritableGridData, opt::GPU, x, I...)
+@propagate_inbounds function _setindex!(d::GridData{<:WriteMode}, opt::GPU, x, I...)
+    source(d)[I...] = x
+end
+@propagate_inbounds function _setindex!(d::GridData{<:SwitchMode}, opt::GPU, x, I...)
     dest(d)[I...] = x
 end
