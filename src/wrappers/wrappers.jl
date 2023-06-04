@@ -24,8 +24,8 @@ stencilkey(rule::MultiRuleWrapper) = stencilkey(first(rules(rule)))
 stencil(rule::MultiRuleWrapper) = stencil(first(rules(rule)))
 neighbors(rule::MultiRuleWrapper) = neighbors(first(rules(rule)))
 modifyrule(rule::MultiRuleWrapper, data) = @set rule.rules = _modifyrules(rules(rule), data)
-@inline function Stencils.setneighbors(rule::MultiRuleWrapper{R,W}, win) where {R,W}
-    rules = map(r -> setneighbors(r, win), rules(rule))
+@inline function Stencils.rebuild(rule::MultiRuleWrapper{R,W}, neighbors) where {R,W}
+    rules = map(r -> rebuild(r, neighbors), rules(rule))
     @set rules.rule = rules
 end
 
