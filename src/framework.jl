@@ -170,8 +170,7 @@ function simloop!(output::Output, simdata, ruleset, fspan; printframe=false, pri
     simdata = _updatetime(simdata, 1) |> _proc_setup
     # Loop over the simulation
     for f in fspan[2:end]
-        # printframe && 
-        println(stdout, "frame: $f, time: $(tspan(simdata)[f])")
+        printframe && println(stdout, "frame: $f, time: $(tspan(simdata)[f])")
         # Update the current simulation frame and time
         simdata = _updatetime(simdata, f) 
         # Update any Delay parameters

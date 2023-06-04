@@ -49,7 +49,7 @@ end
     end
 
     @testset "return type" begin
-        rule = Neighbors{:a,:a}(Moore{1}(zeros(Bool, 3, 3))) do data, hood, x, I
+        rule = Neighbors{:a,:a}(Moore{1}(SVector{8}(zeros(Bool, 8)))) do data, hood, x, I
             round(Int, x + sum(hood))
         end
         output = ArrayOutput((a=rand(Int, 10, 10),); tspan=1:10)

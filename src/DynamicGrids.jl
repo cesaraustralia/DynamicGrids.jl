@@ -40,6 +40,7 @@ using Base: tail, @propagate_inbounds
 import Base: show, getindex, setindex!, lastindex, size, length, push!, append!,
              broadcast, broadcast!, similar, eltype, iterate
 
+
 export sim!, resume!, step!, savegif, isinferred
 
 export rules
@@ -85,7 +86,7 @@ export ObjectScheme, Greyscale, Grayscale
 export CharStyle, Block, Braile
 
 # From Stencils module
-export Neighborhood, Window, Kernel, Moore, VonNeumann, Positional, Layered
+export Stencil, Window, Kernel, Moore, VonNeumann, Positional, Layered
 
 export neighbors, stencil, kernel, kernelproduct, offsets, indices, radius, distances, distance_zones
 
@@ -98,8 +99,7 @@ const EXPERIMENTAL = """
 
 import Stencils: neighbors, unsafe_neighbors, stencil,
     kernel, kernelproduct, offsets, indices, radius, distances, distance_zones,
-    setneighbors, update_stencil, unsafe_update_stencil,
-    boundary, padding, source, dest, switch, padval, update_boundary!
+    stencil, unsafe_stencil, boundary, padding, source, dest, switch, padval, update_boundary!
 
 include("interface.jl")
 include("flags.jl")

@@ -1,5 +1,5 @@
 
-# Broadcast a rule over the grids it reads from, updating the grids it writes to.
+# Map a rule over the grids it reads from, updating the grids it writes to.
 #
 # This is split into setup methods and application methods,
 # for dispatch and to introduce a function barrier for type stability.
@@ -7,23 +7,23 @@
 # We dispatch on `ruletype(rule)` to allow wrapper rules
 # to pass through the type of the wrapped rule.
 # Putting the type in `Val` is best for performance.
-broadcast_rule!(data::AbstractSimData, rule) =
-    broadcast_rule!(data, _val_ruletype(rule), rule)
+maprule!(data::AbstractSimData, rule) =
+    maprule!(data, _val_ruletype(rule), rule)
 # Cellrule
-function broadcast_rule!(data::AbstractSimData, ruletype::Val{<:CellRule}, rule)
+function maprule!(data::AbstractSimData, ruletype::Val{<:CellRule}, rule)
     rkeys, _ = _getreadgrids(rule, data)
     wkeys, _ = _getwritegrids(WriteMode, rule, data)
-    broadcast_rule!(RuleData(data), ruletype, rule, rkeys, wkeys)
+    maprule!(RuleData(data), ruletype, rule, rkeys, wkeys)
     return data
 end
 # NeighborhoodRule
-function broadcast_rule!(data::AbstractSimData, ruletype::Val{<:NeighborhoodRule}, rule)
+function maprule!(data::AbstractSimData, ruletype::Val{<:NeighborhoodRule}, rule)
     rkeys, rgrids = _getreadgrids(rule, data)
     wkeys, wgrids = _getwritegrids(SwitchMode, rule, data)
     # Copy or zero out boundary where needed
     _update_boundary!(rgrids)
     _cleardest!(data[stencilkey(rule)])
-    broadcast_rule!(RuleData(data), ruletype, rule, rkeys, wkeys)
+    maprule!(RuleData(data), ruletype, rule, rkeys, wkeys)
     _maybemask!(wgrids)
     # Swap the dest/source of grids that were written to
     # and combine the written grids with the original simdata
@@ -32,19 +32,19 @@ function broadcast_rule!(data::AbstractSimData, ruletype::Val{<:NeighborhoodRule
     return d
 end
 # SetRule
-function broadcast_rule!(data::AbstractSimData, ruletype::Val{<:SetRule}, rule)
+function maprule!(data::AbstractSimData, ruletype::Val{<:SetRule}, rule)
     rkeys, _ = _getreadgrids(rule, data)
     wkeys, wgrids = _getwritegrids(SwitchMode, rule, data)
     map(_astuple(wkeys, wgrids)) do g
         copyto!(parent(dest(g)), parent(source(g)))
     end
     ruledata = RuleData(_combinegrids(data, wkeys, wgrids))
-    broadcast_rule!(ruledata, ruletype, rule, rkeys, wkeys)
+    maprule!(ruledata, ruletype, rule, rkeys, wkeys)
     _maybemask!(wgrids)
     return _replacegrids(data, wkeys, _to_readonly(switch(wgrids)))
 end
 # SetGridRule (not actually broadcast - it applies to the whole grid manually)
-function broadcast_rule!(data::AbstractSimData, ruletype::Val{<:SetGridRule}, rule)
+function maprule!(data::AbstractSimData, ruletype::Val{<:SetGridRule}, rule)
     rkeys, rgrids = _getreadgrids(rule, data)
     wkeys, wgrids = _getwritegrids(WriteMode, rule, data)
     ruledata = RuleData(_combinegrids(data, wkeys, wgrids))
@@ -53,8 +53,8 @@ function broadcast_rule!(data::AbstractSimData, ruletype::Val{<:SetGridRule}, ru
     return data
 end
 # Expand method arguments for dispatch on processor and optimisation
-function broadcast_rule!(data::AbstractSimData, ruletype::Val, rule, rkeys, wkeys)
-    broadcast_rule!(data, proc(data), opt(data), ruletype, rule, rkeys, wkeys)
+function maprule!(data::AbstractSimData, ruletype::Val, rule, rkeys, wkeys)
+    maprule!(data, proc(data), opt(data), ruletype, rule, rkeys, wkeys)
 end
 
 _update_boundary!(gs::Union{NamedTuple,Tuple}) = map(_update_boundary!, gs)
@@ -62,7 +62,7 @@ _update_boundary!(g::GridData) = update_boundary!(g)
 
 # Most Rules
 # 2 dimensional, with processor selection and optimisations in `broadcast_with_optimisation`
-# function broadcast_rule!(data::AbstractSimData{<:Tuple{Y,X}}, proc::CPU, opt, ruletype::Val, rule, rkeys, wkeys) where {Y,X}
+# function maprule!(data::AbstractSimData{<:Tuple{Y,X}}, proc::CPU, opt, ruletype::Val, rule, rkeys, wkeys) where {Y,X}
 #     let data=data, proc=proc, opt=opt, rule=rule,
 #         rkeys=rkeys, wkeys=wkeys, ruletype=ruletype
 #         broadcast_with_optimisation(data, proc, opt, ruletype, rkeys) do I 
@@ -71,7 +71,7 @@ _update_boundary!(g::GridData) = update_boundary!(g)
 #     end
 # end
 # Arbitrary dimensions, no processor or optimisation selection beyond CPU/GPU
-function broadcast_rule!(data::AbstractSimData, proc::CPU, opt, ruletype::Val, rule, rkeys, wkeys)
+function maprule!(data::AbstractSimData, proc::CPU, opt, ruletype::Val, rule, rkeys, wkeys)
     let data=data, proc=proc, opt=opt, rule=rule,
         rkeys=rkeys, wkeys=wkeys, ruletype=ruletype
         for I in CartesianIndices(first(grids(data)))
@@ -82,7 +82,7 @@ end
 
 # Neighborhood rules
 # 2 dimensional, with processor selection and optimisations
-# function broadcast_rule!(
+# function maprule!(
 #     data::AbstractSimData{<:Tuple{Y,X}}, proc::CPU, opt, ruletype::Val{<:NeighborhoodRule}, 
 #     rule, rkeys, wkeys
 # ) where {Y,X}
@@ -102,7 +102,7 @@ end
 #     return nothing
 # end
 # Arbitrary dimensions, no processor or optimisation selection beyond CPU/GPU
-function broadcast_rule!(
+function maprule!(
     data::AbstractSimData, proc::CPU, opt, ruletype::Val{<:NeighborhoodRule}, rule, rkeys, wkeys
 )
     hoodgrid = _firstgrid(data, rkeys)
@@ -175,7 +175,7 @@ end
 @inline function stencil_kernel!(
     data::AbstractSimData, hoodgrid::GridData, ruletype::Val{<:NeighborhoodRule}, rule, rkeys, wkeys, I...
 )
-    rule1 = setneighbors(rule, unsafe_neighbors(hoodgrid, stencil(rule), CartesianIndex(I)))
+    rule1 = Stencils.rebuild(rule, unsafe_neighbors(stencil(rule), hoodgrid, CartesianIndex(I)))
     cell_kernel!(data, ruletype, rule1, rkeys, wkeys, I...)
 end
 
@@ -197,7 +197,7 @@ function row_kernel!(
         # windows = _slide_windows(windows, src, Val{R}(), i, j)
         # Loop over the COLUMN of windows covering the block
         for b in 1:blocklen
-            rule1 = setneighbors(rule, unsafe_neighbors(grid, stencil(rule), CartesianIndex(i, j)))
+            rule1 = Stencils.rebuild(rule, unsafe_neighbors(stencil(rule), grid, CartesianIndex(i, j)))
             cell_kernel!(simdata, ruletype, rule1, rkeys, wkeys, i + b - 1, j)
         end
     end

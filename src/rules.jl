@@ -420,13 +420,13 @@ stencilkey(rule::NeighborhoodRule{R,W}) where {R,W} = R
 # The first argument is for the stencil grid
 stencilkey(rule::NeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
 Stencils.radius(rule::NeighborhoodRule, args...) = radius(stencil(rule))
-Stencils.unsafe_neighbors(A::Stencils.AbstractStencilArray, rule::NeighborhoodRule, I::CartesianIndex) =
-    Stencils.unsafe_neighbors(A, stencil(rule), I)
-@inline function Stencils.setneighbors(rule::NeighborhoodRule, neighbors::AbstractArray)
-    @set rule.stencil = setneighbors(stencil(rule), neighbors)
+Stencils.unsafe_neighbors(rule::NeighborhoodRule, A::Stencils.AbstractStencilArray, I::CartesianIndex) =
+    Stencils.unsafe_neighbors(stencil(rule), A, I)
+@inline function Stencils.rebuild(rule::NeighborhoodRule, neighbors::SVector)
+    @set rule.stencil = Stencils.rebuild(stencil(rule), neighbors)
 end
-@inline function Stencils.unsafe_update_stencil(A::AbstractArray, rule::NeighborhoodRule, I...)
-    setneighbors(rule, unsafe_neighbors(A, rule, I))
+@inline function Stencils.unsafe_stencil(rule::NeighborhoodRule, A::AbstractArray, I...)
+    rebuild(rule, unsafe_neighbors(rule, A, I))
 end
 
 """
@@ -533,8 +533,9 @@ sim!(output, streak; boundary=Wrap())
 struct Convolution{R,W,N} <: NeighborhoodRule{R,W}
     "The stencil of cells around the central cell"
     stencil::N
+    Convolution{R,W}(stencil::N) where {R,W,N<:Stencil} = new{R,W,N}(stencil)
 end
-Convolution{R,W}(A::AbstractArray) where {R,W} = Convolution{R,W}(Kernel(SMatrix{size(A)...}(A)))
+Convolution{R,W}(A::AbstractArray) where {R,W} = Convolution{R,W}(Kernel(SArray{Tuple{size(A)...}}(A)))
 Convolution{R,W}(; stencil) where {R,W} = Convolution{R,W}(stencil)
 
 @inline applyrule(data, rule::Convolution, read, I) = kernelproduct(stencil(rule))

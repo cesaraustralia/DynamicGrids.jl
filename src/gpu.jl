@@ -21,11 +21,11 @@ Base.Threads.unlock(opt::CPUGPU) = unlock(opt.spinlock)
 
 kernel_setup(::CPUGPU) = KernelAbstractions.CPU(), 1
 
-function broadcast_rule!(
+function maprule!(
     data::AbstractSimData, proc::GPU, opt, ruletype::Val{<:Rule}, rule, rkeys, wkeys
 )
     kernel! = ka_rule_kernel!(kernel_setup(proc)...)
-    kernel!(data, ruletype, rule, rkeys, wkeys; ndrange=gridsize(data)) |> wait
+    kernel!(data, ruletype, rule, rkeys, wkeys; ndrange=gridsize(data))
     return nothing
 end
 

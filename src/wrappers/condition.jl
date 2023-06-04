@@ -24,9 +24,9 @@ neighbors(runif::RunIf) = neighbors(rule(runif))
 
 modifyrule(runif::RunIf, data::AbstractSimData) = @set runif.rule = modifyrule(runif.rule, data)
 
-@inline function Stencils.setneighbors(runif::RunIf{R,W}, win) where {R,W}
+@inline function Stencils.rebuild(runif::RunIf{R,W}, win) where {R,W}
     f = runif.f
-    r = setneighbors(rule(runif), win)
+    r = rebuild(rule(runif), win)
     RunIf{R,W,typeof(f),typeof(r)}(f, r)
 end
 
