@@ -101,6 +101,8 @@ import Stencils: neighbors, unsafe_neighbors, stencil,
     kernel, kernelproduct, offsets, indices, radius, distances, distance_zones,
     stencil, unsafe_stencil, boundary, padding, source, dest, switch, padval, update_boundary!
 
+import Stencils: BoundaryCondition, Padding
+
 include("interface.jl")
 include("flags.jl")
 include("rules.jl")
@@ -144,7 +146,7 @@ function __init__()
     global terminal
     terminal = REPL.Terminals.TTYTerminal(get(ENV, "TERM", Base.Sys.iswindows() ? "" : "dumb"), stdin, stdout, stderr)
 
-    @require CUDAKernels = "72cfdca4-0801-4ab0-bf6a-d52aa10adc57" include("cuda.jl")
+    @require CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba" include("cuda.jl")
 end
 
 end

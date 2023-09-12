@@ -55,6 +55,7 @@ to correct this problem.
 """
 struct Aux{K} <: ParameterSource end
 Aux(key::Symbol) = Aux{key}()
+Aux(key::Val{K}) where K = Aux{K}()
 
 _unwrap(::Aux{X}) where X = X
 _unwrap(::Type{<:Aux{X}}) where X = X

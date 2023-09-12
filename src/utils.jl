@@ -14,6 +14,10 @@ ismasked(data::GridData, I...) = ismasked(mask(data), I...)
 ismasked(mask::Nothing, I...) = false
 ismasked(mask::AbstractArray, I...) = @inbounds !(mask[I...])
 
+abstract type DemoMode end
+struct Infer <: DemoMode end
+struct Descend <: DemoMode end
+
 """
     isinferred(output::Output, ruleset::Ruleset)
     isinferred(output::Output, rules::Rule...)
@@ -23,55 +27,64 @@ Test if a custom rule is inferred and the return type is correct when
 
 Type-stability can give orders of magnitude improvements in performance.
 """
-isinferred(output::Output, rules::Rule...) = isinferred(output, rules)
-isinferred(output::Output, rules::Tuple) = isinferred(output, StaticRuleset(rules...))
-isinferred(output::Output, ruleset::Ruleset) = isinferred(output, StaticRuleset(ruleset))
-function isinferred(output::Output, ruleset::StaticRuleset)
+isinferred(args...) = demo(Infer(), args...)
+
+descendable(sd::AbstractSimData) = demo(Descend(), sd)
+
+demo(m::DemoMode, output::Output, rules::Rule...) = demo(m, output, rules)
+demo(m::DemoMode, output::Output, rules::Tuple) = demo(m, output, StaticRuleset(rules...))
+demo(m::DemoMode, output::Output, ruleset::Ruleset) = demo(m, output, StaticRuleset(ruleset))
+function demo(m, output::Output, ruleset::StaticRuleset)
     simdata = _updaterules(rules(ruleset), SimData(output, ruleset))
-    return _isinferred(simdata)
+    return demo(m, simdata)
 end
-function isinferred(simdata::AbstractSimData)
+function demo(m::DemoMode, simdata::AbstractSimData)
     map(rules(simdata)) do rule
-        isinferred(simdata, rule)
+        if rule isa SetGridRule
+            return true
+        else
+            demo(m, simdata, rule)
+        end
     end
 end
-function isinferred(simdata::AbstractSimData{<:Any,N}, 
+function demo(m::DemoMode, simdata::AbstractSimData{<:Any,N}, 
     rule::Union{NeighborhoodRule,Chain{<:Any,<:Any,<:Tuple{<:NeighborhoodRule,Vararg}}}
 ) where N
     grid = simdata[stencilkey(rule)]
-    r = max(1, radius(rule))
-    T = eltype(grid)
-    S = 2r + 1
-    hood = stencil(rule)
-    L = length(hood)
-    hood1 = unsafe_neighbors(grid, hood, CartesianIndex(ntuple(_ -> 1, N)))
-    rule1 = setneighbors(rule, hood1)
-    return _isinferred(simdata, rule1)
-end
-function isinferred(simdata::AbstractSimData, rule::SetCellRule)
+    rule1 = Stencils.unsafe_stencil(rule, grid, CartesianIndex(ntuple(_ -> 1, N)))
+    # return _demo(m, simdata, rule1)
+    I = (1, 1)
     rkeys, rgrids = _getreadgrids(rule, simdata)
     wkeys, wgrids = _getwritegrids(WriteMode, rule, simdata)
     simdata = @set simdata.grids = _combinegrids(rkeys, rgrids, wkeys, wgrids)
-    readval = _readcell(simdata, rkeys, 1, 1)
-    @inferred applyrule!(simdata, rule, readval, (1, 1))
+    readval = _readcell(simdata, rkeys, I...)
+
+    ex_writeval = Tuple(_example_writeval(wgrids, I))
+    writeval = if m isa Infer
+        @inferred applyrule(simdata, rule, readval, I)
+    else
+        applyrule(simdata, rule, readval, I)
+    end
+    # typeof(Tuple(writeval)) == typeof(ex_writeval) ||
+    #     error("return type `$(typeof(Tuple(writeval)))` doesn't match grids `$(typeof(ex_writeval))`")
     return true
 end
-
-function _isinferred(simdata, rule)
+function demo(m::DemoMode, simdata::AbstractSimData, rule::SetCellRule)
     rkeys, rgrids = _getreadgrids(rule, simdata)
     wkeys, wgrids = _getwritegrids(WriteMode, rule, simdata)
     simdata = @set simdata.grids = _combinegrids(rkeys, rgrids, wkeys, wgrids)
-    readval = _readcell(simdata, rkeys, 1, 1)
-
-    _example_writeval(grids::Tuple) = map(_example_writeval, grids)
-    _example_writeval(grid::GridData{<:WriteMode}) = grid[1, 1]
-
-    ex_writeval = Tuple(_example_writeval(wgrids))
-    writeval = @inferred applyrule(simdata, rule, readval, (1, 1))
-    typeof(Tuple(writeval)) == typeof(ex_writeval) ||
-        error("return type `$(typeof(Tuple(writeval)))` doesn't match grids `$(typeof(ex_writeval))`")
+    I = (1, 1)
+    readval = _readcell(simdata, rkeys, I...)
+    if m isa Infer
+        @inferred applyrule!(simdata, rule, readval, I)
+    else
+        applyrule!(simdata, rule, readval, I)
+    end
     return true
 end
+
+_example_writeval(grids::Tuple, I) = map(g -> _example_writeval(g, I), grids)
+_example_writeval(grid::GridData{<:WriteMode}, I) = grid[I...]
 
 # _zerogrids
 # Generate a Vector of zero valued grids

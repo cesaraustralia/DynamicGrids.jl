@@ -49,7 +49,7 @@ function storeframe!(o::TransformedOutput, data::AbstractSimData)
     i = frameindex(o, data) 
     # Copy the transformed grid/s to the output frames, 
     # instead of just assigning (see issue #169)
-    o[i] = _copytransformed!(o[i], transformed) 
+    o[i] = _copytransformed!(o[i], transformed)
 end
 
 # Copy arrays manually as reducing functions can return the original object without copy.
@@ -57,6 +57,7 @@ _copytransformed!(dest::NamedTuple, src::NamedTuple) = map(_copytransformed!, de
 _copytransformed!(dest::AbstractArray, src::AbstractArray) = dest .= src
 # Non-array output is just assigned
 _copytransformed!(dest, src) = src
+_copytransformed!(dest::StaticArray, src::StaticArray) = src
 
 # Multi/named grid simulation, f is passed a NamedTuple
 function _transform_grids(o::TransformedOutput, grids::NamedTuple)

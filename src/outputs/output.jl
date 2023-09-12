@@ -39,9 +39,15 @@ end
 DimensionalData.refdims(o::Output) = ()
 DimensionalData.name(o::Output) = Symbol("")
 DimensionalData.metadata(o::Output) = NoMetadata()
-# Output bebuild just returns a DimArray
-DimensionalData.rebuild(o::Output, data, dims::Tuple, refdims, name, metadata) = 
-    DimArray(data, dims, refdims, name, metadata)
+# Output rebuild just returns a DimArray
+function DimensionalData.rebuild(o::Output, data, dims::Tuple, refdims, name, metadata)
+    dims == dims(o) || throw("Cant change the dims of an `Output`")
+    @set! o.frames = data
+end
+function DimensionalData.rebuild(o::Output; data=frames(o), dims=dims(o), kw...)
+    dims == DimensionalData.dims(o) || throw("Cant change the dims of an `Output`")
+    @set! o.frames = data
+end
 
 # Required getters and setters for all outputs ###################################
 frames(o::Output) = o.frames
@@ -74,7 +80,7 @@ initialise!(o::Output, data) = nothing
 finalise!(o::Output, data) = nothing
 initialisegraphics(o::Output, data) = nothing
 finalisegraphics(o::Output, data) = nothing
-maybesleep(o::Output, frame) = nothing
+maybesleep(o::Output, frame) = sleep(0) # Helps for exiting simulations
 showframe(o::Output, data) = nothing
 
 frameindex(o::Output, data::AbstractSimData) = frameindex(o, currentframe(data))
