@@ -66,6 +66,13 @@ mutable struct Extent{I<:Union{AbstractArray,NamedTuple},
             if !all(map(i -> size(i) == gridsize, init))
                 throw(ArgumentError("`init` grid sizes do not match"))
             end
+            init1 = first(init)
+            if first(init) isa AbstractDimArray
+                DimensionalData.comparedims(init...; val=true)
+                map(aux) do A
+                    DimensionalData.comparedims(commondims(A, dims(init1)), dims(init1, dims(A)); val=true)
+                end
+            end
             # Use the same padval for everthing if there is only one
             if !(padval isa NamedTuple)
                 padval = map(_ -> padval, init)
@@ -101,4 +108,4 @@ struct StaticExtent{I<:Union{AbstractArray,NamedTuple},
 end
 StaticExtent(; init, mask=nothing, aux=nothing, padval=_padval(init), tspan, kw...) =
     StaticExtent(init, mask, aux, padval, tspan)
-StaticExtent(init::Union{AbstractArray,NamedTuple}; kw...) = Extent(; init, kw...)
+StaticExtent(init::Union{AbstractArray,NamedTuple}; kw...) = StaticExtent(; init, kw...)

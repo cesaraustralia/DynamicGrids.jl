@@ -238,7 +238,7 @@ function _maybemask!(
 ) where {Y,X}
     A = source(wgrid)
     pv = padval(wgrid)
-    if pv == 0
+    if iszero(pv)
         for j in 1:X
             @simd for i in 1:Y
                 source(wgrid)[i, j] *= mask[i, j]

@@ -128,7 +128,7 @@ function SimData(o, extent::AbstractExtent, ruleset::AbstractRuleset)
     else
         nothing 
     end
-    SimData(extent, ruleset, frames_)
+    return SimData(extent, ruleset, frames_)
 end
 # Convenience constructors
 SimData(extent::AbstractExtent, r1::Rule, rs::Rule...) = SimData(extent, (r1, rs...))

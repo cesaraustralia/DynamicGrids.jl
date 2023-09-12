@@ -425,8 +425,8 @@ Stencils.unsafe_neighbors(rule::NeighborhoodRule, A::Stencils.AbstractStencilArr
 @inline function Stencils.rebuild(rule::NeighborhoodRule, neighbors::SVector)
     @set rule.stencil = Stencils.rebuild(stencil(rule), neighbors)
 end
-@inline function Stencils.unsafe_stencil(rule::NeighborhoodRule, A::AbstractArray, I...)
-    rebuild(rule, unsafe_neighbors(rule, A, I))
+@inline function Stencils.unsafe_stencil(rule::NeighborhoodRule, A::AbstractArray, I::CartesianIndex)
+    Stencils.rebuild(rule, unsafe_neighbors(rule, A, I))
 end
 
 """

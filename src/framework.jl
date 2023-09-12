@@ -242,3 +242,6 @@ end
 # GPU needs this to convert arrays to CuArray
 _proc_setup(simdata::AbstractSimData) = _proc_setup(proc(simdata), simdata)
 _proc_setup(proc, simdata) = simdata
+
+# function _checkboxed(
+# rnd

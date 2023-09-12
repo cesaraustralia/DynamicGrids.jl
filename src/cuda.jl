@@ -1,4 +1,4 @@
-using .CUDAKernels, .CUDAKernels.CUDA
+using .CUDA
 import ModelParameters.Flatten
 
 export CuGPU
@@ -20,7 +20,7 @@ CuGPU() = CuGPU{32}()
 
 # CUDA setup
 
-kernel_setup(::CuGPU{N}) where N = CUDAKernels.CUDADevice(), (N, N)
+kernel_setup(::CuGPU{N}) where N = CUDA.CUDAKernels.CUDABackend(), (N, N)
 
 # _proc_setup
 # Convert all arrays in SimData to CuArrays
