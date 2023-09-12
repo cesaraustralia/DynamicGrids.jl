@@ -1,7 +1,7 @@
 using DynamicGrids, Test, BenchmarkTools, StaticArrays
 
 using DynamicGrids: SimData, radius, rules, _readkeys, _writekeys, 
-    applyrule, neighborhood, neighborhoodkey, Extent, ruletype
+    applyrule, stencil, stencilkey, Extent, ruletype
 
 @testset "CellRule chain" begin
 
@@ -92,8 +92,8 @@ end
 
     nbrs = SA[1, 2, 3, 4, 6, 7, 8, 9]
     hood = Moore{1}(nbrs)
-    hoodrule = Neighbors{:a,:a}(hood) do data, neighborhodhood, cell, I
-        sum(neighborhodhood)
+    hoodrule = Neighbors{:a,:a}(hood) do data, stencilood, cell, I
+        sum(stencilood)
     end
 
     rule = Cell{Tuple{:a,:c},:b}() do data, (b, c), I
@@ -121,10 +121,10 @@ end
     chain = Chain(hoodrule, rule)
     @test radius(chain) === 1
     @test ruletype(chain) == NeighborhoodRule
-    @test neighborhood(chain) == hood
+    @test stencil(chain) == hood
 
     @test Tuple(neighbors(chain)) === (1, 2, 3, 4, 6, 7, 8, 9) 
-    @test neighborhoodkey(chain) === :a
+    @test stencilkey(chain) === :a
     @test rules(Base.tail(chain)) === (rule,)
     @test chain[1] === first(chain) === hoodrule
     @test chain[end] === last(chain) === rule

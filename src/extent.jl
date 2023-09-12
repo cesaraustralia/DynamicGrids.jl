@@ -69,9 +69,6 @@ mutable struct Extent{I<:Union{AbstractArray,NamedTuple},
             init1 = first(init)
             if first(init) isa AbstractDimArray
                 DimensionalData.comparedims(init...; val=true)
-                map(aux) do A
-                    DimensionalData.comparedims(commondims(A, dims(init1)), dims(init1, dims(A)); val=true)
-                end
             end
             # Use the same padval for everthing if there is only one
             if !(padval isa NamedTuple)

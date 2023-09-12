@@ -41,12 +41,12 @@ DimensionalData.name(o::Output) = Symbol("")
 DimensionalData.metadata(o::Output) = NoMetadata()
 # Output rebuild just returns a DimArray
 function DimensionalData.rebuild(o::Output, data, dims::Tuple, refdims, name, metadata)
-    dims == dims(o) || throw("Cant change the dims of an `Output`")
-    @set! o.frames = data
+    return DimArray(data, dims, refdims, name, metadata) 
 end
-function DimensionalData.rebuild(o::Output; data=frames(o), dims=dims(o), kw...)
-    dims == DimensionalData.dims(o) || throw("Cant change the dims of an `Output`")
-    @set! o.frames = data
+function DimensionalData.rebuild(o::Output; 
+    data=frames(o), dims=dims(o), refdims=refdims(o), names=name(o), metadata=metadata(o), kw...
+)
+    return DimArray(data, dims, refdims, name, metadata) 
 end
 
 # Required getters and setters for all outputs ###################################

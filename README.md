@@ -32,7 +32,7 @@ running the included game of life model `Life()`:
 ```julia
 using DynamicGrids, Crayons
 
-init = rand(Bool, 450, 400)
+init = rand(Bool, 150, 200)
 output = REPLOutput(init; tspan=1:200, fps=30, color=Crayon(foreground=:red, background=:black, bold=true))
 sim!(output, Life())
 

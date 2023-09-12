@@ -56,11 +56,6 @@ source_array_or_view(d::AbstractGridData) = source(d) isa OffsetArray ? sourcevi
 # Get an a view of the dest, preferring the underlying array if it is not a padded OffsetArray
 dest_array_or_view(d::AbstractGridData) = dest(d) isa OffsetArray ? destview(d) : dest(d)
 
-# @propagate_inbounds Base.getindex(d::GridData{s}, I...) where s = getindex(source(d), I...)
-# @propagate_inbounds function Base.getindex(d::GridData{s}, i1::Int, I::Int...) where s
-#     getindex(source(d), i1, I...)
-# end
-
 _build_optdata(opt::PerformanceOpt, init, r) = nothing
 
 # _indtoblock

@@ -43,12 +43,12 @@ function demo(m::DemoMode, simdata::AbstractSimData)
         if rule isa SetGridRule
             return true
         else
-            demo(m, simdata, rule)
+            demo(m, simdata, rule, ruletype(rule))
         end
-    end
+    end |> all
 end
 function demo(m::DemoMode, simdata::AbstractSimData{<:Any,N}, 
-    rule::Union{NeighborhoodRule,Chain{<:Any,<:Any,<:Tuple{<:NeighborhoodRule,Vararg}}}
+   rule, ruletype::Type{<:Union{<:NeighborhoodRule,<:Chain{<:Any,<:Any,<:Tuple{<:NeighborhoodRule,Vararg}}}}
 ) where N
     grid = simdata[stencilkey(rule)]
     rule1 = Stencils.unsafe_stencil(rule, grid, CartesianIndex(ntuple(_ -> 1, N)))
@@ -60,16 +60,29 @@ function demo(m::DemoMode, simdata::AbstractSimData{<:Any,N},
     readval = _readcell(simdata, rkeys, I...)
 
     ex_writeval = Tuple(_example_writeval(wgrids, I))
-    writeval = if m isa Infer
+    if m isa Infer
+        writeval = @inferred applyrule(simdata, rule1, readval, I)
+        typeof(Tuple(writeval)) == typeof(ex_writeval) ||
+            error("return type `$(typeof(Tuple(writeval)))` doesn't match grid types `$(typeof(ex_writeval))`")
+    else
+        applyrule(simdata, rule1, readval, I)
+    end
+    return true
+end
+function demo(m::DemoMode, simdata::AbstractSimData, rule, ::Type{<:CellRule})
+    rkeys, rgrids = _getreadgrids(rule, simdata)
+    wkeys, wgrids = _getwritegrids(WriteMode, rule, simdata)
+    simdata = @set simdata.grids = _combinegrids(rkeys, rgrids, wkeys, wgrids)
+    I = (1, 1)
+    readval = _readcell(simdata, rkeys, I...)
+    if m isa Infer
         @inferred applyrule(simdata, rule, readval, I)
     else
         applyrule(simdata, rule, readval, I)
     end
-    # typeof(Tuple(writeval)) == typeof(ex_writeval) ||
-    #     error("return type `$(typeof(Tuple(writeval)))` doesn't match grids `$(typeof(ex_writeval))`")
     return true
 end
-function demo(m::DemoMode, simdata::AbstractSimData, rule::SetCellRule)
+function demo(m::DemoMode, simdata::AbstractSimData, rule, ::Type{<:SetCellRule})
     rkeys, rgrids = _getreadgrids(rule, simdata)
     wkeys, wgrids = _getwritegrids(WriteMode, rule, simdata)
     simdata = @set simdata.grids = _combinegrids(rkeys, rgrids, wkeys, wgrids)

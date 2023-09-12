@@ -97,12 +97,12 @@ ruletype(::Rule) = Rule
 # Allow specifying CartesianIndex for `I`
 @inline applyrule(data, rule, state, I) = applyrule(data, rule, state, CartesianIndex(I))
 # # Allow dropping the `data` argument
-# @inline applyrule(data, rule, state, I) = applyrule(rule, state, Tuple(I))
+@inline applyrule(data, rule, state, I::CartesianIndex) = applyrule(rule, state, Tuple(I))
 # # Allow dropping the `data` argument and using CartesianIndex
-# @inline applyrule(rule, state, I) = applyrule(rule, state, CartesianIndex(I))
+@inline applyrule(rule, state, I) = applyrule(rule, state, CartesianIndex(I))
 # # Allow dropping the `I` argument
-# @inline applyrule(rule, state, I::CartesianIndex) = applyrule(rule, state)
-# @inline applyrule(rule, state) = applyrule(rule, state)
+@inline applyrule(rule, state, I::CartesianIndex) = applyrule(rule, state)
+@inline applyrule(rule, state) = applyrule(rule, state)
 
 #= Default constructors for all Rules.
 Sets both the read and write grids to `:_default`.
@@ -486,7 +486,7 @@ struct Neighbors{R,W,F,N} <: NeighborhoodRule{R,W}
     stencil::N
 end
 Neighbors{R,W}(; kw...) where {R,W} = _nofunctionerror(Neighbors)
-Neighbors{R,W}(f; stencil=Moore(1)) where {R,W} =
+Neighbors{R,W}(f; neighborhood=Moore(1), stencil=neighborhood) where {R,W} =
     Neighbors{R,W}(f, stencil)
 
 @inline function applyrule(data, rule::Neighbors, read, I)
@@ -616,7 +616,8 @@ struct SetNeighbors{R,W,F,N} <: SetNeighborhoodRule{R,W}
     stencil::N
 end
 SetNeighbors{R,W}(; kw...) where {R,W} = _nofunctionerror(SetNeighbors)
-SetNeighbors{R,W}(f; stencil=Moore(1)) where {R,W} = SetNeighbors{R,W}(f, stencil)
+SetNeighbors{R,W}(f; neighborhood=Moore(1), stencil=neighborhood) where {R,W} = 
+    SetNeighbors{R,W}(f, stencil)
 
 @inline function applyrule!(data, rule::SetNeighbors, read, I)
     let data=data, hood=stencil(rule), rule=rule, read=read, I=I

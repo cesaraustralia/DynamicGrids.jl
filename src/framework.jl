@@ -40,7 +40,7 @@ Other:
 - `simdata`: a [`SimData`](@ref) object. Keeping it between simulations can reduce memory
   allocation a little, when that is important.
 """
-function sim!(output::Output, ruleset::Ruleset=ruleset(output);
+function sim!(output::Output, ruleset::AbstractRuleset=ruleset(output);
     init=init(output),
     mask=mask(output),
     tspan=tspan(output),

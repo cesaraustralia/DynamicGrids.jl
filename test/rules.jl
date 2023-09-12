@@ -1,11 +1,11 @@
 using DynamicGrids, ModelParameters, Setfield, Test, StaticArrays, 
-      LinearAlgebra, CUDAKernels
-import DynamicGrids: applyrule, applyrule!, broadcast_rule!, ruletype, extent, source, dest,
+      LinearAlgebra, CUDA
+import DynamicGrids: applyrule, applyrule!, maprule!, ruletype, extent, source, dest,
        _getreadgrids, _getwritegrids, _combinegrids, _readkeys, _writekeys,
        SimData, GridData, WriteMode, Rule, Extent, CPUGPU, stencilkey
 
-# if CUDAKernels.CUDA.has_cuda_gpu()
-    # CUDAKernels.CUDA.allowscalar(false)
+# if CUDA.has_cuda_gpu()
+    # CUDA.allowscalar(false)
     # hardware = (SingleCPU(), ThreadedCPU(), CPUGPU(), CuGPU())
 # else
     hardware = (SingleCPU(), ThreadedCPU(), CPUGPU())
@@ -154,13 +154,13 @@ end
 end
 
 @testset "Convolution" begin
-    k = SA[1, 0, 1, 0, 0, 0, 1, 0, 1]
-    @test Convolution{:a}(k) == Convolution{:a,:a}(; stencil=Kernel(Window{1}(k), k)) 
+    k = SMatrix{3,3}([1 0 1; 0 0 0; 1 0 1])
+    @test Convolution{:a}(k) == Convolution{:a,:a}(Kernel(Window{1}(), k)) 
     window = SA[1 0 0; 0 0 1; 0 0 1]
     hood = Window{1,2}(vec(window))
     rule = Convolution{:a,:a}(; stencil=Kernel(hood, k))
     @test DynamicGrids.kernel(rule) === k 
-    @test applyrule(nothing, rule, 0, (3, 3)) == k ⋅ vec(window)
+    @test applyrule(nothing, rule, 0, (3, 3)) == vec(k) ⋅ vec(window)
     output = ArrayOutput((a=init,); tspan=1:2)
     sim!(output, rule)
 end
@@ -338,7 +338,7 @@ applyrule(data, ::TestRule, state, index) = 0
             ext = Extent(; init=(a=init,), tspan=1:1)
             simdata = SimData(ext, ruleset)
 
-            # Test broadcast_rule components
+            # Test maprule components
             rkeys, rgrids = _getreadgrids(rule, simdata)
             wkeys, wgrids = _getwritegrids(WriteMode, rule, simdata)
             @test rkeys == Val{:a}()
@@ -347,9 +347,9 @@ applyrule(data, ::TestRule, state, index) = 0
             @test newsimdata.grids[1] isa GridData{WriteMode}
             # Test type stability
             T = Val{DynamicGrids.ruletype(rule)}()
-            @inferred broadcast_rule!(newsimdata, proc, opt, T, rule, rkeys, wkeys)
+            @inferred maprule!(newsimdata, proc, opt, T, rule, rkeys, wkeys)
             
-            resultdata = broadcast_rule!(simdata, rule)
+            resultdata = maprule!(simdata, rule)
             @test source(resultdata[:a]) == final
         end
     end
@@ -371,8 +371,8 @@ applyrule!(data, ::TestSetCell, state, index) = 0
             wkeys, wgrids = _getwritegrids(WriteMode, rule, simdata)
             newsimdata = @set simdata.grids = _combinegrids(wkeys, wgrids, rkeys, rgrids)
             T = Val{DynamicGrids.ruletype(rule)}()
-            @inferred broadcast_rule!(newsimdata, proc, opt, T, rule, rkeys, wkeys)
-            resultdata = broadcast_rule!(simdata, rule)
+            @inferred maprule!(newsimdata, proc, opt, T, rule, rkeys, wkeys)
+            resultdata = maprule!(simdata, rule)
             @test source(resultdata[:_default_]) == init
         end
     end
@@ -398,7 +398,7 @@ applyrule!(data, ::TestSetCellWrite{R,W}, state, index) where {R,W} = add!(data[
             ruleset = Ruleset(rule; opt=opt, proc=proc)
             ext = Extent(; init=(_default_=init,), tspan=1:1)
             simdata = DynamicGrids._proc_setup(SimData(ext, ruleset));
-            resultdata = broadcast_rule!(simdata, rule);
+            resultdata = maprule!(simdata, rule);
             @test Array(source(first(resultdata))) == final
         end
     end
@@ -421,7 +421,7 @@ applyrule(data, ::TestCellSquare, (state,), index) = state^2
             ruleset = Ruleset(rule; opt=opt, proc=proc)
             ext = Extent(; init=(_default_=init,), tspan=1:1)
             simdata = DynamicGrids._proc_setup(SimData(ext, ruleset))
-            resultdata = broadcast_rule!(simdata, rule);
+            resultdata = maprule!(simdata, rule);
             @test Array(source(first(resultdata))) == final
         end
     end

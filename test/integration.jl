@@ -1,9 +1,9 @@
 using DynamicGrids, DimensionalData, Test, Dates, Unitful, 
-      CUDAKernels, FileIO, FixedPointNumbers, Colors
+      CUDA, FileIO, FixedPointNumbers, Colors
 using DynamicGrids: Extent, SimData, gridview
 
-# if CUDAKernels.CUDA.has_cuda_gpu()
-    # CUDAKernels.CUDA.allowscalar(false)
+# if CUDA.has_cuda_gpu()
+    # CUDA.allowscalar(false)
     # hardware = (SingleCPU(), ThreadedCPU(), CPUGPU(), CuGPU())
 # else
     hardware = (SingleCPU(), ThreadedCPU(), CPUGPU())
@@ -19,7 +19,7 @@ opt = NoOpt()
 # life glider sims
 
 # Test all cycled variants of the array
-cyclei!(arrays) = begin
+cycle_i!(arrays) = begin
     for A in arrays
         v = A[1, :]
         @inbounds copyto!(A, CartesianIndices((1:size(A, 1)-1, 1:size(A, 2))),
@@ -28,7 +28,7 @@ cyclei!(arrays) = begin
     end
 end
 
-cyclej!(arrays) = begin
+cycle_j!(arrays) = begin
     for A in arrays
         v = A[:, 1]
         @inbounds copyto!(A, CartesianIndices((1:size(A, 1), 1:size(A, 2)-1)),
@@ -150,9 +150,8 @@ test = test5_6
                     opt=opt,
                 )
                 @testset "$(nameof(typeof(proc))) $(nameof(typeof(opt))) results match glider behaviour" begin
-                    (output = ArrayOutput(test[:init], tspan=tspan)); sim!(output, ruleset)
-                    @test output[2] == test[:test2]
-                    # || (println(2); display(output[2]); display(test[:test2]))
+                    (output = ArrayOutput(test[:init]; tspan)); sim!(output, ruleset)
+                    @test output[2] == test[:test2] # || (println(2); display(output[2]); display(test[:test2]))
                     @test output[3] == test[:test3] # || (println(3); display(output[3]); display(test[:test3]))
                     @test output[4] == test[:test4] # || (println(4); display(output[4]); display(test[:test4]))
                     @test output[5] == test[:test5] # || (println(5); display(output[5]); display(test[:test5]))
@@ -176,9 +175,9 @@ test = test5_6
                     @test Array(gridview(first(simdata))) == test[:test7] || (println("s7"); display(Array(gridview(first(simdata)))); display(test[:test7]))
                 end
             end
-            cyclej!(test)
+            cycle_j!(test)
         end
-        cyclei!(test)
+        cycle_i!(test)
     end
     nothing
 end
@@ -358,7 +357,7 @@ end
                 @test DynamicGrids.tspan(output) == Date(2010, 4):Month(1):Date(2010, 7)
                 resume!(output, ruleset; tstop=Date(2010, 10))
                 @test DynamicGrids.tspan(output) == Date(2010, 4):Month(1):Date(2010, 10)
-                @test_broken output[end] == test6_7[:test7]
+                @test output[end] == test6_7[:test7]
             end
         end
     end
@@ -431,7 +430,7 @@ end
 @testset "Single dimension rules" begin
     init = zeros(Int, 7)
     init[6] = true
-    rule110 = Neighbors(Moore(1; ndims=1)) do data, hood, c, I
+    rule110 = Neighbors(Moore{1,1}()) do data, hood, c, I
         l, r = neighbors(hood)
         (c + r + c * r + l * c * r) % 2
     end
