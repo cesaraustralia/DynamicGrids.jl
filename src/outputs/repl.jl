@@ -95,11 +95,11 @@ function _replframe(o, frame::AbstractArray{<:Any,N}, currentframe) where N
         # For 1D we show all the rows every time
         tlen = length(tspan(o))
         rowstrings = map(f - nrows + 1:f) do i
-            framewindow1 = view(adapt(Array, frames(o)[i]), rnge) 
+            framewindow1 = view(Adapt.adapt(Array, frames(o)[i]), rnge) 
             framewindow2 = if i == tlen
                 framewindow1
             else
-                view(adapt(Array, frames(o)[i]), rnge) 
+                view(Adapt.adapt(Array, frames(o)[i]), rnge) 
             end
             charfunc(PermutedDimsArray(hcat(framewindow1, framewindow2), (2, 1)), o.cutoff)
         end
@@ -110,7 +110,7 @@ function _replframe(o, frame::AbstractArray{<:Any,N}, currentframe) where N
 
         yrange = max(1, ystep * yoffset):min(youtput, ystep * (dispy + yoffset - 1))
         xrange = max(1, xstep * xoffset):min(xoutput, xstep * (dispx + xoffset - 1))
-        framewindow = view(adapt(Array, frame), yrange, xrange) # TODO make this more efficient on GPU
+        framewindow = view(Adapt.adapt(Array, frame), yrange, xrange) # TODO make this more efficient on GPU
         return charfunc(framewindow, o.cutoff)
     end
 end

@@ -7,26 +7,27 @@ module DynamicGrids
 end DynamicGrids
 
 
-using Adapt,
-      Colors,
+import Adapt,
       ConstructionBase,
+      FreeTypeAbstraction,
+      Reexport,
+      Requires,
+      REPL
+
+using Colors,
       Crayons,
       DimensionalData,
-      FreeTypeAbstraction,
       FileIO,
       LinearAlgebra,
       KernelAbstractions,
       Stencils,
       OffsetArrays,
-      REPL,
-      Reexport,
-      Requires,
       Setfield,
       StaticArrays,
       Test,
       UnicodeGraphics
 
-@reexport using ModelParameters
+Reexport.@reexport using ModelParameters
 
 import ModelParameters.Flatten
 
@@ -146,7 +147,7 @@ function __init__()
     global terminal
     terminal = REPL.Terminals.TTYTerminal(get(ENV, "TERM", Base.Sys.iswindows() ? "" : "dumb"), stdin, stdout, stderr)
 
-    @require CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba" include("cuda.jl")
+    Requires.@require CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba" include("cuda.jl")
 end
 
 end

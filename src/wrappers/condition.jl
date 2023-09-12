@@ -26,7 +26,7 @@ modifyrule(runif::RunIf, data::AbstractSimData) = @set runif.rule = modifyrule(r
 
 @inline function Stencils.rebuild(runif::RunIf{R,W}, win) where {R,W}
     f = runif.f
-    r = rebuild(rule(runif), win)
+    r = Stencils.rebuild(rule(runif), win)
     RunIf{R,W,typeof(f),typeof(r)}(f, r)
 end
 

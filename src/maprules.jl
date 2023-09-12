@@ -222,7 +222,7 @@ function _maybemask!(
     A = source(wgrid)
     pv = padval(wgrid)
     broadcast_on_processor(proc, 1:X) do j
-        if pv == 0
+        if isnothing(pv) || pv == zero(eltype(wgrid))
             @simd for i in 1:Y
                 A[i, j] *= mask[i, j]
             end
@@ -238,7 +238,7 @@ function _maybemask!(
 ) where {Y,X}
     A = source(wgrid)
     pv = padval(wgrid)
-    if iszero(pv)
+    if isnothing(pv) || iszero(pv)
         for j in 1:X
             @simd for i in 1:Y
                 source(wgrid)[i, j] *= mask[i, j]

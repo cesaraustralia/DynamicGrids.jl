@@ -31,7 +31,7 @@ function Adapt.adapt_structure(to, o::Output)
     frames = map(o.frames) do f
         _adapt_x(to, f)
     end
-    @set! o.extent = adapt(to, o.extent)
+    @set! o.extent = Adapt.adapt(to, o.extent)
     @set! o.frames = frames
     return o
 end

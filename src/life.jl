@@ -70,7 +70,8 @@ function Life{R,W}(stencil, born, survive) where {R,W}
     Life{R,W}(stencil, born, survive, nothing)
 end
 function Life{R,W}(; 
-    stencil=Moore(1),
+    neighborhood=Moore(1), # Backwards compat
+    stencil=neighborhood,
     born=Param(3, bounds=(0, 8)),
     survive=(Param(2, bounds=(0, 8)), Param(3, bounds=(0, 8))),
 ) where {R,W}
