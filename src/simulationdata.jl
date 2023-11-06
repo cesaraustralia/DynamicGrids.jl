@@ -170,10 +170,10 @@ function _buildgrids(extent, ruleset, s::Val, radii::NamedTuple)
 end
 function _buildgrids(extent, ruleset, ::Val{S}, ::Val{R}, init, padval) where {S,R}
     hood = Window{R}() 
-    pad = Halo{:out}() # We always pad out in DynamicGrids - it should pay back for multiple time steps?
+    pad = Halo{:out}() # We always pad out in DynamicGrids - it should pay back for multiple time steps
     bc = _boundary(boundary(ruleset), padval)
     GridData{ReadMode,S,R}(
-        init, hood, bc, pad, proc(ruleset), opt(ruleset), mask(extent)
+        init, hood, bc, pad, proc(ruleset), opt(ruleset), mask(extent), padval
     )
 end
 

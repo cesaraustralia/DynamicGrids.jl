@@ -43,7 +43,7 @@ function maprule!(data::AbstractSimData, ruletype::Val{<:SetRule}, rule)
     _maybemask!(wgrids)
     return _replacegrids(data, wkeys, _to_readonly(switch(wgrids)))
 end
-# SetGridRule (not actually broadcast - it applies to the whole grid manually)
+# SetGridRule
 function maprule!(data::AbstractSimData, ruletype::Val{<:SetGridRule}, rule)
     rkeys, rgrids = _getreadgrids(rule, data)
     wkeys, wgrids = _getwritegrids(WriteMode, rule, data)
@@ -61,15 +61,15 @@ _update_boundary!(gs::Union{NamedTuple,Tuple}) = map(_update_boundary!, gs)
 _update_boundary!(g::GridData) = update_boundary!(g)
 
 # Most Rules
-# 2 dimensional, with processor selection and optimisations in `broadcast_with_optimisation`
-# function maprule!(data::AbstractSimData{<:Tuple{Y,X}}, proc::CPU, opt, ruletype::Val, rule, rkeys, wkeys) where {Y,X}
-#     let data=data, proc=proc, opt=opt, rule=rule,
-#         rkeys=rkeys, wkeys=wkeys, ruletype=ruletype
-#         broadcast_with_optimisation(data, proc, opt, ruletype, rkeys) do I 
-#             cell_kernel!(data, ruletype, rule, rkeys, wkeys, I...)
-#         end
-#     end
-# end
+# 2 dimensional, with processor selection and optimisations in `map_with_optimisation`
+function maprule!(data::AbstractSimData{<:Any,<:Tuple{Y,X}}, proc::CPU, opt, ruletype::Val, rule, rkeys, wkeys) where {Y,X}
+    let data=data, proc=proc, opt=opt, rule=rule,
+        rkeys=rkeys, wkeys=wkeys, ruletype=ruletype
+        map_with_optimisation(data, proc, opt, ruletype, rkeys) do I 
+            cell_kernel!(data, ruletype, rule, rkeys, wkeys, I...)
+        end
+    end
+end
 # Arbitrary dimensions, no processor or optimisation selection beyond CPU/GPU
 function maprule!(data::AbstractSimData, proc::CPU, opt, ruletype::Val, rule, rkeys, wkeys)
     let data=data, proc=proc, opt=opt, rule=rule,
@@ -82,25 +82,25 @@ end
 
 # Neighborhood rules
 # 2 dimensional, with processor selection and optimisations
-# function maprule!(
-#     data::AbstractSimData{<:Tuple{Y,X}}, proc::CPU, opt, ruletype::Val{<:NeighborhoodRule}, 
-#     rule, rkeys, wkeys
-# ) where {Y,X}
-#     hoodgrid = _firstgrid(data, rkeys)
-#     let data=data, hoodgrid=hoodgrid, proc=proc, opt=opt, ruletyp=ruletype, rule=rule, rkeys=rkeys, wkeys=wkeys
-#         B = 2radius(hoodgrid)
-#         # UNSAFE: we must avoid sharing status blocks, it could cause race conditions 
-#         # when setting status from different threads. So we split the grid in 2 interleaved
-#         # sets of rows, so that we never run adjacent rows simultaneously
-#         broacast_on_processor(proc, 1:2:_indtoblock(Y, B)) do bi
-#             row_kernel!(data, hoodgrid, proc, opt, ruletype, rule, rkeys, wkeys, bi)
-#         end
-#         broacast_on_processor(proc, 2:2:_indtoblock(Y, B)) do bi
-#             row_kernel!(data, hoodgrid, proc, opt, ruletype, rule, rkeys, wkeys, bi)
-#         end
-#     end
-#     return nothing
-# end
+function maprule!(
+    data::AbstractSimData{<:Any,<:Tuple{Y,X}}, proc::CPU, opt, ruletype::Val{<:NeighborhoodRule}, 
+    rule, rkeys, wkeys
+) where {Y,X}
+    hoodgrid = _firstgrid(data, rkeys)
+    let data=data, hoodgrid=hoodgrid, proc=proc, opt=opt, ruletyp=ruletype, rule=rule, rkeys=rkeys, wkeys=wkeys
+        B = 2radius(hoodgrid)
+        # UNSAFE: we must avoid sharing status blocks, it could cause race conditions 
+        # when setting status from different threads. So we split the grid in 2 interleaved
+        # sets of rows, so that we never run adjacent rows simultaneously
+        map_on_processor(proc, 1:2:_indtoblock(Y, B)) do bi
+            row_kernel!(data, hoodgrid, proc, opt, ruletype, rule, rkeys, wkeys, bi)
+        end
+        map_on_processor(proc, 2:2:_indtoblock(Y, B)) do bi
+            row_kernel!(data, hoodgrid, proc, opt, ruletype, rule, rkeys, wkeys, bi)
+        end
+    end
+    return nothing
+end
 # Arbitrary dimensions, no processor or optimisation selection beyond CPU/GPU
 function maprule!(
     data::AbstractSimData, proc::CPU, opt, ruletype::Val{<:NeighborhoodRule}, rule, rkeys, wkeys
@@ -115,24 +115,24 @@ end
 
 ### Rules that don't need a stencil window ####################
 
-# broadcast_with_optimisation
+# map_with_optimisation
 # Map kernel over the grid, specialising on PerformanceOpt.
 
 # Run kernel over the whole grid, cell by cell:
-function broadcast_with_optimisation(
+function map_with_optimisation(
     f, simdata::AbstractSimData{S}, proc, ::NoOpt, ::Val{<:Rule}, rkeys
 ) where S<:Tuple{Y,X} where {Y,X}
-    broadcast_on_processor(proc, 1:X) do j
+    map_on_processor(proc, 1:X) do j
         for i in 1:Y
             f((i, j)) # Run rule for each row in column j
         end
     end
 end
 # Use @simd for CellRule
-function broadcast_with_optimisation(
+function map_with_optimisation(
     f, simdata::AbstractSimData{S}, proc, ::NoOpt, ::Val{<:CellRule}, rkeys
 ) where S<:Tuple{Y,X} where {Y,X}
-    broadcast_on_processor(proc, 1:X) do j
+    map_on_processor(proc, 1:X) do j
         @simd for i in 1:Y
             f((i, j)) # Run rule for each row in column j
         end
@@ -143,13 +143,13 @@ end
 # Map kernel over the grid, specialising on the processor
 #
 # Looping over cells or blocks on a single CPU
-@inline function broadcast_on_processor(f, proc::SingleCPU, range)
+@inline function map_on_processor(f, proc::SingleCPU, range)
     for n in range
         f(n) # Run rule over each column
     end
 end
 # Or threaded on multiple CPUs
-@inline function broadcast_on_processor(f, proc::ThreadedCPU, range)
+@inline function map_on_processor(f, proc::ThreadedCPU, range)
     Threads.@threads for n in range
         f(n) # Run rule over each column, threaded
     end
@@ -185,7 +185,7 @@ end
 # data in the stencil windows array across by one column. This saves on reads
 # from the main array.
 function row_kernel!(
-    simdata::AbstractSimData, grid::GridData{<:Tuple{Y,X},R}, proc, opt::NoOpt,
+    simdata::AbstractSimData, grid::GridData{<:Any,<:Tuple{Y,X},R}, proc, opt::NoOpt,
     ruletype::Val, rule::Rule, rkeys, wkeys, bi
 ) where {Y,X,R}
     B = 2R
@@ -220,15 +220,15 @@ function _maybemask!(
     wgrid::GridData{<:GridMode,<:Tuple{Y,X}}, proc::CPU, mask::AbstractArray
 ) where {Y,X}
     A = source(wgrid)
-    pv = padval(wgrid)
-    broadcast_on_processor(proc, 1:X) do j
-        if isnothing(pv) || pv == zero(eltype(wgrid))
+    mv = maskval(wgrid)
+    map_on_processor(proc, 1:X) do j
+        if isnothing(mv) || mv == zero(eltype(wgrid))
             @simd for i in 1:Y
                 A[i, j] *= mask[i, j]
             end
         else
             @simd for i in 1:Y
-                A[i, j] = mask[i, j] ? A[i, j] : pv
+                A[i, j] = mask[i, j] ? A[i, j] : mv
             end
         end
     end
@@ -237,19 +237,11 @@ function _maybemask!(
     wgrid::GridData{<:GridMode,<:Tuple{Y,X}}, proc, mask::AbstractArray
 ) where {Y,X}
     A = source(wgrid)
-    pv = padval(wgrid)
-    if isnothing(pv) || iszero(pv)
-        for j in 1:X
-            @simd for i in 1:Y
-                source(wgrid)[i, j] *= mask[i, j]
-            end
-        end
+    mv = maskval(wgrid)
+    if isnothing(mv) || iszero(mv)
+        source_array_or_view(wgrid) .*= mask
     else
-        for j in 1:X
-            @simd for i in 1:Y
-                A[i, j] = mask[i, j] ? A[i, j] : pv
-            end
-        end
+        A .= ((a, m) -> m ? a : mv).(A, mask)
     end
 end
 

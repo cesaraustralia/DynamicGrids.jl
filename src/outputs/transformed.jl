@@ -78,3 +78,5 @@ end
 
 init_output_grids!(o::TransformedOutput, init) = nothing
 initdata!(o::TransformedOutput, init) = nothing
+
+Adapt.adapt_structure(to, o::TransformedOutput) = o

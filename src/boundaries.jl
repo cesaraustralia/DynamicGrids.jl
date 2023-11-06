@@ -25,7 +25,3 @@ end
 
 @inline _isinbounds(size::Tuple, I...) = all(map(_isinbounds, size, I))
 @inline _isinbounds(size, i) = i >= one(i) && i <= size
-
-Stencils.after_update_boundary!(g::GridData) = _wrapopt!(g, opt(g))
-
-_wrapopt!(g, ::PerformanceOpt) = g

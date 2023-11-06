@@ -26,7 +26,7 @@ abstract type AbstractGridData{Mode,S,R,T,N,A,H,B,P} <: Stencils.AbstractSwitchi
 function (::Type{G})(
     d::AbstractGridData{<:Any,S,R,T,N,A}
 ) where {G<:AbstractGridData{<:GridMode},S,R,T,N,A}
-    args = stencil(d), boundary(d), padding(d), proc(d), opt(d), optdata(d), mask(d)
+    args = stencil(d), boundary(d), padding(d), proc(d), opt(d), optdata(d), mask(d), maskval(d)
     G{S,R,T,N,A,map(typeof, args)...}(source(d), dest(d), args...)
 end
 
@@ -35,6 +35,7 @@ proc(d::AbstractGridData) = d.proc
 opt(d::AbstractGridData) = d.opt
 optdata(d::AbstractGridData) = d.optdata
 mask(d::AbstractGridData) = d.mask
+maskval(d::AbstractGridData) = d.maskval
 
 # Get the size of the grid
 gridsize(d::AbstractGridData) = size(d)
@@ -79,7 +80,7 @@ Has `ReadMode`, `WriteMode` and `SwitchMode` to control behaviour.
 Reads are always from the `source` array.
 """
 struct GridData{
-    Mode,S<:Tuple,R,T,N,A,H,B,P,Pr<:Processor,Op<:PerformanceOpt,OpD,Ma
+    Mode,S<:Tuple,R,T,N,A,H,B,P,Pr<:Processor,Op<:PerformanceOpt,OpD,Ma,MV
 } <: AbstractGridData{Mode,S,R,T,N,A,H,B,P}
     source::A
     dest::A
@@ -90,17 +91,18 @@ struct GridData{
     opt::Op
     optdata::OpD
     mask::Ma
+    maskval::MV
 end
 function GridData{Mode,S,R}(
     source::A, dest::A, stencil::H, boundary::B, padding::P,
-    proc::Pr, opt::Op, optdata::OpD, mask::Ma,
-) where {Mode,S,R,A<:AbstractArray{T,N},H,B,P,Pr,Op,OpD,Ma} where {T,N}
-    GridData{Mode,S,R,T,N,A,H,B,P,Pr,Op,OpD,Ma}(
-        source, dest, stencil, boundary, padding, proc, opt, optdata, mask
+    proc::Pr, opt::Op, optdata::OpD, mask::Ma, maskval::MV
+) where {Mode,S,R,A<:AbstractArray{T,N},H,B,P,Pr,Op,OpD,Ma,MV} where {T,N}
+    GridData{Mode,S,R,T,N,A,H,B,P,Pr,Op,OpD,Ma,MV}(
+        source, dest, stencil, boundary, padding, proc, opt, optdata, mask, maskval
     )
 end
 @inline function GridData{Mode,S,R}(
-    init::AbstractArray{<:Any,N}, stencil::Stencil, boundary::BoundaryCondition, padding::Padding, proc, opt, mask
+    init::AbstractArray{<:Any,N}, stencil::Stencil, boundary::BoundaryCondition, padding::Padding, proc, opt, mask, maskval
 ) where {Mode,S,R,N}
     # If the grid radius is larger than zero we pad it as an OffsetArray
     if R > 0
@@ -116,7 +118,7 @@ end
     optdata = _build_optdata(opt, source, R)
 
     grid = GridData{Mode,S,R}(
-        source, dest, stencil, boundary, padding, proc, opt, optdata, mask
+        source, dest, stencil, boundary, padding, proc, opt, optdata, mask, maskval
     )
     update_boundary!(grid)
     return grid
@@ -196,10 +198,9 @@ function Stencils.switch(grids::NamedTuple{<:Any,Tuple{T,Vararg}}) where {T<:Gri
 end
 function Stencils.switch(A::T) where {T<:GridData{<:SwitchMode}}
     od = switch(opt(A), optdata(A))
-    T(dest(A), source(A), stencil(A), boundary(A), padding(A), proc(A), opt(A), od, mask(A))
+    T(dest(A), source(A), stencil(A), boundary(A), padding(A), proc(A), opt(A), od, mask(A), maskval(A))
 end
 Stencils.switch(::PerformanceOpt, optdata) = optdata
 
 Stencils.after_update_boundary!(grid::GridData) = Stencils.after_update_boundary!(grid, opt(grid))
 Stencils.after_update_boundary!(grid::GridData, opt) = grid
-

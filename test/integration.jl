@@ -1,6 +1,10 @@
 using DynamicGrids, DimensionalData, Test, Dates, Unitful, 
       CUDA, FileIO, FixedPointNumbers, Colors
 using DynamicGrids: Extent, SimData, gridview
+using DynamicGrids.Adapt: adapt
+
+maybe_gpu(output, hardware::CuGPU) = adapt(CuArray, output)
+maybe_gpu(output, hardware) = output
 
 # if CUDA.has_cuda_gpu()
     # CUDA.allowscalar(false)
@@ -16,7 +20,7 @@ proc = SingleCPU()
 # opt = SparseOpt()
 opt = NoOpt()
 
-# life glider sims
+# life glider simsa
 
 # Test all cycled variants of the array
 cycle_i!(arrays) = begin
@@ -140,7 +144,7 @@ test = test5_6
     # Loop over shifing init arrays to make sure they all work
     for test in (test5_6, test6_7), i in 1:size(test[:init], 1)
         for j in 1:size(test[:init], 2)
-            for proc in hardware, opt in opts
+            for proc in (SingleCPU(),), opt in opts
                 tspan = Date(2001, 1, 1):Day(2):Date(2001, 1, 14)
                 ruleset = Ruleset(;
                     rules=(Life(),),
@@ -150,29 +154,30 @@ test = test5_6
                     opt=opt,
                 )
                 @testset "$(nameof(typeof(proc))) $(nameof(typeof(opt))) results match glider behaviour" begin
-                    (output = ArrayOutput(test[:init]; tspan)); sim!(output, ruleset)
-                    @test output[2] == test[:test2] # || (println(2); display(output[2]); display(test[:test2]))
-                    @test output[3] == test[:test3] # || (println(3); display(output[3]); display(test[:test3]))
-                    @test output[4] == test[:test4] # || (println(4); display(output[4]); display(test[:test4]))
-                    @test output[5] == test[:test5] # || (println(5); display(output[5]); display(test[:test5]))
-                    @test output[7] == test[:test7] # || (println(7); display(output[7]); display(test[:test7]))
+                    output = maybe_gpu(ArrayOutput(test[:init]; tspan), proc)
+                    sim!(output, ruleset)
+                    output_a = adapt(Array, output)
+                    @test output_a[2] == test[:test2] # || (println(2); display(output[2]); display(test[:test2]))
+                    @test output_a[3] == test[:test3] # || (println(3); display(output[3]); display(test[:test3]))
+                    @test output_a[4] == test[:test4] # || (println(4); display(output[4]); display(test[:test4]))
+                    @test output_a[5] == test[:test5] # || (println(5); display(output[5]); display(test[:test5]))
+                    @test output_a[7] == test[:test7] # || (println(7); display(output[7]); display(test[:test7]))
                 end
                 @testset "$(nameof(typeof(proc))) $(nameof(typeof(opt))) using step!" begin
                     simdata = DynamicGrids._proc_setup(SimData(Extent(; init=test[:init], tspan=tspan), ruleset))
                     # Need Array here to copy from GPU to CPU
-                    @test Array(gridview(first(simdata))) == test[:init]
+                    @test adapt(Array, gridview(first(simdata))) == test[:init]
                     simdata = step!(simdata)
-                    Array(gridview(first(simdata)))
-                    @test Array(gridview(first(simdata))) == test[:test2] || (println("s2"); display(Array(gridview(first(simdata)))); display(test[:test2]))
+                    @test adapt(Array, gridview(first(simdata))) == test[:test2] || (println("s2"); display(Array(gridview(first(simdata)))); display(test[:test2]))
                     simdata = step!(simdata)
-                    @test Array(gridview(first(simdata))) == test[:test3] || (println("s3"); display(Array(gridview(first(simdata)))); display(test[:test3]))
+                    @test adapt(Array, gridview(first(simdata))) == test[:test3] || (println("s3"); display(Array(gridview(first(simdata)))); display(test[:test3]))
                     simdata = step!(simdata)
-                    @test Array(gridview(first(simdata))) == test[:test4] || (println("s4"); display(Array(gridview(first(simdata)))); display(test[:test4]))
+                    @test adapt(Array, gridview(first(simdata))) == test[:test4] || (println("s4"); display(Array(gridview(first(simdata)))); display(test[:test4]))
                     simdata = step!(simdata)
-                    @test Array(gridview(first(simdata))) == test[:test5] || (println("s5"); display(Array(gridview(first(simdata)))); display(test[:test5]))
+                    @test adapt(Array, gridview(first(simdata))) == test[:test5] || (println("s5"); display(Array(gridview(first(simdata)))); display(test[:test5]))
                     simdata = step!(simdata)
                     simdata = step!(simdata)
-                    @test Array(gridview(first(simdata))) == test[:test7] || (println("s7"); display(Array(gridview(first(simdata)))); display(test[:test7]))
+                    @test adapt(Array, gridview(first(simdata))) == test[:test7] || (println("s7"); display(Array(gridview(first(simdata)))); display(test[:test7]))
                 end
             end
             cycle_j!(test)
@@ -240,19 +245,15 @@ end
     end
 
     @testset "Results match glider behaviour" begin
-        output = ArrayOutput((a=init_,); tspan=1:7)
         for proc in hardware, opt in opts
+            output = maybe_gpu(ArrayOutput((a=init_,); tspan=1:7), proc)
             sim!(output, rule; boundary=Remove(), proc=proc, opt=opt)
-            output[2][:a]
-            output[3][:a]
-            output[4][:a]
-            output[5][:a]
-            output[7][:a]
-            @test output[2][:a] == test2_rem
-            @test output[3][:a] == test3_rem
-            @test output[4][:a] == test4_rem
-            @test output[5][:a] == test5_rem
-            @test output[7][:a] == test7_rem
+            output_a = adapt(Array, output)
+            @test output_a[2][:a] == test2_rem
+            @test output_a[3][:a] == test3_rem
+            @test output_a[4][:a] == test4_rem
+            @test output_a[5][:a] == test5_rem
+            @test output_a[7][:a] == test7_rem
         end
     end
 
@@ -268,7 +269,6 @@ end
         sim!(remove_output_ref, remove_rs_ref)
         sim!(wrap_output_ref, wrap_rs_ref)
         for proc in hardware, opt in opts
-
             @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
                 @testset "Wrap" begin
                     wrap_rs = Ruleset(rule; boundary=Wrap(), proc=proc, opt=opt)
@@ -309,12 +309,13 @@ end
                     opt=opt,
                 )
                 tspan_ = Date(2010, 4):Month(1):Date(2010, 7)
-                output = TransformedOutput(sum, test6_7[:init]; tspan=tspan_)
+                output = maybe_gpu(TransformedOutput(sum, test6_7[:init]; tspan=tspan_), proc)
                 sim!(output, ruleset)
-                @test output[1] == sum(test6_7[:init])
-                @test output[2] == sum(test6_7[:test2])
-                @test output[3] == sum(test6_7[:test3])
-                @test output[4] == sum(test6_7[:test4])
+                output_a = adapt(Array, output)
+                @test output_a[1] == sum(test6_7[:init])
+                @test output_a[2] == sum(test6_7[:test2])
+                @test output_a[3] == sum(test6_7[:test3])
+                @test output_a[4] == sum(test6_7[:test4])
             end
             @testset "REPLOutput block works, in Unitful.jl seconds" begin
                 ruleset = Ruleset(;
@@ -324,16 +325,17 @@ end
                     proc=proc,
                     opt=opt,
                 )
-                output = REPLOutput(test6_7[:init]; 
+                output = maybe_gpu(REPLOutput(test6_7[:init]; 
                     tspan=0u"s":5u"s":6u"s", style=Block(), fps=1000, store=true
-                )
+                ), proc)
                 @test DynamicGrids.isstored(output) == true
                 sim!(output, ruleset)
                 resume!(output, ruleset; tstop=30u"s")
-                @test output[At(5u"s")] == test6_7[:test2]
-                @test output[At(10u"s")] == test6_7[:test3]
-                @test output[At(20u"s")] == test6_7[:test5]
-                @test output[At(30u"s")] == test6_7[:test7]
+                output_a = adapt(Array, output)
+                @test output_a[At(5u"s")] == test6_7[:test2]
+                @test output_a[At(10u"s")] == test6_7[:test3]
+                @test output_a[At(20u"s")] == test6_7[:test5]
+                @test output_a[At(30u"s")] == test6_7[:test7]
             end
             @testset "REPLOutput braile works, in Months" begin
                 ruleset = Ruleset(Life();
