@@ -3,13 +3,19 @@ using DynamicGrids, ModelParameters, Setfield, Test, StaticArrays,
 import DynamicGrids: applyrule, applyrule!, maprule!, ruletype, extent, source, dest,
        _getreadgrids, _getwritegrids, _combinegrids, _readkeys, _writekeys,
        SimData, GridData, WriteMode, Rule, Extent, CPUGPU, stencilkey
+using DynamicGrids.Adapt: adapt
 
-# if CUDA.has_cuda_gpu()
-    # CUDA.allowscalar(false)
-    # hardware = (SingleCPU(), ThreadedCPU(), CPUGPU(), CuGPU())
-# else
+maybe_gpu(output, hardware::CuGPU) = adapt(CuArray, output)
+maybe_gpu(output, hardware) = output
+
+if CUDA.has_cuda_gpu()
+    CUDA.allowscalar(false)
+    hardware = (SingleCPU(), ThreadedCPU(), CPUGPU(), CuGPU())
+else
     hardware = (SingleCPU(), ThreadedCPU(), CPUGPU())
-# end
+end
+
+opts = (NoOpt(), SparseOpt())
 
 init  = [0 1 1 0
          0 1 1 0
@@ -17,7 +23,9 @@ init  = [0 1 1 0
          0 1 1 0
          0 1 1 0]
 
+proc = CuGPU()
 proc = SingleCPU()
+opt = SparseOpt()
 opt = NoOpt()
 
 @testset "Generic rule constructors" begin
@@ -180,8 +188,8 @@ end
                 end
             end
         end
-        output = ArrayOutput(init; tspan=1:2)
-        for proc in hardware, opt in (NoOpt(), SparseOpt())
+        for proc in hardware, opt in opts
+            output = maybe_gpu(ArrayOutput(init; tspan=1:2), proc)
             @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
                 ref_output = [1 1 1 0
                               0 1 0 0
@@ -189,7 +197,7 @@ end
                               1 1 2 0
                               0 2 1 1]
                 sim!(output, rule, proc=proc, opt=opt)
-                @test output[2] == ref_output
+                @test adapt(Array, output[2]) == ref_output
             end
         end
     end
@@ -201,8 +209,8 @@ end
                 data[pos...] = 1 
             end
         end
-        output = ArrayOutput(init; tspan=1:2)
-        for proc in hardware, opt in (NoOpt(), SparseOpt())
+        for proc in hardware, opt in opts
+            output = maybe_gpu(ArrayOutput(init; tspan=1:2), proc)
             @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
                 ref_output = [1 1 1 0
                               0 1 0 0
@@ -210,7 +218,7 @@ end
                               1 1 1 0
                               0 1 1 1]
                 sim!(output, rule, proc=proc, opt=opt)
-                @test output[2] == ref_output
+                @test adapt(Array, output[2]) == ref_output
             end
         end
     end
@@ -224,14 +232,14 @@ end
              0 1 0 0
              0 0 1 0]
     @testset "add!" begin
-        output = ArrayOutput(init; tspan=1:2)
         rule = SetCell() do data, state, I
             if state > 0
                 pos = I[1] - 2, I[2]
                 isinbounds(data, pos) && add!(first(data), 1, pos...)
             end
         end
-        for proc in hardware, opt in (NoOpt(), SparseOpt())
+        for proc in hardware, opt in opts
+            output = maybe_gpu(ArrayOutput(init; tspan=1:2), proc)
             @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
                 sim!(output, rule; proc=proc, opt=opt)
                 ref_out = [0 1 0 0
@@ -239,7 +247,7 @@ end
                            0 0 1 0
                            0 1 0 0
                            0 0 1 0]
-                @test output[2] == ref_out
+                @test adapt(Array, output[2]) == ref_out
             end
         end
     end
@@ -294,21 +302,20 @@ DynamicGrids.applyrule(data, ::AddOneRule, state, args...) = state + 1
     mask = Bool[0 1 0
                 0 1 1
                 1 1 0]
-    ruleset1 = Ruleset(AddOneRule{:_default_,:_default_}(); opt=NoOpt())
-    ruleset2 = Ruleset(AddOneRule{:_default_,:_default_}(); opt=SparseOpt())
-    output1 = ArrayOutput(init; tspan=1:3, mask=mask)
-    output2 = ArrayOutput(init; tspan=1:3, mask=mask)
-    sim!(output1, ruleset1)
-    sim!(output2, ruleset2)
-    @test output1[1] == output2[1] == [0.0 4.0 0.0
-                                       0.0 5.0 8.0
-                                       3.0 6.0 0.0]
-    @test output1[2] == output2[2] == [0.0 5.0 0.0
-                                       0.0 6.0 9.0
-                                       4.0 7.0 0.0]
-    @test output1[3] == output2[3] == [0.0 6.0 0.0
-                                       0.0 7.0 10.0
-                                       5.0 8.0 0.0]
+    for opt in opts
+        ruleset = Ruleset(AddOneRule{:_default_,:_default_}(); opt=opt)
+        output = ArrayOutput(init; tspan=1:3, mask=mask)
+        sim!(output, ruleset)
+        @test output[1] == [0.0 4.0 0.0
+                            0.0 5.0 8.0
+                            3.0 6.0 0.0]
+        @test output[2] == [0.0 5.0 0.0
+                            0.0 6.0 9.0
+                            4.0 7.0 0.0]
+        @test output[3] == [0.0 6.0 0.0
+                            0.0 7.0 10.0
+                            5.0 8.0 0.0]
+    end
 end
 
 # Single grid rules
@@ -440,15 +447,15 @@ applyrule(data, rule::PrecalcRule, state, index) = rule.precalc[]
              2 2]
     out3  = [3 3;
              3 3]
-    for proc in hardware, opt in (NoOpt(), SparseOpt())
+    for proc in hardware, opt in opts
         @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
             rule = PrecalcRule(1)
             ruleset = Ruleset(rule; proc=proc, opt=opt)
-            output = ArrayOutput(init; tspan=1:3)
+            output = maybe_gpu(ArrayOutput(init; tspan=1:3), proc)
             sim!(output, ruleset)
             # Copy for GPU
-            @test output[2] == out2
-            @test output[3] == out3
+            @test adapt(Array, output[2]) == out2
+            @test adapt(Array, output[3]) == out3
         end
     end
 end
@@ -485,25 +492,25 @@ end
 @testset "Multi-grid rules work" begin
     init = (prey=[10. 10.], predator=[1. 0.])
     rules = DoubleY{Tuple{:predator,:prey},:prey}(), predation
-    output = ArrayOutput(init; tspan=1:3)
-    for proc in hardware, opt in (NoOpt(), SparseOpt())
+    for proc in hardware, opt in opts
+        output = maybe_gpu(ArrayOutput(init; tspan=1:3), proc)
         @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
             sim!(output, rules; opt=opt, proc=proc)
-            @test output[2] == (prey=[18. 20.], predator=[2. 0.])
-            @test output[3] == (prey=[32. 40.], predator=[4. 0.])
+            @test adapt(Array, output[2]) == (prey=[18. 20.], predator=[2. 0.])
+            @test adapt(Array, output[3]) == (prey=[32. 40.], predator=[4. 0.])
         end
     end
 end
 
 @testset "Multi-grid rules work" begin
     init = (prey=[10. 10.], predator=[0. 0.])
-    output = ArrayOutput(init; tspan=1:3)
-    for proc in hardware, opt in (NoOpt(), SparseOpt())
+    for proc in hardware, opt in opts
+        output = maybe_gpu(ArrayOutput(init; tspan=1:3), proc)
         @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
             ruleset = Ruleset((HalfX{:prey,Tuple{:prey,:predator}}(),); opt=opt, proc=proc)
             sim!(output, ruleset)
-            @test output[2] == (prey=[10. 10.], predator=[5. 5.])
-            @test output[3] == (prey=[10. 10.], predator=[5. 5.])
+            @test map(a -> adapt(Array, a), output[2]) == (prey=[10. 10.], predator=[5. 5.])
+            @test map(a -> adapt(Array, a), output[3]) == (prey=[10. 10.], predator=[5. 5.])
         end
     end
 end

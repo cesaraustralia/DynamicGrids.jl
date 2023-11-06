@@ -34,20 +34,20 @@ sourcestatus(d::GridData) = optdata(d).sourcestatus
 deststatus(d::GridData) = optdata(d).deststatus
 
 # Run kernels with SparseOpt, block by block:
-function optmap(
+function map_with_optimisation(
     f, simdata::AbstractSimData{S}, proc, ::SparseOpt, ruletype::Val{<:Rule}, rkeys
 ) where {S<:Tuple{Y,X}} where {Y,X}
     # Only use SparseOpt for single-grid rules with grid radii > 0
     grid = _firstgrid(simdata, rkeys)
     R = radius(grid)
     if R == 0
-        optmap(f, simdata, proc, NoOpt(), ruletype, rkeys)
+        map_with_optimisation(f, simdata, proc, NoOpt(), ruletype, rkeys)
         return nothing
     end
     B = 2R
     status = sourcestatus(grid)
     let f=f, proc=proc, status=status
-        procmap(proc, 1:_indtoblock(X+R, B)) do bj
+        map_on_processor(proc, 1:_indtoblock(X+R, B)) do bj
             for  bi in 1:_indtoblock(Y+R, B)
                 status[bi, bj] || continue
                 # Convert from padded block to init dimensions
@@ -68,7 +68,7 @@ function optmap(
 end
 
 function row_kernel!(
-    simdata::AbstractSimData, grid::GridData{<:Tuple{Y,X},R}, proc, opt::SparseOpt,
+    simdata::AbstractSimData, grid::GridData{<:Any,<:Tuple{Y,X},R}, proc, opt::SparseOpt,
     ruletype::Val, rule::Rule, rkeys, wkeys, bi
 ) where {Y,X,R}
     # No SparseOpt for radius 0
@@ -138,7 +138,7 @@ function row_kernel!(
             blocklen = min(Y, i + B - 1) - i + 1
             for b in 1:blocklen
                 # Set rule window
-                rule1 = setneighbors(rule, unsafe_neighbors(grid, CartesianIndex(i, j)))
+                rule1 = Stencils.rebuild(rule, unsafe_neighbors(stencil(rule), grid, CartesianIndex(i, j)))
                 # Run the rule kernel for the cell
                 writeval = cell_kernel!(simdata, ruletype, rule1, rkeys, wkeys, i + b - 1, j)
                 # Update the status for the current block
@@ -224,7 +224,7 @@ end
 
 # _wrapopt!
 # Copies status from opposite sides/corners in Wrap boundary mode
-function after_update_boundary!(grid::GridData, ::SparseOpt)
+function Stencils.after_update_boundary!(grid::GridData, ::SparseOpt)
     isnothing(optdata(grid)) && return grid
 
     status = sourcestatus(grid)

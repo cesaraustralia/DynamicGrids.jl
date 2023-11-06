@@ -99,21 +99,22 @@ end
 # copy one or multiple frames from grid/s to the Output
 function _storeframe!(output::Output, ::Type{<:AbstractArray}, data)
     grid = first(grids(data))
-    _copyto_output!(output[frameindex(output, data)], grid, proc(data))
+    _copyto_output!(output[frameindex(output, data)], grid)
 end
 function _storeframe!(output::Output, ::Type{<:NamedTuple}, data)
     map(values(grids(data)), keys(data)) do grid, key
-        _copyto_output!(output[frameindex(output, data)][key], grid, proc(data))
+        _copyto_output!(output[frameindex(output, data)][key], grid)
     end
 end
 
 # Copy cells from grid to output
-function _copyto_output!(outgrid, grid::GridData, proc)
+_copyto_output!(outgrid, grid::GridData) = _copyto_output!(outgrid, grid, proc(grid))
+function _copyto_output!(outgrid, grid::GridData, proc::CPU)
     copyto!(outgrid, CartesianIndices(outgrid), source(grid), CartesianIndices(outgrid))
 end
 # Copy cells from grid to output using multiple threads
-function _copyto_output!(outgrid, grid::GridData, proc::ThreadedCPU)
-    Threads.@threads for j in axes(outgrid, 2) 
+function _copyto_output!(outgrid, grid::GridData{<:Any,Tuple{X,Y}}, proc::ThreadedCPU) where {X, Y}
+    Threads.@threads for j in axes(outgrid, ndims(outgrid)) 
         for i in axes(outgrid, 1)
             @inbounds outgrid[i, j] = grid[i, j]
         end
