@@ -8,12 +8,12 @@ using DynamicGrids.Adapt: adapt
 maybe_gpu(output, hardware::CuGPU) = adapt(CuArray, output)
 maybe_gpu(output, hardware) = output
 
-if CUDA.has_cuda_gpu()
-    CUDA.allowscalar(false)
-    hardware = (SingleCPU(), ThreadedCPU(), CPUGPU(), CuGPU())
-else
+# if CUDA.has_cuda_gpu()
+#     CUDA.allowscalar(false)
+#     hardware = (SingleCPU(), ThreadedCPU(), CPUGPU(), CuGPU())
+# else
     hardware = (SingleCPU(), ThreadedCPU(), CPUGPU())
-end
+# end
 
 opts = (NoOpt(), SparseOpt())
 
