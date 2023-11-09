@@ -5,6 +5,10 @@ Abstract supertype for GPU processors.
 """
 abstract type GPU <: Processor end
 
+function _copyto_output!(outgrid, grid::GridData, proc::GPU)
+    copyto!(outgrid, view(grid, axes(outgrid)...))
+end
+
 """
     CPUGPU <: GPU
 
@@ -21,6 +25,21 @@ Base.Threads.unlock(opt::CPUGPU) = unlock(opt.spinlock)
 
 kernel_setup(::CPUGPU) = KernelAbstractions.CPU(), 1
 
+"""
+    CuGPU <: GPU
+
+    CuGPU()
+    CuGPU{threads_per_block}()
+
+```julia
+ruleset = Ruleset(rule; proc=CuGPU())
+# or
+output = sim!(output, rule; proc=CuGPU())
+```
+"""
+struct CuGPU{X} <: GPU end
+CuGPU() = CuGPU{32}()
+
 function maprule!(
     data::AbstractSimData, proc::GPU, opt, ruletype::Val{<:Rule}, rule, rkeys, wkeys
 )
@@ -28,6 +47,8 @@ function maprule!(
     kernel!(data, ruletype, rule, rkeys, wkeys; ndrange=gridsize(data))
     return nothing
 end
+
+kernel_setup(::CuGPU) = error("Run `using CUDA` to use CuGPU")
 
 # ka_rule_kernel!
 # Runs cell_kernel! on GPU after retrieving the global index
