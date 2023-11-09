@@ -122,43 +122,20 @@ function DynamicGrids.MakieOutput(;
     return output
 end
 
-_plot!(l, f::Observable, t) = _plot!(l, f[], f, t)
-_plot!(l, A::AbstractArray, f::Observable, t) = _plot_array!(l, A, f, t)
-function _plot!(l, ::NamedTuple, f::Observable, t)
-    A = lift(f) do nt
-        first(f)
-    end
-    _plot_array!(l, first(f[]), A, t)
-end
-
-function _plot_array!(l, ::AbstractArray{<:Any,2}, f::Observable, t)
-    axis = Axis(l[1, 1]; aspect=1)
-    hidedecorations!(axis)
-    image!(axis, f; interpolate=false, colormap=:viridis)
-end
-function _plot_array!(l, ::AbstractArray{<:Any,3}, f::Observable, t)
-    axis = Axis(l[1, 1]; aspect=1)
-    hidedecorations!(axis)
-    volume!(axis, f; colormap=:viridis)
-end
-
-# # Base interface
+# Base interface
 Base.display(o::MakieOutput) = display(o.fig)
 
-# # DynamicGrids interface
+# DynamicGrids interface
 DynamicGrids.isasync(o::MakieOutput) = true
 DynamicGrids.ruleset(o::MakieOutput) = o.ruleset
 function DynamicGrids.showframe(frame::NamedTuple, o::MakieOutput, data)
     # Update simulation image, makeing sure any errors are printed in the REPL
     try
-        # println("writing frame to observable")
         if keys(frame) == (:_default_,)
             o.frame_obs[] = first(frame)
         else
             o.frame_obs[] = frame
         end
-        # println("notifying frame observable")
-        # println("notifying time observable")
         o.t_obs[] = DG.currentframe(data)
         notify(o.t_obs)
     catch e
@@ -166,6 +143,9 @@ function DynamicGrids.showframe(frame::NamedTuple, o::MakieOutput, data)
     end
     return nothing
 end
+
+
+# Widget buliding
 
 function attach_sliders!(f::Function, fig, model::AbstractModel; grid=fig, kw...)
     attach_sliders!(fig, model; kw..., f=f)
@@ -176,9 +156,11 @@ function attach_sliders!(fig, model::AbstractModel;
 )
     length(DynamicGrids.params(model)) == 0 && return
 
+    slidergrid, slider_obs = param_sliders!(fig, model; grid, slider_kw)
+
+    # TODO: sliders in columns
     # sliderbox = if submodel === Nothing
         # objpercol = 3
-    slidergrid, slider_obs = param_sliders!(fig, model; grid, slider_kw)
         # _in_columns(sliders, ncolumns, objpercol)
     # else
         # objpercol = 1
@@ -229,7 +211,7 @@ function param_sliders!(fig, model::AbstractModel; grid=fig, throttle=0.1, slide
         map(x -> "", values)
     end
 
-    # Set mouse hover text
+    # TODO Set mouse hover text
     # attributes = map(model[:component], labels, descriptions) do p, n, d
     #     desc = d == "" ? "" : string(": ", d)
     #     Dict(:title => "$p.$n $desc")
@@ -254,8 +236,8 @@ end
 function _add_control_widgets!(
     fig, grid, o::Output, simdata::AbstractSimData, ruleset::Ruleset, extrainit, sim_kw
 )
-    # We use the init dropdown for the simulation init, even if we don't
-    # show the dropdown because it only has 1 option.
+    # We use the init dropdown for the simulation init, 
+    # even if we don't show the dropdown because it only has 1 option.
     extrainit[:init] = deepcopy(DynamicGrids.init(o))
 
     # Buttons
@@ -327,9 +309,6 @@ function _add_control_widgets!(
     return nothing
 end
 
-
-# Widget buliding
-
 function _makerange(bounds::Tuple, val::T) where T
     SLIDER_STEPS = 100
     b1, b2 = map(T, bounds)
@@ -372,6 +351,26 @@ function _in_columns(grid, objects, ncolumns, objpercol)
 
         end
     end
+end
+
+# Default plotting
+_plot!(l, f::Observable, t) = _plot!(l, f[], f, t)
+_plot!(l, A::AbstractArray, f::Observable, t) = _plot_array!(l, A, f, t)
+function _plot!(l, ::NamedTuple, f::Observable, t)
+    A = lift(f) do nt
+        first(f)
+    end
+    _plot_array!(l, first(f[]), A, t)
+end
+function _plot_array!(l, ::AbstractArray{<:Any,2}, f::Observable, t)
+    axis = Axis(l[1, 1]; aspect=1)
+    hidedecorations!(axis)
+    image!(axis, f; interpolate=false, colormap=:viridis)
+end
+function _plot_array!(l, ::AbstractArray{<:Any,3}, f::Observable, t)
+    axis = Axis(l[1, 1]; aspect=1)
+    hidedecorations!(axis)
+    volume!(axis, f; colormap=:viridis)
 end
 
 end
