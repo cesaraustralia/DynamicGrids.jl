@@ -73,7 +73,7 @@ export ParameterSource, Aux, Grid, Delay, Lag, Frame
 
 export Output, ArrayOutput, ResultOutput, TransformedOutput
 
-export GraphicOutput, REPLOutput
+export GraphicOutput, REPLOutput, MakieOutput
 
 export ImageOutput, GifOutput
 
@@ -125,6 +125,7 @@ include("outputs/schemes.jl")
 include("outputs/textconfig.jl")
 include("outputs/render.jl")
 include("outputs/image.jl")
+include("outputs/makie.jl")
 include("outputs/array.jl")
 include("outputs/transformed.jl")
 include("outputs/repl.jl")

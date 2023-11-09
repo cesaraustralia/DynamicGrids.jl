@@ -10,12 +10,17 @@ abstract type AbstractSimSettings end
 
 Holds settings for the simulation, inside a `Ruleset` or `SimData` object.
 """
-Base.@kwdef struct SimSettings{B,P,O,C,T} <: AbstractSimSettings
-    boundary::B = Remove()
-    proc::P = SingleCPU()
-    opt::O = NoOpt()
-    cellsize::C = 1
-    timestep::T = nothing
+struct SimSettings{B,P,O,C,T} <: AbstractSimSettings
+    boundary::B
+    proc::P
+    opt::O
+    cellsize::C
+    timestep::T
+end
+function SimSettings(;
+    boundary=Remove(), proc=SingleCPU(), opt=NoOpt(), cellsize=1, timestep=nothing, kw...
+)
+    SimSettings(boundary, proc, opt, cellsize, timestep)
 end
 
 boundary(s::AbstractSimSettings) = s.boundary

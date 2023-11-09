@@ -28,9 +28,11 @@ UnicodeGraphics = "ebadf6b4-db70-5817-83da-4a19ad584e34"
 
 [weakdeps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 
 [extensions]
 DynamicGridsCUDAExt = "CUDA"
+DynamicGridsMakieExt = "Makie"
 
 [compat]
 Adapt = "2, 3"
@@ -43,6 +45,7 @@ DocStringExtensions = "0.8, 0.9"
 FileIO = "1"
 FreeTypeAbstraction = "^0.6.5, 0.8, 0.9, 0.10"
 KernelAbstractions = "0.9"
+Makie = "0.19"
 ModelParameters = "0.3, 0.4"
 OffsetArrays = "0.11, 1"
 Reexport = "0.2, 1"
@@ -62,6 +65,7 @@ ImageMagick = "6218d12a-5da1-5696-b52f-db25d2ecc6d1"
 SafeTestsets = "1bc83da4-3b8d-516f-aca4-4fe02f6d838f"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
+WGLMakie = "276b4fcb-3e11-5398-bf8b-a0c2d153d008"
 
 [targets]
-test = ["Aqua", "BenchmarkTools", "ColorSchemes", "CUDA", "FixedPointNumbers", "ImageMagick", "SafeTestsets", "StaticArrays", "Unitful"]
+test = ["Aqua", "BenchmarkTools", "ColorSchemes", "CUDA", "FixedPointNumbers", "ImageMagick", "SafeTestsets", "StaticArrays", "Unitful", "WGLMakie"]
