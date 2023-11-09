@@ -2,8 +2,6 @@ module DynamicGridsCUDA
 
 using CUDA, DynamicGrids, ModelParameters
 
-export CuGPU
-
 # CUDA setup
 
 DynamicGrids.kernel_setup(::CuGPU{N}) where N = CUDA.CUDAKernels.CUDABackend(), (N, N)

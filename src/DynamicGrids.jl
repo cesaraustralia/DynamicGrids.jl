@@ -64,7 +64,7 @@ export AbstractRuleset, Ruleset, StaticRuleset
 
 export AbstractSimData
 
-export Processor, SingleCPU, ThreadedCPU, CPUGPU
+export Processor, SingleCPU, ThreadedCPU, CPUGPU, CuGPU
 
 export PerformanceOpt, NoOpt, SparseOpt
 
