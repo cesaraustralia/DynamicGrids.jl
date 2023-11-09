@@ -146,8 +146,6 @@ include("show.jl")
 function __init__()
     global terminal
     terminal = REPL.Terminals.TTYTerminal(get(ENV, "TERM", Base.Sys.iswindows() ? "" : "dumb"), stdin, stdout, stderr)
-
-    Requires.@require CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba" include("cuda.jl")
 end
 
 end
