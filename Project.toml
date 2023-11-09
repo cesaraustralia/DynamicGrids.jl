@@ -26,6 +26,12 @@ Stencils = "264155e8-78a8-466a-aa59-c9b28c34d21a"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 UnicodeGraphics = "ebadf6b4-db70-5817-83da-4a19ad584e34"
 
+[weakdeps]
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+
+[extensions]
+DynamicGridsCUDA = "CUDA"
+
 [compat]
 Adapt = "2, 3"
 Colors = "0.9, 0.10, 0.11, 0.12"
@@ -46,9 +52,6 @@ Stencils = "0.2"
 UnicodeGraphics = "0.1"
 julia = "1.9"
 
-[extensions]
-DynamicGridsCUDA = "CUDA"
-
 [extras]
 Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
@@ -62,6 +65,3 @@ Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [targets]
 test = ["Aqua", "BenchmarkTools", "ColorSchemes", "CUDA", "FixedPointNumbers", "ImageMagick", "SafeTestsets", "StaticArrays", "Unitful"]
-
-[weakdeps]
-CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
