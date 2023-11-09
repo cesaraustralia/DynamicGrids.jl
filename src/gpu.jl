@@ -44,6 +44,8 @@ function maprule!(
     return nothing
 end
 
+kernel_setup(::CuGPU) = error("Run `using CUDA` to use CuGPU")
+
 # ka_rule_kernel!
 # Runs cell_kernel! on GPU after retrieving the global index
 # and setting the stencil buffer to a SArray window retrieved 
