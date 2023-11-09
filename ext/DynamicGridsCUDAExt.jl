@@ -4,7 +4,7 @@ using CUDA, DynamicGrids, ModelParameters
 
 # CUDA setup
 
-DynamicGrids.kernel_setup(::CuGPU{N}) where N = CUDA.CUDAKernels.CUDABackend(), (N, N)
+DynamicGrids._cuda_kernel_setup(::CuGPU{N}) where N = CUDA.CUDAKernels.CUDABackend(), (N, N)
 
 # _proc_setup
 # Convert all arrays in SimData to CuArrays

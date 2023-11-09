@@ -524,12 +524,12 @@ end
     @test Life() == Life(
         Moore(1), 
         Param(3, bounds=(0, 8)),
-        (Param(2, bounds=(0, 8)), Param(3, bounds=(0, 8)))
+        (survive1=Param(2, bounds=(0, 8)), survive2=Param(3, bounds=(0, 8)))
     )
     @test Life{:a,:b}() == Life{:a,:b}(
          Moore(1), 
          Param(3, bounds=(0, 8)),
-         (Param(2, bounds=(0, 8)), Param(3, bounds=(0, 8)))
+         (survive1=Param(2, bounds=(0, 8)), survive2=Param(3, bounds=(0, 8)))
     )
 end
 
