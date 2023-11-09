@@ -11,7 +11,6 @@ import Adapt,
       ConstructionBase,
       FreeTypeAbstraction,
       Reexport,
-      Requires,
       REPL
 
 using Colors,
