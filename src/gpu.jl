@@ -5,6 +5,10 @@ Abstract supertype for GPU processors.
 """
 abstract type GPU <: Processor end
 
+function DynamicGrids._copyto_output!(outgrid, grid::GridData, proc::GPU)
+    copyto!(outgrid, view(grid, axes(outgrid)...))
+end
+
 """
     CPUGPU <: GPU
 
