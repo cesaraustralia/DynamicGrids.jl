@@ -109,7 +109,7 @@ end
 
 # Copy cells from grid to output
 _copyto_output!(outgrid, grid::GridData) = _copyto_output!(outgrid, grid, proc(grid))
-function _copyto_output!(outgrid, grid::GridData, proc::CPU)
+function _copyto_output!(outgrid, grid::GridData, proc)
     copyto!(outgrid, CartesianIndices(outgrid), source(grid), CartesianIndices(outgrid))
 end
 # Copy cells from grid to output using multiple threads
