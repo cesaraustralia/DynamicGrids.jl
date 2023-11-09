@@ -21,6 +21,21 @@ Base.Threads.unlock(opt::CPUGPU) = unlock(opt.spinlock)
 
 kernel_setup(::CPUGPU) = KernelAbstractions.CPU(), 1
 
+"""
+    CuGPU <: GPU
+
+    CuGPU()
+    CuGPU{threads_per_block}()
+
+```julia
+ruleset = Ruleset(rule; proc=CuGPU())
+# or
+output = sim!(output, rule; proc=CuGPU())
+```
+"""
+struct CuGPU{X} <: GPU end
+CuGPU() = CuGPU{32}()
+
 function maprule!(
     data::AbstractSimData, proc::GPU, opt, ruletype::Val{<:Rule}, rule, rkeys, wkeys
 )
