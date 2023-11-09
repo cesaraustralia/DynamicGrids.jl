@@ -13,7 +13,7 @@ DynamicGrids.kernel_setup(::CuGPU{N}) where N = CUDA.CUDAKernels.CUDABackend(), 
 end
 
 # Thread-safe CUDA atomic ops
-for (f, op) in atomic_ops
+for (f, op) in DynamicGrids.ATOMIC_OPS
     atomic_f = Symbol(:atomic_, f)
     @eval begin
         function ($f)(d::GridData{<:WriteMode,<:Any,R}, ::CuGPU, x, I...) where R
