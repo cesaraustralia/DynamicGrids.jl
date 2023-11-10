@@ -64,6 +64,7 @@ aux(d::AbstractSimData, args...) = aux(extent(d), args...)
 auxframe(d::AbstractSimData, key) = auxframe(d)[_unwrap(key)]
 tspan(d::AbstractSimData) = tspan(extent(d))
 timestep(d::AbstractSimData) = step(tspan(d))
+radius(d::AbstractSimData) = max(map(radius, grids(d))...)
 
 # Calculated:
 # Get the current time for this frame
@@ -179,6 +180,7 @@ end
 
 _boundary(::Wrap, padval) = Wrap()
 _boundary(::Remove, padval) = Remove(padval)
+_boundary(::Ignore, padval) = Ignore()
 
 ConstructionBase.constructorof(::Type{<:SimData{S,N}}) where {S,N} = SimData{S,N}
 
@@ -234,8 +236,10 @@ function RuleData{S,N}(
 ) where {S,N,G,E,Se,F,CF,AF}
     RuleData{S,N,G,E,Se,F,CF,AF}(grids, extent, settings, frames, currentframe, auxframe)
 end
-function RuleData(d::AbstractSimData{S,N}) where {S,N}
-    RuleData{S,N}(grids(d), extent(d), settings(d), frames(d), currentframe(d), auxframe(d))
+function RuleData(d::AbstractSimData{S,N};
+    grids=grids(d), extent=extent(d), settings=settings(d), frames=frames(d), currentframe=currentframe(d), auxframe=auxframe(d)
+) where {S,N}
+    return RuleData{S,N}(grids, extent, settings, frames, currentframe, auxframe)
 end
 
 ConstructionBase.constructorof(::Type{<:RuleData{S,N}}) where {S,N} = RuleData{S,N}

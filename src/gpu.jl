@@ -77,3 +77,21 @@ end
 @propagate_inbounds function _setindex!(d::GridData{<:SwitchMode}, opt::GPU, x, I...)
     dest(d)[I...] = x
 end
+
+function _maybemask!(
+    wgrid::GridData{<:GridMode,<:Tuple{Y,X}}, proc::GPU, mask::AbstractArray
+) where {Y,X}
+    pv = padval(wgrid)
+    kernel! = ka_mask_kernel!(kernel_setup(proc)...)
+    kernel!(source(wgrid), mask, pv; ndrange=size(wgrid)) 
+    return nothing
+end
+
+@kernel function ka_mask_kernel!(grid, mask, padval)
+    I = @index(Global, NTuple)
+    mask[I...] ? grid[I...] : padval
+end
+@kernel function ka_mask_kernel!(grid, mask, padval::Nothing)
+    I = @index(Global, NTuple)
+    mask[I...] * grid[I...]
+end

@@ -67,7 +67,7 @@ export Processor, SingleCPU, ThreadedCPU, CPUGPU, CuGPU
 
 export PerformanceOpt, NoOpt, SparseOpt
 
-export BoundaryCondition, Remove, Wrap
+export BoundaryCondition, Remove, Wrap, Ignore
 
 export ParameterSource, Aux, Grid, Delay, Lag, Frame
 
