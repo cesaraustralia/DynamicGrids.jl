@@ -1,11 +1,11 @@
 # Atomic opterations
 
-const atomic_ops = ((:add!, :+), (:sub!, :-), (:min!, :min), (:max!, :max),
+const ATOMIC_OPS = ((:add!, :+), (:sub!, :-), (:min!, :min), (:max!, :max),
                     (:and!, :&), (:or!, :|), (:xor!, :xor))
 
 # Methods for writing to a `WriteMode` `GridData` grid with threading. These are
 # associative and commutative so that write order does not affect the result.
-for (f, op) in atomic_ops
+for (f, op) in ATOMIC_OPS
     @eval begin
         @propagate_inbounds ($f)(d::AbstractSimData, x, I...) = ($f)(first(d), x, I...)
         @propagate_inbounds ($f)(d::GridData{<:WriteMode,<:Any,R}, x, I...) where R = ($f)(d, proc(d), x, I...)

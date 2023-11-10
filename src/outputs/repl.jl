@@ -14,7 +14,7 @@ simulation frames.
 
 # Arguments:
 
-- `init`: initialisation `AbstractArrayArray` or `NamedTuple` of `AbstractArrayArray`.
+- `init`: initialisation `AbstractArray` or `NamedTuple` of `AbstractArray`.
 
 # Keywords
 
