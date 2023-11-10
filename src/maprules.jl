@@ -92,10 +92,10 @@ function maprule!(
         # UNSAFE: we must avoid sharing status blocks, it could cause race conditions 
         # when setting status from different threads. So we split the grid in 2 interleaved
         # sets of rows, so that we never run adjacent rows simultaneously
-        map_on_processor(proc, 1:2:_indtoblock(Y, B)) do bi
+        map_on_processor(proc, data, 1:2:_indtoblock(Y, B)) do bi
             row_kernel!(data, hoodgrid, proc, opt, ruletype, rule, rkeys, wkeys, bi)
         end
-        map_on_processor(proc, 2:2:_indtoblock(Y, B)) do bi
+        map_on_processor(proc, data, 2:2:_indtoblock(Y, B)) do bi
             row_kernel!(data, hoodgrid, proc, opt, ruletype, rule, rkeys, wkeys, bi)
         end
     end
@@ -122,7 +122,7 @@ end
 function map_with_optimisation(
     f, simdata::AbstractSimData{S}, proc, ::NoOpt, ::Val{<:Rule}, rkeys
 ) where S<:Tuple{Y,X} where {Y,X}
-    map_on_processor(proc, 1:X) do j
+    map_on_processor(proc, simdata, 1:X) do j
         for i in 1:Y
             f((i, j)) # Run rule for each row in column j
         end
@@ -132,7 +132,7 @@ end
 function map_with_optimisation(
     f, simdata::AbstractSimData{S}, proc, ::NoOpt, ::Val{<:CellRule}, rkeys
 ) where S<:Tuple{Y,X} where {Y,X}
-    map_on_processor(proc, 1:X) do j
+    map_on_processor(proc, simdata, 1:X) do j
         @simd for i in 1:Y
             f((i, j)) # Run rule for each row in column j
         end
@@ -143,30 +143,51 @@ end
 # Map kernel over the grid, specialising on the processor
 #
 # Looping over cells or blocks on a single CPU
-@inline function map_on_processor(f, proc::SingleCPU, range)
+@inline function map_on_processor(f, proc::SingleCPU, data, range)
     for n in range
         f(n) # Run rule over each column
     end
 end
 # Or threaded on multiple CPUs
-@inline function map_on_processor(f, proc::ThreadedCPU, range)
-    Threads.@threads for n in range
-        f(n) # Run rule over each column, threaded
+@inline function map_on_processor(f, proc::ThreadedCPU, data, rnge)
+    # We don't want to share memory between neighborhoods
+    min_cols = max(3, 2radius(data) + 1)
+    N = Threads.nthreads()
+    allchunks = collect(Iterators.partition(rnge, min_cols))
+    chunks = map(1:N) do i
+        allchunks[i:N:end]
     end
+    tasks = map(chunks) do chunk
+        Threads.@spawn begin
+            for subchunk in chunk
+                for n in subchunk
+                    f(n)
+                end
+            end
+        end
+    end
+    states = fetch.(tasks)
+    return nothing
 end
 
 # cell_kernel!
 # runs a rule for the current cell
 @inline function cell_kernel!(simdata, ruletype::Val{<:Rule}, rule, rkeys, wkeys, I...)
+    if !isnothing(mask(simdata))
+        mask(simdata)[I...] || return nothing
+    end
     readval = _readcell(simdata, rkeys, I...)
     writeval = applyrule(simdata, rule, readval, I)
     _writecell!(simdata, ruletype, wkeys, writeval, I...)
-    writeval
+    return writeval
 end
 @inline function cell_kernel!(simdata, ::Val{<:SetRule}, rule, rkeys, wkeys, I...)
+    if !isnothing(mask(simdata))
+        mask(simdata)[I...] || return nothing
+    end
     readval = _readcell(simdata, rkeys, I...)
     applyrule!(simdata, rule, readval, I)
-    nothing
+    return nothing
 end
 
 # stencil_kernel!
@@ -185,7 +206,7 @@ end
 # data in the stencil windows array across by one column. This saves on reads
 # from the main array.
 function row_kernel!(
-    simdata::AbstractSimData, grid::GridData{<:Any,<:Tuple{Y,X},R}, proc, opt::NoOpt,
+    simdata::AbstractSimData, grid::GridData{<:GridMode,<:Tuple{Y,X},R}, proc, opt::NoOpt,
     ruletype::Val, rule::Rule, rkeys, wkeys, bi
 ) where {Y,X,R}
     B = 2R
@@ -194,11 +215,9 @@ function row_kernel!(
     # Loop along the block ROW.
     blocklen = min(Y, i + B - 1) - i + 1
     for j = 1:X
-        # windows = _slide_windows(windows, src, Val{R}(), i, j)
         # Loop over the COLUMN of windows covering the block
         for b in 1:blocklen
-            rule1 = Stencils.rebuild(rule, unsafe_neighbors(stencil(rule), grid, CartesianIndex(i, j)))
-            cell_kernel!(simdata, ruletype, rule1, rkeys, wkeys, i + b - 1, j)
+            stencil_kernel!(simdata, grid, ruletype, rule, rkeys, wkeys, i + b - 1, j)
         end
     end
     return nothing
@@ -221,7 +240,7 @@ function _maybemask!(
 ) where {Y,X}
     A = source(wgrid)
     mv = maskval(wgrid)
-    map_on_processor(proc, 1:X) do j
+    map_on_processor(proc, wgrid, 1:X) do j
         if isnothing(mv) || mv == zero(eltype(wgrid))
             @simd for i in 1:Y
                 A[i, j] *= mask[i, j]

@@ -44,8 +44,7 @@ using DynamicGrids: SimData, radius, rules, _readkeys, _writekeys,
 
     @test radius(ruleset) == (b=0, c=0, d=0, e=0, a=0)
 
-    @test applyrule(data, chain, (b=1, c=1, d=1, a=1), (1, 1)) ==
-        (4, 6, 10, 3, 2)
+    @test applyrule(data, chain, (b=1, c=1, d=1, a=1), (1, 1)) == (4, 6, 10, 3, 2)
 
     # @inferred applyrule(data, chain, (b=1, c=1, d=1, a=1), (1, 1))
 

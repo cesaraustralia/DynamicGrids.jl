@@ -133,45 +133,29 @@ end
 # matching type to the simulation tspan.
 # This is called from _updatetime in simulationdata.jl
 _calc_auxframe(data::AbstractSimData) = _calc_auxframe(aux(data), data)
-function _calc_auxframe(aux::NamedTuple, data::AbstractSimData)
-    map(A -> _calc_auxframe(A, data), aux)
+function _calc_auxframe(aux::NamedTuple{K}, data::AbstractSimData) where K
+    map((A, k) -> _calc_auxframe(A, data, k), aux, NamedTuple{K}(K))
 end
-function _calc_auxframe(A::AbstractDimArray, data)
+function _calc_auxframe(A::AbstractDimArray, data, key)
     hasdim(A, TimeDim) || return nothing
     timedim = dims(A, TimeDim)
     curtime = currenttime(data)
-    firstauxtime = first(timedim)
-    # For Irregular we use `Contains` to get the nearest matching timestep
-    if span(timedim) isa Irregular
-        return DimensionalData.selectindices(timedim, Contains(curtime))
+    if !hasselection(timedim, Near(curtime)) 
+        if lookup(timedim) isa Cyclic
+            if sampling(timedim) isa Points
+                throw(ArgumentError("Time dimension of aux `$key` has no valid selection for `Contains($curtime)`. Did you mean to use `Intervals` for the time dimension `sampling`? `Contains` on `Points` defaults to `At`, and must be exact."))
+            else
+                throw(ArgumentError("Time dimension of aux `$key` has no valid selection for `Contains($curtime)`."))
+            end
+        elseif sampling(timedim) isa Points
+            throw(ArgumentError("Time dimension of aux `$key` has no valid selection for `Contains($curtime)`. Did you mean to use `Intervals` for the time dimension `sampling`? `Contains` on `Points` defaults to `At`, and must be exact."))
+        else
+            throw(ArgumentError("aux `$key` has no valid selection for `Contains($curtime)`. Did you mean to use a `Cyclic` lookup for the time dimension of the array?"))
+        end
     end
-    auxstep = step(timedim)
-    # Use julias range objects to calculate the distance between the
-    # current time and the start of the aux
-    i = if curtime >= firstauxtime
-        length(firstauxtime:auxstep:curtime)
-    else
-        1 - length(firstauxtime-timestep(data):-auxstep:curtime)
-    end
-    # TODO use a cyclic mode DimensionalArray
-    # and handle the mismatch of e.g. weeks and years
-    return _cyclic_index(i, size(A, Ti))
+    return DimensionalData.selectindices(timedim, Near(curtime))
 end
-_calc_auxframe(aux, data) = nothing
-
-# _cyclic_index
-# Cycle an index over the length of the aux data.
-function _cyclic_index(i::Integer, len::Integer)
-    return if i > len
-        rem(i + len - 1, len) + 1
-    elseif i <= 0
-        i + (i ÷ len -1) * -len
-    else
-        i
-    end
-end
-
-
+_calc_auxframe(aux, data, key) = nothing
 
 """
     Grid <: ParameterSource

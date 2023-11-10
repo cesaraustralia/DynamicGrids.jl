@@ -27,6 +27,7 @@ Ruleset
 BoundaryCondition
 Wrap
 Remove
+Ignore
 ```
 
 ### Hardware selection
