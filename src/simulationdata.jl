@@ -180,7 +180,7 @@ end
 
 _boundary(::Wrap, padval) = Wrap()
 _boundary(::Remove, padval) = Remove(padval)
-_boundary(::Ignore, padval) = Ignore()
+_boundary(::Use, padval) = Use()
 
 ConstructionBase.constructorof(::Type{<:SimData{S,N}}) where {S,N} = SimData{S,N}
 
@@ -200,13 +200,13 @@ end
 function initdata!(
     simdata::SimData, output, extent::AbstractExtent, ruleset::AbstractRuleset
 )
-    # TODO: make sure this works with delays and new outputs?
+    # TODO: make sure this works with delays and new simuloutputs?
     map(copy!, values(simdata), values(init(extent)))
     @set! simdata.extent = StaticExtent(extent)
     @set! simdata.ruleset = StaticRuleset(ruleset)
     if hasdelay(rules(ruleset)) 
-        isstored(o) || _not_stored_delay_error()
-        @set! simdata.frames = frames(o) 
+        isstored(output) || _not_stored_delay_error()
+        @set! simdata.frames = frames(output) 
     end
     return simdata
 end

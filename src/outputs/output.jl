@@ -44,7 +44,7 @@ function DimensionalData.rebuild(o::Output, data, dims::Tuple, refdims, name, me
     return DimArray(data, dims, refdims, name, metadata) 
 end
 function DimensionalData.rebuild(o::Output; 
-    data=frames(o), dims=dims(o), refdims=refdims(o), names=name(o), metadata=metadata(o), kw...
+    data=frames(o), dims=DD.dims(o), refdims=DD.refdims(o), names=DD.name(o), metadata=DD.metadata(o), kw...
 )
     return DimArray(data, dims, refdims, name, metadata) 
 end

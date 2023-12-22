@@ -67,6 +67,8 @@ _build_optdata(opt::PerformanceOpt, init, r) = nothing
 # Convert block index to regular index
 @inline _blocktoind(x::Int, blocksize::Int) = (x - 1) * blocksize + 1
 
+Base.copy!(dest::AbstractGridData, source::AbstractDimArray) = copy!(dest, parent(source))
+
 """
     GridData <: GridData
 

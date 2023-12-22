@@ -140,7 +140,7 @@ function _calc_auxframe(A::AbstractDimArray, data, key)
     hasdim(A, TimeDim) || return nothing
     timedim = dims(A, TimeDim)
     curtime = currenttime(data)
-    if !hasselection(timedim, Near(curtime)) 
+    if !hasselection(timedim, Contains(curtime)) 
         if lookup(timedim) isa Cyclic
             if sampling(timedim) isa Points
                 throw(ArgumentError("Time dimension of aux `$key` has no valid selection for `Contains($curtime)`. Did you mean to use `Intervals` for the time dimension `sampling`? `Contains` on `Points` defaults to `At`, and must be exact."))
@@ -153,9 +153,9 @@ function _calc_auxframe(A::AbstractDimArray, data, key)
             throw(ArgumentError("aux `$key` has no valid selection for `Contains($curtime)`. Did you mean to use a `Cyclic` lookup for the time dimension of the array?"))
         end
     end
-    return DimensionalData.selectindices(timedim, Near(curtime))
+    return DimensionalData.selectindices(timedim, Contains(curtime))
 end
-_calc_auxframe(aux, data, key) = nothing
+_calc_auxframe(args...) = nothing
 
 """
     Grid <: ParameterSource
