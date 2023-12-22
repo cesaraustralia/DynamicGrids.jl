@@ -102,7 +102,8 @@ ruletype(::Rule) = Rule
 @inline applyrule(rule, state, I) = applyrule(rule, state, CartesianIndex(I))
 # # Allow dropping the `I` argument
 @inline applyrule(rule, state, I::CartesianIndex) = applyrule(rule, state)
-@inline applyrule(rule, state) = applyrule(rule, state)
+# TODO add a specific method that includes all the above possible signiatures
+applyrule(rule::R, state::T) where {R,T} = throw(MethodError(applyrule, Tuple{R,T}))
 
 #= Default constructors for all Rules.
 Sets both the read and write grids to `:_default`.
