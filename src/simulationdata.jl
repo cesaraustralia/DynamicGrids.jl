@@ -173,8 +173,9 @@ function _buildgrids(extent, ruleset, ::Val{S}, ::Val{R}, init, padval) where {S
     hood = Window{R}() 
     pad = Halo{:out}() # We always pad out in DynamicGrids - it should pay back for multiple time steps
     bc = _boundary(boundary(ruleset), padval)
+    data = _replicate_init(init, replicates(extent))
     GridData{ReadMode,S,R}(
-        init, hood, bc, pad, proc(ruleset), opt(ruleset), mask(extent), padval
+        data, hood, bc, pad, proc(ruleset), opt(ruleset), mask(extent), padval, replicates(extent)
     )
 end
 
@@ -191,6 +192,7 @@ boundary(d::SimData) = boundary(ruleset(d))
 proc(d::SimData) = proc(ruleset(d))
 opt(d::SimData) = opt(ruleset(d))
 settings(d::SimData) = settings(ruleset(d))
+replicates(d::SimData) = replicates(extent(d))
 
 # When no simdata is passed in, create new AbstractSimData
 function initdata!(::Nothing, output, extent::AbstractExtent, ruleset::AbstractRuleset)
@@ -223,23 +225,41 @@ The simplified object actually passed to rules with the current design.
 
 Passing a smaller object than `SimData` to rules leads to faster GPU compilation.
 """
-struct RuleData{S<:Tuple,N,G<:NamedTuple,E,Se,F,CF,AF} <: AbstractSimData{S,N,G}
+struct RuleData{S<:Tuple,N,G<:NamedTuple,E,Se,F,CF,AF,R,V,I} <: AbstractSimData{S,N,G}
     grids::G
     extent::E
     settings::Se
     frames::F
     currentframe::CF
     auxframe::AF
+    replicates::R
+    value::V
+    indices::I
 end
 function RuleData{S,N}(
-    grids::G, extent::E, settings::Se, frames::F, currentframe::CF, auxframe::AF
-) where {S,N,G,E,Se,F,CF,AF}
-    RuleData{S,N,G,E,Se,F,CF,AF}(grids, extent, settings, frames, currentframe, auxframe)
+    grids::G, extent::E, settings::Se, frames::F, currentframe::CF, auxframe::AF, replicates::Re, value::V, indices::I
+) where {S,N,G,E,Se,F,CF,AF,Re,V,I}
+    RuleData{S,N,G,E,Se,F,CF,AF,Re,V,I}(grids, extent, settings, frames, currentframe, auxframe, replicates, value, indices)
 end
 function RuleData(d::AbstractSimData{S,N};
-    grids=grids(d), extent=extent(d), settings=settings(d), frames=frames(d), currentframe=currentframe(d), auxframe=auxframe(d)
+    grids=grids(d), 
+    extent=extent(d), 
+    settings=settings(d),
+    frames=frames(d), 
+    currentframe=currentframe(d), 
+    auxframe=auxframe(d), 
+    replicates=replicates(d),
+    value=nothing, 
+    indices=nothing,
 ) where {S,N}
-    return RuleData{S,N}(grids, extent, settings, frames, currentframe, auxframe)
+    return RuleData{S,N}(
+        grids, extent, settings, frames, currentframe, auxframe, replicates, value, indices
+    )
+end
+
+function Base.getindex(d::RuleData, key::Symbol) 
+    grid = getindex(grids(d), key)
+    @set grid.indices = d.indices
 end
 
 ConstructionBase.constructorof(::Type{<:RuleData{S,N}}) where {S,N} = RuleData{S,N}
@@ -249,4 +269,5 @@ settings(d::RuleData) = d.settings
 boundary(d::RuleData) = boundary(settings(d))
 proc(d::RuleData) = proc(settings(d))
 opt(d::RuleData) = opt(settings(d))
-
+replicates(d::RuleData) = d.replicates
+indices(d::RuleData) = d.indices

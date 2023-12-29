@@ -15,13 +15,21 @@ aux(e::AbstractExtent) = e.aux
 padval(e::AbstractExtent) = e.padval
 tspan(e::AbstractExtent) = e.tspan # Never type-stable, only access in `modifyrule` methods
 gridsize(extent::AbstractExtent) = gridsize(init(extent))
+replicates(extent::AbstractExtent) = extent.replicates
 
 Base.ndims(e::AbstractExtent{<:AbstractArray}) = ndims(init(e))
 Base.ndims(e::AbstractExtent{<:NamedTuple}) = ndims(first(init(e)))
-Base.size(e::AbstractExtent{<:AbstractArray}) = size(init(e))
-Base.size(e::AbstractExtent{<:NamedTuple}) = size(first(init(e)))
+function Base.size(e::AbstractExtent{<:AbstractArray})
+    sz = size(init(e))
+    return isnothing(replicates(e)) ? sz : (size(init(e))..., e.replicates)
+end
+function Base.size(e::AbstractExtent{<:NamedTuple})
+    sz = size(first(init(e)))
+    return isnothing(replicates(e)) ? sz : (sz..., e.replicates)
+end
 
-(::Type{T})(e::AbstractExtent) where T<:AbstractExtent = T(init(e), mask(e), aux(e), padval(e), tspan(e))
+(::Type{T})(e::AbstractExtent) where T<:AbstractExtent = 
+    T(init(e), mask(e), aux(e), padval(e), replicates(e), tspan(e))
 
 const EXTENT_KEYWORDS = """
 - `init`: initialisation `Array`/`NamedTuple` for grid/s.
@@ -53,13 +61,14 @@ $EXTENT_KEYWORDS
 mutable struct Extent{I<:Union{AbstractArray,NamedTuple},
                       M<:Union{AbstractArray,Nothing},
                       A<:Union{NamedTuple,Nothing},
-                      PV} <: AbstractExtent{I,M,A,PV}
+                      PV,R} <: AbstractExtent{I,M,A,PV}
     init::I
     mask::M
     aux::A
     padval::PV
+    replicates::R
     tspan::AbstractRange
-    function Extent(init::I, mask::M, aux::A, padval::PV, tspan::T) where {I,M,A,PV,T}
+    function Extent(init::I, mask::M, aux::A, padval::PV, replicates::R, tspan::T) where {I,M,A,PV,R,T}
         # Check grid sizes match
         if init isa NamedTuple
             gridsize = size(first(init))
@@ -80,11 +89,11 @@ mutable struct Extent{I<:Union{AbstractArray,NamedTuple},
         if (mask !== nothing) && (size(mask) != gridsize)
             throw(ArgumentError("`mask` size do not match `init`"))
         end
-        new{I,M,A,typeof(padval)}(init, mask, aux, padval, tspan)
+        new{I,M,A,typeof(padval),R}(init, mask, aux, padval, replicates, tspan)
     end
 end
-Extent(; init, mask=nothing, aux=nothing, padval=_padval(init), tspan, kw...) =
-    Extent(init, mask, aux, padval, tspan)
+Extent(; init, mask=nothing, aux=nothing, padval=_padval(init), replicates=nothing, tspan, kw...) =
+    Extent(init, mask, aux, padval, replicates, tspan)
 Extent(init::Union{AbstractArray,NamedTuple}; kw...) = Extent(; init, kw...)
 
 settspan!(e::Extent, tspan) = e.tspan = tspan
@@ -96,13 +105,14 @@ _padval(init::AbstractArray{T}) where T = zero(T)
 struct StaticExtent{I<:Union{AbstractArray,NamedTuple},
                     M<:Union{AbstractArray,Nothing},
                     A<:Union{NamedTuple,Nothing},
-                    PV,T} <: AbstractExtent{I,M,A,PV}
+                    PV,R,T} <: AbstractExtent{I,M,A,PV}
     init::I
     mask::M
     aux::A
     padval::PV
+    replicates::R
     tspan::T
 end
-StaticExtent(; init, mask=nothing, aux=nothing, padval=_padval(init), tspan, kw...) =
-    StaticExtent(init, mask, aux, padval, tspan)
+StaticExtent(; init, mask=nothing, aux=nothing, padval=_padval(init), replicates=nothing, tspan, kw...) =
+    StaticExtent(init, mask, aux, padval, replicates, tspan)
 StaticExtent(init::Union{AbstractArray,NamedTuple}; kw...) = StaticExtent(; init, kw...)

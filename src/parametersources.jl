@@ -65,7 +65,7 @@ _unwrap(::Type{<:Aux{X}}) where X = X
 @propagate_inbounds function Base.get(data::AbstractSimData, key, I::CartesianIndex)
     Base.get(data, key, Tuple(I))
 end
-@propagate_inbounds function Base.get(data::AbstractSimData, key::Aux, I::Tuple)
+@propagate_inbounds function Base.get(data::AbstractSimData, key::Aux, I)
     _getaux(data, key, I)
 end
 
@@ -90,13 +90,13 @@ end
     hasdim(A, TimeDim) ? A[auxframe(data, key)] : A[I...]
 end
 @propagate_inbounds function _getaux(
-    A::AbstractDimArray, data::AbstractSimData, key::Union{Aux,Symbol}, I::Tuple
-)
+    A::AbstractDimArray{<:Any,N1}, data::AbstractSimData, key::Union{Aux,Symbol}, I::NTuple{N2}
+   ) where {N1,N2}
     if hasdim(A, TimeDim)
         last(dims(A)) isa TimeDim || throw(ArgumentError("The time dimensions in aux data must be the last dimension"))
-        A[I..., auxframe(data, key)]
+        A[ntuple(i -> I[i], Val{N1-1}())..., auxframe(data, key)]
     else
-        A[I...]
+        A[ntuple(i -> I[i], Val{N1-1}())...]
     end
 end
 

@@ -36,68 +36,69 @@ demo(m::DemoMode, output::Output, rules::Tuple) = demo(m, output, StaticRuleset(
 demo(m::DemoMode, output::Output, ruleset::Ruleset) = demo(m, output, StaticRuleset(ruleset))
 function demo(m, output::Output, ruleset::StaticRuleset)
     simdata = _updaterules(rules(ruleset), SimData(output, ruleset))
-    return demo(m, simdata)
+    return _demo(m, simdata)
 end
 function demo(m::DemoMode, simdata::AbstractSimData)
+    # sd = _updaterules(rules(simdata), simdata)
+    _demo(m, simdata)
+end
+@noinline function _demo(m::DemoMode, simdata::AbstractSimData)
     map(rules(simdata)) do rule
         if rule isa SetGridRule
             return true
         else
-            demo(m, simdata, rule, ruletype(rule))
+            _demo(m, RuleData(simdata), rule, Val{ruletype(rule)}())
         end
     end |> all
 end
-function demo(m::DemoMode, simdata::AbstractSimData{<:Any,N}, 
-   rule, ruletype::Type{<:Union{<:NeighborhoodRule,<:Chain{<:Any,<:Any,<:Tuple{<:NeighborhoodRule,Vararg}}}}
+function _demo(m::DemoMode, simdata::RuleData{<:Any,N}, 
+   rule, ruletype::Val{<:Union{<:NeighborhoodRule,<:Chain{<:Any,<:Any,<:Tuple{<:NeighborhoodRule,Vararg}}}}
 ) where N
-    grid = simdata[stencilkey(rule)]
-    rule1 = Stencils.unsafe_stencil(rule, grid, CartesianIndex(ntuple(_ -> 1, N)))
-    # return _demo(m, simdata, rule1)
-    I = (1, 1)
+    hoodgrid = simdata[stencilkey(rule)]
     rkeys, rgrids = _getreadgrids(rule, simdata)
     wkeys, wgrids = _getwritegrids(WriteMode, rule, simdata)
     simdata = @set simdata.grids = _combinegrids(rkeys, rgrids, wkeys, wgrids)
-    readval = _readcell(simdata, rkeys, I...)
-
-    ex_writeval = Tuple(_example_writeval(wgrids, I))
+    I = ntuple(_ -> 1, Val{N}())
+    example_writeval = _example_writeval(wgrids, I)
     if m isa Infer
-        writeval = @inferred applyrule(simdata, rule1, readval, I)
-        typeof(Tuple(writeval)) == typeof(ex_writeval) ||
-            error("return type `$(typeof(Tuple(writeval)))` doesn't match grid types `$(typeof(ex_writeval))`")
+        writeval = @inferred stencil_kernel!(simdata, hoodgrid, ruletype, rule, rkeys, wkeys, I...)
+        typeof(Tuple(writeval)) == typeof(example_writeval) ||
+            error("return type `$(typeof(Tuple(writeval)))` doesn't match grid types `$(typeof(example_writeval))`")
     else
-        applyrule(simdata, rule1, readval, I)
+        stencil_kernel!(simdata, hoodgrid, ruletype, rule, rkeys, wkeys, I...)
     end
     return true
 end
-function demo(m::DemoMode, simdata::AbstractSimData, rule, ::Type{<:CellRule})
+function _demo(m::DemoMode, simdata::RuleData{<:Any,N}, rule, ::Val{<:CellRule}) where N
     rkeys, rgrids = _getreadgrids(rule, simdata)
     wkeys, wgrids = _getwritegrids(WriteMode, rule, simdata)
     simdata = @set simdata.grids = _combinegrids(rkeys, rgrids, wkeys, wgrids)
-    I = (1, 1)
-    readval = _readcell(simdata, rkeys, I...)
+    I = ntuple(_ -> 1, Val{N}())
+    example_writeval = _example_writeval(wgrids, I)
     if m isa Infer
-        @inferred applyrule(simdata, rule, readval, I)
+        writeval = @inferred cell_kernel!(simdata, ruletype, rule1, rkeys, wkeys, I...)
+        typeof(Tuple(writeval)) == typeof(example_writeval) ||
+            error("return type `$(typeof(Tuple(writeval)))` doesn't match grid types `$(typeof(example_writeval))`")
     else
-        applyrule(simdata, rule, readval, I)
+        cell_kernel!(simdata, ruletype, rule1, rkeys, wkeys, I...)
     end
     return true
 end
-function demo(m::DemoMode, simdata::AbstractSimData, rule, ::Type{<:SetCellRule})
+function _demo(m::DemoMode, simdata::RuleData{<:Any,N}, rule, ::Val{<:SetCellRule}) where N
     rkeys, rgrids = _getreadgrids(rule, simdata)
     wkeys, wgrids = _getwritegrids(WriteMode, rule, simdata)
     simdata = @set simdata.grids = _combinegrids(rkeys, rgrids, wkeys, wgrids)
-    I = (1, 1)
-    readval = _readcell(simdata, rkeys, I...)
+    I = ntuple(_ -> 1, Val{N}())
     if m isa Infer
-        @inferred applyrule!(simdata, rule, readval, I)
+        @inferred cell_kernel!(simdata, ruletype, rule1, rkeys, wkeys, I...)
     else
-        applyrule!(simdata, rule, readval, I)
+        @inferred cell_kernel!(simdata, ruletype, rule1, rkeys, wkeys, I...)
     end
     return true
 end
 
-_example_writeval(grids::Tuple, I) = map(g -> _example_writeval(g, I), grids)
-_example_writeval(grid::GridData{<:WriteMode}, I) = grid[I...]
+_example_writeval(grids::Tuple, I) = Tuple(map(g -> _example_writeval(g, I), grids))
+_example_writeval(grid::GridData{<:WriteMode}, I) = Tuple(grid[I...])
 
 # _zerogrids
 # Generate a Vector of zero valued grids
@@ -126,7 +127,7 @@ _zerogrids(initgrids::NamedTuple, length) =
 # the Array will be called _default_.
 @inline _asnamedtuple(x::NamedTuple) = x
 @inline _asnamedtuple(x) = (_default_=x,)
-@inline function _asnamedtuple(e::Extent) 
+@inline function _asnamedtuple(e::AbstractExtent) 
     init_nt = _asnamedtuple(init(e))
     e = @set e.init = init_nt
     pv = _samenamedtuple(init_nt, padval(e))
@@ -148,6 +149,24 @@ _unwrap(x) = x
 _unwrap(::Val{X}) where X = X
 _unwrap(::Type{<:Val{X}}) where X = X
 
-
 @inline _firstgrid(simdata, ::Val{K}) where K = simdata[K]
 @inline _firstgrid(simdata, ::Tuple{Val{K},Vararg}) where K = simdata[K]
+
+_replicate_init(init, ::Nothing) = deepcopy(init)
+function _replicate_init(init::NamedTuple, replicates::Integer)
+    map(init) do layer
+        _replicate_init(layer, replicates)
+    end
+end
+function _replicate_init(init::AbstractArray, replicates::Integer)
+    A = similar(init, size(init)..., replicates)
+    for r in 1:replicates
+        A[:, :, r] .= init
+    end
+    return A
+end
+function _replicate_init(init::AbstractDimArray, replicates::Integer)
+    rep_data = _replicate_init(parent(init), replicates)
+    rep_dims = (dims(init)..., Dim{:__replicates__}(NoLookup(Base.OneTo(replicates))))
+    return rebuild(init; data=rep_data, dims=rep_dims)
+end

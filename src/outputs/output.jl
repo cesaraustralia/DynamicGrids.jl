@@ -17,7 +17,8 @@ function (::Type{T})(
     init::Union{NamedTuple,AbstractArray}; extent=nothing, kw...
 ) where T <: Output
     extent = extent isa Nothing ? Extent(; init=init, kw...) : extent
-    T(; frames=[deepcopy(init)], running=false, extent=extent, kw...)
+    frames = [_replicate_init(init, replicates(extent))]
+    T(; frames, running=false, extent=extent, kw...)
 end
 
 # Forward base methods to the frames array
@@ -57,6 +58,7 @@ init(o::Output) = init(extent(o))
 mask(o::Output) = mask(extent(o))
 aux(o::Output, key...) = aux(extent(o), key...)
 padval(o::Output, key...) = padval(extent(o), key...)
+replicates(o::Output) = replicates(extent(o))
 tspan(o::Output) = tspan(extent(o))
 timestep(o::Output) = step(tspan(o))
 

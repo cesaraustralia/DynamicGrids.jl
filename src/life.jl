@@ -80,3 +80,8 @@ end
 
 # This is the whole rule
 applyrule(rule::Life, state) = rule.lookup[state + 1][sum(neighbors(rule)) + 1]
+
+@inline function Stencils.rebuild(rule::Life{R,W,N,B,S,L}, neighbors::SVector) where {R,W,N,B,S,L}
+    stencil = Stencils.rebuild(rule.stencil, neighbors)
+    Life{R,W,typeof(stencil),B,S,L}(stencil, rule.born, rule.survive, rule.lookup)
+end

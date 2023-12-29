@@ -81,36 +81,43 @@ _chartype(o::REPLOutput) = _chartype(o.style)
 _chartype(s::Braile) = YBRAILE, XBRAILE, brailize
 _chartype(s::Block) = YBLOCK, XBLOCK, blockize
 
-function _replframe(o, frame::AbstractArray{<:Any,N}, currentframe) where N
+function _replframe(o, frame::AbstractArray{<:Any,1}, currentframe)
+    ystep, xstep, charfunc = _chartype(o)
+    # Limit output area to available terminal size.
+    dispy, dispx = displaysize(stdout)
+
+    offset = 0
+    rnge = max(1, xstep * offset):min(length(frame))
+    f = currentframe
+    nrows = min(f, dispy) 
+    # For 1D we show all the rows every time
+    tlen = length(tspan(o))
+    rowstrings = map(f - nrows + 1:f) do i
+        framewindow1 = view(Adapt.adapt(Array, frames(o)[i]), rnge) 
+        framewindow2 = if i == tlen
+            framewindow1
+        else
+            view(Adapt.adapt(Array, frames(o)[i]), rnge) 
+        end
+        charfunc(PermutedDimsArray(hcat(framewindow1, framewindow2), (2, 1)), o.cutoff)
+    end
+    return join(rowstrings, "\n")
+end
+function _replframe(o, frame::AbstractArray{<:Any,2}, currentframe)
     ystep, xstep, charfunc = _chartype(o)
 
     # Limit output area to available terminal size.
     dispy, dispx = displaysize(stdout)
 
-    if N === 1
-        offset = 0
-        rnge = max(1, xstep * offset):min(length(frame))
-        f = currentframe
-        nrows = min(f, dispy) 
-        # For 1D we show all the rows every time
-        tlen = length(tspan(o))
-        rowstrings = map(f - nrows + 1:f) do i
-            framewindow1 = view(Adapt.adapt(Array, frames(o)[i]), rnge) 
-            framewindow2 = if i == tlen
-                framewindow1
-            else
-                view(Adapt.adapt(Array, frames(o)[i]), rnge) 
-            end
-            charfunc(PermutedDimsArray(hcat(framewindow1, framewindow2), (2, 1)), o.cutoff)
-        end
-        return join(rowstrings, "\n")
-    else
-        youtput, xoutput = outputsize = size(frame)
-        yoffset, xoffset = (0, 0)
+    youtput, xoutput = outputsize = size(frame)
+    yoffset, xoffset = (0, 0)
 
-        yrange = max(1, ystep * yoffset):min(youtput, ystep * (dispy + yoffset - 1))
-        xrange = max(1, xstep * xoffset):min(xoutput, xstep * (dispx + xoffset - 1))
-        framewindow = view(Adapt.adapt(Array, frame), yrange, xrange) # TODO make this more efficient on GPU
-        return charfunc(framewindow, o.cutoff)
-    end
+    yrange = max(1, ystep * yoffset):min(youtput, ystep * (dispy + yoffset - 1))
+    xrange = max(1, xstep * xoffset):min(xoutput, xstep * (dispx + xoffset - 1))
+    framewindow = view(Adapt.adapt(Array, frame), yrange, xrange) # TODO make this more efficient on GPU
+    return charfunc(framewindow, o.cutoff)
+end
+function _replframe(o, frame::AbstractArray{<:Any,N}, currentframe) where N
+    slice = view(frame, :, :, ntuple(_ -> 1, N-2)...)
+    _replframe(o, slice, currentframe)
 end

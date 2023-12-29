@@ -1,6 +1,6 @@
 module DynamicGridsCUDAExt
 
-using CUDA, DynamicGrids, ModelParameters
+using Adapt, CUDA, DynamicGrids, ModelParameters
 
 # CUDA setup
 

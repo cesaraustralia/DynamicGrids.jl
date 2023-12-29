@@ -9,13 +9,15 @@
 # Putting the type in `Val` is best for performance.
 maprule!(data::AbstractSimData, rule) =
     maprule!(data, _val_ruletype(rule), rule)
-# Cellrule
+
+# CellRule
 function maprule!(data::AbstractSimData, ruletype::Val{<:CellRule}, rule)
     rkeys, _ = _getreadgrids(rule, data)
     wkeys, _ = _getwritegrids(WriteMode, rule, data)
     maprule!(RuleData(data), ruletype, rule, rkeys, wkeys)
     return data
 end
+
 # NeighborhoodRule
 function maprule!(data::AbstractSimData, ruletype::Val{<:NeighborhoodRule}, rule)
     rkeys, rgrids = _getreadgrids(rule, data)
@@ -31,6 +33,7 @@ function maprule!(data::AbstractSimData, ruletype::Val{<:NeighborhoodRule}, rule
     d =  _replacegrids(data, wkeys, new_rgrids)
     return d
 end
+
 # SetRule
 function maprule!(data::AbstractSimData, ruletype::Val{<:SetRule}, rule)
     rkeys, _ = _getreadgrids(rule, data)
@@ -43,6 +46,7 @@ function maprule!(data::AbstractSimData, ruletype::Val{<:SetRule}, rule)
     _maybemask!(wgrids)
     return _replacegrids(data, wkeys, _to_readonly(switch(wgrids)))
 end
+
 # SetGridRule
 function maprule!(data::AbstractSimData, ruletype::Val{<:SetGridRule}, rule)
     rkeys, rgrids = _getreadgrids(rule, data)
@@ -52,6 +56,7 @@ function maprule!(data::AbstractSimData, ruletype::Val{<:SetGridRule}, rule)
     applyrule!(ruledata, rule)
     return data
 end
+
 # Expand method arguments for dispatch on processor and optimisation
 function maprule!(data::AbstractSimData, ruletype::Val, rule, rkeys, wkeys)
     maprule!(data, proc(data), opt(data), ruletype, rule, rkeys, wkeys)
@@ -172,32 +177,52 @@ end
 
 # cell_kernel!
 # runs a rule for the current cell
-@inline function cell_kernel!(simdata, ruletype::Val{<:Rule}, rule, rkeys, wkeys, I...)
-    if !isnothing(mask(simdata))
-        mask(simdata)[I...] || return nothing
+@inline function cell_kernel!(simdata, ruletype, rule, rkeys, wkeys, I...)
+    # When we have replicates as an additional grid 
+    # dimension we hide the extra dimension from rules.
+    I1 = _strip_replicates(simdata, I)
+    # We skip the cell if there is a mask layer
+    m = mask(simdata)
+    if !isnothing(m)
+        m[I1...] || return nothing
     end
+    # We read a value from the grid
     readval = _readcell(simdata, rkeys, I...)
-    writeval = applyrule(simdata, rule, readval, I)
-    _writecell!(simdata, ruletype, wkeys, writeval, I...)
+    # Update the simdata object
+    simdata1 = ConstructionBase.setproperties(simdata, (value=readval, indices = I))
+    # Pass all of these to the applyrule function
+    writeval = applyrule(simdata1, rule, readval, I1)
+    # And write its result/s to the cell in the relevent grid/s
+    _writecell!(simdata1, ruletype, wkeys, writeval, I...)
+    # We also return the written value
     return writeval
 end
 @inline function cell_kernel!(simdata, ::Val{<:SetRule}, rule, rkeys, wkeys, I...)
-    if !isnothing(mask(simdata))
-        mask(simdata)[I...] || return nothing
+    I1 = _strip_replicates(simdata, I)
+    m = mask(simdata)
+    if !isnothing(m)
+        m[I1...] || return nothing
     end
     readval = _readcell(simdata, rkeys, I...)
-    applyrule!(simdata, rule, readval, I)
+    simdata1 = ConstructionBase.setproperties(simdata, (value=readval, indices = I))
+    # Rules will manually write to grids in `applyrule!`
+    applyrule!(simdata1, rule, readval, I1)
+    # In a SetRule there is no return value
     return nothing
 end
+
+_strip_replicates(simdata::AbstractSimData, I) = _strip_replicates(replicates(simdata), I)
+_strip_replicates(::Nothing, I::NTuple) = I
+_strip_replicates(::Integer, I::NTuple{N}) where N = ntuple(i -> I[i], Val{N-1}())
 
 # stencil_kernel!
 # Runs a rule for the current cell/stencil, when there is no
 # row-based optimisation
 @inline function stencil_kernel!(
-    data::AbstractSimData, hoodgrid::GridData, ruletype::Val{<:NeighborhoodRule}, rule, rkeys, wkeys, I...
+    simdata::AbstractSimData, hoodgrid::GridData, ruletype::Val{<:NeighborhoodRule}, rule, rkeys, wkeys, I...
 )
     rule1 = Stencils.rebuild(rule, unsafe_neighbors(stencil(rule), hoodgrid, CartesianIndex(I)))
-    cell_kernel!(data, ruletype, rule1, rkeys, wkeys, I...)
+    cell_kernel!(simdata, ruletype, rule1, rkeys, wkeys, I...)
 end
 
 # row_kernel!
@@ -253,8 +278,8 @@ function _maybemask!(
     end
 end
 function _maybemask!(
-    wgrid::GridData{<:GridMode,<:Tuple{Y,X}}, proc, mask::AbstractArray
-) where {Y,X}
+    wgrid::GridData{<:GridMode}, proc, mask::AbstractArray
+)
     A = source(wgrid)
     mv = maskval(wgrid)
     if isnothing(mv) || iszero(mv)

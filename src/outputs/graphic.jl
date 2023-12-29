@@ -91,7 +91,8 @@ function (::Type{T})(
     extent = extent isa Nothing ? Extent(; init=init, kw...) : extent
     store = check_stored(extent, store)
     graphicconfig = graphicconfig isa Nothing ? GraphicConfig(; store, kw...) : graphicconfig
-    T(; frames=[deepcopy(init)], running=false, extent, graphicconfig, store, kw...)
+    frames = [_replicate_init(init, replicates(extent))]
+    T(; frames, running=false, extent, graphicconfig, store, kw...)
 end
 
 function check_stored(extent, store) 
