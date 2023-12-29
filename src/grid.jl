@@ -23,19 +23,14 @@ for optimisations.
 """
 abstract type AbstractGridData{Mode,S,R,T,N,A,H,B,P} <: Stencils.AbstractSwitchingStencilArray{S,R,T,N,A,H,B,P} end
 
-function (::Type{G})(
-    d::AbstractGridData{<:Any,S,R,T,N,A}
-) where {G<:AbstractGridData{<:GridMode},S,R,T,N,A}
-    args = stencil(d), boundary(d), padding(d), proc(d), opt(d), optdata(d), mask(d), maskval(d)
-    G{S,R,T,N,A,map(typeof, args)...}(source(d), dest(d), args...)
-end
-
 # Getters
 proc(d::AbstractGridData) = d.proc
 opt(d::AbstractGridData) = d.opt
 optdata(d::AbstractGridData) = d.optdata
 mask(d::AbstractGridData) = d.mask
 maskval(d::AbstractGridData) = d.maskval
+replicates(d::AbstractGridData) = d.replicates
+indices(d::AbstractGridData) = d.indices
 
 # Get the size of the grid
 gridsize(d::AbstractGridData) = size(d)
@@ -50,12 +45,15 @@ sourceview(d::AbstractGridData) = _unpad_view(source(d), d)
 # Get a view of the grid dest, without padding
 destview(d::AbstractGridData) = _unpad_view(dest(d), d)
 
-_unpad_view(A, d::AbstractGridData) = view(A, axes(d)...)
+_unpad_view(A, d::AbstractGridData{<:Any,<:Any,R}) where R =
+    view(A, map(a -> a .+ R, axes(d))...)
 
-# Get an a view of the source, preferring the underlying array if it is not a padded OffsetArray
-source_array_or_view(d::AbstractGridData) = source(d) isa OffsetArray ? sourceview(d) : source(d)
-# Get an a view of the dest, preferring the underlying array if it is not a padded OffsetArray
-dest_array_or_view(d::AbstractGridData) = dest(d) isa OffsetArray ? destview(d) : dest(d)
+# Get an a view of the source, preferring the underlying array if there is no radius
+source_array_or_view(d::AbstractGridData) = sourceview(d)
+source_array_or_view(d::AbstractGridData{<:Any,<:Any,0}) = source(d)
+# Get an a view of the dest, preferring the underlying array if there is no radius
+dest_array_or_view(d::AbstractGridData) = destview(d)
+dest_array_or_view(d::AbstractGridData{<:Any,<:Any,0}) = dest(d)
 
 _build_optdata(opt::PerformanceOpt, init, r) = nothing
 
@@ -82,7 +80,7 @@ Has `ReadMode`, `WriteMode` and `SwitchMode` to control behaviour.
 Reads are always from the `source` array.
 """
 struct GridData{
-    Mode,S<:Tuple,R,T,N,A,H,B,P,Pr<:Processor,Op<:PerformanceOpt,OpD,Ma,MV
+    Mode,S<:Tuple,R,T,N,A,H,B,P,Pr<:Processor,Op<:PerformanceOpt,OpD,Ma,MV,Re,I
 } <: AbstractGridData{Mode,S,R,T,N,A,H,B,P}
     source::A
     dest::A
@@ -94,25 +92,36 @@ struct GridData{
     optdata::OpD
     mask::Ma
     maskval::MV
+    replicates::Re
+    indices::I
 end
 function GridData{Mode,S,R}(
     source::A, dest::A, stencil::H, boundary::B, padding::P,
-    proc::Pr, opt::Op, optdata::OpD, mask::Ma, maskval::MV
-) where {Mode,S,R,A<:AbstractArray{T,N},H,B,P,Pr,Op,OpD,Ma,MV} where {T,N}
-    GridData{Mode,S,R,T,N,A,H,B,P,Pr,Op,OpD,Ma,MV}(
-        source, dest, stencil, boundary, padding, proc, opt, optdata, mask, maskval
+    proc::Pr, opt::Op, optdata::OpD, mask::Ma, maskval::MV,
+    replicates::Re, indices::I
+) where {Mode,S,R,A<:AbstractArray{T,N},H,B,P,Pr,Op,OpD,Ma,MV,Re,I} where {T,N}
+    GridData{Mode,S,R,T,N,A,H,B,P,Pr,Op,OpD,Ma,MV,Re,I}(
+        source, dest, stencil, boundary, padding, proc, opt, optdata, mask, maskval, replicates, indices
     )
 end
+function GridData{Mode}(d::AbstractGridData{<:Any,S,R,T,N,A}) where {Mode,S,R,T,N,A}
+    args = stencil(d), boundary(d), padding(d), proc(d), opt(d), optdata(d), mask(d), maskval(d), replicates(d), indices(d)
+    GridData{Mode,S,R,T,N,A,map(typeof, args)...}(source(d), dest(d), args...)
+end
 @inline function GridData{Mode,S,R}(
-    init::AbstractArray{<:Any,N}, stencil::Stencil, boundary::BoundaryCondition, padding::Padding, proc, opt, mask, maskval
+    init::AbstractArray{<:Any,N}, stencil::Stencil, boundary::BoundaryCondition,
+    padding::Padding, proc, opt, mask, maskval, replicates, indices=nothing
 ) where {Mode,S,R,N}
-    # If the grid radius is larger than zero we pad it as an OffsetArray
+    # If the grid radius is larger than zero we pad it
     if R > 0
         # Blocks (only used for 2d sims) need additional vertical padding.
         # TODO: this needs clarification.
         r = N == 2 ? ((R, 3R), (R, R)) : R
         source = Stencils.pad_array(padding, boundary, stencil, init)
         dest = Stencils.pad_array(padding, boundary, stencil, init)
+        # TODO is there a chance this doen't make a copy?
+        # For now just assert that they are not identical arrays
+        @assert source !== dest
     else
         source = deepcopy(init)
         dest = deepcopy(init)
@@ -120,7 +129,7 @@ end
     optdata = _build_optdata(opt, source, R)
 
     grid = GridData{Mode,S,R}(
-        source, dest, stencil, boundary, padding, proc, opt, optdata, mask, maskval
+        source, dest, stencil, boundary, padding, proc, opt, optdata, mask, maskval, replicates, indices
     )
     update_boundary!(grid)
     return grid
@@ -132,14 +141,16 @@ function ConstructionBase.constructorof(
     GridData{Mode,S,R}
 end
 
-# function Base.parent(d::ReadableGridData{S,<:Any,T,N}) where {S,T,N}
-#     SizedArray{S,T,N}(source_array_or_view(d))
-# end
-
-
-# function Base.parent(d::WritableGridData{S,<:Any,T,N}) where {S,T,N}
-    # SizedArray{S,T,N}(dest_array_or_view(d))
-# end
+for f in (:getindex, :view, :dotview)
+    unsafe_f = Symbol(string("unsafe_", f))
+    @eval begin
+        Base.@propagate_inbounds function Base.$f(A::GridData, i1::Int, Is::Int...)
+            # If we have replicates, we add the replicate index here
+            I = _maybe_complete_indices(A, (i1, Is...))
+            Stencils.$unsafe_f(A, I...)
+        end
+    end
+end
 
 ### UNSAFE / LOCKS required
 
@@ -155,38 +166,46 @@ end
 end
 
 @propagate_inbounds function _setindex!(d::GridData{<:WriteMode}, proc::SingleCPU, x, I...)
+    I = _maybe_complete_indices(data, I)
     @boundscheck checkbounds(dest(d), I...)
-    # @inbounds 
+    # @inbounds
     _setoptindex!(d, x, I...)
-    # @inbounds 
-    source(d)[I...] = x
+    source(d)[add_halo(d, I)...] = x
 end
 @propagate_inbounds function _setindex!(d::GridData{<:WriteMode}, proc::ThreadedCPU, x, I...)
+    I = _maybe_complete_indices(data, I)
     # Dest status is not threadsafe, even if the
     # setindex itself is safe. So we LOCK
     lock(proc)
-    # @inbounds 
+    # @inbounds
     _setoptindex!(d, x, I...)
     unlock(proc)
-    # @inbounds 
-    source(d)[I...] = x
+    source(d)[add_halo(d, I)...] = x
 end
 @propagate_inbounds function _setindex!(d::GridData{<:SwitchMode}, proc::SingleCPU, x, I...)
+    I = _maybe_complete_indices(data, I)
     @boundscheck checkbounds(dest(d), I...)
-    # @inbounds 
+    # @inbounds
     _setoptindex!(d, x, I...)
-    # @inbounds 
-    dest(d)[I...] = x # In switch mode we write to `dest`
+    dest(d)[add_halo(d, I)...] = x
 end
 @propagate_inbounds function _setindex!(d::GridData{<:SwitchMode}, proc::ThreadedCPU, x, I...)
+    I = _maybe_complete_indices(data, I)
     # Dest status is not threadsafe, even if the
     # setindex itself is safe. So we LOCK
     lock(proc)
-    # @inbounds 
+    # @inbounds
     _setoptindex!(d, x, I...)
     unlock(proc)
-    # @inbounds 
-    dest(d)[I...] = x # In switch mode we write to `dest`
+    dest(d)[add_halo(d, I)...] = x
+end
+
+function _maybe_complete_indices(data::GridData, I::Tuple)
+    if isnothing(replicates(data)) || isnothing(indices(data))
+        I
+    else
+        (I..., last(indices(data)))
+    end
 end
 
 # _setoptindex!
@@ -200,7 +219,7 @@ function Stencils.switch(grids::NamedTuple{<:Any,Tuple{T,Vararg}}) where {T<:Gri
 end
 function Stencils.switch(A::T) where {T<:GridData{<:SwitchMode}}
     od = switch(opt(A), optdata(A))
-    T(dest(A), source(A), stencil(A), boundary(A), padding(A), proc(A), opt(A), od, mask(A), maskval(A))
+    T(dest(A), source(A), stencil(A), boundary(A), padding(A), proc(A), opt(A), od, mask(A), maskval(A), replicates(A), indices(A))
 end
 Stencils.switch(::PerformanceOpt, optdata) = optdata
 

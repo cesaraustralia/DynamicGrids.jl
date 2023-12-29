@@ -60,7 +60,14 @@ function sim!(output::Output, ruleset::AbstractRuleset=ruleset(output);
     gridsize(init) == gridsize(DG.init(output)) || throw(ArgumentError("init size does not match output init"))
 
     # Rebuild Extent to allow kwarg alterations
-    extent = Extent(; init=_asnamedtuple(init), mask=mask, aux=aux, padval=_asnamedtuple(padval(output)), tspan=tspan)
+    extent = Extent(; 
+        init=_asnamedtuple(init),
+        mask=mask,
+        aux=aux,
+        padval=_asnamedtuple(padval(output)),
+        replicates=replicates(output),
+        tspan=tspan
+    )
     simruleset = Ruleset(rules(ruleset);
         boundary=boundary, proc=proc, opt=opt, cellsize=cellsize, timestep=timestep,
     )

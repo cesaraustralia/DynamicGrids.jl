@@ -99,7 +99,7 @@ const EXPERIMENTAL = """
 
 import Stencils: neighbors, unsafe_neighbors, stencil,
     kernel, kernelproduct, offsets, indices, radius, distances, distance_zones,
-    stencil, unsafe_stencil, boundary, padding, source, dest, switch, padval, update_boundary!
+    stencil, unsafe_stencil, boundary, padding, source, dest, switch, padval, update_boundary!, add_halo
 
 import Stencils: BoundaryCondition, Padding
 

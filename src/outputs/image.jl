@@ -128,9 +128,9 @@ function (::Type{T})(init::Union{NamedTuple,AbstractArray};
     store = check_stored(extent, store)
     graphicconfig = graphicconfig isa Nothing ? GraphicConfig(; store, kw...) : extent
     imageconfig = imageconfig isa Nothing ? ImageConfig(init; kw...) : imageconfig
+    frames = [_replicate_init(init, replicates(extent))]
     T(; 
-        frames=[deepcopy(init)], running=false, 
-        extent, graphicconfig, imageconfig, store, kw...
+        frames, running=false, extent, graphicconfig, imageconfig, store, kw...
     )
 end
 
