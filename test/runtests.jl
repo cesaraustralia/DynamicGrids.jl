@@ -8,7 +8,6 @@ if VERSION >= v"1.5.0"
     Aqua.test_project_extras(DynamicGrids)
     Aqua.test_stale_deps(DynamicGrids)
     Aqua.test_deps_compat(DynamicGrids)
-    Aqua.test_project_toml_formatting(DynamicGrids)
 end
 
 @time @safetestset "generated" begin include("generated.jl") end
