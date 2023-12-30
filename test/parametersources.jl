@@ -1,40 +1,40 @@
-using DynamicGrids, Dates, DimensionalData, Setfield, Unitful, Test
+using DynamicGrids, Dates, DimensionalData, Setfield, Unitful, Test, DimensionalData
 using Unitful: d
-using DynamicGrids: SimData, Extent, _calc_auxframe, _cyclic_index
+using DynamicGrids: SimData, Extent, _calc_auxframe
 const DG = DynamicGrids
+using DimensionalData.Dimensions, DimensionalData.LookupArrays
 
 @testset "Aux" begin
-    @testset "sequence cycling" begin
-        @test _cyclic_index(-4, 2) == 2
-        @test _cyclic_index(-3, 2) == 1
-        @test _cyclic_index(-2, 2) == 2
-        @test _cyclic_index(-1, 2) == 1
-        @test _cyclic_index(0, 2) == 2
-        @test _cyclic_index(1, 2) == 1
-        @test _cyclic_index(2, 2) == 2
-        @test _cyclic_index(3, 2) == 1
-        @test _cyclic_index(4, 2) == 2
-        @test _cyclic_index(20, 10) == 10
-        @test _cyclic_index(21, 10) == 1
-        @test _cyclic_index(27, 10) == 7
-    end
-
     @testset "aux sequence" begin
         a = cat([0.1 0.2; 0.3 0.4], [1.1 1.2; 1.3 1.4], [2.1 2.2; 2.3 2.4]; dims=3)
 
         @testset "the correct frame is calculated for aux data" begin
-            dimz = X(1:2), Y(1:2), Ti(15d:5d:25d)
+            dimz = X(1:2), Y(1:2), Ti(DimensionalData.Cyclic(1d:5d:14d; order=ForwardOrdered(), cycle=15d, sampling=Intervals(Start())))
             seq = DimArray(a, dimz)
             init = zero(seq[Ti(1)])
             sd = SimData(Extent(init=init, aux=(seq=seq,), tspan=1d:1d:100d), Ruleset())
             @test DynamicGrids.boundscheck_aux(sd, Aux{:seq}()) == true
-            tests = (1, 1), (4, 1), (5, 2), (6, 2), (9, 2), (10, 3), (11, 3), (14, 3), (15, 1), 
-                    (19, 1), (20, 2), (25, 3), (29, 3), (30, 1), (34, 1), (35, 2)
+            tests = (1, 1), (4, 1), (5, 1), (6, 2), (9, 2), (10, 2), (11, 3), (14, 3), (15, 3), 
+                    (20, 1), (21, 2), (26, 3), (30, 3), (31, 1), (35, 1), (36, 2)
             for (f, ref_af) in tests
                 @set! sd.currentframe = f
                 af = _calc_auxframe(sd).seq
                 @test af == ref_af 
             end
+            # Not Cycled
+            dimz = X(1:2), Y(1:2), Ti(1d:5d:14d; order=ForwardOrdered(), cycle=15d, sampling=Intervals(Start()))
+            seq = DimArray(a, dimz)
+            init = zero(seq[Ti(1)])
+            sd = SimData(Extent(init=init, aux=(seq=seq,), tspan=1d:1d:100d), Ruleset())
+            @set! sd.currentframe = 20
+            @test_throws ArgumentError _calc_auxframe(sd).seq
+            # Not Intervals
+            dimz = X(1:2), Y(1:2), Ti(DimensionalData.Cyclic(1d:5d:14d; order=ForwardOrdered(), cycle=15d, sampling=Points()))
+            seq = DimArray(a, dimz)
+            init = zero(seq[Ti(1)])
+            sd = SimData(Extent(init=init, aux=(seq=seq,), tspan=1d:1d:100d), Ruleset())
+            @set! sd.currentframe = 7
+            @test_throws ArgumentError _calc_auxframe(sd).seq
         end
 
         @testset "boundscheck_aux" begin
@@ -58,7 +58,7 @@ const DG = DynamicGrids
         end
 
         @testset "correct values are returned by get" begin
-            x, y, ti = X(1:2), Y(1:2), Ti(Date(2001, 1, 15):Day(5):Date(2001, 1, 25))
+            x, y, ti = X(1:2), Y(1:2), Ti(Cyclic(Date(2001, 1, 15):Day(5):Date(2001, 1, 25); cycle=Day(15), order=ForwardOrdered(), sampling=Intervals(Start())))
             @testset "1d" begin
                 seq1 = DimArray(a[2, 2, :], ti)
                 seq3 = DimArray(a[:, 1, :], (x, ti))
@@ -68,8 +68,7 @@ const DG = DynamicGrids
                 data1 = DG._updatetime(data, 1)
                 @test data1.auxframe == (seq1 = 1, seq3 = 1,)
                 # I is ignored for 1d with Ti dim
-                @test get(data1, Aux(:seq1), (-10,)) == 0.4
-                @test get(data1, Aux(:seq3), (1)) == 0.1
+                @test get(data1, Aux(:seq3), (1,)) == 0.1
                 dims(seq1, Ti) === dims(seq3, Ti)
                 data2 = DG._updatetime(data, 5);
                 @test data2.auxframe == (seq1 = 2, seq3 = 2,)
@@ -144,7 +143,7 @@ end
         sim!(output, ruleset)
         @test output == [[0 0], [3 4], [3 4]]
 
-        da = DimArray(cat([1 2], [3 4]; dims=3) , (X(), Y(), Ti(4d:1d:5d)))
+        da = DimArray(cat([1 2], [3 4]; dims=3) , (X(), Y(), Ti(Cyclic(4d:1d:5d; cycle=2d, order=ForwardOrdered(), sampling=Intervals(Start())))))
         output = ArrayOutput(init; tspan=1d:1d:3d, aux=(l=da,))
         sim!(output, ruleset)
         @test output == [[0 0], [1 2], [3 4]]

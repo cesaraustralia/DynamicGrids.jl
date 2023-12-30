@@ -17,7 +17,8 @@ function (::Type{T})(
     init::Union{NamedTuple,AbstractArray}; extent=nothing, kw...
 ) where T <: Output
     extent = extent isa Nothing ? Extent(; init=init, kw...) : extent
-    T(; frames=[deepcopy(init)], running=false, extent=extent, kw...)
+    frames = [_replicate_init(init, replicates(extent))]
+    T(; frames, running=false, extent=extent, kw...)
 end
 
 # Forward base methods to the frames array
@@ -44,7 +45,7 @@ function DimensionalData.rebuild(o::Output, data, dims::Tuple, refdims, name, me
     return DimArray(data, dims, refdims, name, metadata) 
 end
 function DimensionalData.rebuild(o::Output; 
-    data=frames(o), dims=dims(o), refdims=refdims(o), names=name(o), metadata=metadata(o), kw...
+    data=frames(o), dims=DD.dims(o), refdims=DD.refdims(o), names=DD.name(o), metadata=DD.metadata(o), kw...
 )
     return DimArray(data, dims, refdims, name, metadata) 
 end
@@ -57,6 +58,7 @@ init(o::Output) = init(extent(o))
 mask(o::Output) = mask(extent(o))
 aux(o::Output, key...) = aux(extent(o), key...)
 padval(o::Output, key...) = padval(extent(o), key...)
+replicates(o::Output) = replicates(extent(o))
 tspan(o::Output) = tspan(extent(o))
 timestep(o::Output) = step(tspan(o))
 
@@ -110,7 +112,7 @@ end
 # Copy cells from grid to output
 _copyto_output!(outgrid, grid::GridData) = _copyto_output!(outgrid, grid, proc(grid))
 function _copyto_output!(outgrid, grid::GridData, proc::CPU)
-    copyto!(outgrid, CartesianIndices(outgrid), source(grid), CartesianIndices(outgrid))
+    copyto!(outgrid, CartesianIndices(outgrid), grid, CartesianIndices(outgrid))
 end
 # Copy cells from grid to output using multiple threads
 function _copyto_output!(outgrid, grid::GridData{<:Any,Tuple{X,Y}}, proc::ThreadedCPU) where {X, Y}

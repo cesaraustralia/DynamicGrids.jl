@@ -66,7 +66,7 @@ end
     expr = Expr(:tuple)
     keys = map(_unwrap, Tuple(K.parameters))
     for (i, k) in enumerate(keys)
-        push!(expr.args, :(@inbounds source(data[$(QuoteNode(k))])[I...]))
+        push!(expr.args, :(@inbounds source(data[$(QuoteNode(k))])[add_halo(data[$(QuoteNode(k))], I)...]))
     end
     return quote
         keys = $keys
@@ -75,7 +75,8 @@ end
     end
 end
 @inline function _readcell(data::AbstractSimData, ::Val{K}, I...) where K
-    @inbounds source(data[K])[I...]
+    grid = data[K]
+    @inbounds source(grid)[add_halo(grid, I)...]
 end
 
 # _writecell! => nothing
@@ -88,14 +89,15 @@ end
     keys = map(_unwrap, Tuple(K.parameters))
     for (i, k) in enumerate(keys) 
         # MUST write to source(grid) - CellRule doesn't switch grids
-        push!(expr.args, :(@inbounds source(data[$(QuoteNode(k))])[I...] = vals[$i]))
+        push!(expr.args, :(@inbounds source(data[$(QuoteNode(k))])[add_halo(data[$(QuoteNode(k))], I)...] = vals[$i]))
     end
     push!(expr.args, :(nothing))
     return expr
 end
 @inline function _writecell!(data, ::Val{<:CellRule}, wkeys::Val{K}, val, I...) where K
     # MUST write to source(grid) - CellRule doesn't switch grids
-    @inbounds source(data[K])[I...] = val
+    grid = data[K]
+    @inbounds source(grid)[add_halo(grid, I)...] = val
     return nothing
 end
 @generated function _writecell!(
@@ -106,7 +108,7 @@ end
     for (i, k) in enumerate(keys) 
         # MUST write to dest(grid) here, not grid K
         # setindex! has overrides for the grid
-        push!(expr.args, :(@inbounds dest(data[$(QuoteNode(k))])[I...] = vals[$i]))
+        push!(expr.args, :(@inbounds dest(data[$(QuoteNode(k))])[add_halo(data[$(QuoteNode(k))], I)...] = vals[$i]))
     end
     push!(expr.args, :(nothing))
     return expr
@@ -114,7 +116,8 @@ end
 @inline function _writecell!(data, ::Val, wkeys::Val{K}, val, I...) where K
     # MUST write to dest(grid) here, not grid K
     # setindex! has overrides for the grid
-    @inbounds dest(data[K])[I...] = val
+    grid = data[K]
+    @inbounds dest(grid)[add_halo(grid, I)...] = val
     return nothing
 end
 

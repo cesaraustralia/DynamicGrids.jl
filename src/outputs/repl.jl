@@ -40,15 +40,20 @@ function REPLOutput(;
     color=:white, cutoff=0.5, style=Block(), kw...
 )
     if store(graphicconfig)
-        append!(frames, _zerogrids(init(extent), length(tspan(extent))-1))
+        append!(frames, _zerogrids(first(frames), length(tspan(extent))-1))
     end
     REPLOutput(frames, running, extent, graphicconfig, color, style, cutoff)
 end
 
 function showframe(frame::AbstractArray, o::REPLOutput, data::AbstractSimData)
-    _print_to_repl((0, 0), o.color, _replframe(o, frame, currentframe(data)))
+    f = currentframe(data)
+    t = currenttime(data)
+    if f == 1 # Clear the console
+        print(stdout, "\033c") 
+    end
+    _print_to_repl((0, 0), o.color, _replframe(>(o.cutoff), o, frame, f))
     # Print the timestamp in the top right corner
-    _print_to_repl((0, 0), o.color, string("Time $(currenttime(data))"))
+    _print_to_repl((0, 0), o.color, string("Time $(t)"))
 end
 
 # Terminal commands
@@ -58,8 +63,9 @@ _movepos(io::IO, c=(0,0)) = print(io, "\x1b[$(c[2]);$(c[1])H")
 _cursor_hide(io::IO=terminal.out_stream) = print(io, "\x1b[?25l")
 _cursor_show(io::IO=terminal.out_stream) = print(io, "\x1b[?25h")
 
-_print_to_repl(pos, c::Symbol, s::String) = _print_to_repl(pos, Crayon(foreground=c), s)
-function _print_to_repl(pos, color::Crayon, str::String)
+_print_to_repl(pos, c::Symbol, str) =
+    _print_to_repl(pos, Crayon(foreground=c), str)
+function _print_to_repl(pos, color::Crayon, str)
     io = terminal.out_stream
     _savepos(io)
     _cursor_hide(io)
@@ -78,39 +84,35 @@ const YBLOCK = 2
 const XBLOCK = 1
 
 _chartype(o::REPLOutput) = _chartype(o.style)
-_chartype(s::Braile) = YBRAILE, XBRAILE, brailize
-_chartype(s::Block) = YBLOCK, XBLOCK, blockize
+_chartype(s::Braile) = YBRAILE, XBRAILE, :braille
+_chartype(s::Block) = YBLOCK, XBLOCK, :block
 
-function _replframe(o, frame::AbstractArray{<:Any,N}, currentframe) where N
-    ystep, xstep, charfunc = _chartype(o)
-
+function _replframe(pred, o, frame::AbstractArray{<:Any,1}, currentframe)
+    ystep, xstep, chartype = _chartype(o)
     # Limit output area to available terminal size.
     dispy, dispx = displaysize(stdout)
 
-    if N === 1
-        offset = 0
-        rnge = max(1, xstep * offset):min(length(frame))
-        f = currentframe
-        nrows = min(f, dispy) 
-        # For 1D we show all the rows every time
-        tlen = length(tspan(o))
-        rowstrings = map(f - nrows + 1:f) do i
-            framewindow1 = view(Adapt.adapt(Array, frames(o)[i]), rnge) 
-            framewindow2 = if i == tlen
-                framewindow1
-            else
-                view(Adapt.adapt(Array, frames(o)[i]), rnge) 
-            end
-            charfunc(PermutedDimsArray(hcat(framewindow1, framewindow2), (2, 1)), o.cutoff)
-        end
-        return join(rowstrings, "\n")
-    else
-        youtput, xoutput = outputsize = size(frame)
-        yoffset, xoffset = (0, 0)
+    f = currentframe
+    disprows = (dispy - 1) * ystep + 1
+    # For 1D we show all the rows every time
+    tlen = length(tspan(o))
+    iobuf = IOBuffer()
+    catframes = reduce(hcat, frames(o)[f - min(f, disprows) + 1:f])
+    uprint(iobuf, pred, permutedims(catframes, (2, 1)), chartype)
+    return String(take!(iobuf))
+end
+function _replframe(pred, o, frame::AbstractArray{<:Any,2}, currentframe)
+    ystep, xstep, chartype = _chartype(o)
+    # Limit output area to available terminal size.
+    dispy, dispx = displaysize(stdout)
 
-        yrange = max(1, ystep * yoffset):min(youtput, ystep * (dispy + yoffset - 1))
-        xrange = max(1, xstep * xoffset):min(xoutput, xstep * (dispx + xoffset - 1))
-        framewindow = view(Adapt.adapt(Array, frame), yrange, xrange) # TODO make this more efficient on GPU
-        return charfunc(framewindow, o.cutoff)
-    end
+    youtput, xoutput = outputsize = size(frame)
+    yoffset, xoffset = (0, 0)
+
+    yrange = max(1, ystep * yoffset):min(youtput, ystep * (dispy + yoffset - 1))
+    xrange = max(1, xstep * xoffset):min(xoutput, xstep * (dispx + xoffset - 1))
+    framewindow = view(Adapt.adapt(Array, frame), yrange, xrange) # TODO make this more efficient on GPU
+    iobuf = IOBuffer()
+    uprint(iobuf, pred, framewindow, chartype)
+    return String(take!(iobuf))
 end

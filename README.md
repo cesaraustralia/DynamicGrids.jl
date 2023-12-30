@@ -50,6 +50,25 @@ sim!(output, life)
 *A game of life simulation being displayed directly in a terminal.*
 
 
+```julia
+using DynamicGrids
+
+# Define a rule
+rule110 = Neighbors(Moore{1,1}()) do data, hood, c, I
+    l, r = neighbors(hood)
+    (c + r + c * r + l * c * r) % 2
+end
+
+# Initialise
+init = zeros(Int, 200)
+init[190] = true
+
+output = REPLOutput(init; tspan=1:200, fps=50, style=Braile(), color=:green)
+sim!(output, rule110)
+
+*A one dimensional cellular automata displayed in the terminal line by line*
+
+
 # Concepts
 
 The framework is highly customisable, but there are some central ideas that define

@@ -5,6 +5,27 @@ using DynamicGrids, Makie
 const MAX_COLUMNS = 3
 const DG = DynamicGrids
 
+struct MakieSim
+    figure::Figure
+    layout::GridLayout
+    frame::Observable
+    time::Observable
+end
+
+for f in (:plot!, :heatmap!, :image!, :contour!, :contourf!)
+    @eval function Makie.$f(x::MakieSim; kw...)
+        axis = Axis(x.layout[1, 1])
+        if x.frame[] isa AbstractArray
+            Makie.$f(axis, x.frame; kw...)
+        else
+            A = lift(x.frame) do f
+                first(f)
+            end
+            Makie.$f(axis, A; kw...)
+        end
+    end
+end
+
 """
     MakieOutput <: GraphicOutput
 
@@ -73,16 +94,16 @@ function DynamicGrids.MakieOutput(f::Function, init::Union{NamedTuple,AbstractAr
     return MakieOutput(; frames, running=false, extent, store, f, kw...)
 end
 DynamicGrids.MakieOutput(init::Union{NamedTuple,AbstractArray}; kw...) =
-    DynamicGrids.MakieOutput(_plot!, init; kw...)
+    DynamicGrids.MakieOutput(Makie.plot!, init; kw...)
 # Most defaults are passed in from the generic ImageOutput constructor
 function DynamicGrids.MakieOutput(;
     frames, running, extent, ruleset,
     extrainit=Dict(),
     throttle=0.1,
     interactive=true,
-    fig=Figure(),
-    layout=GridLayout(fig[1:4, 1]),
-    inputgrid=GridLayout(fig[5, 1]),
+    figure=Figure(),
+    layout=GridLayout(figure[1:4, 1]),
+    inputgrid=GridLayout(figure[5, 1]),
     f=_plot!,
     graphicconfig=nothing,
     simdata=nothing,
@@ -99,16 +120,17 @@ function DynamicGrids.MakieOutput(;
 
     # Page and output construction
     output = MakieOutput(
-        frames, running, extent, graphicconfig, ruleset, fig, nothing, frame_obs, t_obs
+        frames, running, extent, graphicconfig, ruleset, figure, nothing, frame_obs, t_obs
     )
-    simdata = DynamicGrids.initdata!(simdata, output, extent, ruleset)
+    # TODO fix this hack
+    simdata = DynamicGrids.SimData(simdata, output, extent, ruleset)
 
     # Widgets
     controlgrid = GridLayout(inputgrid[1, 1])
     slidergrid = GridLayout(inputgrid[2, 1])
-    _add_control_widgets!(fig, controlgrid, output, simdata, ruleset, extrainit, sim_kw)
+    _add_control_widgets!(figure, controlgrid, output, simdata, ruleset, extrainit, sim_kw)
     if interactive
-        attach_sliders!(fig, ruleset; grid=slidergrid, throttle, slider_kw)
+        attach_sliders!(figure, ruleset; grid=slidergrid, throttle, slider_kw)
     end
 
     # Set up plot with the first frame
@@ -117,7 +139,8 @@ function DynamicGrids.MakieOutput(;
     else
         frame_obs[] = map(DynamicGrids.gridview, DynamicGrids.grids(simdata))
     end
-    f(layout, frame_obs, t_obs)
+
+    f(MakieSim(figure, layout, frame_obs, t_obs))
 
     return output
 end
@@ -351,26 +374,6 @@ function _in_columns(grid, objects, ncolumns, objpercol)
 
         end
     end
-end
-
-# Default plotting
-_plot!(l, f::Observable, t) = _plot!(l, f[], f, t)
-_plot!(l, A::AbstractArray, f::Observable, t) = _plot_array!(l, A, f, t)
-function _plot!(l, ::NamedTuple, f::Observable, t)
-    A = lift(f) do nt
-        first(f)
-    end
-    _plot_array!(l, first(f[]), A, t)
-end
-function _plot_array!(l, ::AbstractArray{<:Any,2}, f::Observable, t)
-    axis = Axis(l[1, 1]; aspect=1)
-    hidedecorations!(axis)
-    image!(axis, f; interpolate=false, colormap=:viridis)
-end
-function _plot_array!(l, ::AbstractArray{<:Any,3}, f::Observable, t)
-    axis = Axis(l[1, 1]; aspect=1)
-    hidedecorations!(axis)
-    volume!(axis, f; colormap=:viridis)
 end
 
 end

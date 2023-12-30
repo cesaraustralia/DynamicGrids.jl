@@ -20,7 +20,6 @@ using Colors,
       LinearAlgebra,
       KernelAbstractions,
       Stencils,
-      OffsetArrays,
       Setfield,
       StaticArrays,
       Test,
@@ -67,7 +66,7 @@ export Processor, SingleCPU, ThreadedCPU, CPUGPU, CuGPU
 
 export PerformanceOpt, NoOpt, SparseOpt
 
-export BoundaryCondition, Remove, Wrap
+export BoundaryCondition, Remove, Wrap, Use
 
 export ParameterSource, Aux, Grid, Delay, Lag, Frame
 
@@ -99,7 +98,7 @@ const EXPERIMENTAL = """
 
 import Stencils: neighbors, unsafe_neighbors, stencil,
     kernel, kernelproduct, offsets, indices, radius, distances, distance_zones,
-    stencil, unsafe_stencil, boundary, padding, source, dest, switch, padval, update_boundary!
+    stencil, unsafe_stencil, boundary, padding, source, dest, switch, padval, update_boundary!, add_halo
 
 import Stencils: BoundaryCondition, Padding
 

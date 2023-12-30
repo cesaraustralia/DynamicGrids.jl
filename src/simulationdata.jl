@@ -56,7 +56,7 @@ auxframe(d::AbstractSimData) = d.auxframe
 currentframe(d::AbstractSimData) = d.currentframe
 
 # Forwarded to the Extent object
-gridsize(d::AbstractSimData) = gridsize(extent(d))
+gridsize(d::AbstractSimData) = size(d)
 padval(d::AbstractSimData) = padval(extent(d))
 init(d::AbstractSimData) = init(extent(d))
 mask(d::AbstractSimData) = mask(extent(d))
@@ -64,6 +64,7 @@ aux(d::AbstractSimData, args...) = aux(extent(d), args...)
 auxframe(d::AbstractSimData, key) = auxframe(d)[_unwrap(key)]
 tspan(d::AbstractSimData) = tspan(extent(d))
 timestep(d::AbstractSimData) = step(tspan(d))
+radius(d::AbstractSimData) = max(map(radius, grids(d))...)
 
 # Calculated:
 # Get the current time for this frame
@@ -121,6 +122,26 @@ end
 SimData(o, ruleset::AbstractRuleset) = SimData(o, extent(o), ruleset)
 SimData(o, r1::Rule, rs::Rule...) = SimData(o, extent(o), Ruleset(r1, rs...))
 
+# When no simdata is passed in, create new SimData
+function SimData(::Nothing, output, extent::AbstractExtent, ruleset::AbstractRuleset)
+    SimData(output, extent, ruleset)
+end
+# Initialise a AbstractSimData object with a new `Extent` and `Ruleset`.
+function SimData(
+    simdata::SimData, output, extent::AbstractExtent, ruleset::AbstractRuleset
+)
+    (replicates(simdata) == replicates(output) == replicates(extent)) || 
+        throw(ArgumentError("`simdata` must have same numver of replicates as `output`"))
+
+    @assert simdata.extent == StaticExtent(extent)
+    @set! simdata.ruleset = StaticRuleset(ruleset)
+    if hasdelay(rules(ruleset)) 
+        isstored(output) || _not_stored_delay_error()
+        @set! simdata.frames = frames(output) 
+    end
+    return simdata
+end
+
 function SimData(o, extent::AbstractExtent, ruleset::AbstractRuleset)
     frames_ = if hasdelay(rules(ruleset)) 
         isstored(o) || _notstorederror()
@@ -172,13 +193,15 @@ function _buildgrids(extent, ruleset, ::Val{S}, ::Val{R}, init, padval) where {S
     hood = Window{R}() 
     pad = Halo{:out}() # We always pad out in DynamicGrids - it should pay back for multiple time steps
     bc = _boundary(boundary(ruleset), padval)
+    data = _replicate_init(init, replicates(extent))
     GridData{ReadMode,S,R}(
-        init, hood, bc, pad, proc(ruleset), opt(ruleset), mask(extent), padval
+        data, hood, bc, pad, proc(ruleset), opt(ruleset), mask(extent), padval, replicates(extent)
     )
 end
 
 _boundary(::Wrap, padval) = Wrap()
 _boundary(::Remove, padval) = Remove(padval)
+_boundary(::Use, padval) = Use()
 
 ConstructionBase.constructorof(::Type{<:SimData{S,N}}) where {S,N} = SimData{S,N}
 
@@ -189,25 +212,7 @@ boundary(d::SimData) = boundary(ruleset(d))
 proc(d::SimData) = proc(ruleset(d))
 opt(d::SimData) = opt(ruleset(d))
 settings(d::SimData) = settings(ruleset(d))
-
-# When no simdata is passed in, create new AbstractSimData
-function initdata!(::Nothing, output, extent::AbstractExtent, ruleset::AbstractRuleset)
-    SimData(output, extent, ruleset)
-end
-# Initialise a AbstractSimData object with a new `Extent` and `Ruleset`.
-function initdata!(
-    simdata::SimData, output, extent::AbstractExtent, ruleset::AbstractRuleset
-)
-    # TODO: make sure this works with delays and new outputs?
-    map(copy!, values(simdata), values(init(extent)))
-    @set! simdata.extent = StaticExtent(extent)
-    @set! simdata.ruleset = StaticRuleset(ruleset)
-    if hasdelay(rules(ruleset)) 
-        isstored(o) || _not_stored_delay_error()
-        @set! simdata.frames = frames(o) 
-    end
-    return simdata
-end
+replicates(d::SimData) = replicates(extent(d))
 
 """
     RuleData <: AbstractSimData
@@ -221,21 +226,41 @@ The simplified object actually passed to rules with the current design.
 
 Passing a smaller object than `SimData` to rules leads to faster GPU compilation.
 """
-struct RuleData{S<:Tuple,N,G<:NamedTuple,E,Se,F,CF,AF} <: AbstractSimData{S,N,G}
+struct RuleData{S<:Tuple,N,G<:NamedTuple,E,Se,F,CF,AF,R,V,I} <: AbstractSimData{S,N,G}
     grids::G
     extent::E
     settings::Se
     frames::F
     currentframe::CF
     auxframe::AF
+    replicates::R
+    value::V
+    indices::I
 end
 function RuleData{S,N}(
-    grids::G, extent::E, settings::Se, frames::F, currentframe::CF, auxframe::AF
-) where {S,N,G,E,Se,F,CF,AF}
-    RuleData{S,N,G,E,Se,F,CF,AF}(grids, extent, settings, frames, currentframe, auxframe)
+    grids::G, extent::E, settings::Se, frames::F, currentframe::CF, auxframe::AF, replicates::Re, value::V, indices::I
+) where {S,N,G,E,Se,F,CF,AF,Re,V,I}
+    RuleData{S,N,G,E,Se,F,CF,AF,Re,V,I}(grids, extent, settings, frames, currentframe, auxframe, replicates, value, indices)
 end
-function RuleData(d::AbstractSimData{S,N}) where {S,N}
-    RuleData{S,N}(grids(d), extent(d), settings(d), frames(d), currentframe(d), auxframe(d))
+function RuleData(d::AbstractSimData{S,N};
+    grids=grids(d), 
+    extent=extent(d), 
+    settings=settings(d),
+    frames=frames(d), 
+    currentframe=currentframe(d), 
+    auxframe=auxframe(d), 
+    replicates=replicates(d),
+    value=nothing, 
+    indices=nothing,
+) where {S,N}
+    return RuleData{S,N}(
+        grids, extent, settings, frames, currentframe, auxframe, replicates, value, indices
+    )
+end
+
+function Base.getindex(d::RuleData, key::Symbol) 
+    grid = getindex(grids(d), key)
+    @set grid.indices = d.indices
 end
 
 ConstructionBase.constructorof(::Type{<:RuleData{S,N}}) where {S,N} = RuleData{S,N}
@@ -245,4 +270,5 @@ settings(d::RuleData) = d.settings
 boundary(d::RuleData) = boundary(settings(d))
 proc(d::RuleData) = proc(settings(d))
 opt(d::RuleData) = opt(settings(d))
-
+replicates(d::RuleData) = d.replicates
+indices(d::RuleData) = d.indices

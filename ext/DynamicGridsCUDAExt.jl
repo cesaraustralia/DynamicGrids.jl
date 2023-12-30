@@ -1,6 +1,6 @@
 module DynamicGridsCUDAExt
 
-using CUDA, DynamicGrids, ModelParameters
+using Adapt, CUDA, DynamicGrids, ModelParameters
 
 # CUDA setup
 
@@ -18,7 +18,7 @@ for (f, op) in DynamicGrids.ATOMIC_OPS
     @eval begin
         function ($f)(d::DynamicGrids.GridData{<:DynamicGrids.WriteMode,<:Any,R}, ::CuGPU, x, I...) where R
             A = parent(dest(d))
-            i = Base._to_linear_index(A, (I .+ R)...)
+            i = Base._to_linear_index(A, add_halo(d, I)...)
             (CUDA.$atomic_f)(pointer(A, i), x)
         end
     end

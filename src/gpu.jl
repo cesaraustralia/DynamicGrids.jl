@@ -6,7 +6,7 @@ Abstract supertype for GPU processors.
 abstract type GPU <: Processor end
 
 function _copyto_output!(outgrid, grid::GridData, proc::GPU)
-    copyto!(outgrid, view(grid, axes(outgrid)...))
+    copyto!(outgrid, grid)
 end
 
 """
@@ -23,7 +23,7 @@ CPUGPU() = CPUGPU(Base.Threads.SpinLock())
 Base.Threads.lock(opt::CPUGPU) = lock(opt.spinlock)
 Base.Threads.unlock(opt::CPUGPU) = unlock(opt.spinlock)
 
-kernel_setup(::CPUGPU) = KernelAbstractions.CPU(), 1
+kernel_setup(::CPUGPU) = KernelAbstractions.CPU(; static=true), 64
 
 """
     CuGPU <: GPU
@@ -43,8 +43,10 @@ CuGPU() = CuGPU{32}()
 function maprule!(
     data::AbstractSimData, proc::GPU, opt, ruletype::Val{<:Rule}, rule, rkeys, wkeys
 )
-    kernel! = ka_rule_kernel!(kernel_setup(proc)...)
-    kernel!(data, ruletype, rule, rkeys, wkeys; ndrange=gridsize(data))
+    backend = KernelAbstractions.get_backend(first(grids(data)))
+    kernel! = ka_rule_kernel!(kernel_setup(proc)..., gridsize(first(grids(data))))
+    kernel!(data, ruletype, rule, rkeys, wkeys)
+    KernelAbstractions.synchronize(backend)
     return nothing
 end
 
@@ -76,4 +78,22 @@ end
 end
 @propagate_inbounds function _setindex!(d::GridData{<:SwitchMode}, opt::GPU, x, I...)
     dest(d)[I...] = x
+end
+
+function _maybemask!(
+    wgrid::GridData{<:GridMode,<:Tuple{Y,X}}, proc::GPU, mask::AbstractArray
+) where {Y,X}
+    mv = maskval(wgrid)
+    kernel! = ka_mask_kernel!(kernel_setup(proc)...)
+    kernel!(source(wgrid), mask, mv; ndrange=size(wgrid)) 
+    return nothing
+end
+
+@kernel function ka_mask_kernel!(grid, mask, maskval)
+    I = @index(Global, NTuple)
+    grid[I...] = mask[I...] ? grid[I...] : maskval
+end
+@kernel function ka_mask_kernel!(grid, mask, maskval::Nothing)
+    I = @index(Global, NTuple)
+    grid[I...] = mask[I...] * grid[I...]
 end
