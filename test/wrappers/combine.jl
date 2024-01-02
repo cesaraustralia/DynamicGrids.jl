@@ -1,5 +1,5 @@
 using DynamicGrids, Test, Dates
-using DynamicGrids: applyrule, ruletype, _readkeys, _writekeys, SimData
+using DynamicGrids: applyrule, ruletype, _readkeys, _writekeys, SimData, RuleData
 
 @testset "Combine" begin
     rule1 = Cell{:a,:b}() do data, a, I
@@ -37,7 +37,7 @@ using DynamicGrids: applyrule, ruletype, _readkeys, _writekeys, SimData
 
     ruleset = Ruleset(combinedrule)
     init = (a=agrid, b=bgrid, c=cgrid, d=dgrid, e=egrid)
-    data = SimData(Extent(init=init, tspan=1:1), ruleset)
+    data = RuleData(SimData(Extent(init=init, tspan=1:1), ruleset))
 
     @test radius(ruleset) == (b=0, c=0, d=0, e=0, a=0)
     @test applyrule(data, combinedrule, (b=1, c=2, d=3, a=4), (1, 1)) == (10, 8, 15, 12, 8)

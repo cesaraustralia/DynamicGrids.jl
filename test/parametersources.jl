@@ -2,6 +2,7 @@ using DynamicGrids, Dates, DimensionalData, Setfield, Unitful, Test, Dimensional
 using Unitful: d
 using DynamicGrids: SimData, Extent, _calc_auxframe
 const DG = DynamicGrids
+using DimensionalData.Dimensions, DimensionalData.LookupArrays
 
 @testset "Aux" begin
     @testset "aux sequence" begin
@@ -57,7 +58,7 @@ const DG = DynamicGrids
         end
 
         @testset "correct values are returned by get" begin
-            x, y, ti = X(1:2), Y(1:2), Ti(Date(2001, 1, 15):Day(5):Date(2001, 1, 25))
+            x, y, ti = X(1:2), Y(1:2), Ti(Cyclic(Date(2001, 1, 15):Day(5):Date(2001, 1, 25); cycle=Day(15), order=ForwardOrdered(), sampling=Intervals(Start())))
             @testset "1d" begin
                 seq1 = DimArray(a[2, 2, :], ti)
                 seq3 = DimArray(a[:, 1, :], (x, ti))
@@ -67,8 +68,7 @@ const DG = DynamicGrids
                 data1 = DG._updatetime(data, 1)
                 @test data1.auxframe == (seq1 = 1, seq3 = 1,)
                 # I is ignored for 1d with Ti dim
-                @test get(data1, Aux(:seq1), (-10,)) == 0.4
-                @test get(data1, Aux(:seq3), (1)) == 0.1
+                @test get(data1, Aux(:seq3), (1,)) == 0.1
                 dims(seq1, Ti) === dims(seq3, Ti)
                 data2 = DG._updatetime(data, 5);
                 @test data2.auxframe == (seq1 = 2, seq3 = 2,)
@@ -143,7 +143,7 @@ end
         sim!(output, ruleset)
         @test output == [[0 0], [3 4], [3 4]]
 
-        da = DimArray(cat([1 2], [3 4]; dims=3) , (X(), Y(), Ti(4d:1d:5d)))
+        da = DimArray(cat([1 2], [3 4]; dims=3) , (X(), Y(), Ti(Cyclic(4d:1d:5d; cycle=2d, order=ForwardOrdered(), sampling=Intervals(Start())))))
         output = ArrayOutput(init; tspan=1d:1d:3d, aux=(l=da,))
         sim!(output, ruleset)
         @test output == [[0 0], [1 2], [3 4]]

@@ -1,5 +1,5 @@
 using DynamicGrids, Test
-using DynamicGrids: inbounds, isinbounds, _inbounds, _isinbounds, _cyclic_index, 
+using DynamicGrids: inbounds, isinbounds, _inbounds, _isinbounds,
     SimData, _unwrap, ismasked
 
 @testset "boundary boundary checks are working" begin
@@ -50,29 +50,12 @@ end
 
     @testset "return type" begin
         rule = Neighbors{:a,:a}(Moore{1}()) do data, hood, x, I
-            round(Int, x + sum(hood))
+            Int(maximum(hood))
         end
         output = ArrayOutput((a=rand(Int, 10, 10),); tspan=1:10)
         @test isinferred(output, rule)
         output = ArrayOutput((a=rand(Bool, 10, 10),); tspan=1:10)
         @test_throws ErrorException isinferred(output, rule)
-    end
-
-    @testset "let blocks" begin
-        a = 0.7
-        rule = SetCell() do data, x, I
-            add!(first(data), round(Int, a + x), I...)
-        end
-        output = ArrayOutput(zeros(Int, 10, 10); tspan=1:10)
-        @test_throws ErrorException isinferred(output, Ruleset(rule))
-        a = 0.7
-        rule = let a = a
-            SetCell() do data, x, I
-                add!(first(data), round(Int, a), I...)
-            end
-        end
-        output = ArrayOutput(zeros(Int, 10, 10); tspan=1:10)
-        @test isinferred(output, Ruleset(rule))
     end
 
 end

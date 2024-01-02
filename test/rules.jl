@@ -2,7 +2,7 @@ using DynamicGrids, ModelParameters, Setfield, Test, StaticArrays,
       LinearAlgebra, CUDA
 import DynamicGrids: applyrule, applyrule!, maprule!, ruletype, extent, source, dest,
        _getreadgrids, _getwritegrids, _combinegrids, _readkeys, _writekeys,
-       SimData, GridData, WriteMode, Rule, Extent, CPUGPU, stencilkey
+       SimData, RuleData, GridData, WriteMode, Rule, Extent, CPUGPU, stencilkey
 using DynamicGrids.Adapt: adapt
 
 maybe_gpu(output, hardware::CuGPU) = adapt(CuArray, output)
@@ -196,7 +196,7 @@ end
                               0 1 0 0
                               1 1 2 0
                               0 2 1 1]
-                sim!(output, rule, proc=proc, opt=opt)
+                sim!(output, rule; proc=proc, opt=opt)
                 @test adapt(Array, output[2]) == ref_output
             end
         end
@@ -206,7 +206,7 @@ end
         rule = SetNeighbors(VonNeumann(1)) do data, hood, state, I
             state == 0 && return nothing
             for pos in indices(hood, I)
-                data[pos...] = 1 
+                data[pos...] = 1
             end
         end
         for proc in hardware, opt in opts
@@ -344,17 +344,18 @@ applyrule(data, ::TestRule, state, index) = 0
 
             ext = Extent(; init=(a=init,), tspan=1:1)
             simdata = SimData(ext, ruleset)
+            ruledata = RuleData(simdata)
 
             # Test maprule components
-            rkeys, rgrids = _getreadgrids(rule, simdata)
-            wkeys, wgrids = _getwritegrids(WriteMode, rule, simdata)
+            rkeys, rgrids = _getreadgrids(rule, ruledata)
+            wkeys, wgrids = _getwritegrids(WriteMode, rule, ruledata)
             @test rkeys == Val{:a}()
             @test wkeys == Val{:a}()
-            newsimdata = @set simdata.grids = _combinegrids(rkeys, rgrids, wkeys, wgrids)
-            @test newsimdata.grids[1] isa GridData{WriteMode}
+            newruledata = @set ruledata.grids = _combinegrids(rkeys, rgrids, wkeys, wgrids)
+            @test newruledata.grids[1] isa GridData{WriteMode}
             # Test type stability
             T = Val{DynamicGrids.ruletype(rule)}()
-            @inferred maprule!(newsimdata, proc, opt, T, rule, rkeys, wkeys)
+            @inferred maprule!(newruledata, proc, opt, T, rule, rkeys, wkeys)
             
             resultdata = maprule!(simdata, rule)
             @test source(resultdata[:a]) == final
@@ -374,11 +375,12 @@ applyrule!(data, ::TestSetCell, state, index) = 0
             # Test type stability
             ext = Extent(; init=(_default_=init,), tspan=1:1)
             simdata = SimData(ext, ruleset)
-            rkeys, rgrids = _getreadgrids(rule, simdata)
-            wkeys, wgrids = _getwritegrids(WriteMode, rule, simdata)
-            newsimdata = @set simdata.grids = _combinegrids(wkeys, wgrids, rkeys, rgrids)
+            ruledata = RuleData(simdata)
+            rkeys, rgrids = _getreadgrids(rule, ruledata)
+            wkeys, wgrids = _getwritegrids(WriteMode, rule, ruledata)
+            newruledata = @set ruledata.grids = _combinegrids(wkeys, wgrids, rkeys, rgrids)
             T = Val{DynamicGrids.ruletype(rule)}()
-            @inferred maprule!(newsimdata, proc, opt, T, rule, rkeys, wkeys)
+            @inferred maprule!(newruledata, proc, opt, T, rule, rkeys, wkeys)
             resultdata = maprule!(simdata, rule)
             @test source(resultdata[:_default_]) == init
         end

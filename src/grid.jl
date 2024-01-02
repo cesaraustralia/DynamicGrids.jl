@@ -158,46 +158,40 @@ end
 # This is not safe for general use.
 # It can be used where only identical transformations of a cell
 # can happen from any other cell, such as setting all 1s to 2.
-@propagate_inbounds function Base.setindex!(d::GridData{<:WriteMode}, x, I...)
+@propagate_inbounds function Base.setindex!(d::GridData{<:WriteMode}, x, i1::Int, Is::Int...)
+    I = _maybe_complete_indices(d, add_halo(d, (i1, Is...)))
     _setindex!(d, proc(d), x, I...)
-end
-@propagate_inbounds function Base.setindex!(d::GridData{<:WriteMode}, x, i1::Int, I::Int...)
-    _setindex!(d, proc(d), x, i1, I...)
 end
 
 @propagate_inbounds function _setindex!(d::GridData{<:WriteMode}, proc::SingleCPU, x, I...)
-    I = _maybe_complete_indices(data, I)
     @boundscheck checkbounds(dest(d), I...)
     # @inbounds
     _setoptindex!(d, x, I...)
-    source(d)[add_halo(d, I)...] = x
+    source(d)[d...] = x
 end
 @propagate_inbounds function _setindex!(d::GridData{<:WriteMode}, proc::ThreadedCPU, x, I...)
-    I = _maybe_complete_indices(data, I)
     # Dest status is not threadsafe, even if the
     # setindex itself is safe. So we LOCK
     lock(proc)
     # @inbounds
     _setoptindex!(d, x, I...)
     unlock(proc)
-    source(d)[add_halo(d, I)...] = x
+    source(d)[d...] = x
 end
 @propagate_inbounds function _setindex!(d::GridData{<:SwitchMode}, proc::SingleCPU, x, I...)
-    I = _maybe_complete_indices(data, I)
     @boundscheck checkbounds(dest(d), I...)
     # @inbounds
     _setoptindex!(d, x, I...)
-    dest(d)[add_halo(d, I)...] = x
+    dest(d)[I...] = x
 end
 @propagate_inbounds function _setindex!(d::GridData{<:SwitchMode}, proc::ThreadedCPU, x, I...)
-    I = _maybe_complete_indices(data, I)
     # Dest status is not threadsafe, even if the
     # setindex itself is safe. So we LOCK
     lock(proc)
     # @inbounds
     _setoptindex!(d, x, I...)
     unlock(proc)
-    dest(d)[add_halo(d, I)...] = x
+    dest(d)[I...] = x
 end
 
 function _maybe_complete_indices(data::GridData, I::Tuple)
@@ -213,7 +207,6 @@ end
 _setoptindex!(d::GridData{<:WriteMode,<:Any,R}, x, I...) where R = _setoptindex!(d, opt(d), x, I...)
 _setoptindex!(d::GridData{<:WriteMode,<:Any,R}, opt::PerformanceOpt, x, I...) where R = nothing
 
-Stencils.switch(d::Tuple) = map(switch, d)
 function Stencils.switch(grids::NamedTuple{<:Any,Tuple{T,Vararg}}) where {T<:GridData{<:SwitchMode}}
     map(switch, grids)
 end
@@ -225,3 +218,48 @@ Stencils.switch(::PerformanceOpt, optdata) = optdata
 
 Stencils.after_update_boundary!(grid::GridData) = Stencils.after_update_boundary!(grid, opt(grid))
 Stencils.after_update_boundary!(grid::GridData, opt) = grid
+
+function Base.copyto!(dst::GridData, idst::CartesianIndices, src::GridData, isrc::CartesianIndices)
+    dst_axes = add_halo(dst, idst)
+    src_axes = add_halo(src, isrc)
+    copyto!(
+        parent(dst), CartesianIndices(dst_axes),
+        parent(src), CartesianIndices(src_axes),
+    )
+    return dst
+end
+function Base.copyto!(dst::AbstractDimArray, idst::CartesianIndices, src::GridData, isrc::CartesianIndices)
+    src_axes = add_halo(src, isrc)
+    copyto!(dst, idst, parent(src), src_axes)
+    return dst
+end
+function Base.copyto!(dst::GridData, idst::CartesianIndices, src::AbstractDimArray, isrc::CartesianIndices)
+    dst_axes = add_halo(dst, idst)
+    copyto!(source(dst), dst_axes, src, isrc)
+    return dst
+end
+function Base.copyto!(dst::GridData, src::GridData)
+    dst_axes = add_halo(dst, axes(dst))
+    src_axes = add_halo(src, axes(src))
+    copyto!(
+        source(dst), CartesianIndices(dst_axes),
+        source(src), CartesianIndices(src_axes),
+    )
+    return dst
+end
+function Base.copyto!(dst::AbstractDimArray, src::GridData)
+    src_axes = add_halo(src, axes(src))
+    copyto!(
+        dst, CartesianIndices(dst),
+        source(src), CartesianIndices(src_axes),
+    )
+    return dst
+end
+function Base.copyto!(dst::GridData, src::AbstractDimArray)
+    dst_axes = add_halo(dst, axes(dst))
+    copyto!(
+        source(dst), CartesianIndices(dst_axes),
+        src, CartesianIndices(src),
+    )
+    return dst
+end

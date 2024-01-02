@@ -56,7 +56,7 @@ auxframe(d::AbstractSimData) = d.auxframe
 currentframe(d::AbstractSimData) = d.currentframe
 
 # Forwarded to the Extent object
-gridsize(d::AbstractSimData) = gridsize(extent(d))
+gridsize(d::AbstractSimData) = size(d)
 padval(d::AbstractSimData) = padval(extent(d))
 init(d::AbstractSimData) = init(extent(d))
 mask(d::AbstractSimData) = mask(extent(d))
@@ -121,6 +121,26 @@ function SimData{S,N}(
 end
 SimData(o, ruleset::AbstractRuleset) = SimData(o, extent(o), ruleset)
 SimData(o, r1::Rule, rs::Rule...) = SimData(o, extent(o), Ruleset(r1, rs...))
+
+# When no simdata is passed in, create new SimData
+function SimData(::Nothing, output, extent::AbstractExtent, ruleset::AbstractRuleset)
+    SimData(output, extent, ruleset)
+end
+# Initialise a AbstractSimData object with a new `Extent` and `Ruleset`.
+function SimData(
+    simdata::SimData, output, extent::AbstractExtent, ruleset::AbstractRuleset
+)
+    (replicates(simdata) == replicates(output) == replicates(extent)) || 
+        throw(ArgumentError("`simdata` must have same numver of replicates as `output`"))
+
+    @assert simdata.extent == StaticExtent(extent)
+    @set! simdata.ruleset = StaticRuleset(ruleset)
+    if hasdelay(rules(ruleset)) 
+        isstored(output) || _not_stored_delay_error()
+        @set! simdata.frames = frames(output) 
+    end
+    return simdata
+end
 
 function SimData(o, extent::AbstractExtent, ruleset::AbstractRuleset)
     frames_ = if hasdelay(rules(ruleset)) 
@@ -193,25 +213,6 @@ proc(d::SimData) = proc(ruleset(d))
 opt(d::SimData) = opt(ruleset(d))
 settings(d::SimData) = settings(ruleset(d))
 replicates(d::SimData) = replicates(extent(d))
-
-# When no simdata is passed in, create new AbstractSimData
-function initdata!(::Nothing, output, extent::AbstractExtent, ruleset::AbstractRuleset)
-    SimData(output, extent, ruleset)
-end
-# Initialise a AbstractSimData object with a new `Extent` and `Ruleset`.
-function initdata!(
-    simdata::SimData, output, extent::AbstractExtent, ruleset::AbstractRuleset
-)
-    # TODO: make sure this works with delays and new simuloutputs?
-    map(copy!, values(simdata), values(init(extent)))
-    @set! simdata.extent = StaticExtent(extent)
-    @set! simdata.ruleset = StaticRuleset(ruleset)
-    if hasdelay(rules(ruleset)) 
-        isstored(output) || _not_stored_delay_error()
-        @set! simdata.frames = frames(output) 
-    end
-    return simdata
-end
 
 """
     RuleData <: AbstractSimData

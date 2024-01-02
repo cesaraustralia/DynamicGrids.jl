@@ -152,7 +152,6 @@ function radius(rules::Tuple{Vararg{<:Rule}})
     maxradii = Tuple(radius(rules, key) for key in allkeys)
     return NamedTuple{allkeys}(maxradii)
 end
-radius(rules::Tuple{}) = NamedTuple{(),Tuple{}}(())
 # Get radius of specific key from all rules
 radius(rules::Tuple{Vararg{<:Rule}}, key::Symbol) =
     reduce(max, radius(ru) for ru in rules if key in keys(ru); init=0)

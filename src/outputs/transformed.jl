@@ -62,21 +62,19 @@ _copytransformed!(dest::StaticArray, src::StaticArray) = src
 # Multi/named grid simulation, f is passed a NamedTuple
 function _transform_grids(o::TransformedOutput, grids::NamedTuple)
     # Make a new named tuple of raw arrays without wrappers, copying
-    # to the buffer where an OffsetArray was used for padding.
     # Often it's faster to copy than use a view when f is sum/mean etc.
     nt = map(grids, o.buffer) do g, b
-        source(g) isa OffsetArray ? copy!(b, sourceview(g)) : source(g)
+        padding(g) isa Halo ? copy!(b, g) : source(g)
     end
     o.f(nt)
 end
 # Single unnamed grid simulation, f is passed an AbstractArray
 function _transform_grids(o::TransformedOutput, grids::NamedTuple{(DEFAULT_KEY,)})
     g = first(grids)
-    A = source(g) isa OffsetArray ? copy!(o.buffer, sourceview(g)) : source(g)
+    A = padding(g) isa Halo ? copy!(o.buffer, g) : source(g)
     o.f(A)
 end
 
 init_output_grids!(o::TransformedOutput, init) = nothing
-initdata!(o::TransformedOutput, init) = nothing
 
 Adapt.adapt_structure(to, o::TransformedOutput) = o

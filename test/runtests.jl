@@ -1,14 +1,6 @@
 using DynamicGrids, Aqua, SafeTestsets
 
-if VERSION >= v"1.5.0"
-    # Amibiguities are not owned by DynamicGrids
-    # Aqua.test_ambiguities([DynamicGrids, Base, Core])
-    Aqua.test_unbound_args(DynamicGrids)
-    Aqua.test_undefined_exports(DynamicGrids)
-    Aqua.test_project_extras(DynamicGrids)
-    Aqua.test_stale_deps(DynamicGrids)
-    Aqua.test_deps_compat(DynamicGrids)
-end
+Aqua.test_all(DynamicGrids; ambiguities=false)
 
 @time @safetestset "generated" begin include("generated.jl") end
 @time @safetestset "rules" begin include("rules.jl") end

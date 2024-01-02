@@ -112,7 +112,7 @@ end
 # Copy cells from grid to output
 _copyto_output!(outgrid, grid::GridData) = _copyto_output!(outgrid, grid, proc(grid))
 function _copyto_output!(outgrid, grid::GridData, proc::CPU)
-    copyto!(outgrid, CartesianIndices(outgrid), source(grid), CartesianIndices(outgrid))
+    copyto!(outgrid, CartesianIndices(outgrid), grid, CartesianIndices(outgrid))
 end
 # Copy cells from grid to output using multiple threads
 function _copyto_output!(outgrid, grid::GridData{<:Any,Tuple{X,Y}}, proc::ThreadedCPU) where {X, Y}

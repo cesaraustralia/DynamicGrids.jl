@@ -17,7 +17,7 @@ such as another [`Grid`](@ref), an [`Aux`](@ref) array, or a [`Delay`](@ref).
 Other `source` objects are used as-is without indexing with `I`.
 """
 @propagate_inbounds Base.get(data::AbstractSimData, val, I...) = val
-@propagate_inbounds Base.get(data::AbstractSimData, key::ParameterSource, I...) =
+@propagate_inbounds Base.get(data::AbstractSimData, key::ParameterSource, I::Integer...) =
     get(data, key, I)
 @propagate_inbounds Base.get(data::AbstractSimData, key::ParameterSource, I::CartesianIndex) =
     get(data, key, Tuple(I))
@@ -62,10 +62,7 @@ _unwrap(::Type{<:Aux{X}}) where X = X
 
 @inline aux(nt::NamedTuple, ::Aux{Key}) where Key = nt[Key]
 
-@propagate_inbounds function Base.get(data::AbstractSimData, key, I::CartesianIndex)
-    Base.get(data, key, Tuple(I))
-end
-@propagate_inbounds function Base.get(data::AbstractSimData, key::Aux, I)
+@propagate_inbounds function Base.get(data::AbstractSimData, key::Aux, I::Tuple)
     _getaux(data, key, I)
 end
 
@@ -85,13 +82,13 @@ end
 # For a DimArray with a time dimension we return the value at the
 # current auxframe, also using the index `I` if aux is multidimensional.
 @propagate_inbounds function _getaux(
-    A::AbstractDimArray{<:Any,1}, data::AbstractSimData, key::Union{Aux,Symbol}, I::Tuple
-)
+    A::AbstractDimArray{<:Any,1}, data::AbstractSimData, key::Union{Aux,Symbol}, I::NTuple{N}
+) where N
     hasdim(A, TimeDim) ? A[auxframe(data, key)] : A[I...]
 end
 @propagate_inbounds function _getaux(
     A::AbstractDimArray{<:Any,N1}, data::AbstractSimData, key::Union{Aux,Symbol}, I::NTuple{N2}
-   ) where {N1,N2}
+) where {N1,N2}
     if hasdim(A, TimeDim)
         last(dims(A)) isa TimeDim || throw(ArgumentError("The time dimensions in aux data must be the last dimension"))
         A[ntuple(i -> I[i], Val{N1-1}())..., auxframe(data, key)]
