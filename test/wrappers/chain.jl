@@ -1,7 +1,7 @@
 using DynamicGrids, Test, BenchmarkTools, StaticArrays
 
-using DynamicGrids: SimData, radius, rules, _readkeys, _writekeys, 
-    applyrule, stencil, stencilkey, Extent, ruletype
+using DynamicGrids: SimData, RuleData, radius, rules, _readkeys, _writekeys, 
+    applyrule, stencil, stencilkey, Extent, ruletype, stencilkey, stencil
 
 @testset "CellRule chain" begin
 
@@ -40,11 +40,12 @@ using DynamicGrids: SimData, radius, rules, _readkeys, _writekeys,
 
     ruleset = Ruleset(chain)
     init = (a=agrid, b=bgrid, c=cgrid, d=dgrid, e=egrid)
-    data = SimData(Extent(init=init, tspan=1:1), ruleset)
+    data = RuleData(SimData(Extent(init=init, tspan=1:1), ruleset))
 
     @test radius(ruleset) == (b=0, c=0, d=0, e=0, a=0)
 
-    @test applyrule(data, chain, (b=1, c=1, d=1, a=1), (1, 1)) == (4, 6, 10, 3, 2)
+    @test applyrule(data, chain, (b=1, c=1, d=1, a=1), (1, 1)) ==
+        (4, 6, 10, 3, 2)
 
     # @inferred applyrule(data, chain, (b=1, c=1, d=1, a=1), (1, 1))
 

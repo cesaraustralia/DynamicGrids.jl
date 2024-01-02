@@ -6,8 +6,7 @@ Abstract supertype for GPU processors.
 abstract type GPU <: Processor end
 
 function _copyto_output!(outgrid, grid::GridData, proc::GPU)
-    # copyto!(outgrid, view(grid, axes(outgrid)...))
-    outgrid .= view(grid, axes(outgrid)...)
+    copyto!(outgrid, grid)
 end
 
 """
@@ -24,7 +23,7 @@ CPUGPU() = CPUGPU(Base.Threads.SpinLock())
 Base.Threads.lock(opt::CPUGPU) = lock(opt.spinlock)
 Base.Threads.unlock(opt::CPUGPU) = unlock(opt.spinlock)
 
-kernel_setup(::CPUGPU) = KernelAbstractions.CPU(), 1
+kernel_setup(::CPUGPU) = KernelAbstractions.CPU(; static=true), 64
 
 """
     CuGPU <: GPU
@@ -45,8 +44,8 @@ function maprule!(
     data::AbstractSimData, proc::GPU, opt, ruletype::Val{<:Rule}, rule, rkeys, wkeys
 )
     backend = KernelAbstractions.get_backend(first(grids(data)))
-    kernel! = ka_rule_kernel!(kernel_setup(proc)...)
-    kernel!(data, ruletype, rule, rkeys, wkeys; ndrange=gridsize(data))
+    kernel! = ka_rule_kernel!(kernel_setup(proc)..., gridsize(first(grids(data))))
+    kernel!(data, ruletype, rule, rkeys, wkeys)
     KernelAbstractions.synchronize(backend)
     return nothing
 end
@@ -75,26 +74,26 @@ end
 # It can be used where only identical transformations of a cell 
 # can happen from any other cell, such as setting all 1s to 2.
 @propagate_inbounds function _setindex!(d::GridData{<:WriteMode}, opt::GPU, x, I...)
-    Stencils.unsafe_setindex_with_padding(source(d), padding(d), x, I...)
+    source(d)[I...] = x
 end
 @propagate_inbounds function _setindex!(d::GridData{<:SwitchMode}, opt::GPU, x, I...)
-    Stencils.unsafe_setindex_with_padding(dest(d), padding(d), x, I...)
+    dest(d)[I...] = x
 end
 
 function _maybemask!(
     wgrid::GridData{<:GridMode,<:Tuple{Y,X}}, proc::GPU, mask::AbstractArray
 ) where {Y,X}
-    pv = padval(wgrid)
+    mv = maskval(wgrid)
     kernel! = ka_mask_kernel!(kernel_setup(proc)...)
-    kernel!(source(wgrid), mask, pv; ndrange=size(wgrid)) 
+    kernel!(source(wgrid), mask, mv; ndrange=size(wgrid)) 
     return nothing
 end
 
-@kernel function ka_mask_kernel!(grid, mask, padval)
+@kernel function ka_mask_kernel!(grid, mask, maskval)
     I = @index(Global, NTuple)
-    mask[I...] ? grid[I...] : padval
+    grid[I...] = mask[I...] ? grid[I...] : maskval
 end
-@kernel function ka_mask_kernel!(grid, mask, padval::Nothing)
+@kernel function ka_mask_kernel!(grid, mask, maskval::Nothing)
     I = @index(Global, NTuple)
-    mask[I...] * grid[I...]
+    grid[I...] = mask[I...] * grid[I...]
 end

@@ -66,11 +66,7 @@ end
     expr = Expr(:tuple)
     keys = map(_unwrap, Tuple(K.parameters))
     for (i, k) in enumerate(keys)
-        grid_expr = quote
-            grid_$k = data[$(QuoteNode(k))]
-            @inbounds source(grid_$k)[I...]
-        end
-        push!(expr.args, grid_expr)
+        push!(expr.args, :(@inbounds source(data[$(QuoteNode(k))])[add_halo(data[$(QuoteNode(k))], I)...]))
     end
     return quote
         keys = $keys
@@ -93,11 +89,7 @@ end
     keys = map(_unwrap, Tuple(K.parameters))
     for (i, k) in enumerate(keys) 
         # MUST write to source(grid) - CellRule doesn't switch grids
-        grid_expr = quote
-            grid_$k = data[$(QuoteNode(k))]
-            @inbounds source(grid_$k)[add_halo(grid_$k, I)...] = vals[$i]
-        end
-        push!(expr.args, grid_expr)
+        push!(expr.args, :(@inbounds source(data[$(QuoteNode(k))])[add_halo(data[$(QuoteNode(k))], I)...] = vals[$i]))
     end
     push!(expr.args, :(nothing))
     return expr
@@ -116,11 +108,7 @@ end
     for (i, k) in enumerate(keys) 
         # MUST write to dest(grid) here, not grid K
         # setindex! has overrides for the grid
-        grid_expr = quote 
-            grid_$k = data[$(QuoteNode(k))]
-            @inbounds dest(grid_$k)[add_halo(grid_$k, I)...] = vals[$i]
-        end
-        push!(expr.args, grid_expr)
+        push!(expr.args, :(@inbounds dest(data[$(QuoteNode(k))])[add_halo(data[$(QuoteNode(k))], I)...] = vals[$i]))
     end
     push!(expr.args, :(nothing))
     return expr

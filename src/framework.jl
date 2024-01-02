@@ -77,7 +77,7 @@ function sim!(output::Output, ruleset::AbstractRuleset=ruleset(output);
     # Set up output
     settspan!(output, tspan)
     # Create or update the combined data object for the simulation
-    simdata = initdata!(simdata, output, extent, simruleset)
+    simdata = SimData(simdata, output, extent, simruleset)
     # Run validation for the rules - they can check if simdata has what they need
     # So error messages happen early, without pages of scrolling.
     _validaterules(ruleset, simdata)
@@ -142,7 +142,7 @@ function resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
 
     setfps!(output, fps)
     extent = Extent(; init=_asnamedtuple(init), mask=mask(output), aux=aux(output), tspan=new_tspan)
-    simdata = initdata!(simdata, output, extent, ruleset)
+    simdata = SimData(simdata, output, extent, ruleset)
     initialise!(output, simdata)
     setrunning!(output, true) || error("Could not start the simulation with this output")
     return runsim!(output, simdata, ruleset, fspan; kw...)
@@ -168,7 +168,8 @@ end
 # Operations on [`Rule`](@ref)s and [`SimData`](@ref) objects are in a
 # functional style, as they are used in inner loops where immutability improves
 # performance.
-function simloop!(output::Output, simdata, ruleset, fspan; printframe=false, printtime=false)
+function simloop!(output::Output, simdata, ruleset, fspan; printframe=false)
+    printframe && _printframe(simdata, 1)
     # Generate any initialisation data the rules need
     rule_initialisation = initialiserules(simdata)
     # Set the frame timestamp for fps calculation
@@ -177,7 +178,7 @@ function simloop!(output::Output, simdata, ruleset, fspan; printframe=false, pri
     simdata = _updatetime(simdata, 1) |> _proc_setup
     # Loop over the simulation
     for f in fspan[2:end]
-        printframe && println(stdout, "frame: $f, time: $(tspan(simdata)[f])")
+        printframe && _printframe(simdata, f)
         # Update the current simulation frame and time
         simdata = _updatetime(simdata, f) 
         # Update any Delay parameters
@@ -201,6 +202,8 @@ function simloop!(output::Output, simdata, ruleset, fspan; printframe=false, pri
     setrunning!(output, false)
     return output
 end
+
+_printframe(simdata, i) = println(stdout, "frame: $i, time: $(tspan(simdata)[i])")
 
 _step!(sd::AbstractSimData, rules) = _updaterules(rules, sd) |> sequencerules!
 

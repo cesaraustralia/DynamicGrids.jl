@@ -6,21 +6,22 @@ using DynamicGrids.Adapt: adapt
 maybe_gpu(output, hardware::CuGPU) = adapt(CuArray, output)
 maybe_gpu(output, hardware) = output
 
-# if CUDA.has_cuda_gpu()
-    # CUDA.allowscalar(false)
-    # hardware = (SingleCPU(), ThreadedCPU(), CPUGPU(), CuGPU())
-# else
+if CUDA.has_cuda_gpu()
+    CUDA.allowscalar(false)
+    hardware = (SingleCPU(), ThreadedCPU(), CPUGPU(), CuGPU())
+else
     hardware = (SingleCPU(), ThreadedCPU(), CPUGPU())
-# end
+end
 opts = (NoOpt(), SparseOpt())
 
-# proc = CPUGPU()
+proc = CPUGPU()
 proc = CuGPU()
+proc = ThreadedCPU()
 proc = SingleCPU()
-# opt = SparseOpt()
+opt = SparseOpt()
 opt = NoOpt()
 
-# life glider simsa
+# life glider sims
 
 # Test all cycled variants of the array
 cycle_i!(arrays) = begin
@@ -256,53 +257,51 @@ end
             @test output_a[7][:a] == test7_rem
         end
     end
+end
 
-    @testset "Combinatoric comparisons in a larger Life sim" begin
-        rule = Life(stencil=Moore(1))
-        init_ = rand(Bool, 100, 99)
-        mask_ = ones(Bool, size(init_)...)
-        mask_[1:50, 1:50] .= false  
-        wrap_rs_ref = Ruleset(rule; boundary=Wrap())
-        remove_rs_ref = Ruleset(rule; boundary=Remove())
-        wrap_output_ref = ArrayOutput(init_; tspan=1:100, mask=mask_)
-        remove_output_ref = ArrayOutput(init_; tspan=1:100, mask=mask_)
-        sim!(remove_output_ref, remove_rs_ref)
-        sim!(wrap_output_ref, wrap_rs_ref)
-        for proc in hardware, opt in opts
-            @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
-                @testset "Wrap" begin
-                    wrap_rs = Ruleset(rule; boundary=Wrap(), proc=proc, opt=opt)
-                    wrap_output = ArrayOutput(init_; tspan=1:100, mask=mask_)
-                    sim!(wrap_output, wrap_rs)
-                    wrap_output_ref[2] .- wrap_output[2]
-                    @test wrap_output_ref[2] == wrap_output[2]
-                    wrap_output_ref[3] .- wrap_output[3]
-                    @test wrap_output_ref[3] == wrap_output[3]
-                    @test wrap_output_ref[10] == wrap_output[10]
-                    @test wrap_output_ref[100] == wrap_output[100]
-                end
-                @testset "Remove" begin
-                    remove_rs = Ruleset(rule; boundary=Remove(), proc=proc, opt=opt)
-                    remove_output = ArrayOutput(init_; tspan=1:100, mask=mask_)
-                    sim!(remove_output, remove_rs);
-                    @test remove_output_ref[2] == remove_output[2]
-                    @test remove_output_ref[3] == remove_output[3]
-                    remove_output_ref[3] .- remove_output[3]
-                    @test remove_output_ref[10] == remove_output[10]
-                    @test remove_output_ref[100] == remove_output[100]
-                end
+@testset "Combinatoric comparisons in a larger Life sim" begin
+    rule = Life(stencil=Moore(1))
+    init_ = rand(Bool, 100, 99)
+    mask_ = ones(Bool, size(init_)...)
+    mask_[1:50, 1:50] .= false  
+    wrap_rs_ref = Ruleset(rule; boundary=Wrap())
+    remove_rs_ref = Ruleset(rule; boundary=Remove())
+    wrap_output_ref = ArrayOutput(init_; tspan=1:100, mask=mask_)
+    remove_output_ref = ArrayOutput(init_; tspan=1:100, mask=mask_)
+    sim!(remove_output_ref, remove_rs_ref)
+    sim!(wrap_output_ref, wrap_rs_ref)
+    for proc in hardware, opt in opts
+        @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
+            @testset "Wrap" begin
+                wrap_rs = Ruleset(rule; boundary=Wrap(), proc=proc, opt=opt)
+                wrap_output = ArrayOutput(init_; tspan=1:100, mask=mask_)
+                sim!(wrap_output, wrap_rs)
+                wrap_output_ref[2] .- wrap_output[2]
+                @test wrap_output_ref[2] == wrap_output[2]
+                wrap_output_ref[3] .- wrap_output[3]
+                @test wrap_output_ref[3] == wrap_output[3]
+                @test wrap_output_ref[10] == wrap_output[10]
+                @test wrap_output_ref[100] == wrap_output[100]
             end
-
+            @testset "Remove" begin
+                remove_rs = Ruleset(rule; boundary=Remove(), proc=proc, opt=opt)
+                remove_output = ArrayOutput(init_; tspan=1:100, mask=mask_)
+                sim!(remove_output, remove_rs);
+                @test remove_output_ref[2] == remove_output[2]
+                @test remove_output_ref[3] == remove_output[3]
+                remove_output_ref[3] .- remove_output[3]
+                @test remove_output_ref[10] == remove_output[10]
+                @test remove_output_ref[100] == remove_output[100]
+            end
         end
     end
-
 end
 
 @testset "sim! with other outputs" begin
     for proc in hardware, opt in opts
         @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
             @testset "Transformed output" begin
-                ruleset = Ruleset(Life();
+                rs = Ruleset(Life();
                     timestep=Month(1),
                     boundary=Wrap(),
                     proc=proc,
@@ -310,12 +309,12 @@ end
                 )
                 tspan_ = Date(2010, 4):Month(1):Date(2010, 7)
                 output = maybe_gpu(TransformedOutput(sum, test6_7[:init]; tspan=tspan_), proc)
-                sim!(output, ruleset)
+                sim!(output, rs)
                 output_a = adapt(Array, output)
-                @test output_a[1] == sum(test6_7[:init])
-                @test output_a[2] == sum(test6_7[:test2])
-                @test output_a[3] == sum(test6_7[:test3])
-                @test output_a[4] == sum(test6_7[:test4])
+                @test output_a[1] == 5
+                @test output_a[2] == 5
+                @test output_a[3] == 5
+                @test output_a[4] == 5
             end
             @testset "REPLOutput block works, in Unitful.jl seconds" begin
                 ruleset = Ruleset(;

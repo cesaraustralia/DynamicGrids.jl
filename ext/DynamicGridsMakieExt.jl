@@ -123,7 +123,7 @@ function DynamicGrids.MakieOutput(;
         frames, running, extent, graphicconfig, ruleset, figure, nothing, frame_obs, t_obs
     )
     # TODO fix this hack
-    simdata = DynamicGrids.initdata!(simdata, output, extent, ruleset)
+    simdata = DynamicGrids.SimData(simdata, output, extent, ruleset)
 
     # Widgets
     controlgrid = GridLayout(inputgrid[1, 1])
