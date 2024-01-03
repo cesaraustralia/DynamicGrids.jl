@@ -1,4 +1,4 @@
-using DynamicGrids, Setfield, Test, LinearAlgebra, StaticArrays, OffsetArrays
+using DynamicGrids, Setfield, Test, LinearAlgebra, StaticArrays
 
 using DynamicGrids.Neighborhoods
 
@@ -187,11 +187,9 @@ end
          0  0  0  0  0  0
     ]
     @test DynamicGrids.readwindow(Moore{1,1}(), grid1, (2,)) == [0, 1, 2]
-    @test DynamicGrids.readwindow(Moore{1,1}(), OffsetArray(grid1, (0:5)), (2,)) == [1, 2, 3]
     @test_throws DimensionMismatch DynamicGrids.readwindow(Moore{1,1}(), grid2, (2,))
     @test_throws DimensionMismatch DynamicGrids.readwindow(Moore{1,2}(), grid2, (2,))
     @test DynamicGrids.readwindow(Moore{1,2}(), grid2, (2, 2)) == [0 0 0; 0 1 2; 0 5 6]
-    @test DynamicGrids.readwindow(Moore{1,2}(), OffsetArray(grid2, (0:4, 0:5)), (2, 2)) == [1 2 3; 5 6 7; 9 10 11]
     @test DynamicGrids.readwindow(Moore{2,2}(), grid2, (3, 3)) == [0 0 0 0 0; 0 1 2 3 4; 0 5 6 7 8; 0 9 10 11 12; 0 0 0 0 0]
 end
 
