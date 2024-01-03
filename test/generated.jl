@@ -1,5 +1,5 @@
 using DynamicGrids, Test
-using DynamicGrids: SimData, GridData, WriteMode, Extent,
+using DynamicGrids: SimData, WritableGridData, Extent,
     _getreadgrids, _getwritegrids, _readcell, _writecell!, grids, source, dest
 
 rule = Cell{Tuple{:c,:a,:b},Tuple{:a,:c}}(identity)
@@ -13,9 +13,9 @@ simdata = SimData(Extent(;init=init, tspan=1:1), Ruleset(rule))
 end
 
 @testset "_getwritegrids gets write grids for a Rule" begin
-    wkeys, wgrids = _getwritegrids(WriteMode, rule, simdata)
+    wkeys, wgrids = _getwritegrids(rule, simdata)
     @test wkeys === (Val(:a), Val(:c))
-    @test wgrids === map(GridData{WriteMode}, (simdata[:a], simdata[:c]))
+    @test wgrids === map(WritableGridData, (simdata[:a], simdata[:c]))
 end
 
 @testset "_readcell read from specified grids" begin

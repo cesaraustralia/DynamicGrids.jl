@@ -23,8 +23,8 @@ function Chain(rules::Tuple)
     Chain{rkeys,wkeys,typeof(rules)}(rules)
 end
 
-@inline function Stencils.rebuild(chain::Chain{R,W}, win) where {R,W}
-    rules = (Stencils.rebuild(chain[1], win), tail(chain.rules)...)
+@inline function setwindow(chain::Chain{R,W}, win) where {R,W}
+    rules = (setwindow(chain[1], win), tail(chain.rules)...)
     Chain{R,W,typeof(rules)}(rules)
 end
 

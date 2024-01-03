@@ -31,7 +31,7 @@ if they are a `Matrix`.
 - `tspan(data)`: get the simulation time span, an `AbstractRange`.
 - `timestep(data)`: get the simulaiton time step.
 - `boundary(data)` : returns the [`BoundaryCondition`](@ref) - `Remove` or `Wrap`.
-- `padding(data)` : returns the value to use as grid border padding.
+- `padval(data)` : returns the value to use as grid border padding.
 
 These are also available, but you probably shouldn't use them and their behaviour
 is not guaranteed in furture versions. Using them will also mean a rule is useful 
@@ -56,7 +56,7 @@ auxframe(d::AbstractSimData) = d.auxframe
 currentframe(d::AbstractSimData) = d.currentframe
 
 # Forwarded to the Extent object
-gridsize(d::AbstractSimData) = size(d)
+gridsize(d::AbstractSimData) = gridsize(extent(d))
 padval(d::AbstractSimData) = padval(extent(d))
 init(d::AbstractSimData) = init(extent(d))
 mask(d::AbstractSimData) = mask(extent(d))
@@ -64,7 +64,6 @@ aux(d::AbstractSimData, args...) = aux(extent(d), args...)
 auxframe(d::AbstractSimData, key) = auxframe(d)[_unwrap(key)]
 tspan(d::AbstractSimData) = tspan(extent(d))
 timestep(d::AbstractSimData) = step(tspan(d))
-radius(d::AbstractSimData) = max(map(radius, grids(d))...)
 
 # Calculated:
 # Get the current time for this frame
@@ -122,26 +121,6 @@ end
 SimData(o, ruleset::AbstractRuleset) = SimData(o, extent(o), ruleset)
 SimData(o, r1::Rule, rs::Rule...) = SimData(o, extent(o), Ruleset(r1, rs...))
 
-# When no simdata is passed in, create new SimData
-function SimData(::Nothing, output, extent::AbstractExtent, ruleset::AbstractRuleset)
-    SimData(output, extent, ruleset)
-end
-# Initialise a AbstractSimData object with a new `Extent` and `Ruleset`.
-function SimData(
-    simdata::SimData, output, extent::AbstractExtent, ruleset::AbstractRuleset
-)
-    (replicates(simdata) == replicates(output) == replicates(extent)) || 
-        throw(ArgumentError("`simdata` must have same numver of replicates as `output`"))
-
-    @assert simdata.extent == StaticExtent(extent)
-    @set! simdata.ruleset = StaticRuleset(ruleset)
-    if hasdelay(rules(ruleset)) 
-        isstored(output) || _not_stored_delay_error()
-        @set! simdata.frames = frames(output) 
-    end
-    return simdata
-end
-
 function SimData(o, extent::AbstractExtent, ruleset::AbstractRuleset)
     frames_ = if hasdelay(rules(ruleset)) 
         isstored(o) || _notstorederror()
@@ -149,19 +128,23 @@ function SimData(o, extent::AbstractExtent, ruleset::AbstractRuleset)
     else
         nothing 
     end
-    return SimData(extent, ruleset, frames_)
+    SimData(extent, ruleset, frames_)
 end
 # Convenience constructors
 SimData(extent::AbstractExtent, r1::Rule, rs::Rule...) = SimData(extent, (r1, rs...))
 SimData(extent::AbstractExtent, rs::Tuple{<:Rule,Vararg}) = SimData(extent, Ruleset(rs))
 # Convert grids in extent to NamedTuple
 function SimData(extent::AbstractExtent, ruleset::AbstractRuleset, frames=nothing)
-    nt_extent = _asnamedtuple(extent)
-    SimData(nt_extent, ruleset, frames) 
+    SimData(_asnamedtuple(extent), ruleset) 
 end
-function SimData(extent::AbstractExtent{<:NamedTuple}, ruleset::AbstractRuleset, frames=nothing)
-    # Calculate the stencil array for each grid
-    grids = _buildgrids(extent, ruleset)
+function SimData(
+    extent::AbstractExtent{<:NamedTuple{Keys}}, ruleset::AbstractRuleset, frames=nothing
+) where Keys
+    # Calculate the neighborhood radus (and grid padding) for each grid
+    S = Val{Tuple{gridsize(extent)...}}()
+    radii = map(k-> Val{get(radius(ruleset), k, 0)}(), Keys)
+    radii = NamedTuple{Keys}(radii)
+    grids = _buildgrids(extent, ruleset, S, radii)
     # Construct the SimData for each grid
     SimData(grids, extent, ruleset, frames)
 end
@@ -177,31 +160,17 @@ function SimData(
     SimData{S,N}(grids, s_extent, s_ruleset, frames, currentframe, auxframe)
 end
 
-# Build the grids for the simulation from the extent, ruleset, init and padding
-function _buildgrids(extent::AbstractExtent{<:NamedTuple{Keys}}, ruleset) where Keys
-    S = Val{Tuple{size(extent)...}}()
-    radii = map(k-> Val{get(radius(ruleset), k, 0)}(), Keys)
-    radii = NamedTuple{Keys}(radii)
-    _buildgrids(extent, ruleset, S, radii)
-end
-function _buildgrids(extent, ruleset, s::Val, radii::NamedTuple)
+# Build the grids for the simulation from the exebnt, ruleset, init and padval
+function _buildgrids(extent, ruleset, s, radii::NamedTuple)
     map(radii, init(extent), padval(extent)) do r, in, pv
         _buildgrids(extent, ruleset, s, r, in, pv)
     end
 end
 function _buildgrids(extent, ruleset, ::Val{S}, ::Val{R}, init, padval) where {S,R}
-    hood = Window{R}() 
-    pad = Halo{:out}() # We always pad out in DynamicGrids - it should pay back for multiple time steps
-    bc = _boundary(boundary(ruleset), padval)
-    data = _replicate_init(init, replicates(extent))
-    GridData{ReadMode,S,R}(
-        data, hood, bc, pad, proc(ruleset), opt(ruleset), mask(extent), padval, replicates(extent)
+    ReadableGridData{S,R}(
+        init, mask(extent), proc(ruleset), opt(ruleset), boundary(ruleset), padval 
     )
 end
-
-_boundary(::Wrap, padval) = Wrap()
-_boundary(::Remove, padval) = Remove(padval)
-_boundary(::Use, padval) = Use()
 
 ConstructionBase.constructorof(::Type{<:SimData{S,N}}) where {S,N} = SimData{S,N}
 
@@ -212,7 +181,25 @@ boundary(d::SimData) = boundary(ruleset(d))
 proc(d::SimData) = proc(ruleset(d))
 opt(d::SimData) = opt(ruleset(d))
 settings(d::SimData) = settings(ruleset(d))
-replicates(d::SimData) = replicates(extent(d))
+
+# When no simdata is passed in, create new AbstractSimData
+function initdata!(::Nothing, output, extent::AbstractExtent, ruleset::AbstractRuleset)
+    SimData(output, extent, ruleset)
+end
+# Initialise a AbstractSimData object with a new `Extent` and `Ruleset`.
+function initdata!(
+    simdata::SimData, output, extent::AbstractExtent, ruleset::AbstractRuleset
+)
+    # TODO: make sure this works with delays and new outputs?
+    map(copy!, values(simdata), values(init(extent)))
+    @set! simdata.extent = StaticExtent(extent)
+    @set! simdata.ruleset = StaticRuleset(ruleset)
+    if hasdelay(rules(ruleset)) 
+        isstored(o) || _not_stored_delay_error()
+        @set! simdata.frames = frames(o) 
+    end
+    simdata
+end
 
 """
     RuleData <: AbstractSimData
@@ -226,41 +213,21 @@ The simplified object actually passed to rules with the current design.
 
 Passing a smaller object than `SimData` to rules leads to faster GPU compilation.
 """
-struct RuleData{S<:Tuple,N,G<:NamedTuple,E,Se,F,CF,AF,R,V,I} <: AbstractSimData{S,N,G}
+struct RuleData{S<:Tuple,N,G<:NamedTuple,E,Se,F,CF,AF} <: AbstractSimData{S,N,G}
     grids::G
     extent::E
     settings::Se
     frames::F
     currentframe::CF
     auxframe::AF
-    replicates::R
-    value::V
-    indices::I
 end
 function RuleData{S,N}(
-    grids::G, extent::E, settings::Se, frames::F, currentframe::CF, auxframe::AF, replicates::Re, value::V, indices::I
-) where {S,N,G,E,Se,F,CF,AF,Re,V,I}
-    RuleData{S,N,G,E,Se,F,CF,AF,Re,V,I}(grids, extent, settings, frames, currentframe, auxframe, replicates, value, indices)
+    grids::G, extent::E, settings::Se, frames::F, currentframe::CF, auxframe::AF
+) where {S,N,G,E,Se,F,CF,AF}
+    RuleData{S,N,G,E,Se,F,CF,AF}(grids, extent, settings, frames, currentframe, auxframe)
 end
-function RuleData(d::AbstractSimData{S,N};
-    grids=grids(d), 
-    extent=extent(d), 
-    settings=settings(d),
-    frames=frames(d), 
-    currentframe=currentframe(d), 
-    auxframe=auxframe(d), 
-    replicates=replicates(d),
-    value=nothing, 
-    indices=nothing,
-) where {S,N}
-    return RuleData{S,N}(
-        grids, extent, settings, frames, currentframe, auxframe, replicates, value, indices
-    )
-end
-
-function Base.getindex(d::RuleData, key::Symbol) 
-    grid = getindex(grids(d), key)
-    @set grid.indices = d.indices
+function RuleData(d::AbstractSimData{S,N}) where {S,N}
+    RuleData{S,N}(grids(d), extent(d), settings(d), frames(d), currentframe(d), auxframe(d))
 end
 
 ConstructionBase.constructorof(::Type{<:RuleData{S,N}}) where {S,N} = RuleData{S,N}
@@ -270,5 +237,4 @@ settings(d::RuleData) = d.settings
 boundary(d::RuleData) = boundary(settings(d))
 proc(d::RuleData) = proc(settings(d))
 opt(d::RuleData) = opt(settings(d))
-replicates(d::RuleData) = d.replicates
-indices(d::RuleData) = d.indices
+

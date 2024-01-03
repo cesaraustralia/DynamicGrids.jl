@@ -15,28 +15,20 @@ aux(e::AbstractExtent) = e.aux
 padval(e::AbstractExtent) = e.padval
 tspan(e::AbstractExtent) = e.tspan # Never type-stable, only access in `modifyrule` methods
 gridsize(extent::AbstractExtent) = gridsize(init(extent))
-replicates(extent::AbstractExtent) = extent.replicates
 
 Base.ndims(e::AbstractExtent{<:AbstractArray}) = ndims(init(e))
 Base.ndims(e::AbstractExtent{<:NamedTuple}) = ndims(first(init(e)))
-function Base.size(e::AbstractExtent{<:AbstractArray})
-    sz = size(init(e))
-    return isnothing(replicates(e)) ? sz : (size(init(e))..., e.replicates)
-end
-function Base.size(e::AbstractExtent{<:NamedTuple})
-    sz = size(first(init(e)))
-    return isnothing(replicates(e)) ? sz : (sz..., e.replicates)
-end
+Base.size(e::AbstractExtent{<:AbstractArray}) = size(init(e))
+Base.size(e::AbstractExtent{<:NamedTuple}) = size(first(init(e)))
 
-(::Type{T})(e::AbstractExtent) where T<:AbstractExtent = 
-    T(init(e), mask(e), aux(e), padval(e), replicates(e), tspan(e))
+(::Type{T})(e::AbstractExtent) where T<:AbstractExtent = T(init(e), mask(e), aux(e), padval(e), tspan(e))
 
 const EXTENT_KEYWORDS = """
 - `init`: initialisation `Array`/`NamedTuple` for grid/s.
 - `mask`: `BitArray` for defining cells that will/will not be run.
 - `aux`: NamedTuple of arbitrary input data. Use `aux(data, Aux(:key))` to access from
     a `Rule` in a type-stable way.
-- `padval`: padding value for grids with stencil rules. The default is 
+- `padval`: padding value for grids with neighborhood rules. The default is 
     `zero(eltype(init))`.
 - `tspan`: Time span range. Never type-stable, only access this in `modifyrule` methods
 """
@@ -61,39 +53,31 @@ $EXTENT_KEYWORDS
 mutable struct Extent{I<:Union{AbstractArray,NamedTuple},
                       M<:Union{AbstractArray,Nothing},
                       A<:Union{NamedTuple,Nothing},
-                      PV,R} <: AbstractExtent{I,M,A,PV}
+                      PV} <: AbstractExtent{I,M,A,PV}
     init::I
     mask::M
     aux::A
     padval::PV
-    replicates::R
     tspan::AbstractRange
-    function Extent(init::I, mask::M, aux::A, padval::PV, replicates::R, tspan::T) where {I,M,A,PV,R,T}
+    function Extent(init::I, mask::M, aux::A, padval::PV, tspan::T) where {I,M,A,PV,T}
         # Check grid sizes match
-        if init isa NamedTuple
-            gridsize = size(first(init))
-            if !all(map(i -> size(i) == gridsize, init))
+        gridsize = if init isa NamedTuple
+            size_ = size(first(init))
+            if !all(map(i -> size(i) == size_, init))
                 throw(ArgumentError("`init` grid sizes do not match"))
             end
-            init1 = first(init)
-            if first(init) isa AbstractDimArray
-                DimensionalData.comparedims(init...; val=true)
-            end
-            # Use the same padval for everthing if there is only one
-            if !(padval isa NamedTuple)
-                padval = map(_ -> padval, init)
-            end
+            size_
         else
-            gridsize = size(init)
+            size(init)
         end
         if (mask !== nothing) && (size(mask) != gridsize)
             throw(ArgumentError("`mask` size do not match `init`"))
         end
-        new{I,M,A,typeof(padval),R}(init, mask, aux, padval, replicates, tspan)
+        new{I,M,A,PV}(init, mask, aux, padval, tspan)
     end
 end
-Extent(; init, mask=nothing, aux=nothing, padval=_padval(init), replicates=nothing, tspan, kw...) =
-    Extent(init, mask, aux, padval, replicates, tspan)
+Extent(; init, mask=nothing, aux=nothing, padval=_padval(init), tspan, kw...) =
+    Extent(init, mask, aux, padval, tspan)
 Extent(init::Union{AbstractArray,NamedTuple}; kw...) = Extent(; init, kw...)
 
 settspan!(e::Extent, tspan) = e.tspan = tspan
@@ -105,14 +89,13 @@ _padval(init::AbstractArray{T}) where T = zero(T)
 struct StaticExtent{I<:Union{AbstractArray,NamedTuple},
                     M<:Union{AbstractArray,Nothing},
                     A<:Union{NamedTuple,Nothing},
-                    PV,R,T} <: AbstractExtent{I,M,A,PV}
+                    PV,T} <: AbstractExtent{I,M,A,PV}
     init::I
     mask::M
     aux::A
     padval::PV
-    replicates::R
     tspan::T
 end
-StaticExtent(; init, mask=nothing, aux=nothing, padval=_padval(init), replicates=nothing, tspan, kw...) =
-    StaticExtent(init, mask, aux, padval, replicates, tspan)
-StaticExtent(init::Union{AbstractArray,NamedTuple}; kw...) = StaticExtent(; init, kw...)
+StaticExtent(; init, mask=nothing, aux=nothing, padval=_padval(init), tspan, kw...) =
+    StaticExtent(init, mask, aux, padval, tspan)
+StaticExtent(init::Union{AbstractArray,NamedTuple}; kw...) = Extent(; init, kw...)

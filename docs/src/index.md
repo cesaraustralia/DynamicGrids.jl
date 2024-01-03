@@ -27,7 +27,6 @@ Ruleset
 BoundaryCondition
 Wrap
 Remove
-Ignore
 ```
 
 ### Hardware selection
@@ -334,22 +333,15 @@ work - as they are loaded directly in the simulation. Mutable objects,
 especially containing pointers, may lead to incorrect stored results, and wont
 work at all on GPUs.
 
-For a custom grid element to work, it must have a number of methods defined.
-
 Methods to define are: 
-
-Minimum:
-
 - `zero`: define zero of the object type
-
-Context dependent, and visualisation:
 - `oneunit`: define one of the object type
 - `isless`: define comparison between two of the objects
 - `*`: multiplication by a `Real` scalar.
 - `/`: division by a `Real` scalar.
 - `+`: addition to another object of the same type
 - `-`: subtraction from another object of the same type
-- `to_rgb`: optional: return an `ARGB32` to visualise the object as a pixel 
+- `to_rgb`: return and `ARGB32` to visualise the object as a pixel 
 
 In this example we define a struct with two fields. You will need to determine the
 correct behaviours for your own types, but hopefully this will get you started.

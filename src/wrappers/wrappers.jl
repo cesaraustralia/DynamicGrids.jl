@@ -5,8 +5,6 @@ A `Rule` that wraps other rules, altering their behaviour or how they are run.
 """
 abstract type RuleWrapper{R,W} <: Rule{R,W} end
 
-_val_ruletype(rule::RuleWrapper) = Val{ruletype(rule)}()
-
 """
     MultiRuleWrapper <: RuleWrapper
 
@@ -20,19 +18,13 @@ rules(rule::MultiRuleWrapper) = rule.rules
 radius(rule::MultiRuleWrapper) = radius(first(rules(rule)))
 # Forward ruletype to the contained rule
 ruletype(rule::MultiRuleWrapper) = ruletype(first(rules(rule)))
-stencilkey(rule::MultiRuleWrapper) = stencilkey(first(rules(rule)))
-stencil(rule::MultiRuleWrapper) = stencil(first(rules(rule)))
+neighborhoodkey(rule::MultiRuleWrapper) = neighborhoodkey(first(rules(rule)))
+neighborhood(rule::MultiRuleWrapper) = neighborhood(first(rules(rule)))
 neighbors(rule::MultiRuleWrapper) = neighbors(first(rules(rule)))
 modifyrule(rule::MultiRuleWrapper, data) = @set rule.rules = _modifyrules(rules(rule), data)
-Stencils.radius(rule::MultiRuleWrapper, args...) = radius(stencil(rule))
-Stencils.unsafe_neighbors(rule::MultiRuleWrapper, A::Stencils.AbstractStencilArray, I::CartesianIndex) =
-    Stencils.unsafe_neighbors(stencil(rule), A, I)
-@inline function Stencils.rebuild(rule::MultiRuleWrapper{R,W}, neighbors) where {R,W}
-    rules = map(r -> rebuild(r, neighbors), rules(rule))
+@inline function setwindow(rule::MultiRuleWrapper{R,W}, win) where {R,W}
+    rules = map(r -> setwindow(r, win), rules(rule))
     @set rules.rule = rules
-end
-@inline function Stencils.unsafe_stencil(rule::MultiRuleWrapper, A::AbstractArray, I::CartesianIndex)
-    Stencils.rebuild(rule, unsafe_neighbors(rule, A, I))
 end
 
 # Base interface
