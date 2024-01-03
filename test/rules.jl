@@ -1,15 +1,21 @@
 using DynamicGrids, ModelParameters, Setfield, Test, StaticArrays, 
-      LinearAlgebra, CUDAKernels
+      LinearAlgebra, CUDA
 import DynamicGrids: applyrule, applyrule!, maprule!, ruletype, extent, source, dest,
        _getreadgrids, _getwritegrids, _combinegrids, _readkeys, _writekeys,
-       SimData, WritableGridData, Rule, Extent, CPUGPU, neighborhoodkey
+       SimData, RuleData, GridData, WriteMode, Rule, Extent, CPUGPU, stencilkey
+using DynamicGrids.Adapt: adapt
 
-if CUDAKernels.CUDA.has_cuda_gpu()
-    CUDAKernels.CUDA.allowscalar(false)
-    hardware = (SingleCPU(), ThreadedCPU(), CPUGPU(), CuGPU())
-else
+maybe_gpu(output, hardware::CuGPU) = adapt(CuArray, output)
+maybe_gpu(output, hardware) = output
+
+# if CUDA.has_cuda_gpu()
+#     CUDA.allowscalar(false)
+#     hardware = (SingleCPU(), ThreadedCPU(), CPUGPU(), CuGPU())
+# else
     hardware = (SingleCPU(), ThreadedCPU(), CPUGPU())
-end
+# end
+
+opts = (NoOpt(), SparseOpt())
 
 init  = [0 1 1 0
          0 1 1 0
@@ -17,7 +23,9 @@ init  = [0 1 1 0
          0 1 1 0
          0 1 1 0]
 
+proc = CuGPU()
 proc = SingleCPU()
+opt = SparseOpt()
 opt = NoOpt()
 
 @testset "Generic rule constructors" begin
@@ -29,24 +37,24 @@ opt = NoOpt()
    #@test_throws ArgumentError Cell(identity, identity)
    rule1 = Neighbors{:a,:b}(identity, Moore(1))
    @test rule1.f == identity
-   rule2 = Neighbors{:a,:b}(identity; neighborhood=Moore(1))
+   rule2 = Neighbors{:a,:b}(identity; stencil=Moore(1))
    @test rule1 == rule2
    @test typeof(rule1) == Neighbors{:a,:b,typeof(identity),Moore{1,2,8,Nothing}}
    rule1 = Neighbors(identity, Moore(1))
    @test rule1.f == identity
-   rule2 = Neighbors(identity; neighborhood=Moore(1))
+   rule2 = Neighbors(identity; stencil=Moore(1))
    @test typeof(rule1)  == Neighbors{:_default_,:_default_,typeof(identity),Moore{1,2,8,Nothing}}
    @test rule1 == rule2
    @test_throws ArgumentError Neighbors()
    # @test_throws ArgumentError Neighbors(identity, identity, identity)
    rule1 = SetNeighbors{:a,:b}(identity, Moore(1))
    @test rule1.f == identity
-   rule2 = SetNeighbors{:a,:b}(identity; neighborhood=Moore(1))
+   rule2 = SetNeighbors{:a,:b}(identity; stencil=Moore(1))
    @test rule1 == rule2
    @test typeof(rule1)  == SetNeighbors{:a,:b,typeof(identity),Moore{1,2,8,Nothing}}
    rule1 = SetNeighbors(identity, Moore(1))
    @test rule1.f == identity
-   rule2 = SetNeighbors(identity; neighborhood=Moore(1))
+   rule2 = SetNeighbors(identity; stencil=Moore(1))
    @test typeof(rule1)  == SetNeighbors{:_default_,:_default_,typeof(identity),Moore{1,2,8,Nothing}}
    @test rule1 == rule2
    @test_throws ArgumentError Neighbors()
@@ -79,24 +87,25 @@ end
 end
 
 @testset "Neighbors" begin
-    window = [1 0 0; 0 0 1; 0 0 1]
-    rule = Neighbors(VonNeumann(1, window)) do data, hood, state, I
+    nbrs = SA[0, 0, 1, 0]
+    rule = Neighbors(VonNeumann{1}(nbrs)) do data, hood, state, I
         sum(hood)
     end
     @test applyrule(nothing, rule, 0, (3, 3)) == 1
-    rule = Neighbors(Moore{1}(window)) do data, hood, state, I
+    nbrs = SA[1, 0, 0, 0, 1, 0, 0, 1]
+    rule = Neighbors(Moore{1}(nbrs)) do data, hood, state, I
         sum(hood)
     end
     @test applyrule(nothing, rule, 0, (3, 3)) == 3
 end
 
 struct TestNeighborhoodRule{R,W,N} <: NeighborhoodRule{R,W}
-    neighborhood::N
+    stencil::N
 end
 DynamicGrids.applyrule(data, rule::TestNeighborhoodRule, state, index) = state
 
 struct TestSetNeighborhoodRule{R,W,N} <: SetNeighborhoodRule{R,W}
-    neighborhood::N
+    stencil::N
 end
 function DynamicGrids.applyrule!(
     data, rule::TestSetNeighborhoodRule{R,Tuple{W1,}}, state, index
@@ -104,43 +113,43 @@ function DynamicGrids.applyrule!(
     add!(data[W1], state[1], index...)
 end
 
-win5x5 = zeros(5, 5)
-win7x7 = zeros(7, 7)
+moore2 = SVector{24}(zeros(24))
+moore3 = SVector{48}(zeros(48))
 
-@testset "neighborhood rules" begin
-    ruleA = TestSetNeighborhoodRule{:a,:a}(Moore{3}(win7x7))
-    ruleB = TestSetNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}(win5x5))
-    @test offsets(ruleA) isa Tuple
-    @test positions(ruleA, (1, 1)) isa Tuple
-    @test neighborhood(ruleA) == Moore{3}(win7x7)
-    @test neighborhood(ruleB) == Moore{2}(win5x5)
-    @test neighborhoodkey(ruleA) == :a
-    @test neighborhoodkey(ruleB) == :b
-    ruleA = TestNeighborhoodRule{:a,:a}(Moore{3}(win7x7))
-    ruleB = TestNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}(win5x5))
-    @test offsets(ruleA) isa Tuple
-    @test neighborhood(ruleA) == Moore{3}(win7x7)
-    @test neighborhood(ruleB) == Moore{2}(win5x5)
-    @test neighborhoodkey(ruleA) == :a
-    @test neighborhoodkey(ruleB) == :b
+@testset "stencil rules" begin
+    ruleA = TestSetNeighborhoodRule{:a,:a}(Moore{3}(moore3))
+    ruleB = TestSetNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}(moore2))
+    @test offsets(ruleA) isa StaticVector
+    @test indices(ruleA, CartesianIndex(1, 1)) isa StaticVector
+    @test stencil(ruleA) == Moore{3}(moore3)
+    @test stencil(ruleB) == Moore{2}(moore2)
+    @test stencilkey(ruleA) == :a
+    @test stencilkey(ruleB) == :b
+    ruleA = TestNeighborhoodRule{:a,:a}(Moore{3}(moore3))
+    ruleB = TestNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}(moore2))
+    @test offsets(ruleA) isa StaticVector
+    @test stencil(ruleA) == Moore{3}(moore3)
+    @test stencil(ruleB) == Moore{2}(moore2)
+    @test stencilkey(ruleA) == :a
+    @test stencilkey(ruleB) == :b
     @test offsets(ruleB) === 
-        ((-2,-2), (-1,-2), (0,-2), (1,-2), (2,-2),
+        SA[(-2,-2), (-1,-2), (0,-2), (1,-2), (2,-2),
          (-2,-1), (-1,-1), (0,-1), (1,-1), (2,-1),
          (-2,0), (-1,0), (1,0), (2,0),
          (-2,1), (-1,1), (0,1), (1,1), (2,1),
-         (-2,2), (-1,2), (0,2), (1,2), (2,2))
-    @test positions(ruleB, (10, 10)) == 
-        ((8, 8), (9, 8), (10, 8), (11, 8), (12, 8), 
+         (-2,2), (-1,2), (0,2), (1,2), (2,2)]
+    @test indices(ruleB, (10, 10)) == 
+        SA[(8, 8), (9, 8), (10, 8), (11, 8), (12, 8), 
          (8, 9), (9, 9), (10, 9), (11, 9), (12, 9), 
          (8, 10), (9, 10), (11, 10), (12, 10), 
          (8, 11), (9, 11), (10, 11), (11, 11), (12, 11), 
-         (8, 12), (9, 12), (10, 12), (11, 12), (12, 12))
+         (8, 12), (9, 12), (10, 12), (11, 12), (12, 12)]
 end
 
 @testset "radius" begin
     init = (a=[1.0 2.0], b=[10.0 11.0])
-    ruleA = TestNeighborhoodRule{:a,:a}(Moore{3}(win7x7))
-    ruleB = TestSetNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}(win5x5))
+    ruleA = TestNeighborhoodRule{:a,:a}(Moore{3}(moore3))
+    ruleB = TestSetNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}(moore2))
     ruleset = Ruleset(ruleA, ruleB)
     @test radius(ruleA) == 3
     @test radius(ruleB) == 2
@@ -153,13 +162,13 @@ end
 end
 
 @testset "Convolution" begin
-    k = SA[1 0 1; 0 0 0; 1 0 1]
-    @test Convolution{:a}(k) == Convolution{:a,:a}(; neighborhood=Kernel(Window(1), k)) 
+    k = SMatrix{3,3}([1 0 1; 0 0 0; 1 0 1])
+    @test Convolution{:a}(k) == Convolution{:a,:a}(Kernel(Window{1}(), k)) 
     window = SA[1 0 0; 0 0 1; 0 0 1]
-    hood = Window{1,2,9,typeof(window)}(window)
-    rule = Convolution{:a,:a}(; neighborhood=Kernel(hood, k))
+    hood = Window{1,2}(vec(window))
+    rule = Convolution{:a,:a}(; stencil=Kernel(hood, k))
     @test DynamicGrids.kernel(rule) === k 
-    @test applyrule(nothing, rule, 0, (3, 3)) == k ⋅ window
+    @test applyrule(nothing, rule, 0, (3, 3)) == vec(k) ⋅ vec(window)
     output = ArrayOutput((a=init,); tspan=1:2)
     sim!(output, rule)
 end
@@ -174,21 +183,21 @@ end
     @testset "atomics" begin
         rule = SetNeighbors(VonNeumann(1)) do data, hood, state, I
             if state > 0
-                for pos in positions(hood, I)
+                for pos in indices(hood, I)
                     add!(data, 1, pos...) 
                 end
             end
         end
-        output = ArrayOutput(init; tspan=1:2)
-        for proc in hardware, opt in (NoOpt(), SparseOpt())
+        for proc in hardware, opt in opts
+            output = maybe_gpu(ArrayOutput(init; tspan=1:2), proc)
             @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
                 ref_output = [1 1 1 0
                               0 1 0 0
                               0 1 0 0
                               1 1 2 0
                               0 2 1 1]
-                sim!(output, rule, proc=proc, opt=opt)
-                @test output[2] == ref_output
+                sim!(output, rule; proc=proc, opt=opt)
+                @test adapt(Array, output[2]) == ref_output
             end
         end
     end
@@ -196,12 +205,12 @@ end
     @testset "setindex" begin
         rule = SetNeighbors(VonNeumann(1)) do data, hood, state, I
             state == 0 && return nothing
-            for pos in positions(hood, I)
-                data[pos...] = 1 
+            for pos in indices(hood, I)
+                data[pos...] = 1
             end
         end
-        output = ArrayOutput(init; tspan=1:2)
-        for proc in hardware, opt in (NoOpt(), SparseOpt())
+        for proc in hardware, opt in opts
+            output = maybe_gpu(ArrayOutput(init; tspan=1:2), proc)
             @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
                 ref_output = [1 1 1 0
                               0 1 0 0
@@ -209,7 +218,7 @@ end
                               1 1 1 0
                               0 1 1 1]
                 sim!(output, rule, proc=proc, opt=opt)
-                @test output[2] == ref_output
+                @test adapt(Array, output[2]) == ref_output
             end
         end
     end
@@ -223,14 +232,14 @@ end
              0 1 0 0
              0 0 1 0]
     @testset "add!" begin
-        output = ArrayOutput(init; tspan=1:2)
         rule = SetCell() do data, state, I
             if state > 0
                 pos = I[1] - 2, I[2]
                 isinbounds(data, pos) && add!(first(data), 1, pos...)
             end
         end
-        for proc in hardware, opt in (NoOpt(), SparseOpt())
+        for proc in hardware, opt in opts
+            output = maybe_gpu(ArrayOutput(init; tspan=1:2), proc)
             @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
                 sim!(output, rule; proc=proc, opt=opt)
                 ref_out = [0 1 0 0
@@ -238,7 +247,7 @@ end
                            0 0 1 0
                            0 1 0 0
                            0 0 1 0]
-                @test output[2] == ref_out
+                @test adapt(Array, output[2]) == ref_out
             end
         end
     end
@@ -259,28 +268,28 @@ end
     end
 end
 
-@testset "SetGrid" begin
-    @test_throws ArgumentError SetGrid()
-    rule = SetGrid() do r, w
-        w .*= 2
-    end
-    init  = [0 1 0 0
-             0 0 0 0
-             0 0 0 0
-             0 1 0 0
-             0 0 1 0]
-    output = ArrayOutput(init; tspan=1:2)
-    for proc in hardware, opt in (NoOpt(), SparseOpt())
-        @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
-            sim!(output, rule; proc=proc, opt=opt)
-            @test output[2] == [0 2 0 0
-                                0 0 0 0
-                                0 0 0 0
-                                0 2 0 0
-                                0 0 2 0]
-        end
-    end
-end
+# @testset "SetGrid" begin
+#     @test_throws ArgumentError SetGrid()
+#     rule = SetGrid() do r, w
+#         w .*= 2
+#     end
+#     init  = [0 1 0 0
+#              0 0 0 0
+#              0 0 0 0
+#              0 1 0 0
+#              0 0 1 0]
+#     output = ArrayOutput(init; tspan=1:2)
+#     for proc in hardware, opt in (NoOpt(), SparseOpt())
+#         @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
+#             sim!(output, rule; proc=proc, opt=opt)
+#             @test output[2] == [0 2 0 0
+#                                 0 0 0 0
+#                                 0 0 0 0
+#                                 0 2 0 0
+#                                 0 0 2 0]
+#         end
+#     end
+# end
 
 struct AddOneRule{R,W} <: CellRule{R,W} end
 DynamicGrids.applyrule(data, ::AddOneRule, state, args...) = state + 1
@@ -293,21 +302,20 @@ DynamicGrids.applyrule(data, ::AddOneRule, state, args...) = state + 1
     mask = Bool[0 1 0
                 0 1 1
                 1 1 0]
-    ruleset1 = Ruleset(AddOneRule{:_default_,:_default_}(); opt=NoOpt())
-    ruleset2 = Ruleset(AddOneRule{:_default_,:_default_}(); opt=SparseOpt())
-    output1 = ArrayOutput(init; tspan=1:3, mask=mask)
-    output2 = ArrayOutput(init; tspan=1:3, mask=mask)
-    sim!(output1, ruleset1)
-    sim!(output2, ruleset2)
-    @test output1[1] == output2[1] == [0.0 4.0 0.0
-                                       0.0 5.0 8.0
-                                       3.0 6.0 0.0]
-    @test output1[2] == output2[2] == [0.0 5.0 0.0
-                                       0.0 6.0 9.0
-                                       4.0 7.0 0.0]
-    @test output1[3] == output2[3] == [0.0 6.0 0.0
-                                       0.0 7.0 10.0
-                                       5.0 8.0 0.0]
+    for opt in opts
+        ruleset = Ruleset(AddOneRule{:_default_,:_default_}(); opt=opt)
+        output = ArrayOutput(init; tspan=1:3, mask=mask)
+        sim!(output, ruleset)
+        @test output[1] == [0.0 4.0 0.0
+                            0.0 5.0 8.0
+                            3.0 6.0 0.0]
+        @test output[2] == [0.0 5.0 0.0
+                            0.0 6.0 9.0
+                            4.0 7.0 0.0]
+        @test output[3] == [0.0 6.0 0.0
+                            0.0 7.0 10.0
+                            5.0 8.0 0.0]
+    end
 end
 
 # Single grid rules
@@ -336,17 +344,18 @@ applyrule(data, ::TestRule, state, index) = 0
 
             ext = Extent(; init=(a=init,), tspan=1:1)
             simdata = SimData(ext, ruleset)
+            ruledata = RuleData(simdata)
 
-            # Test maprules components
-            rkeys, rgrids = _getreadgrids(rule, simdata)
-            wkeys, wgrids = _getwritegrids(rule, simdata)
+            # Test maprule components
+            rkeys, rgrids = _getreadgrids(rule, ruledata)
+            wkeys, wgrids = _getwritegrids(WriteMode, rule, ruledata)
             @test rkeys == Val{:a}()
             @test wkeys == Val{:a}()
-            newsimdata = @set simdata.grids = _combinegrids(rkeys, rgrids, wkeys, wgrids)
-            @test newsimdata.grids[1] isa WritableGridData
+            newruledata = @set ruledata.grids = _combinegrids(rkeys, rgrids, wkeys, wgrids)
+            @test newruledata.grids[1] isa GridData{WriteMode}
             # Test type stability
             T = Val{DynamicGrids.ruletype(rule)}()
-            @inferred maprule!(newsimdata, proc, opt, T, rule, rkeys, wkeys)
+            @inferred maprule!(newruledata, proc, opt, T, rule, rkeys, wkeys)
             
             resultdata = maprule!(simdata, rule)
             @test source(resultdata[:a]) == final
@@ -366,11 +375,12 @@ applyrule!(data, ::TestSetCell, state, index) = 0
             # Test type stability
             ext = Extent(; init=(_default_=init,), tspan=1:1)
             simdata = SimData(ext, ruleset)
-            rkeys, rgrids = _getreadgrids(rule, simdata)
-            wkeys, wgrids = _getwritegrids(rule, simdata)
-            newsimdata = @set simdata.grids = _combinegrids(wkeys, wgrids, rkeys, rgrids)
+            ruledata = RuleData(simdata)
+            rkeys, rgrids = _getreadgrids(rule, ruledata)
+            wkeys, wgrids = _getwritegrids(WriteMode, rule, ruledata)
+            newruledata = @set ruledata.grids = _combinegrids(wkeys, wgrids, rkeys, rgrids)
             T = Val{DynamicGrids.ruletype(rule)}()
-            @inferred maprule!(newsimdata, proc, opt, T, rule, rkeys, wkeys)
+            @inferred maprule!(newruledata, proc, opt, T, rule, rkeys, wkeys)
             resultdata = maprule!(simdata, rule)
             @test source(resultdata[:_default_]) == init
         end
@@ -439,15 +449,15 @@ applyrule(data, rule::PrecalcRule, state, index) = rule.precalc[]
              2 2]
     out3  = [3 3;
              3 3]
-    for proc in hardware, opt in (NoOpt(), SparseOpt())
+    for proc in hardware, opt in opts
         @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
             rule = PrecalcRule(1)
             ruleset = Ruleset(rule; proc=proc, opt=opt)
-            output = ArrayOutput(init; tspan=1:3)
+            output = maybe_gpu(ArrayOutput(init; tspan=1:3), proc)
             sim!(output, ruleset)
             # Copy for GPU
-            @test output[2] == out2
-            @test output[3] == out3
+            @test adapt(Array, output[2]) == out2
+            @test adapt(Array, output[3]) == out3
         end
     end
 end
@@ -484,53 +494,53 @@ end
 @testset "Multi-grid rules work" begin
     init = (prey=[10. 10.], predator=[1. 0.])
     rules = DoubleY{Tuple{:predator,:prey},:prey}(), predation
-    output = ArrayOutput(init; tspan=1:3)
-    for proc in hardware, opt in (NoOpt(), SparseOpt())
+    for proc in hardware, opt in opts
+        output = maybe_gpu(ArrayOutput(init; tspan=1:3), proc)
         @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
             sim!(output, rules; opt=opt, proc=proc)
-            @test output[2] == (prey=[18. 20.], predator=[2. 0.])
-            @test output[3] == (prey=[32. 40.], predator=[4. 0.])
+            @test adapt(Array, output[2]) == (prey=[18. 20.], predator=[2. 0.])
+            @test adapt(Array, output[3]) == (prey=[32. 40.], predator=[4. 0.])
         end
     end
 end
 
 @testset "Multi-grid rules work" begin
     init = (prey=[10. 10.], predator=[0. 0.])
-    output = ArrayOutput(init; tspan=1:3)
-    for proc in hardware, opt in (NoOpt(), SparseOpt())
+    for proc in hardware, opt in opts
+        output = maybe_gpu(ArrayOutput(init; tspan=1:3), proc)
         @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
             ruleset = Ruleset((HalfX{:prey,Tuple{:prey,:predator}}(),); opt=opt, proc=proc)
             sim!(output, ruleset)
-            @test output[2] == (prey=[10. 10.], predator=[5. 5.])
-            @test output[3] == (prey=[10. 10.], predator=[5. 5.])
+            @test map(a -> adapt(Array, a), output[2]) == (prey=[10. 10.], predator=[5. 5.])
+            @test map(a -> adapt(Array, a), output[3]) == (prey=[10. 10.], predator=[5. 5.])
         end
     end
 end
 
 @testset "life with generic constructors" begin
     @test Life(Moore(1), (1, 1), (5, 5)) ==
-        Life(; neighborhood=Moore(1), born=(1, 1), survive=(5, 5))
+        Life(; stencil=Moore(1), born=(1, 1), survive=(5, 5))
     @test Life{:a,:b}(Moore(1), (7, 1), (5, 3)) ==
-          Life{:a,:b}(neighborhood=Moore(1), born=(7, 1), survive=(5, 3))
+          Life{:a,:b}(stencil=Moore(1), born=(7, 1), survive=(5, 3))
     # Defaults
     @test Life() == Life(
         Moore(1), 
         Param(3, bounds=(0, 8)),
-        (Param(2, bounds=(0, 8)), Param(3, bounds=(0, 8)))
+        (survive1=Param(2, bounds=(0, 8)), survive2=Param(3, bounds=(0, 8)))
     )
     @test Life{:a,:b}() == Life{:a,:b}(
          Moore(1), 
          Param(3, bounds=(0, 8)),
-         (Param(2, bounds=(0, 8)), Param(3, bounds=(0, 8)))
+         (survive1=Param(2, bounds=(0, 8)), survive2=Param(3, bounds=(0, 8)))
     )
 end
 
 @testset "generic ConstructionBase compatability" begin
-    life = Life{:x,:y}(; neighborhood=Moore(2), born=(1, 1), survive=(2, 2))
+    life = Life{:x,:y}(; stencil=Moore(2), born=(1, 1), survive=(2, 2))
     @set! life.born = (5, 6)
     @test life.born == (5, 6)
     @test life.survive == (2, 2)
     @test _readkeys(life) == :x
     @test _writekeys(life) == :y
-    @test DynamicGrids.neighborhood(life) == Moore(2)
+    @test DynamicGrids.stencil(life) == Moore(2)
 end

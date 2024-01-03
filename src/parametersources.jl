@@ -17,7 +17,7 @@ such as another [`Grid`](@ref), an [`Aux`](@ref) array, or a [`Delay`](@ref).
 Other `source` objects are used as-is without indexing with `I`.
 """
 @propagate_inbounds Base.get(data::AbstractSimData, val, I...) = val
-@propagate_inbounds Base.get(data::AbstractSimData, key::ParameterSource, I...) =
+@propagate_inbounds Base.get(data::AbstractSimData, key::ParameterSource, I::Integer...) =
     get(data, key, I)
 @propagate_inbounds Base.get(data::AbstractSimData, key::ParameterSource, I::CartesianIndex) =
     get(data, key, Tuple(I))
@@ -55,6 +55,7 @@ to correct this problem.
 """
 struct Aux{K} <: ParameterSource end
 Aux(key::Symbol) = Aux{key}()
+Aux(key::Val{K}) where K = Aux{K}()
 
 _unwrap(::Aux{X}) where X = X
 _unwrap(::Type{<:Aux{X}}) where X = X
@@ -81,18 +82,18 @@ end
 # For a DimArray with a time dimension we return the value at the
 # current auxframe, also using the index `I` if aux is multidimensional.
 @propagate_inbounds function _getaux(
-    A::AbstractDimArray{<:Any,1}, data::AbstractSimData, key::Union{Aux,Symbol}, I::Tuple
-)
+    A::AbstractDimArray{<:Any,1}, data::AbstractSimData, key::Union{Aux,Symbol}, I::NTuple{N}
+) where N
     hasdim(A, TimeDim) ? A[auxframe(data, key)] : A[I...]
 end
 @propagate_inbounds function _getaux(
-    A::AbstractDimArray, data::AbstractSimData, key::Union{Aux,Symbol}, I::Tuple
-)
+    A::AbstractDimArray{<:Any,N1}, data::AbstractSimData, key::Union{Aux,Symbol}, I::NTuple{N2}
+) where {N1,N2}
     if hasdim(A, TimeDim)
         last(dims(A)) isa TimeDim || throw(ArgumentError("The time dimensions in aux data must be the last dimension"))
-        A[I..., auxframe(data, key)]
+        A[ntuple(i -> I[i], Val{N1-1}())..., auxframe(data, key)]
     else
-        A[I...]
+        A[ntuple(i -> I[i], Val{N1-1}())...]
     end
 end
 
@@ -129,40 +130,29 @@ end
 # matching type to the simulation tspan.
 # This is called from _updatetime in simulationdata.jl
 _calc_auxframe(data::AbstractSimData) = _calc_auxframe(aux(data), data)
-function _calc_auxframe(aux::NamedTuple, data::AbstractSimData)
-    map(A -> _calc_auxframe(A, data), aux)
+function _calc_auxframe(aux::NamedTuple{K}, data::AbstractSimData) where K
+    map((A, k) -> _calc_auxframe(A, data, k), aux, NamedTuple{K}(K))
 end
-function _calc_auxframe(A::AbstractDimArray, data)
+function _calc_auxframe(A::AbstractDimArray, data, key)
     hasdim(A, TimeDim) || return nothing
+    timedim = dims(A, TimeDim)
     curtime = currenttime(data)
-    firstauxtime = first(dims(A, TimeDim))
-    auxstep = step(dims(A, TimeDim))
-    # Use julias range objects to calculate the distance between the
-    # current time and the start of the aux
-    i = if curtime >= firstauxtime
-        length(firstauxtime:auxstep:curtime)
-    else
-        1 - length(firstauxtime-timestep(data):-auxstep:curtime)
+    if !hasselection(timedim, Contains(curtime)) 
+        if lookup(timedim) isa Cyclic
+            if sampling(timedim) isa Points
+                throw(ArgumentError("Time dimension of aux `$key` has no valid selection for `Contains($curtime)`. Did you mean to use `Intervals` for the time dimension `sampling`? `Contains` on `Points` defaults to `At`, and must be exact."))
+            else
+                throw(ArgumentError("Time dimension of aux `$key` has no valid selection for `Contains($curtime)`."))
+            end
+        elseif sampling(timedim) isa Points
+            throw(ArgumentError("Time dimension of aux `$key` has no valid selection for `Contains($curtime)`. Did you mean to use `Intervals` for the time dimension `sampling`? `Contains` on `Points` defaults to `At`, and must be exact."))
+        else
+            throw(ArgumentError("aux `$key` has no valid selection for `Contains($curtime)`. Did you mean to use a `Cyclic` lookup for the time dimension of the array?"))
+        end
     end
-    # TODO use a cyclic mode DimensionalArray
-    # and handle the mismatch of e.g. weeks and years
-    return _cyclic_index(i, size(A, Ti))
+    return DimensionalData.selectindices(timedim, Contains(curtime))
 end
-_calc_auxframe(aux, data) = nothing
-
-# _cyclic_index
-# Cycle an index over the length of the aux data.
-function _cyclic_index(i::Integer, len::Integer)
-    return if i > len
-        rem(i + len - 1, len) + 1
-    elseif i <= 0
-        i + (i ÷ len -1) * -len
-    else
-        i
-    end
-end
-
-
+_calc_auxframe(args...) = nothing
 
 """
     Grid <: ParameterSource

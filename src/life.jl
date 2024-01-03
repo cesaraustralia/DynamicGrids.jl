@@ -1,7 +1,7 @@
 """
     Life <: NeighborhoodRule
 
-    Life(neighborhood, born=3, survive=(2, 3))
+    Life(stencil, born=3, survive=(2, 3))
 
 Rule for game-of-life style cellular automata. This is a demonstration of
 Cellular Automata more than a seriously optimised game of life rule.
@@ -53,7 +53,7 @@ nothing
 """ 
 struct Life{R,W,N,B,S,L} <: NeighborhoodRule{R,W}
     "A Neighborhood, usually Moore(1)"
-    neighborhood::N
+    stencil::N
     "Int, Array, Tuple or Iterable of values that match sum(neighbors) when cell is empty"
     born::B 
     "Int, Array, Tuple or Iterable of values that match sum(neighbors) when cell is full"
@@ -61,27 +61,27 @@ struct Life{R,W,N,B,S,L} <: NeighborhoodRule{R,W}
     lookup::L
 end
 function Life{R,W}(
-    neighborhood::N, born::B, survive::S, lookup_
+    stencil::N, born::B, survive::S, lookup_
 ) where {R,W,N<:Neighborhood{<:Any,<:Any,L},B,S} where L
     lookup = ntuple(i -> (i - 1) in born, L+1), ntuple(i -> (i - 1) in survive, L+1)
-    Life{R,W,N,B,S,typeof(lookup)}(neighborhood, born, survive, lookup)
+    Life{R,W,N,B,S,typeof(lookup)}(stencil, born, survive, lookup)
 end
-function Life{R,W}(neighborhood, born, survive) where {R,W}
-    Life{R,W}(neighborhood, born, survive, nothing)
+function Life{R,W}(stencil, born, survive) where {R,W}
+    Life{R,W}(stencil, born, survive, nothing)
 end
 function Life{R,W}(; 
-    neighborhood=Moore(1),
+    neighborhood=Moore(1), # Backwards compat
+    stencil=neighborhood,
     born=Param(3, bounds=(0, 8)),
-    survive=(Param(2, bounds=(0, 8)), Param(3, bounds=(0, 8))),
+    survive=(survive1=Param(2, bounds=(0, 8)), survive2=Param(3, bounds=(0, 8))),
 ) where {R,W}
-    Life{R,W}(neighborhood, born, survive, nothing)
+    Life{R,W}(stencil, born, survive, nothing)
 end
 
-function setwindow(r::Life{R,W,N,B,S,LU}, buffer) where {R,W,N,B,S,LU} 
-    hood = setwindow(r.neighborhood, buffer)
-    Life{R,W,typeof(hood),B,S,LU}(hood, r.born, r.survive, r.lookup)
-end
+# This is the whole rule
+applyrule(rule::Life, state) = rule.lookup[state + 1][sum(neighbors(rule)) + 1]
 
-function applyrule(data, rule::Life, state, I)
-    rule.lookup[state + 1][sum(neighbors(rule)) + 1]
+@inline function Stencils.rebuild(rule::Life{R,W,N,B,S,L}, neighbors::SVector) where {R,W,N,B,S,L}
+    stencil = Stencils.rebuild(rule.stencil, neighbors)
+    Life{R,W,typeof(stencil),B,S,L}(stencil, rule.born, rule.survive, rule.lookup)
 end

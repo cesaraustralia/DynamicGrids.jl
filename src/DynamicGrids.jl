@@ -7,25 +7,25 @@ module DynamicGrids
 end DynamicGrids
 
 
-using Adapt,
-      Colors,
+import Adapt,
       ConstructionBase,
+      FreeTypeAbstraction,
+      Reexport,
+      REPL
+
+using Colors,
       Crayons,
       DimensionalData,
-      FreeTypeAbstraction,
       FileIO,
       LinearAlgebra,
       KernelAbstractions,
-      OffsetArrays,
-      REPL,
-      Reexport,
-      Requires,
+      Stencils,
       Setfield,
       StaticArrays,
       Test,
       UnicodeGraphics
 
-@reexport using ModelParameters
+Reexport.@reexport using ModelParameters
 
 import ModelParameters.Flatten
 
@@ -38,6 +38,7 @@ using Base: tail, @propagate_inbounds
 
 import Base: show, getindex, setindex!, lastindex, size, length, push!, append!,
              broadcast, broadcast!, similar, eltype, iterate
+
 
 export sim!, resume!, step!, savegif, isinferred
 
@@ -61,17 +62,17 @@ export AbstractRuleset, Ruleset, StaticRuleset
 
 export AbstractSimData
 
-export Processor, SingleCPU, ThreadedCPU, CPUGPU
+export Processor, SingleCPU, ThreadedCPU, CPUGPU, CuGPU
 
 export PerformanceOpt, NoOpt, SparseOpt
 
-export BoundaryCondition, Remove, Wrap
+export BoundaryCondition, Remove, Wrap, Use
 
 export ParameterSource, Aux, Grid, Delay, Lag, Frame
 
 export Output, ArrayOutput, ResultOutput, TransformedOutput
 
-export GraphicOutput, REPLOutput
+export GraphicOutput, REPLOutput, MakieOutput
 
 export ImageOutput, GifOutput
 
@@ -83,11 +84,10 @@ export ObjectScheme, Greyscale, Grayscale
 
 export CharStyle, Block, Braile
 
-# From Neighborhoods module
-export Neighborhood, Window, AbstractKernelNeighborhood, Kernel,
-       Moore, VonNeumann, Positional, LayeredPositional
+# From Stencils module
+export Stencil, Window, Kernel, Moore, VonNeumann, Positional, Layered
 
-export neighbors, neighborhood, kernel, kernelproduct, offsets, positions, radius, distances
+export neighbors, stencil, kernel, kernelproduct, offsets, indices, radius, distances, distance_zones
 
 const DEFAULT_KEY = :_default_
 
@@ -96,12 +96,11 @@ const EXPERIMENTAL = """
         and may not be 100% reliable in all cases. Please file github issues if problems occur.
         """
 
-include("Neighborhoods/Neighborhoods.jl")
+import Stencils: neighbors, unsafe_neighbors, stencil,
+    kernel, kernelproduct, offsets, indices, radius, distances, distance_zones,
+    stencil, unsafe_stencil, boundary, padding, source, dest, switch, padval, update_boundary!, add_halo
 
-using .Neighborhoods
-import .Neighborhoods: neighbors, neighborhood, kernel, kernelproduct, offsets, positions,
-    radius, distances, readwindow, setwindow, unsafe_readwindow,
-    updatewindow, unsafe_updatewindow
+import Stencils: BoundaryCondition, Padding
 
 include("interface.jl")
 include("flags.jl")
@@ -125,6 +124,7 @@ include("outputs/schemes.jl")
 include("outputs/textconfig.jl")
 include("outputs/render.jl")
 include("outputs/image.jl")
+include("outputs/makie.jl")
 include("outputs/array.jl")
 include("outputs/transformed.jl")
 include("outputs/repl.jl")
@@ -145,8 +145,6 @@ include("show.jl")
 function __init__()
     global terminal
     terminal = REPL.Terminals.TTYTerminal(get(ENV, "TERM", Base.Sys.iswindows() ? "" : "dumb"), stdin, stdout, stderr)
-
-    @require CUDAKernels = "72cfdca4-0801-4ab0-bf6a-d52aa10adc57" include("cuda.jl")
 end
 
 end

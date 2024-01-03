@@ -12,7 +12,7 @@ end
 function sequencerules!(simdata::AbstractSimData, rules::Tuple)
     rule = rules[1]
     rest = tail(rules)
-    # Run the first rules
+    # Run the first rule
     newsimdata = maprule!(simdata, rule)
     # Run the rest of the rules recursively
     sequencerules!(newsimdata, rest)

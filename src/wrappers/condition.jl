@@ -15,42 +15,42 @@ struct RunIf{R,W,F,T<:Rule{R,W}} <: RuleWrapper{R,W}
 end
 
 rule(runif::RunIf) = runif.rule
-# Forward ruletype, radius and neighborhoodkey to the contained rule
+# Forward ruletype, radius and stencilkey to the contained rule
 ruletype(runif::RunIf) = ruletype(rule(runif))
 radius(runif::RunIf) = radius(rule(runif))
-neighborhoodkey(runif::RunIf) = neighborhoodkey(rule(runif))
-neighborhood(runif::RunIf) = neighborhood(rule(runif))
+stencilkey(runif::RunIf) = stencilkey(rule(runif))
+stencil(runif::RunIf) = stencil(rule(runif))
 neighbors(runif::RunIf) = neighbors(rule(runif))
 
 modifyrule(runif::RunIf, data::AbstractSimData) = @set runif.rule = modifyrule(runif.rule, data)
 
-@inline function setwindow(runif::RunIf{R,W}, win) where {R,W}
+@inline function Stencils.rebuild(runif::RunIf{R,W}, win) where {R,W}
     f = runif.f
-    r = setwindow(rule(runif), win)
+    r = Stencils.rebuild(rule(runif), win)
     RunIf{R,W,typeof(f),typeof(r)}(f, r)
 end
 
 # We have to hook into cell_kernel! to handle the option of no return value
 @inline function cell_kernel!(
-    simdata, ruletype::Val{<:Rule}, condition::RunIf, rkeys, wkeys, I...
+    data::RuleData, ruletype::Val{<:Rule}, condition::RunIf, rkeys, wkeys, I...
 )
-    readstate = _readcell(simdata, rkeys, I...)
-    if condition.f(simdata, readstate, I)
-        writeval = applyrule(simdata, rule(condition), readstate, I)
-        _writecell!(simdata, ruletype, wkeys, writeval, I...)
+    readstate = _readcell(data, rkeys, I...)
+    if condition.f(data, readstate, I)
+        writeval = applyrule(data, rule(condition), readstate, I)
+        _writecell!(data, ruletype, wkeys, writeval, I...)
     else
         # Otherwise copy source to dest without change
-        _writecell!(simdata, ruletype, wkeys, _readcell(simdata, wkeys, I...), I...)
+        _writecell!(data, ruletype, wkeys, _readcell(data, wkeys, I...), I...)
     end
     return nothing
 end
 # We have to hook into cell_kernel! to handle the option of no return value
 @inline function cell_kernel!(
-    simdata, ::Type{<:SetRule}, condition::RunIf, rkeys, wkeys, I...
+    data::RuleData, ::Type{<:SetRule}, condition::RunIf, rkeys, wkeys, I...
 )
-    readstate = _readcell(simdata, rkeys, I...)
+    readstate = _readcell(data, rkeys, I...)
     if condition.f(data, readstate, I)
-        applyrule!(simdata, rule(condition), readstate, I)
+        applyrule!(data, rule(condition), readstate, I)
     end
     return nothing
 end

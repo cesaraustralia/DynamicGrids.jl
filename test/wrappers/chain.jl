@@ -1,7 +1,7 @@
-using DynamicGrids, Test, BenchmarkTools
+using DynamicGrids, Test, BenchmarkTools, StaticArrays
 
-using DynamicGrids: SimData, radius, rules, _readkeys, _writekeys, 
-    applyrule, neighborhood, neighborhoodkey, Extent, ruletype
+using DynamicGrids: SimData, RuleData, radius, rules, _readkeys, _writekeys, 
+    applyrule, stencil, stencilkey, Extent, ruletype, stencilkey, stencil
 
 @testset "CellRule chain" begin
 
@@ -40,7 +40,7 @@ using DynamicGrids: SimData, radius, rules, _readkeys, _writekeys,
 
     ruleset = Ruleset(chain)
     init = (a=agrid, b=bgrid, c=cgrid, d=dgrid, e=egrid)
-    data = SimData(Extent(init=init, tspan=1:1), ruleset)
+    data = RuleData(SimData(Extent(init=init, tspan=1:1), ruleset))
 
     @test radius(ruleset) == (b=0, c=0, d=0, e=0, a=0)
 
@@ -90,10 +90,10 @@ end
 
 @testset "NeighborhoodRule, CellRule chain" begin
 
-    buf = reshape(1:9, 3, 3)
-    hood = Moore{1}(buf)
-    hoodrule = Neighbors{:a,:a}(hood) do data, neighborhodhood, cell, I
-        sum(neighborhodhood)
+    nbrs = SA[1, 2, 3, 4, 6, 7, 8, 9]
+    hood = Moore{1}(nbrs)
+    hoodrule = Neighbors{:a,:a}(hood) do data, stencilood, cell, I
+        sum(stencilood)
     end
 
     rule = Cell{Tuple{:a,:c},:b}() do data, (b, c), I
@@ -121,9 +121,10 @@ end
     chain = Chain(hoodrule, rule)
     @test radius(chain) === 1
     @test ruletype(chain) == NeighborhoodRule
-    @test neighborhood(chain) == hood
+    @test stencil(chain) == hood
+
     @test Tuple(neighbors(chain)) === (1, 2, 3, 4, 6, 7, 8, 9) 
-    @test neighborhoodkey(chain) === :a
+    @test stencilkey(chain) === :a
     @test rules(Base.tail(chain)) === (rule,)
     @test chain[1] === first(chain) === hoodrule
     @test chain[end] === last(chain) === rule
@@ -134,12 +135,12 @@ end
 
     ruleset = Ruleset(chain; opt=NoOpt())
     noopt_output = ArrayOutput(init; tspan=1:3)
-    @btime sim!($noopt_output, $ruleset)
+    sim!(noopt_output, ruleset)
     @test isinferred(noopt_output, ruleset)
     
     ruleset = Ruleset(Chain(hoodrule, rule); opt=SparseOpt())
     sparseopt_output = ArrayOutput(init; tspan=1:3)
-    @btime sim!($sparseopt_output, $ruleset; init=$init)
+    sim!(sparseopt_output, ruleset; init=init)
     @test isinferred(sparseopt_output, ruleset)
 
     noopt_output[2][:a] == sparseopt_output[2][:a] ==

@@ -1,7 +1,7 @@
-using DynamicGrids, OffsetArrays, Test, Dates
-using DynamicGrids: initdata!, init, mask, boundary, source, dest, 
+using DynamicGrids, Test, Dates
+using DynamicGrids: init, mask, boundary, source, dest, 
     sourcestatus, deststatus, gridsize, ruleset, grids, SimData, Extent,
-    _updatetime, WritableGridData, tspan, extent, optdata
+    _updatetime, GridData, SwitchMode, WriteMode, tspan, extent, optdata
 
 inita = [0 1 1
          0 1 1]
@@ -12,7 +12,7 @@ initab = (a=inita, b=initb)
 life = Life{:a,:a}()
 tspan_ = DateTime(2001):Day(1):DateTime(2001, 2)
 
-@testset "initdata!" begin
+@testset "SimData" begin
     rs = Ruleset(life, timestep=Day(1); opt=SparseOpt());
 
     ext = Extent(; init=initab, tspan=tspan_)
@@ -35,27 +35,27 @@ tspan_ = DateTime(2001):Day(1):DateTime(2001, 2)
     grida = gs[:a]
     gridb = gs[:b]
 
-    @test parent(source(grida)) == parent(dest(grida)) ==
+    @test parent(source(grida)) ==
         [0 0 0 0 0
          0 0 1 1 0
          0 0 1 1 0
-         0 0 0 0 0
-         0 0 0 0 0
+         # 0 0 0 0 0
+         # 0 0 0 0 0
          0 0 0 0 0]
 
-    wgrida = WritableGridData(grida)
+    wgrida = GridData{SwitchMode}(grida)
     @test parent(source(grida)) === parent(source(wgrida))
     @test parent(dest(grida)) === parent(dest(wgrida))
 
-    @test parent(grida) == parent(wgrida) ==
+    @test grida == wgrida ==
         [0 1 1 
          0 1 1]
-    
 
-    @test sourcestatus(grida) == deststatus(grida) == 
+    # Status isn't updated in the constructor now...
+    @test_broken sourcestatus(grida) == deststatus(grida) == 
         [0 1 0 0
          0 1 0 0
-         0 0 0 0
+         # 0 0 0 0
          0 0 0 0]
 
     @test parent(source(gridb)) == parent(dest(gridb)) == 
@@ -71,22 +71,17 @@ tspan_ = DateTime(2001):Day(1):DateTime(2001, 2)
     @test eltype(grida) == Int
 
     output = ArrayOutput(initab; tspan=tspan_)
-    initdata!(simdata, output, extent(output), rs)
+    SimData(simdata, output, extent(output), rs)
 end
 
-@testset "initdata! with :_default_" begin
+@testset "SimData with :_default_" begin
     initx = [1 0]
     rs = Ruleset(Life())
     output = ArrayOutput((_default_=initx,); tspan=tspan_)
     simdata = SimData(output, rs)
-    simdata2 = initdata!(simdata, output, extent(output), rs)
+    simdata2 = SimData(simdata, output, extent(output), rs)
     @test keys(simdata2) == (:_default_,)
     @test DynamicGrids.ruleset(simdata2) == DynamicGrids.StaticRuleset(rs)
     @test DynamicGrids.init(simdata2)[:_default_] == [1 0]
-    @test DynamicGrids.source(simdata2[:_default_]) == 
-        OffsetArray([0 0 0 0
-                     0 1 0 0
-                     0 0 0 0
-                     0 0 0 0
-                     0 0 0 0], (0:4, 0:3))
+    @test DynamicGrids.source(simdata2[:_default_]) == [0 0 0 0; 0 1 0 0; 0 0 0 0]
 end

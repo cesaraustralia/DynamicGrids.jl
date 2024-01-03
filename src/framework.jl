@@ -40,7 +40,7 @@ Other:
 - `simdata`: a [`SimData`](@ref) object. Keeping it between simulations can reduce memory
   allocation a little, when that is important.
 """
-function sim!(output::Output, ruleset=ruleset(output);
+function sim!(output::Output, ruleset::AbstractRuleset=ruleset(output);
     init=init(output),
     mask=mask(output),
     tspan=tspan(output),
@@ -51,15 +51,23 @@ function sim!(output::Output, ruleset=ruleset(output);
     opt=opt(ruleset),
     cellsize=cellsize(ruleset),
     timestep=timestep(ruleset),
-    simdata=nothing,
+    simdata=nothing, 
+    kw...
 )
-    isrunning(output) && error("Either a simulation is already running in this output, or an error occurred")
+    # isrunning(output) && error("Either a simulation is already running in this output, or an error occurred")
     setrunning!(output, true) || error("Could not start the simulation with this output")
 
     gridsize(init) == gridsize(DG.init(output)) || throw(ArgumentError("init size does not match output init"))
 
     # Rebuild Extent to allow kwarg alterations
-    extent = Extent(; init=_asnamedtuple(init), mask=mask, aux=aux, tspan=tspan)
+    extent = Extent(; 
+        init=_asnamedtuple(init),
+        mask=mask,
+        aux=aux,
+        padval=_asnamedtuple(padval(output)),
+        replicates=replicates(output),
+        tspan=tspan
+    )
     simruleset = Ruleset(rules(ruleset);
         boundary=boundary, proc=proc, opt=opt, cellsize=cellsize, timestep=timestep,
     )
@@ -69,7 +77,10 @@ function sim!(output::Output, ruleset=ruleset(output);
     # Set up output
     settspan!(output, tspan)
     # Create or update the combined data object for the simulation
-    simdata = initdata!(simdata, output, extent, simruleset)
+    simdata = SimData(simdata, output, extent, simruleset)
+    # Run validation for the rules - they can check if simdata has what they need
+    # So error messages happen early, without pages of scrolling.
+    _validaterules(ruleset, simdata)
     init_output_grids!(output, init)
     # Set run speed for GraphicOutputs
     setfps!(output, fps)
@@ -83,10 +94,10 @@ function sim!(output::Output, ruleset=ruleset(output);
     # the original ruleset to allow interactive updates to rules.
     # We pass throught the original ruleset as a handle for e.g. 
     # control sliders to update the rules.
-    return runsim!(output, simdata, ruleset, 1:lastindex(tspan))
+    return runsim!(output, simdata, ruleset, 1:lastindex(tspan); kw...)
 end
 sim!(output::Output, rules::Tuple; kw...) = sim!(output, rules...; kw...)
-sim!(output::Output, rules::Rule...; kw...) = sim!(output, Ruleset(rules...); kw...)
+sim!(output::Output, rules::Rule...; kw...) = sim!(output, Ruleset(rules...; kw...); kw...)
 
 """
     resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output); tstop, kw...)
@@ -111,6 +122,7 @@ function resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
         tstop=last(tspan(output)),
         fps=fps(output),
         simdata=nothing,
+        kw...
 )
     # Check status and arguments
     isrunning(output) && error("A simulation is already running in this output")
@@ -130,10 +142,10 @@ function resume!(output::GraphicOutput, ruleset::Ruleset=ruleset(output);
 
     setfps!(output, fps)
     extent = Extent(; init=_asnamedtuple(init), mask=mask(output), aux=aux(output), tspan=new_tspan)
-    simdata = initdata!(simdata, output, extent, ruleset)
+    simdata = SimData(simdata, output, extent, ruleset)
     initialise!(output, simdata)
     setrunning!(output, true) || error("Could not start the simulation with this output")
-    return runsim!(output, simdata, ruleset, fspan)
+    return runsim!(output, simdata, ruleset, fspan; kw...)
 end
 
 # Simulation runner. Runs a simulation synchonously or asynchonously
@@ -141,11 +153,11 @@ end
 # fixed trait or a field value depending on the output type.
 
 # This allows interfaces with interactive components to update during the simulations.
-function runsim!(output, simdata, ruleset, fspan)
+function runsim!(output, simdata, ruleset, fspan; kw...)
     if isasync(output)
-        @async simloop!(output, simdata, ruleset, fspan)
+        @async simloop!(output, simdata, ruleset, fspan; kw...)
     else
-        simloop!(output, simdata, ruleset, fspan)
+        simloop!(output, simdata, ruleset, fspan; kw...)
     end
 end
 
@@ -156,7 +168,8 @@ end
 # Operations on [`Rule`](@ref)s and [`SimData`](@ref) objects are in a
 # functional style, as they are used in inner loops where immutability improves
 # performance.
-function simloop!(output::Output, simdata, ruleset, fspan)
+function simloop!(output::Output, simdata, ruleset, fspan; printframe=false)
+    printframe && _printframe(simdata, 1)
     # Generate any initialisation data the rules need
     rule_initialisation = initialiserules(simdata)
     # Set the frame timestamp for fps calculation
@@ -165,6 +178,7 @@ function simloop!(output::Output, simdata, ruleset, fspan)
     simdata = _updatetime(simdata, 1) |> _proc_setup
     # Loop over the simulation
     for f in fspan[2:end]
+        printframe && _printframe(simdata, f)
         # Update the current simulation frame and time
         simdata = _updatetime(simdata, f) 
         # Update any Delay parameters
@@ -174,7 +188,7 @@ function simloop!(output::Output, simdata, ruleset, fspan)
         # Save/do something with the the current grid
         storeframe!(output, simdata)
         # Let output UI things happen
-        isasync(output) && yield()
+        yield()
         # Stick to the FPS
         maybesleep(output, f)
         # Exit gracefully
@@ -188,6 +202,8 @@ function simloop!(output::Output, simdata, ruleset, fspan)
     setrunning!(output, false)
     return output
 end
+
+_printframe(simdata, i) = println(stdout, "frame: $i, time: $(tspan(simdata)[i])")
 
 _step!(sd::AbstractSimData, rules) = _updaterules(rules, sd) |> sequencerules!
 
@@ -228,9 +244,7 @@ step!(sd::AbstractSimData; rules=rules(sd)) = step!(sd::AbstractSimData, rules)
 
 step!(sd::AbstractSimData, r1::Rule, rs::Rule...) = step!(sd::AbstractSimData, (r1, rs...))
 function step!(sd::AbstractSimData, rules::Tuple)
-    _updatetime(sd, currentframe(sd) + 1) |> 
-    _proc_setup |> 
-    sd -> _step!(sd, rules)
+    _updatetime(sd, currentframe(sd) + 1) |> _proc_setup |> sd -> _step!(sd, rules)
 end
 
 # _proc_setup
@@ -238,3 +252,6 @@ end
 # GPU needs this to convert arrays to CuArray
 _proc_setup(simdata::AbstractSimData) = _proc_setup(proc(simdata), simdata)
 _proc_setup(proc, simdata) = simdata
+
+# function _checkboxed(
+# rnd

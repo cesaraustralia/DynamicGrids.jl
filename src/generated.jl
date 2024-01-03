@@ -66,7 +66,7 @@ end
     expr = Expr(:tuple)
     keys = map(_unwrap, Tuple(K.parameters))
     for (i, k) in enumerate(keys)
-        push!(expr.args, :(@inbounds source(data[$(QuoteNode(k))])[I...]))
+        push!(expr.args, :(@inbounds source(data[$(QuoteNode(k))])[add_halo(data[$(QuoteNode(k))], I)...]))
     end
     return quote
         keys = $keys
@@ -75,34 +75,40 @@ end
     end
 end
 @inline function _readcell(data::AbstractSimData, ::Val{K}, I...) where K
-    @inbounds source(data[K])[I...]
+    grid = data[K]
+    @inbounds source(grid)[add_halo(grid, I)...]
 end
 
 # _writecell! => nothing
 # Write values to grid/s at index `I`. 
 # This occurs for every cell for every rule, so has to be very fast.
-@generated function _writecell!(data, ::Val{<:CellRule}, wkeys::K, vals::Union{Tuple,NamedTuple}, I...) where K<:Tuple
+@generated function _writecell!(
+    data, ::Val{<:CellRule}, wkeys::K, vals::Union{Tuple,NamedTuple}, I...
+) where K<:Tuple
     expr = Expr(:block)
     keys = map(_unwrap, Tuple(K.parameters))
     for (i, k) in enumerate(keys) 
         # MUST write to source(grid) - CellRule doesn't switch grids
-        push!(expr.args, :(@inbounds source(data[$(QuoteNode(k))])[I...] = vals[$i]))
+        push!(expr.args, :(@inbounds source(data[$(QuoteNode(k))])[add_halo(data[$(QuoteNode(k))], I)...] = vals[$i]))
     end
     push!(expr.args, :(nothing))
     return expr
 end
 @inline function _writecell!(data, ::Val{<:CellRule}, wkeys::Val{K}, val, I...) where K
     # MUST write to source(grid) - CellRule doesn't switch grids
-    @inbounds source(data[K])[I...] = val
+    grid = data[K]
+    @inbounds source(grid)[add_halo(grid, I)...] = val
     return nothing
 end
-@generated function _writecell!(data, ::Val, wkeys::K, vals::Union{Tuple,NamedTuple}, I...) where K<:Tuple
+@generated function _writecell!(
+    data, ::Val, wkeys::K, vals::Union{Tuple,NamedTuple}, I...
+) where K<:Tuple
     expr = Expr(:block)
     keys = map(_unwrap, Tuple(K.parameters))
     for (i, k) in enumerate(keys) 
         # MUST write to dest(grid) here, not grid K
         # setindex! has overrides for the grid
-        push!(expr.args, :(@inbounds dest(data[$(QuoteNode(k))])[I...] = vals[$i]))
+        push!(expr.args, :(@inbounds dest(data[$(QuoteNode(k))])[add_halo(data[$(QuoteNode(k))], I)...] = vals[$i]))
     end
     push!(expr.args, :(nothing))
     return expr
@@ -110,35 +116,41 @@ end
 @inline function _writecell!(data, ::Val, wkeys::Val{K}, val, I...) where K
     # MUST write to dest(grid) here, not grid K
     # setindex! has overrides for the grid
-    @inbounds dest(data[K])[I...] = val
+    grid = data[K]
+    @inbounds dest(grid)[add_halo(grid, I)...] = val
     return nothing
 end
 
-# _getreadgrids => Union{ReadableGridData,Tuple{ReadableGridData,Vararg}}
+# _getgrids => Union{GridData{<:ReadMode},Tuple{GridData{<:ReadMode},Vararg}}
 # Retrieves `GridData` from a `SimData` object to match the requirements of a `Rule`.
 # Returns a `Tuple` holding the key or `Tuple` of keys, and grid or `Tuple` of grids.
 @generated function _getreadgrids(::Rule{R,W}, data::AbstractSimData) where {R<:Tuple,W}
     Expr(:tuple,
         Expr(:tuple, (:(Val{$(QuoteNode(key))}()) for key in R.parameters)...),
-        Expr(:tuple, (:(data[$(QuoteNode(key))]) for key in R.parameters)...),
+        Expr(:tuple, (:(GridData{ReadMode}(data[$(QuoteNode(key))])) for key in R.parameters)...),
     )
 end
 @generated function _getreadgrids(::Rule{R,W}, data::AbstractSimData) where {R,W}
-    :((Val{$(QuoteNode(R))}(), data[$(QuoteNode(R))]))
+    :((Val{$(QuoteNode(R))}(), GridData{ReadMode}(data[$(QuoteNode(R))])))
 end
 
-# _getwritegrids => Union{WritableGridData,Tuple{WritableGridData,Vararg}}
+# _getwritegrids => Union{GridData{<:WriteMode},Tuple{GridData{<:WriteMode},Vararg}}
 # Retrieves `GridData` from a `SimData` object to match the requirements of a `Rule`.
 # Returns a `Tuple` holding the key or `Tuple` of keys, and grid or `Tuple` of grids.
-@generated function _getwritegrids(::Rule{R,W}, data::AbstractSimData) where {R,W<:Tuple}
+@generated function _getwritegrids(
+    ::Type{Mode}, ::Rule{R,W}, data::AbstractSimData
+) where {Mode<:WriteMode,R,W<:Tuple}
     Expr(:tuple,
         Expr(:tuple, (:(Val{$(QuoteNode(key))}()) for key in W.parameters)...),
-        Expr(:tuple, (:(WritableGridData(data[$(QuoteNode(key))])) for key in W.parameters)...),
+        Expr(:tuple, (:(GridData{Mode}(data[$(QuoteNode(key))])) for key in W.parameters)...),
     )
 end
-@generated function _getwritegrids(::Rule{R,W}, data::AbstractSimData) where {R,W}
-    :((Val{$(QuoteNode(W))}(), WritableGridData(data[$(QuoteNode(W))])))
+@generated function _getwritegrids(
+    ::Type{Mode}, ::Rule{R,W}, data::AbstractSimData
+) where {Mode<:WriteMode,R,W}
+    :((Val{$(QuoteNode(W))}(), GridData{Mode}(data[$(QuoteNode(W))])))
 end
+
 
 # _combinegrids => AbstractSimData
 # Combine grids into a new NamedTuple of grids depending

@@ -17,7 +17,8 @@ function (::Type{T})(
     init::Union{NamedTuple,AbstractArray}; extent=nothing, kw...
 ) where T <: Output
     extent = extent isa Nothing ? Extent(; init=init, kw...) : extent
-    T(; frames=[deepcopy(init)], running=false, extent=extent, kw...)
+    frames = [_replicate_init(init, replicates(extent))]
+    T(; frames, running=false, extent=extent, kw...)
 end
 
 # Forward base methods to the frames array
@@ -39,9 +40,15 @@ end
 DimensionalData.refdims(o::Output) = ()
 DimensionalData.name(o::Output) = Symbol("")
 DimensionalData.metadata(o::Output) = NoMetadata()
-# Output bebuild just returns a DimArray
-DimensionalData.rebuild(o::Output, data, dims::Tuple, refdims, name, metadata) = 
-    DimArray(data, dims, refdims, name, metadata)
+# Output rebuild just returns a DimArray
+function DimensionalData.rebuild(o::Output, data, dims::Tuple, refdims, name, metadata)
+    return DimArray(data, dims, refdims, name, metadata) 
+end
+function DimensionalData.rebuild(o::Output; 
+    data=frames(o), dims=DD.dims(o), refdims=DD.refdims(o), names=DD.name(o), metadata=DD.metadata(o), kw...
+)
+    return DimArray(data, dims, refdims, name, metadata) 
+end
 
 # Required getters and setters for all outputs ###################################
 frames(o::Output) = o.frames
@@ -50,6 +57,8 @@ extent(o::Output) = o.extent
 init(o::Output) = init(extent(o))
 mask(o::Output) = mask(extent(o))
 aux(o::Output, key...) = aux(extent(o), key...)
+padval(o::Output, key...) = padval(extent(o), key...)
+replicates(o::Output) = replicates(extent(o))
 tspan(o::Output) = tspan(extent(o))
 timestep(o::Output) = step(tspan(o))
 
@@ -73,7 +82,7 @@ initialise!(o::Output, data) = nothing
 finalise!(o::Output, data) = nothing
 initialisegraphics(o::Output, data) = nothing
 finalisegraphics(o::Output, data) = nothing
-maybesleep(o::Output, frame) = nothing
+maybesleep(o::Output, frame) = sleep(0) # Helps for exiting simulations
 showframe(o::Output, data) = nothing
 
 frameindex(o::Output, data::AbstractSimData) = frameindex(o, currentframe(data))
@@ -92,21 +101,22 @@ end
 # copy one or multiple frames from grid/s to the Output
 function _storeframe!(output::Output, ::Type{<:AbstractArray}, data)
     grid = first(grids(data))
-    _copyto_output!(output[frameindex(output, data)], grid, proc(data))
+    _copyto_output!(output[frameindex(output, data)], grid)
 end
 function _storeframe!(output::Output, ::Type{<:NamedTuple}, data)
     map(values(grids(data)), keys(data)) do grid, key
-        _copyto_output!(output[frameindex(output, data)][key], grid, proc(data))
+        _copyto_output!(output[frameindex(output, data)][key], grid)
     end
 end
 
 # Copy cells from grid to output
-function _copyto_output!(outgrid, grid::GridData, proc)
-    copyto!(outgrid, CartesianIndices(outgrid), source(grid), CartesianIndices(outgrid))
+_copyto_output!(outgrid, grid::GridData) = _copyto_output!(outgrid, grid, proc(grid))
+function _copyto_output!(outgrid, grid::GridData, proc::CPU)
+    copyto!(outgrid, CartesianIndices(outgrid), grid, CartesianIndices(outgrid))
 end
 # Copy cells from grid to output using multiple threads
-function _copyto_output!(outgrid, grid::GridData, proc::ThreadedCPU)
-    Threads.@threads for j in axes(outgrid, 2) 
+function _copyto_output!(outgrid, grid::GridData{<:Any,Tuple{X,Y}}, proc::ThreadedCPU) where {X, Y}
+    Threads.@threads for j in axes(outgrid, ndims(outgrid)) 
         for i in axes(outgrid, 1)
             @inbounds outgrid[i, j] = grid[i, j]
         end

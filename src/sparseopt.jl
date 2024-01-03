@@ -19,7 +19,7 @@ output = sim!(output, rule; opt=SparseOpt())
 ```
 
 `SparseOpt` is best demonstrated with this simulation, where the grey areas do not
-run except where the neighborhood partially hangs over an area that is not grey:
+run except where the stencil partially hangs over an area that is not grey:
 
 ![SparseOpt demonstration](https://raw.githubusercontent.com/cesaraustralia/DynamicGrids.jl/media/complexlife_spareseopt.gif)
 """
@@ -34,20 +34,20 @@ sourcestatus(d::GridData) = optdata(d).sourcestatus
 deststatus(d::GridData) = optdata(d).deststatus
 
 # Run kernels with SparseOpt, block by block:
-function optmap(
+function map_with_optimisation(
     f, simdata::AbstractSimData{S}, proc, ::SparseOpt, ruletype::Val{<:Rule}, rkeys
 ) where {S<:Tuple{Y,X}} where {Y,X}
     # Only use SparseOpt for single-grid rules with grid radii > 0
     grid = _firstgrid(simdata, rkeys)
     R = radius(grid)
     if R == 0
-        optmap(f, simdata, proc, NoOpt(), ruletype, rkeys)
+        map_with_optimisation(f, simdata, proc, NoOpt(), ruletype, rkeys)
         return nothing
     end
     B = 2R
     status = sourcestatus(grid)
     let f=f, proc=proc, status=status
-        procmap(proc, 1:_indtoblock(X+R, B)) do bj
+        map_on_processor(proc, 1:_indtoblock(X+R, B)) do bj
             for  bi in 1:_indtoblock(Y+R, B)
                 status[bi, bj] || continue
                 # Convert from padded block to init dimensions
@@ -68,7 +68,7 @@ function optmap(
 end
 
 function row_kernel!(
-    simdata::AbstractSimData, grid::GridData{<:Tuple{Y,X},R}, proc, opt::SparseOpt,
+    simdata::AbstractSimData, grid::GridData{<:Any,<:Tuple{Y,X},R}, proc, opt::SparseOpt,
     ruletype::Val, rule::Rule, rkeys, wkeys, bi
 ) where {Y,X,R}
     # No SparseOpt for radius 0
@@ -78,7 +78,6 @@ function row_kernel!(
     B = 2R
     S = 2R + 1
     nblockcols = _indtoblock(X+R, B)
-    src = parent(source(grid))
     srcstatus, dststatus = sourcestatus(grid), deststatus(grid)
 
     # Blocks ignore padding! the first block contains padding.
@@ -94,7 +93,6 @@ function row_kernel!(
     # New block status
     newbs12 = false
     newbs22 = false
-    windows = _initialise_windows(src, Val{R}(), i, 1)
     for bj = 1:nblockcols
         # Shuffle current window status
         bs11, bs21 = bs12, bs22
@@ -122,9 +120,8 @@ function row_kernel!(
         jstart = _blocktoind(bj, B)
         jstop = min(jstart + B - 1, X)
 
-        # Reinitialise neighborhood windows if we have skipped a section of the array
+        # Reinitialise stencil windows if we have skipped a section of the array
         if skippedlastblock
-            windows = _initialise_windows(src, Val{R}(), i, jstart)
             skippedlastblock = false
         end
         # Shuffle new window status
@@ -135,14 +132,13 @@ function row_kernel!(
         # Loop over the grid COLUMNS inside the block
         for j in jstart:jstop
             # Update windows unless feshly populated
-            windows = _slide_windows(windows, src, Val{R}(), i, j)
             # Which block column are we in, 1 or 2
             curblockj = (j - jstart) ÷ R + 1
             # Loop over the COLUMN of windows covering the block
             blocklen = min(Y, i + B - 1) - i + 1
             for b in 1:blocklen
                 # Set rule window
-                rule1 = setwindow(rule, windows[b])
+                rule1 = Stencils.rebuild(rule, unsafe_neighbors(stencil(rule), grid, CartesianIndex(i, j)))
                 # Run the rule kernel for the cell
                 writeval = cell_kernel!(simdata, ruletype, rule1, rkeys, wkeys, i + b - 1, j)
                 # Update the status for the current block
@@ -184,14 +180,9 @@ function _build_optdata(opt::SparseOpt, source, r::Int)
     return (; sourcestatus, deststatus)
 end
 
-function _swapoptdata(opt::SparseOpt, grid::GridData)
-    isnothing(optdata(grid)) && return grid
-    od = optdata(grid)
-    srcstatus = od.sourcestatus
-    dststatus = od.deststatus
-    @set! od.deststatus = srcstatus
-    @set! od.sourcestatus = dststatus
-    return @set grid.optdata = od
+Stencils.switch(::SparseOpt, ::Nothing) = nothing
+function Stencils.switch(::SparseOpt, optdata)
+    (sourcestatus=optdata.deststatus, deststatus=optdata.sourcestatus)
 end
 
 
@@ -224,7 +215,7 @@ end
 # Sets the status of the destination block that the current index is in.
 # It can't turn of block status as the block is larger than the cell
 # But should be used inside a LOCK
-function _setoptindex!(grid::WritableGridData{<:Any,R}, opt::SparseOpt, x, I...) where R
+function _setoptindex!(grid::GridData{<:SwitchMode,<:Any,R}, opt::SparseOpt, x, I...) where R
     isnothing(optdata(grid)) && return grid
     blockindex = _indtoblock.(I .+ R, 2R)
     @inbounds deststatus(grid)[blockindex...] |= !(opt.f(x))
@@ -233,7 +224,7 @@ end
 
 # _wrapopt!
 # Copies status from opposite sides/corners in Wrap boundary mode
-function _wrapopt!(grid, ::SparseOpt)
+function Stencils.after_update_boundary!(grid::GridData, ::SparseOpt)
     isnothing(optdata(grid)) && return grid
 
     status = sourcestatus(grid)
@@ -288,7 +279,7 @@ function cell_to_pixel(p::SparseOptInspector, mask, minval, maxval, data::Abstra
     normedval = normalise(val, minval, maxval)
     # This is done at the start of the next frame, so wont show up in
     # the image properly. So do it preemtively?
-    _wrapopt!(first(data))
+    Stencils.after_update_boundary!(first(data))
     status = sourcestatus(first(data))
     if status[blockindex...]
         if normedval > 0

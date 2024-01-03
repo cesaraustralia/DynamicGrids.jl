@@ -14,7 +14,13 @@ proc(rs::AbstractRuleset) = proc(settings(rs))
 opt(rs::AbstractRuleset) = opt(settings(rs))
 cellsize(rs::AbstractRuleset) = cellsize(settings(rs))
 timestep(rs::AbstractRuleset) = timestep(settings(rs))
-radius(set::AbstractRuleset) = radius(rules(set))
+function radius(set::AbstractRuleset) 
+    if isempty(rules(set))
+        NamedTuple()
+    else
+        radius(rules(set))
+    end
+end
 
 Base.step(rs::AbstractRuleset) = timestep(rs)
 

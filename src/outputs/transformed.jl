@@ -16,7 +16,7 @@ An output that stores the result of some function `f` of the grid/s.
 - `aux`: NamedTuple of arbitrary input data. Use `get(data, Aux(:key), I...)` 
     to access from a `Rule` in a type-stable way.
 - `mask`: `BitArray` for defining cells that will/will not be run.
-- `padval`: padding value for grids with neighborhood rules. The default is `zero(eltype(init))`.
+- `padval`: padding value for grids with stencil rules. The default is `zero(eltype(init))`.
 
 $EXPERIMENTAL
 """
@@ -49,7 +49,7 @@ function storeframe!(o::TransformedOutput, data::AbstractSimData)
     i = frameindex(o, data) 
     # Copy the transformed grid/s to the output frames, 
     # instead of just assigning (see issue #169)
-    o[i] = _copytransformed!(o[i], transformed) 
+    o[i] = _copytransformed!(o[i], transformed)
 end
 
 # Copy arrays manually as reducing functions can return the original object without copy.
@@ -57,23 +57,24 @@ _copytransformed!(dest::NamedTuple, src::NamedTuple) = map(_copytransformed!, de
 _copytransformed!(dest::AbstractArray, src::AbstractArray) = dest .= src
 # Non-array output is just assigned
 _copytransformed!(dest, src) = src
+_copytransformed!(dest::StaticArray, src::StaticArray) = src
 
 # Multi/named grid simulation, f is passed a NamedTuple
 function _transform_grids(o::TransformedOutput, grids::NamedTuple)
     # Make a new named tuple of raw arrays without wrappers, copying
-    # to the buffer where an OffsetArray was used for padding.
     # Often it's faster to copy than use a view when f is sum/mean etc.
     nt = map(grids, o.buffer) do g, b
-        source(g) isa OffsetArray ? copy!(b, sourceview(g)) : source(g)
+        padding(g) isa Halo ? copy!(b, g) : source(g)
     end
     o.f(nt)
 end
 # Single unnamed grid simulation, f is passed an AbstractArray
 function _transform_grids(o::TransformedOutput, grids::NamedTuple{(DEFAULT_KEY,)})
     g = first(grids)
-    A = source(g) isa OffsetArray ? copy!(o.buffer, sourceview(g)) : source(g)
+    A = padding(g) isa Halo ? copy!(o.buffer, g) : source(g)
     o.f(A)
 end
 
 init_output_grids!(o::TransformedOutput, init) = nothing
-initdata!(o::TransformedOutput, init) = nothing
+
+Adapt.adapt_structure(to, o::TransformedOutput) = o

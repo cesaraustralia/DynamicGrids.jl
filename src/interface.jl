@@ -1,20 +1,29 @@
 """
-    applyrule(data::AbstractSimData, rule::Rule{R,W}, state, index::Tuple{Int,Int}) -> cell value(s)
+    applyrule(data::AbstractSimData, rule::Rule, state, index::NTuple{N,Int}) -> new cell value/s
+    applyrule(data::AbstractSimData, rule::Rule, state, index::CaresianIndex) -> new cell value/s
+    applyrule(rule::Rule, state, index::NTuple{N,Int}) -> new cell value/s
+    applyrule(rule::Rule, state, index::CaresianIndex) -> new cell value/s
+    applyrule(rule::Rule, state) -> new cell value/s
+    applyrule(rule::Rule) -> new cell value/s
 
 Apply a rule to the cell state and return values to write to the grid(s).
 
 This is called in `maprule!` methods during the simulation,
-not by the user. Custom `Rule` implementations must define this method.
+not by the user. Custom `Rule` implementations must define this method,
+but may use any of the combinations of arguments show above.
 
 ## Arguments
 
 - `data` : [`AbstractSimData`](@ref)
 - `rule` : [`Rule`](@ref)
 - `state`: the value(s) of the current cell
-- `index`: a (row, column) tuple of Int for the current cell coordinates
+- `index`: a (row, column) tuple of `Int` for the current cell coordinates
 
-Returns the value(s) to be written to the current cell(s) of
-the grids specified by the `W` type parameter.
+Returns the value/s to be written to the current cell of
+the grids specified by the `W` type parameter. 
+
+For a single grid, return a single value. For multiple grids, a `Tuple`
+with values for each grid in the order specified in `W`.
 """
 function applyrule end
 
