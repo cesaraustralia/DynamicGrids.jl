@@ -5,10 +5,6 @@ Abstract supertype for GPU processors.
 """
 abstract type GPU <: Processor end
 
-function _copyto_output!(outgrid, grid::GridData, proc::GPU)
-    copyto!(outgrid, grid)
-end
-
 """
     CPUGPU <: GPU
 
@@ -23,43 +19,23 @@ CPUGPU() = CPUGPU(Base.Threads.SpinLock())
 Base.Threads.lock(opt::CPUGPU) = lock(opt.spinlock)
 Base.Threads.unlock(opt::CPUGPU) = unlock(opt.spinlock)
 
-kernel_setup(::CPUGPU) = KernelAbstractions.CPU(; static=true), 64
-
-"""
-    CuGPU <: GPU
-
-    CuGPU()
-    CuGPU{threads_per_block}()
-
-```julia
-ruleset = Ruleset(rule; proc=CuGPU())
-# or
-output = sim!(output, rule; proc=CuGPU())
-```
-"""
-struct CuGPU{X} <: GPU end
-CuGPU() = CuGPU{32}()
+kernel_setup(::CPUGPU) = KernelAbstractions.CPU(), 1
 
 function maprule!(
     data::AbstractSimData, proc::GPU, opt, ruletype::Val{<:Rule}, rule, rkeys, wkeys
 )
-    backend = KernelAbstractions.get_backend(first(grids(data)))
-    kernel! = ka_rule_kernel!(kernel_setup(proc)..., gridsize(first(grids(data))))
-    kernel!(data, ruletype, rule, rkeys, wkeys)
-    KernelAbstractions.synchronize(backend)
+    kernel! = ka_rule_kernel!(kernel_setup(proc)...)
+    kernel!(data, ruletype, rule, rkeys, wkeys; ndrange=gridsize(data)) |> wait
     return nothing
 end
 
-kernel_setup(proc::CuGPU) = _cuda_kernel_setup(proc)
-_cuda_kernel_setup(proc) = error("Run `using CUDA` to use CuGPU")
-
 # ka_rule_kernel!
 # Runs cell_kernel! on GPU after retrieving the global index
-# and setting the stencil buffer to a SArray window retrieved 
-# from the first (stencil) grid
+# and setting the neighborhood buffer to a SArray window retrieved 
+# from the first (neighborhood) grid
 @kernel function ka_rule_kernel!(data, ruletype::Val{<:NeighborhoodRule}, rule, rkeys, wkeys)
     I = @index(Global, NTuple)
-    stencil_kernel!(data, _firstgrid(data, rkeys), ruletype, rule, rkeys, wkeys, I...)
+    neighborhood_kernel!(data, _firstgrid(data, rkeys), ruletype, rule, rkeys, wkeys, I...)
     nothing
 end
 @kernel function ka_rule_kernel!(data, ruletype::Val, rule, rkeys, wkeys)
@@ -73,27 +49,6 @@ end
 # This is not safe for general use. 
 # It can be used where only identical transformations of a cell 
 # can happen from any other cell, such as setting all 1s to 2.
-@propagate_inbounds function _setindex!(d::GridData{<:WriteMode}, opt::GPU, x, I...)
-    source(d)[I...] = x
-end
-@propagate_inbounds function _setindex!(d::GridData{<:SwitchMode}, opt::GPU, x, I...)
+@propagate_inbounds function _setindex!(d::WritableGridData, opt::GPU, x, I...)
     dest(d)[I...] = x
-end
-
-function _maybemask!(
-    wgrid::GridData{<:GridMode,<:Tuple{Y,X}}, proc::GPU, mask::AbstractArray
-) where {Y,X}
-    mv = maskval(wgrid)
-    kernel! = ka_mask_kernel!(kernel_setup(proc)...)
-    kernel!(source(wgrid), mask, mv; ndrange=size(wgrid)) 
-    return nothing
-end
-
-@kernel function ka_mask_kernel!(grid, mask, maskval)
-    I = @index(Global, NTuple)
-    grid[I...] = mask[I...] ? grid[I...] : maskval
-end
-@kernel function ka_mask_kernel!(grid, mask, maskval::Nothing)
-    I = @index(Global, NTuple)
-    grid[I...] = mask[I...] * grid[I...]
 end

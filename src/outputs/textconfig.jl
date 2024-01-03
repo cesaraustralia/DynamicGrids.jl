@@ -97,16 +97,16 @@ function _rendertime! end
 function _rendertext!(img, config::TextConfig, name, t)
     _rendername!(img, config::TextConfig, name)
     _rendertime!(img, config::TextConfig, t)
-    return img
+    img
 end
 _rendertext!(img, config::Nothing, name, t) = nothing
 
 # Render `name` as text on the image following config settings.
 function _rendername!(img, config::TextConfig, name)
-    FreeTypeAbstraction.renderstring!(img, name, config.face, config.namepixels, config.namepos...;
+    renderstring!(img, name, config.face, config.namepixels, config.namepos...;
         fcolor=config.fcolor, bcolor=config.bcolor
     )
-    return img
+    img
 end
 _rendername!(img, config::TextConfig, name::Nothing) = img
 _rendername!(img, config::Nothing, name) = img
@@ -114,10 +114,10 @@ _rendername!(img, config::Nothing, name::Nothing) = img
 
 # Render time `t` as text on the image following config settings.
 function _rendertime!(img, config::TextConfig, t)
-    FreeTypeAbstraction.renderstring!(img, string(t), config.face, config.timepixels, config.timepos...;
+    renderstring!(img, string(t), config.face, config.timepixels, config.timepos...;
         fcolor=config.fcolor, bcolor=config.bcolor
     )
-    return img
+    img
 end
 _rendertime!(img, config::Nothing, t) = img
 _rendertime!(img, config::TextConfig, t::Nothing) = img
