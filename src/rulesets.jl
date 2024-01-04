@@ -73,3 +73,10 @@ function StaticRuleset(; rules=(), settings=nothing, kw...)
 end
 
 const SRuleset = StaticRuleset
+
+# combine rules via +
+Base.:+(a::T, b::V) where {T <: Rule, V <: Rule} = Ruleset(a,b)  
+Base.:+(a::T, b::V) where {T <: Ruleset, V <: Rule} = Ruleset(rules(a)...,b)  
+Base.:+(a::T, b::V) where {T <: Rule, V <: Ruleset} = Ruleset(a,rules(b)...)  
+Base.:+(a::T, b::V) where {T <: Ruleset, V <: Ruleset} = Ruleset(rules(a)...,rules(b)...)  
+
