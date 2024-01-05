@@ -28,7 +28,7 @@ end
     Chain{R,W,typeof(rules)}(rules)
 end
 
-@generated function applyrule(data::AbstractSimData, chain1::Chain{R,W,T}, state1, index) where {R,W,T}
+@generated function applyrule(data::RuleData, chain1::Chain{R,W,T}, state1, index) where {R,W,T}
     expr = Expr(:block)
     nrules = length(T.parameters)
     for i in 1:nrules

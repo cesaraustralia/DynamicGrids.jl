@@ -17,8 +17,8 @@ such as another [`Grid`](@ref), an [`Aux`](@ref) array, or a [`Delay`](@ref).
 Other `source` objects are used as-is without indexing with `I`.
 """
 @propagate_inbounds Base.get(data::AbstractSimData, val, I...) = val
-@propagate_inbounds Base.get(data::AbstractSimData, key::ParameterSource, I::Integer...) =
-    get(data, key, I)
+@propagate_inbounds Base.get(data::AbstractSimData, key::ParameterSource, i::Integer, I::Integer...) =
+    get(data, key, (i, I...))
 @propagate_inbounds Base.get(data::AbstractSimData, key::ParameterSource, I::CartesianIndex) =
     get(data, key, Tuple(I))
 
@@ -64,6 +64,9 @@ _unwrap(::Type{<:Aux{X}}) where X = X
 
 @propagate_inbounds function Base.get(data::AbstractSimData, key::Aux, I::Tuple)
     _getaux(data, key, I)
+end
+@propagate_inbounds function Base.get(data::AbstractSimData, key::Aux)
+    aux(data, key)
 end
 
 # _getaux
