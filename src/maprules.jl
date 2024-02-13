@@ -292,14 +292,14 @@ _maybemask!(grids::Union{Tuple,NamedTuple}) = map(_maybemask!, grids)
 _maybemask!(grid::GridData) = _maybemask!(grid, proc(grid), mask(grid))
 _maybemask!(grid::GridData, proc, mask::Nothing) = nothing
 function _maybemask!(grid::GridData, proc, mask::AbstractArray)
-    # mv = maskval(grid)
-    # # `mask` is also a padded StencilArray
-    # # so we mask the whole thing to take care of the edges
-    # if isnothing(mv) || iszero(mv)
-    #     source(grid) .*= parent(mask)
-    # else
-    #     source(grid) .= ((a, m) -> m ? a : mv).(source(grid), parent(mask))
-    # end
+    mv = maskval(grid)
+    # `mask` is also a padded StencilArray
+    # so we mask the whole thing to take care of the edges
+    if isnothing(mv) || iszero(mv)
+        source(grid) .*= parent(mask)
+    else
+        source(grid) .= ((a, m) -> m ? a : mv).(source(grid), parent(mask))
+    end
     return grid
 end
 
