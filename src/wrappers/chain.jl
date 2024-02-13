@@ -59,8 +59,7 @@ end
 
 # Merge new state with previous state.
 # Returns a new `NamedTuple` with all keys having the most recent state
-@generated function _update_chainstate(rule::Rule{R,W}, state::NamedTuple{K,V}, writestate
-                                     ) where {R,W,K,V}
+@generated function _update_chainstate(rule::Rule{R,W}, state::NamedTuple{K,V}, writestate) where {R,W,K,V}
     expr = Expr(:tuple)
     writekeys = W isa Symbol ? (W,) : W.parameters
     keys = (union(K, writekeys)...,)
@@ -68,7 +67,11 @@ end
         if k in writekeys
             for (j, wkey) in enumerate(writekeys)
                 if k == wkey
-                    push!(expr.args, :(writestate[$j]))
+                    if W isa Symbol
+                        push!(expr.args, :(writestate))
+                    else
+                        push!(expr.args, :(writestate[$j]))
+                    end
                 end
             end
         else
