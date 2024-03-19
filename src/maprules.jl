@@ -291,7 +291,7 @@ _to_readonly(data::GridData) = GridData{ReadMode}(data)
 _maybemask!(grids::Union{Tuple,NamedTuple}) = map(_maybemask!, grids)
 _maybemask!(grid::GridData) = _maybemask!(grid, proc(grid), mask(grid))
 _maybemask!(grid::GridData, proc, mask::Nothing) = nothing
-function _maybemask!(grid::GridData, proc, mask::AbstractArray)
+function _maybemask!(grid::GridData, proc::CPU, mask::AbstractArray)
     mv = maskval(grid)
     # `mask` is also a padded StencilArray
     # so we mask the whole thing to take care of the edges

@@ -80,9 +80,7 @@ end
     dest(d)[I...] = x
 end
 
-function _maybemask!(
-    grid::GridData{<:GridMode,<:Tuple{Y,X}}, proc::GPU, mask::AbstractArray
-) where {Y,X}
+function _maybemask!(grid::GridData, proc::GPU, mask::AbstractArray)
     mv = maskval(grid)
     kernel! = ka_mask_kernel!(kernel_setup(proc)..., size(grid))
     kernel!(source(grid), mask, mv) 
@@ -91,11 +89,11 @@ end
 
 @kernel function ka_mask_kernel!(grid, mask, maskval)
     I = @index(Global, NTuple)
-    grid[I...] = mask[I...] ? grid[I...] : maskval
+    grid[I...] = mask[I[1], I[2]] ? grid[I...] : maskval
     nothing
 end
 @kernel function ka_mask_kernel!(grid, mask, maskval::Nothing)
     I = @index(Global, NTuple)
-    grid[I...] = mask[I...] * grid[I...]
+    grid[I...] = mask[I[1], I[2]] * grid[I...]
     nothing
 end
