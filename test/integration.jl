@@ -1,11 +1,11 @@
-using DynamicGrids, DimensionalData, Test, Dates, Unitful, 
-      CUDA, FileIO, FixedPointNumbers, Colors
+using DynamicGrids, DimensionalData, Test, Dates, Unitful, FileIO, FixedPointNumbers, Colors
 using DynamicGrids: Extent, SimData, gridview
 using DynamicGrids.Adapt: adapt
 
 maybe_gpu(output, hardware::CuGPU) = adapt(CuArray, output)
 maybe_gpu(output, hardware) = output
 
+# using CUDA
 # if CUDA.has_cuda_gpu()
 #     CUDA.allowscalar(false)
 #     hardware = (SingleCPU(), ThreadedCPU(), CPUGPU(), CuGPU())

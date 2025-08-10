@@ -21,7 +21,7 @@ for optimisations.
 - `R`: grid padding radius
 - `T`: grid data type
 """
-abstract type AbstractGridData{Mode,S,R,T,N,A,H,B,P} <: Stencils.AbstractSwitchingStencilArray{S,R,T,N,A,H,B,P} end
+abstract type AbstractGridData{Mode,S,R,T,N,A,H,B,P} <: Stencils.AbstractSwitchingStencilArray{R,T,N,A,H,B,P} end
 
 # Getters
 proc(d::AbstractGridData) = d.proc
