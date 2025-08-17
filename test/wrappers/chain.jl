@@ -91,7 +91,7 @@ end
 @testset "NeighborhoodRule, CellRule chain" begin
 
     nbrs = SA[1, 2, 3, 4, 6, 7, 8, 9]
-    hood = Moore{1}(nbrs)
+    hood = Moore{1}(nbrs, 0)
     hoodrule = Neighbors{:a,:a}(hood) do data, stencilood, cell, I
         sum(stencilood)
     end

@@ -250,9 +250,9 @@ _strip_replicates(::Integer, I::NTuple{N}) where N = ntuple(i -> I[i], Val{N-1}(
 # Runs a rule for the current cell/stencil, when there is no
 # row-based optimisation
 @inline function stencil_kernel!(
-    data::RuleData, hoodgrid::GridData, ruletype::Val{<:NeighborhoodRule}, rule, rkeys, wkeys, I...
+    data::RuleData, hoodgrid::GridData, ruletype::Val{<:NeighborhoodRule}, rule::Rule, rkeys, wkeys, I...
 )
-    rule1 = Stencils.rebuild(rule, unsafe_neighbors(stencil(rule), hoodgrid, CartesianIndex(I)))
+    rule1 = Stencils.rebuild(rule, unsafe_stencil(stencil(rule), hoodgrid, CartesianIndex(I)))
     cell_kernel!(data, ruletype, rule1, rkeys, wkeys, I...)
 end
 

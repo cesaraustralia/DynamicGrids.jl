@@ -3,7 +3,7 @@ using Test, DynamicGrids, WGLMakie
 # Just run it and check it ran every frame
 
 output = MakieOutput(rand(Bool, 200, 300); tspan=1.0:3.0, ruleset=Ruleset()) do obj
-    image!(Axis(obj.layout[1, 1]), obj.frame; interpolate=false, color=:inferno)
+    image!(Axis(obj.layout[1, 1]), obj.frame; interpolate=false, colormap=:inferno)
 end
 
 # Redirect stdout to collect the frame printing

@@ -1,5 +1,4 @@
-using DynamicGrids, ModelParameters, Setfield, Test, StaticArrays, 
-      LinearAlgebra, CUDA
+using DynamicGrids, ModelParameters, Setfield, Test, StaticArrays, LinearAlgebra
 import DynamicGrids: applyrule, applyrule!, maprule!, ruletype, extent, source, dest,
        _getreadgrids, _getwritegrids, _combinegrids, _readkeys, _writekeys,
        SimData, RuleData, GridData, WriteMode, Rule, Extent, CPUGPU, stencilkey
@@ -8,6 +7,7 @@ using DynamicGrids.Adapt: adapt
 maybe_gpu(output, hardware::CuGPU) = adapt(CuArray, output)
 maybe_gpu(output, hardware) = output
 
+# using CUDA
 # if CUDA.has_cuda_gpu()
 #     CUDA.allowscalar(false)
 #     hardware = (SingleCPU(), ThreadedCPU(), CPUGPU(), CuGPU())
@@ -88,12 +88,12 @@ end
 
 @testset "Neighbors" begin
     nbrs = SA[0, 0, 1, 0]
-    rule = Neighbors(VonNeumann{1}(nbrs)) do data, hood, state, I
+    rule = Neighbors(VonNeumann{1,2}(nbrs, 0)) do data, hood, state, I
         sum(hood)
     end
     @test applyrule(nothing, rule, 0, (3, 3)) == 1
     nbrs = SA[1, 0, 0, 0, 1, 0, 0, 1]
-    rule = Neighbors(Moore{1}(nbrs)) do data, hood, state, I
+    rule = Neighbors(Moore{1}(nbrs, 0)) do data, hood, state, I
         sum(hood)
     end
     @test applyrule(nothing, rule, 0, (3, 3)) == 3
@@ -117,19 +117,19 @@ moore2 = SVector{24}(zeros(24))
 moore3 = SVector{48}(zeros(48))
 
 @testset "stencil rules" begin
-    ruleA = TestSetNeighborhoodRule{:a,:a}(Moore{3}(moore3))
-    ruleB = TestSetNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}(moore2))
+    ruleA = TestSetNeighborhoodRule{:a,:a}(Moore{3}(moore3, 0.0))
+    ruleB = TestSetNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}(moore2, 0.0))
     @test offsets(ruleA) isa StaticVector
     @test indices(ruleA, CartesianIndex(1, 1)) isa StaticVector
-    @test stencil(ruleA) == Moore{3}(moore3)
-    @test stencil(ruleB) == Moore{2}(moore2)
+    @test stencil(ruleA) == Moore{3}(moore3, 0.0)
+    @test stencil(ruleB) == Moore{2}(moore2, 0.0)
     @test stencilkey(ruleA) == :a
     @test stencilkey(ruleB) == :b
-    ruleA = TestNeighborhoodRule{:a,:a}(Moore{3}(moore3))
-    ruleB = TestNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}(moore2))
+    ruleA = TestNeighborhoodRule{:a,:a}(Moore{3}(moore3, 0.0))
+    ruleB = TestNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}(moore2, 0.0))
     @test offsets(ruleA) isa StaticVector
-    @test stencil(ruleA) == Moore{3}(moore3)
-    @test stencil(ruleB) == Moore{2}(moore2)
+    @test stencil(ruleA) == Moore{3}(moore3, 0.0)
+    @test stencil(ruleB) == Moore{2}(moore2, 0.0)
     @test stencilkey(ruleA) == :a
     @test stencilkey(ruleB) == :b
     @test offsets(ruleB) === 
@@ -148,8 +148,8 @@ end
 
 @testset "radius" begin
     init = (a=[1.0 2.0], b=[10.0 11.0])
-    ruleA = TestNeighborhoodRule{:a,:a}(Moore{3}(moore3))
-    ruleB = TestSetNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}(moore2))
+    ruleA = TestNeighborhoodRule{:a,:a}(Moore{3}(moore3, 0.0))
+    ruleB = TestSetNeighborhoodRule{Tuple{:b},Tuple{:b}}(Moore{2}(moore2, 0.0))
     ruleset = Ruleset(ruleA, ruleB)
     @test radius(ruleA) == 3
     @test radius(ruleB) == 2
@@ -165,7 +165,7 @@ end
     k = SMatrix{3,3}([1 0 1; 0 0 0; 1 0 1])
     @test Convolution{:a}(k) == Convolution{:a,:a}(Kernel(Window{1}(), k)) 
     window = SA[1 0 0; 0 0 1; 0 0 1]
-    hood = Window{1,2}(vec(window))
+    hood = Window{1,2}(vec(window), 0)
     rule = Convolution{:a,:a}(; stencil=Kernel(hood, k))
     @test DynamicGrids.kernel(rule) === k 
     @test applyrule(nothing, rule, 0, (3, 3)) == vec(k) ⋅ vec(window)

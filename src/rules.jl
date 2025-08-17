@@ -422,8 +422,11 @@ stencilkey(rule::NeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
 Stencils.radius(rule::NeighborhoodRule, args...) = radius(stencil(rule))
 Stencils.unsafe_neighbors(rule::NeighborhoodRule, A::Stencils.AbstractStencilArray, I::CartesianIndex) =
     Stencils.unsafe_neighbors(stencil(rule), A, I)
-@inline function Stencils.rebuild(rule::NeighborhoodRule, neighbors::SVector)
-    @set rule.stencil = Stencils.rebuild(stencil(rule), neighbors)
+@inline function Stencils.rebuild(rule::NeighborhoodRule, stencil::Stencil)
+    @set rule.stencil = stencil
+end
+@inline function Stencils.rebuild(rule::NeighborhoodRule, neighbors::SVector, center=center(stencil(rule)))
+    @set rule.stencil = Stencils.rebuild(stencil(rule), neighbors, center)
 end
 @inline function Stencils.unsafe_stencil(rule::NeighborhoodRule, A::AbstractArray, I::CartesianIndex)
     Stencils.rebuild(rule, unsafe_neighbors(rule, A, I))
@@ -560,6 +563,7 @@ Stencils.stencil(rule::SetNeighborhoodRule) = rule.stencil
 Stencils.offsets(rule::SetNeighborhoodRule) = offsets(stencil(rule))
 Stencils.kernel(rule::SetNeighborhoodRule) = kernel(stencil(rule))
 Stencils.indices(rule::SetNeighborhoodRule, args...) = indices(stencil(rule), args...)
+Stencils.indices(rule::SetNeighborhoodRule, I::CartesianIndex) = indices(stencil(rule), I)
 Stencils.radius(rule::SetNeighborhoodRule, args...) = radius(stencil(rule))
 stencilkey(rule::SetNeighborhoodRule{R,W}) where {R,W} = R
 stencilkey(rule::SetNeighborhoodRule{<:Tuple{R1,Vararg},W}) where {R1,W} = R1
