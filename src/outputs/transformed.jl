@@ -51,10 +51,11 @@ function TransformedOutput(f::Function, init::Union{NamedTuple,AbstractMatrix};
         buffer .= (zero(first(buffer)),)
     end
     # Build simulation frames from the output of `f` for empty frames
+    zeroframe = f(buffer)
     frames = if isnothing(eltype)
-        [deepcopy(f1) for _ in eachindex(tspan)]
+        [deepcopy(zeroframe) for _ in eachindex(tspan)]
     else
-        eltype[deepcopy(f1) for _ in eachindex(tspan)]
+        eltype[deepcopy(zeroframe) for _ in eachindex(tspan)]
     end
     # Set the first frame to the output of `f` for `init`
     frames[1] = f1
