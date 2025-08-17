@@ -42,7 +42,7 @@ function TransformedOutput(f::Function, init::Union{NamedTuple,AbstractMatrix};
     extent = extent isa Nothing ? Extent(; init=init, tspan, kw...) : extent
     # Define buffers to copy to before applying `f`
     buffer = _replicate_init(init, replicates(extent))
-    f1 = f(buffer)
+    f1 = deepcopy(f(buffer))
     if buffer isa NamedTuple
         map(buffer) do b
             b .= (zero(first(b)),)
