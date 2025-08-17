@@ -17,17 +17,26 @@ An output that stores the result of some function `f` of the grid/s.
     to access from a `Rule` in a type-stable way.
 - `mask`: `BitArray` for defining cells that will/will not be run.
 - `padval`: padding value for grids with stencil rules. The default is `zero(eltype(init))`.
+- `eltype`: force the output vector to have a specific element type.
+    Useful if `f` doesn't always return the same type.
 
 $EXPERIMENTAL
 """
-mutable struct TransformedOutput{T,A<:AbstractVector{T},E,F,B} <: Output{T,A} 
+mutable struct TransformedOutput{T,F,A<:AbstractVector{T},E,B} <: Output{T,A} 
+    f::F
     frames::A
     running::Bool
     extent::E
-    f::F
     buffer::B
 end
-function TransformedOutput(f::Function, init::Union{NamedTuple,AbstractMatrix}; extent=nothing, tspan, kw...)
+TransformedOutput{T}(f::Function, init::Union{NamedTuple,AbstractMatrix}; kw...) where T =
+    TransformedOutput(f, init; kw..., eltype=T)
+function TransformedOutput(f::Function, init::Union{NamedTuple,AbstractMatrix}; 
+    extent=nothing, 
+    eltype=nothing,
+    tspan, 
+    kw...
+)
     _check_grids_are_isbits(init)
     # We have to handle some things manually as we are changing the standard output frames
     extent = extent isa Nothing ? Extent(; init=init, tspan, kw...) : extent
@@ -41,13 +50,17 @@ function TransformedOutput(f::Function, init::Union{NamedTuple,AbstractMatrix}; 
     else
         buffer .= (zero(first(buffer)),)
     end
-    zeroframe = f(buffer)
     # Build simulation frames from the output of `f` for empty frames
-    frames = [deepcopy(zeroframe) for _ in eachindex(tspan)]
+    zeroframe = f(buffer)
+    frames = if isnothing(eltype)
+        [deepcopy(zeroframe) for _ in eachindex(tspan)]
+    else
+        eltype[deepcopy(zeroframe) for _ in eachindex(tspan)]
+    end
     # Set the first frame to the output of `f` for `init`
     frames[1] = f1
 
-    return TransformedOutput(frames, false, extent, f, buffer)
+    return TransformedOutput(f, frames, false, extent, buffer)
 end
 function TransformedOutput(init; kw...)
     throw(ArgumentError("TransformedOutput must be passed a function and the init grid(s) as arguments"))
