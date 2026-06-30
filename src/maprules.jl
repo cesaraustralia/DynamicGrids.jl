@@ -62,75 +62,42 @@ function maprule!(simdata::AbstractSimData, ruletype::Val{<:SetGridRule}, rule)
     # We don't mask here or do anything, its on the user
     return simdata
 end
-
 # Expand method arguments for dispatch on processor and optimisation
-function maprule!(ruledata::RuleData, ruletype::Val, rule, rkeys, wkeys)
+maprule!(ruledata::RuleData, ruletype::Val, rule, rkeys, wkeys) =
     maprule!(ruledata, proc(ruledata), opt(ruledata), ruletype, rule, rkeys, wkeys)
-end
-
-_update_boundary!(gs::Union{NamedTuple,Tuple}) = map(_update_boundary!, gs)
-_update_boundary!(g::GridData) = update_boundary!(g)
 
 # Most Rules
 # 2 dimensional, with processor selection and optimisations in `map_with_optimisation`
-function maprule!(ruledata::RuleData{<:Any,<:Tuple{Y,X}}, proc::CPU, opt, ruletype::Val, rule, rkeys, wkeys) where {Y,X}
-    let ruledata=ruledata, proc=proc, opt=opt, rule=rule,
-        rkeys=rkeys, wkeys=wkeys, ruletype=ruletype
-        map_with_optimisation(ruledata, proc, opt, ruletype, rkeys) do I 
-            cell_kernel!(data, ruletype, rule, rkeys, wkeys, I...)
+function maprule!(
+    ruledata::RuleData{<:Tuple{Y,X}}, proc::CPU, opt::PerformanceOpt, ruletype::Val, rule, rkeys, wkeys
+) where {Y,X}
+    let ruledata=ruledata, proc=proc, opt=opt, ruletype=ruletype, rule=rule, rkeys=rkeys, wkeys=wkeys
+        map_with_optimisation(ruledata, proc, opt, ruletype, rkeys, wkeys) do I 
+            cell_kernel!(ruledata, ruletype, rule, rkeys, wkeys, I...)
         end
     end
 end
-# Arbitrary dimensions, no processor or optimisation selection beyond CPU/GPU
-function maprule!(ruledata::RuleData, proc::CPU, opt, ruletype::Val, rule, rkeys, wkeys)
-    let ruledata=ruledata, proc=proc, opt=opt, rule=rule,
-        rkeys=rkeys, wkeys=wkeys, ruletype=ruletype
+# # Arbitrary dimensions, no processor or optimisation selection beyond CPU/GPU
+function maprule!(ruledata::RuleData{<:Tuple}, proc::CPU, opt::PerformanceOpt, ruletype::Val, rule, rkeys, wkeys)
+    let ruledata=ruledata, ruletype=ruletype, rule=rule, rkeys=rkeys, wkeys=wkeys
         for I in CartesianIndices(first(grids(ruledata)))
             cell_kernel!(ruledata, ruletype, rule, rkeys, wkeys, Tuple(I)...)
         end
     end
 end
+# Neighborhoods: Arbitrary dimensions, no processor or optimisation selection beyond CPU/GPU
+function maprule!(
+    data::RuleData{<:Tuple{Y,X}}, proc::CPU, opt::PerformanceOpt, ruletype::Val{<:NeighborhoodRule}, rule, rkeys, wkeys
+) where {Y,X}
+    hoodgrid = _firstgrid(data, rkeys)
+    map_with_optimisation(data, proc, opt, ruletype, rkeys, wkeys) do I
+        stencil_kernel!(data, hoodgrid, ruletype, rule, rkeys, wkeys, Tuple(I)...)
+    end
+    return nothing
+end
 
-# Neighborhood rules
-# 2 dimensional, with processor selection and optimisations
-# function maprule!(
-#     data::AbstractSimData{<:Any,<:Tuple{I,J}}, proc::CPU, opt, ruletype::Val{<:NeighborhoodRule}, 
-#     rule, rkeys, wkeys
-# ) where {I,J}
-#     hoodgrid = _firstgrid(data, rkeys)
-#     let data=data, hoodgrid=hoodgrid, proc=proc, opt=opt, ruletyp=ruletype, rule=rule, rkeys=rkeys, wkeys=wkeys
-#         B = 2radius(hoodgrid)
-#         # UNSAFE: we must avoid sharing status blocks, it could cause race conditions 
-#         # when setting status from different threads. So we split the grid in 2 interleaved
-#         # sets of rows, so that we never run adjacent rows simultaneously
-#         map_on_processor(proc, data, 1:2:_indtoblock(I, B)) do bi
-#             row_kernel!(data, hoodgrid, proc, opt, ruletype, rule, rkeys, wkeys, bi)
-#         end
-#         map_on_processor(proc, data, 2:2:_indtoblock(I, B)) do bi
-#             row_kernel!(data, hoodgrid, proc, opt, ruletype, rule, rkeys, wkeys, bi)
-#         end
-#     end
-#     return nothing
-# end
-# Arbitrary dimensions, no processor or optimisation selection beyond CPU/GPU
-function maprule!(
-    data::RuleData, proc::SingleCPU, opt, ruletype::Val{<:NeighborhoodRule}, rule, rkeys, wkeys
-)
-    hoodgrid = _firstgrid(data, rkeys)
-    for I in CartesianIndices(hoodgrid) 
-        stencil_kernel!(data, hoodgrid, ruletype, rule, rkeys, wkeys, Tuple(I)...)
-    end
-    return nothing
-end
-function maprule!(
-    data::RuleData, proc::ThreadedCPU, opt, ruletype::Val{<:NeighborhoodRule}, rule, rkeys, wkeys
-)
-    hoodgrid = _firstgrid(data, rkeys)
-    map_with_optimisation(data, proc, opt, ruletype, rkeys) do I
-        stencil_kernel!(data, hoodgrid, ruletype, rule, rkeys, wkeys, Tuple(I)...)
-    end
-    return nothing
-end
+_update_boundary!(gs::Union{NamedTuple,Tuple}) = map(_update_boundary!, gs)
+_update_boundary!(g::GridData) = update_boundary!(g)
 
 ### Rules that don't need a stencil window ####################
 
@@ -139,7 +106,7 @@ end
 
 # Run kernel over the whole grid, cell by cell:
 function map_with_optimisation(
-    f, simdata::AbstractSimData{S}, proc, ::NoOpt, ::Val{<:Rule}, rkeys
+    f, ruledata::AbstractSimData{S}, proc, ::NoOpt, ::Val{<:Rule}, rkeys, wkeys
 ) where S<:Tuple{I,J} where {I,J}
     map_on_processor(proc, simdata, 1:J) do j
         @simd for i in 1:I
@@ -148,7 +115,7 @@ function map_with_optimisation(
     end
 end
 function map_with_optimisation(
-    f, simdata::AbstractSimData{S}, proc, ::NoOpt, ::Val{<:Rule}, rkeys
+    f, simdata::AbstractSimData{S}, proc, ::NoOpt, ::Val{<:Rule}, rkeys, wkeys
 ) where S<:Tuple{I,J,K} where {I,J,K}
     map_on_processor(proc, simdata, 1:K) do k
         for j in 1:J 
@@ -159,7 +126,7 @@ function map_with_optimisation(
     end
 end
 function map_with_optimisation(
-    f, simdata::AbstractSimData{S}, proc, ::NoOpt, ::Val{<:Rule}, rkeys
+    f, simdata::AbstractSimData{S}, proc, ::NoOpt, ::Val{<:Rule}, rkeys, wkeys
 ) where S<:Tuple{I,J,K,L} where {I,J,K,L}
     map_on_processor(proc, simdata, 1:L) do l
         for k in 1:K 
@@ -168,6 +135,15 @@ function map_with_optimisation(
                     f((i, j, k, l))
                 end
             end
+        end
+    end
+end
+function map_with_optimisation(
+    f, simdata::AbstractSimData{S}, proc, ::NoOpt, ::Val{<:Rule}, rkeys, wkeys
+) where S<:Tuple{I,J} where {I,J}
+    map_on_processor(proc, simdata, 1:J) do j
+        @simd for i in 1:I
+            f((i, j))
         end
     end
 end
@@ -247,38 +223,13 @@ _strip_replicates(::Nothing, I::NTuple) = I
 _strip_replicates(::Integer, I::NTuple{N}) where N = ntuple(i -> I[i], Val{N-1}())
 
 # stencil_kernel!
-# Runs a rule for the current cell/stencil, when there is no
-# row-based optimisation
+# Runs a rule for the current cell/stencil
 @inline function stencil_kernel!(
     data::RuleData, hoodgrid::GridData, ruletype::Val{<:NeighborhoodRule}, rule::Rule, rkeys, wkeys, I...
 )
     rule1 = Stencils.rebuild(rule, unsafe_stencil(stencil(rule), hoodgrid, CartesianIndex(I)))
     cell_kernel!(data, ruletype, rule1, rkeys, wkeys, I...)
 end
-
-# row_kernel!
-# Run a NeighborhoodRule rule row by row. When we move along a row by one cell, we 
-# access only a single new column of data with the height of 4R, and move the existing
-# data in the stencil windows array across by one column. This saves on reads
-# from the main array.
-function row_kernel!(
-    simdata::AbstractSimData, grid::GridData{<:GridMode,<:Tuple{I,J},R}, proc, opt::NoOpt,
-    ruletype::Val, rule::Rule, rkeys, wkeys, bi
-) where {I,J,R}
-    B = 2R
-    i = _blocktoind(bi, B)
-    i > I && return nothing
-    # Loop along the block ROW.
-    blocklen = min(I, i + B - 1) - i + 1
-    for j = 1:J
-        # Loop over the COLUMN of windows covering the block
-        for b in 1:blocklen
-            stencil_kernel!(simdata, grid, ruletype, rule, rkeys, wkeys, i + b - 1, j)
-        end
-    end
-    return nothing
-end
-
 
 #### Utils
 

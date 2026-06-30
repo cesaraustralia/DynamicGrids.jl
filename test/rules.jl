@@ -189,15 +189,21 @@ end
             end
         end
         for proc in hardware, opt in opts
-            output = maybe_gpu(ArrayOutput(init; tspan=1:2), proc)
+            output = maybe_gpu(ArrayOutput(init; tspan=1:3), proc)
             @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
-                ref_output = [1 1 1 0
-                              0 1 0 0
-                              0 1 0 0
-                              1 1 2 0
-                              0 2 1 1]
-                sim!(output, rule; proc=proc, opt=opt)
-                @test adapt(Array, output[2]) == ref_output
+                ref_output2 = [1 1 1 0
+                               0 1 0 0
+                               0 1 0 0
+                               1 1 2 0
+                               0 2 1 1]
+                ref_output3 = [2 4 2 1
+                               2 3 2 0
+                               2 3 2 0
+                               2 5 4 2
+                               2 4 4 2]
+                sim!(output, rule; proc, opt)
+                @test adapt(Array, output[2]) == ref_output2
+                @test adapt(Array, output[3]) == ref_output3
             end
         end
     end
@@ -268,28 +274,28 @@ end
     end
 end
 
-# @testset "SetGrid" begin
-#     @test_throws ArgumentError SetGrid()
-#     rule = SetGrid() do r, w
-#         w .*= 2
-#     end
-#     init  = [0 1 0 0
-#              0 0 0 0
-#              0 0 0 0
-#              0 1 0 0
-#              0 0 1 0]
-#     output = ArrayOutput(init; tspan=1:2)
-#     for proc in hardware, opt in (NoOpt(), SparseOpt())
-#         @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
-#             sim!(output, rule; proc=proc, opt=opt)
-#             @test output[2] == [0 2 0 0
-#                                 0 0 0 0
-#                                 0 0 0 0
-#                                 0 2 0 0
-#                                 0 0 2 0]
-#         end
-#     end
-# end
+@testset "SetGrid" begin
+    @test_throws ArgumentError SetGrid()
+    rule = SetGrid() do data, r, w
+        w .*= 2
+    end
+    init  = [0 1 0 0
+             0 0 0 0
+             0 0 0 0
+             0 1 0 0
+             0 0 1 0]
+    output = ArrayOutput(init; tspan=1:2)
+    for proc in hardware, opt in (NoOpt(), SparseOpt())
+        @testset "$(nameof(typeof(opt))) $(nameof(typeof(proc)))" begin
+            sim!(output, rule; proc=proc, opt=opt)
+            @test output[2] == [0 2 0 0
+                                0 0 0 0
+                                0 0 0 0
+                                0 2 0 0
+                                0 0 2 0]
+        end
+    end
+end
 
 struct AddOneRule{R,W} <: CellRule{R,W} end
 DynamicGrids.applyrule(data, ::AddOneRule, state, args...) = state + 1

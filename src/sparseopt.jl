@@ -35,7 +35,7 @@ deststatus(d::GridData) = optdata(d).deststatus
 
 # Run kernels with SparseOpt, block by block:
 function map_with_optimisation(
-    f, simdata::AbstractSimData{S}, proc, ::SparseOpt, ruletype::Val{<:Rule}, rkeys
+    f, simdata::AbstractSimData{S}, proc, opt::SparseOpt, ruletype::Val{<:Rule}, rkeys, wkeys
 ) where {S<:Tuple{Y,X}} where {Y,X}
     # Only use SparseOpt for single-grid rules with grid radii > 0
     grid = _firstgrid(simdata, rkeys)
@@ -45,21 +45,117 @@ function map_with_optimisation(
         return nothing
     end
     B = 2R
-    status = sourcestatus(grid)
-    let f=f, proc=proc, status=status
+    srcstatus = sourcestatus(grid)
+    dststatus = deststatus(grid)
+    let f=f, proc=proc, srcstatus=srcstatus, dststatus=dststatus
         map_on_processor(proc, simdata, 1:_indtoblock(X+R, B)) do bj
-            for  bi in 1:_indtoblock(Y+R, B)
-                status[bi, bj] || continue
+            for  bi in 1:2:_indtoblock(Y+R, B)
+                srcstatus[bi, bj] || continue
                 # Convert from padded block to init dimensions
                 istart, jstart = _blocktoind(bi, B) - R, _blocktoind(bj, B) - R
                 # Stop at the init row/column size, not the padding or block multiple
                 istop, jstop = min(istart + B - 1, Y), min(jstart + B - 1, X)
                 # Skip the padding
                 istart, jstart  = max(istart, 1), max(jstart, 1)
+                isactive = false
                 for j in jstart:jstop 
                     @simd for i in istart:istop
-                        f((i, j))
+                        writeval = f((i, j))
+                        isactive |= _cellstatus(opt, wkeys, writeval)
                     end
+                end
+                if !(rule isa SetRule)
+                    dststatus[bi, bj] = isactive
+                end
+            end
+        end
+    end
+    @show srcstatus dststatus
+    return nothing
+end
+
+function map_with_optimisation(
+    f, simdata::AbstractSimData{S}, proc, opt::SparseOpt, ruletype::Val{<:NeighborhoodRule}, rkeys, wkeys
+) where {S<:Tuple{Y,X}} where {Y,X}
+    # Only use SparseOpt for single-grid rules with grid radii > 0
+    grid = _firstgrid(simdata, rkeys)
+    R = radius(grid)
+    if R == 0
+        map_with_optimisation(f, simdata, proc, NoOpt(), ruletype, rkeys)
+        return nothing
+    end
+    B = 2R
+    srcstatus = sourcestatus(grid)
+    dststatus = deststatus(grid)
+    let f=f, proc=proc, srcstatus=srcstatus, dststatus=dststatus
+        map_on_processor(proc, simdata, 1:_indtoblock(Y+R, B)) do bi
+            # Blocks ignore padding! the first block contains padding.
+            i = _blocktoind(bi, B)
+            i > Y && return nothing
+
+            # Initialise block status for the start of the row
+            # The first column always runs, it's buggy otherwise.
+            @inbounds bs11, bs12 = true, true
+            @inbounds bs21, bs22 = true, true
+            # New block status
+            newbs12 = false
+            newbs22 = false
+            for bj in 1:2:_indtoblock(X+R, B)
+                # Shuffle current window status
+                bs11, bs21 = bs12, bs22
+                @inbounds bs12, bs22 = srcstatus[bi, bj + 1], srcstatus[bi + 1, bj + 1]
+                # Skip this block if it and the neighboring blocks are inactive
+                if !(bs11 | bs12 | bs21 | bs22)
+                    # Run the rest of the chain if it exists and more than 1 grid is used
+                    # if rule isa Chain && length(rule) > 1 && length(rkeys) > 1
+                    #     # Loop over the grid COLUMNS inside the block
+                    #     jstart = _blocktoind(bj, B)
+                    #     jstop = min(jstart + B - 1, X)
+                    #     for j in jstart:jstop
+                    #         # Loop over the grid ROWS inside the block
+                    #         blocklen = min(Y, i + B - 1) - i + 1
+                    #         for b in 1:blocklen
+                    #             cell_kernel!(simdata, ruletype, rule, rkeys, wkeys, i + b - 1, j)
+                    #         end
+                    #     end
+                    # end
+                    continue
+                end
+                # Define area to loop over with the block.
+                # It's variable because the last block may be partial
+                jstart = _blocktoind(bj, B)
+                jstop = min(jstart + B - 1, X)
+
+                # Shuffle new window status
+                newbs11 = newbs12
+                newbs21 = newbs22
+                newbs12 = newbs22 = false
+
+                # Loop over the grid COLUMNS inside the block
+                for j in jstart:jstop
+                    # Update windows unless feshly populated
+                    # Which block column are we in, 1 or 2
+                    curblockj = (j - jstart) ÷ R + 1
+                    # Loop over the COLUMN of windows covering the block
+                    blocklen = min(Y, i + B - 1) - i + 1
+                    for b in 1:blocklen
+                        # Run the rule kernel for the cell
+                        writeval = stencil_kernel!(simdata, hoodgrid, ruletype, rule1, rkeys, wkeys, i + b - 1, j)
+                        # Update the status for the current block
+                        cs = _cellstatus(opt, wkeys, writeval)
+                        curblocki = R == 1 ? b : (b - 1) ÷ R + 1
+                        if curblocki == 1
+                            curblockj == 1 ? (newbs11 |= cs) : (newbs12 |= cs)
+                        else
+                            curblockj == 1 ? (newbs21 |= cs) : (newbs22 |= cs)
+                        end
+                    end
+
+                    # Combine new block status with deststatus array
+                    @inbounds dststatus[bi, bj] |= newbs11
+                    @inbounds dststatus[bi+1, bj] |= newbs21
+                    @inbounds dststatus[bi, bj+1] |= newbs12
+                    @inbounds dststatus[bi+1, bj+1] |= newbs22
                 end
             end
         end
@@ -68,13 +164,9 @@ function map_with_optimisation(
 end
 
 function row_kernel!(
-    simdata::AbstractSimData, grid::GridData{<:Any,<:Tuple{Y,X},R}, proc, opt::SparseOpt,
+    simdata::AbstractSimData, grid::GridData{<:Any,<:Tuple{Y,X},R}, proc::CPU, opt::SparseOpt,
     ruletype::Val, rule::Rule, rkeys, wkeys, bi
 ) where {Y,X,R}
-    # No SparseOpt for radius 0
-    if R === 0
-        return row_kernel!(simdata, grid, proc, NoOpt(), ruletype, rule, rkeys, wkeys, bi)
-    end
     B = 2R
     S = 2R + 1
     nblockcols = _indtoblock(X+R, B)
@@ -83,8 +175,6 @@ function row_kernel!(
     # Blocks ignore padding! the first block contains padding.
     i = _blocktoind(bi, B)
     i > Y && return nothing
-    # Get current bloc
-    skippedlastblock = true
 
     # Initialise block status for the start of the row
     # The first column always runs, it's buggy otherwise.
@@ -99,7 +189,6 @@ function row_kernel!(
         @inbounds bs12, bs22 = srcstatus[bi, bj + 1], srcstatus[bi + 1, bj + 1]
         # Skip this block if it and the neighboring blocks are inactive
         if !(bs11 | bs12 | bs21 | bs22)
-            skippedlastblock = true
             # Run the rest of the chain if it exists and more than 1 grid is used
             if rule isa Chain && length(rule) > 1 && length(rkeys) > 1
                 # Loop over the grid COLUMNS inside the block
@@ -120,10 +209,6 @@ function row_kernel!(
         jstart = _blocktoind(bj, B)
         jstop = min(jstart + B - 1, X)
 
-        # Reinitialise stencil windows if we have skipped a section of the array
-        if skippedlastblock
-            skippedlastblock = false
-        end
         # Shuffle new window status
         newbs11 = newbs12
         newbs21 = newbs22
@@ -181,14 +266,12 @@ function _build_optdata(opt::SparseOpt, source, r::Int)
 end
 
 Stencils.switch(::SparseOpt, ::Nothing) = nothing
-function Stencils.switch(::SparseOpt, optdata)
+Stencils.switch(::SparseOpt, optdata) =
     (sourcestatus=optdata.deststatus, deststatus=optdata.sourcestatus)
-end
-
 
 # Initialise the block status array.
 # This tracks whether anything has to be done in an area of the main array.
-function _update_optdata!(grid, opt::SparseOpt)
+function _update_optdata!(grid::AbstractGridData, opt::SparseOpt)
     isnothing(optdata(grid)) && return grid
     blocksize = 2 * radius(grid)
     src = parent(source(grid))

@@ -23,6 +23,8 @@ for optimisations.
 """
 abstract type AbstractGridData{Mode,S,R,T,N,A,H,B,P} <: Stencils.AbstractSwitchingStencilArray{R,T,N,A,H,B,P} end
 
+const AbstractGridVector = AbstractGridData{<:Any,<:Any,<:Any,<:Any,1}
+
 # Getters
 proc(d::AbstractGridData) = d.proc
 opt(d::AbstractGridData) = d.opt
@@ -56,6 +58,7 @@ dest_array_or_view(d::AbstractGridData) = destview(d)
 dest_array_or_view(d::AbstractGridData{<:Any,<:Any,0}) = dest(d)
 
 _build_optdata(opt::PerformanceOpt, init, r) = nothing
+_update_optdata!(grid::AbstractGridData, opt::NoOpt) = nothing
 
 # _indtoblock
 # Convert regular index to block index
@@ -66,6 +69,7 @@ _build_optdata(opt::PerformanceOpt, init, r) = nothing
 @inline _blocktoind(x::Int, blocksize::Int) = (x - 1) * blocksize + 1
 
 Base.copy!(dest::AbstractGridData, source::AbstractDimArray) = copy!(dest, parent(source))
+Base.copy!(dest::AbstractGridVector, source::AbstractDimVector) = copy!(dest, parent(source))
 
 """
     GridData <: GridData
@@ -132,8 +136,11 @@ end
         source, dest, stencil, boundary, padding, proc, opt, optdata, mask, maskval, replicates, indices
     )
     update_boundary!(grid)
+    _update_optdata!(grid, opt)
     return grid
 end
+
+const GridVector = GridData{<:Any,<:Any,<:Any,<:Any,1}
 
 function ConstructionBase.constructorof(
     ::Type{G}
@@ -219,17 +226,27 @@ Stencils.switch(::PerformanceOpt, optdata) = optdata
 Stencils.after_update_boundary!(grid::GridData) = Stencils.after_update_boundary!(grid, opt(grid))
 Stencils.after_update_boundary!(grid::GridData, opt) = grid
 
-function Base.copy!(S::GridData{<:Any,R}, A::AbstractDimArray) where R
+function Base.copy!(S::GridVector, A::AbstractDimVector)
     pad_axes = add_halo(S, axes(S))
     copyto!(parent(parent(S)), CartesianIndices(pad_axes), A, CartesianIndices(A))
     return
 end
-function Base.copy!(A::AbstractDimArray, S::GridData{<:Any,R}) where R
+function Base.copy!(S::GridData, A::AbstractDimArray)
+    pad_axes = add_halo(S, axes(S))
+    copyto!(parent(parent(S)), CartesianIndices(pad_axes), A, CartesianIndices(A))
+    return
+end
+function Base.copy!(A::AbstractDimVector, S::GridVector)
     pad_axes = add_halo(S, axes(S))
     copyto!(A, CartesianIndices(A), parent(S), CartesianIndices(pad_axes))
     return A
 end
-function Base.copy!(dst::GridData{<:Any,RD}, src::GridData{<:Any,RS}) where {RD,RS}
+function Base.copy!(A::AbstractDimArray, S::GridData)
+    pad_axes = add_halo(S, axes(S))
+    copyto!(A, CartesianIndices(A), parent(S), CartesianIndices(pad_axes))
+    return A
+end
+function Base.copy!(dst::GridData, src::GridData)
     dst_axes = add_halo(dst, axes(dst))
     src_axes = add_halo(src, axes(src))
     copyto!(

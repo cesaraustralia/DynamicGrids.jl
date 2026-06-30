@@ -18,6 +18,6 @@ CopyTo{W}(; from) where W = CopyTo{W,typeof(from)}(from)
 
 ConstructionBase.constructorof(::Type{<:CopyTo{W}}) where W = CopyTo{W}
 
-DynamicGrids.applyrule(data, rule::CopyTo, state, I) = get(data, rule.from, I)
-DynamicGrids.applyrule(data, rule::CopyTo{W}, state, I) where W <: Tuple =
+DynamicGrids.applyrule(data, rule::CopyTo, state, I::Tuple) = get(data, rule.from, I)
+DynamicGrids.applyrule(data, rule::CopyTo{W}, state, I::Tuple) where W <: Tuple =
     ntuple(i -> get(data, rule.from, I), length(_asiterable(W)))

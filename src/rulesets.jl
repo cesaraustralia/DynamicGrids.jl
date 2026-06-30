@@ -58,8 +58,8 @@ mutable struct Ruleset{S} <: AbstractRuleset
     rules::Tuple{Vararg{Rule}}
     settings::S
 end
-Ruleset(rule1, rules::Rule...; kw...) = Ruleset((rule1, rules...); kw...)
-Ruleset(rules::Tuple; kw...) = Ruleset(rules, SimSettings(; kw...))
+Ruleset(rule1::Rule, rules::Rule...; kw...) = Ruleset((rule1, rules...); kw...)
+Ruleset(rules::Tuple{Vararg{Rule}}; kw...) = Ruleset(rules, SimSettings(; kw...))
 Ruleset(rs::AbstractRuleset) = Ruleset(rules(rs), settings(rs))
 function Ruleset(; rules=(), settings=nothing, kw...) 
     settings1 = settings isa Nothing ? SimSettings(; kw...) : settings
@@ -70,8 +70,8 @@ struct StaticRuleset{R<:Tuple,S} <: AbstractRuleset
     rules::R
     settings::S
 end
-StaticRuleset(rule1, rules::Rule...; kw...) = StaticRuleset((rule1, rules...); kw...)
-StaticRuleset(rules::Tuple; kw...) = StaticRuleset(rules, SimSettings(; kw...))
+StaticRuleset(rule1::Rule, rules::Rule...; kw...) = StaticRuleset((rule1, rules...); kw...)
+StaticRuleset(rules::Tuple{Vararg{Rule}}; kw...) = StaticRuleset(rules, SimSettings(; kw...))
 StaticRuleset(rs::AbstractRuleset) = StaticRuleset(rules(rs), settings(rs))
 function StaticRuleset(; rules=(), settings=nothing, kw...) 
     settings1 = settings isa Nothing ? SimSettings(; kw...) : settings

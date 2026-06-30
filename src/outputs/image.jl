@@ -65,6 +65,9 @@ An `ImageConfig` object can be also passed to the `imageconfig` keyword, and oth
 """
     ImageOutput <: GraphicOutput
 
+Deprecated: prefer to use `MakieOutput`, `ImageOutput` will be removed 
+in the next breaking release.
+
 Abstract supertype for Graphic outputs that display the simulation frames as RGB images.
 
 `ImageOutput`s must have [`Extent`](@ref), [`GraphicConfig`](@ref) 

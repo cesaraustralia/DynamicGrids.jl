@@ -24,7 +24,7 @@ Combine(f, rules::ReturnRule...) = Combine(f, rules)
 Combine(rules::ReturnRule...) = Combine(identity, rules)
 Combine(rules::Tuple{Vararg{ReturnRule}}) = Combine(identity, rules)
 
-function applyrule(data::AbstractSimData, combinedrule::Combine{R,W}, state, I) where {R,W}
+function applyrule(data::AbstractSimData, combinedrule::Combine{R,W}, state, I::Tuple) where {R,W}
     writestates = map(rules(combinedrule)) do rule
         readstate = _filter_readstate(rule, state)
         applyrule(data, rule, readstate, I)

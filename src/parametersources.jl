@@ -16,7 +16,7 @@ such as another [`Grid`](@ref), an [`Aux`](@ref) array, or a [`Delay`](@ref).
 
 Other `source` objects are used as-is without indexing with `I`.
 """
-@propagate_inbounds Base.get(data::AbstractSimData, val, I...) = val
+@propagate_inbounds Base.get(data::AbstractSimData, val, i::Integer, I::Integer...) = val
 @propagate_inbounds Base.get(data::AbstractSimData, key::ParameterSource, i::Integer, I::Integer...) =
     get(data, key, (i, I...))
 @propagate_inbounds Base.get(data::AbstractSimData, key::ParameterSource, I::CartesianIndex) =

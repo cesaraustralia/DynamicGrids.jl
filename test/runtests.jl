@@ -1,6 +1,8 @@
-using DynamicGrids, Aqua, SafeTestsets
+using DynamicGrids, Aqua, SafeTestsets, Test
 
-Aqua.test_all(DynamicGrids; ambiguities=false)
+@testset "Aqua" begin
+    Aqua.test_all(DynamicGrids)
+end
 
 @time @safetestset "generated" begin include("generated.jl") end
 @time @safetestset "rules" begin include("rules.jl") end

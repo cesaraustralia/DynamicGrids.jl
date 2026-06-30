@@ -96,11 +96,11 @@ ruletype(::Rule) = Rule
 
 # Allow specifying CartesianIndex for `I`
 @inline applyrule(data, rule, state, I) = applyrule(data, rule, state, CartesianIndex(I))
-# # Allow dropping the `data` argument
+# Allow dropping the `data` argument
 @inline applyrule(data, rule, state, I::CartesianIndex) = applyrule(rule, state, Tuple(I))
-# # Allow dropping the `data` argument and using CartesianIndex
+# Allow dropping the `data` argument and using CartesianIndex
 @inline applyrule(rule, state, I) = applyrule(rule, state, CartesianIndex(I))
-# # Allow dropping the `I` argument
+# Allow dropping the `I` argument
 @inline applyrule(rule, state, I::CartesianIndex) = applyrule(rule, state)
 # TODO add a specific method that includes all the above possible signiatures
 applyrule(rule::R, state::T) where {R,T} = throw(MethodError(applyrule, Tuple{R,T}))
@@ -254,7 +254,7 @@ struct Cell{R,W,F} <: CellRule{R,W}
 end
 Cell{R,W}(; kw...) where {R,W} = _nofunctionerror(Cell)
 
-@inline function applyrule(data, rule::Cell, read, I)
+@inline function applyrule(data, rule::Cell, read, I::Tuple)
     let data=data, rule=rule, read=read, I=I
         rule.f(data, read, I)
     end
@@ -492,7 +492,7 @@ Neighbors{R,W}(; kw...) where {R,W} = _nofunctionerror(Neighbors)
 Neighbors{R,W}(f; neighborhood=Moore(1), stencil=neighborhood) where {R,W} =
     Neighbors{R,W}(f, stencil)
 
-@inline function applyrule(data, rule::Neighbors, read, I)
+@inline function applyrule(data, rule::Neighbors, read, I::Tuple)
     let rule=rule, hood=stencil(rule), read=read, I=I
         rule.f(data, hood, read, I)
     end
@@ -541,7 +541,7 @@ end
 Convolution{R,W}(A::AbstractArray) where {R,W} = Convolution{R,W}(Kernel(SArray{Tuple{size(A)...}}(A)))
 Convolution{R,W}(; stencil) where {R,W} = Convolution{R,W}(stencil)
 
-@inline applyrule(data, rule::Convolution, read, I) = kernelproduct(stencil(rule))
+@inline applyrule(data, rule::Convolution, read, I::Tuple) = kernelproduct(stencil(rule))
 
 """
     SetNeighborhoodRule <: SetRule
@@ -669,7 +669,7 @@ This example simply sets grid `a` to equal grid `b`:
 
 ```jldoctest
 using DynamicGrids
-rule = SetGrid{:a,:b}() do a, b
+rule = SetGrid{:a,:b}() do data, a, b
     b .= a
 end
 

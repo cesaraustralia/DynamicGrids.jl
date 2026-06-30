@@ -46,6 +46,9 @@ end
 
     GifOutput(init; filename, tspan, kw...)
 
+Deprecated: prefer to use `MakieOutput`, 
+`GifOutput` will be removed in the next breaking release.
+
 Output that stores the simulation as images and saves a Gif file on completion.
 
 # Arguments:

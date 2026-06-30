@@ -11,7 +11,7 @@ abstract type Renderer end
 
 imagesize(r::Renderer, e::Extent) = imagesize(r, init(e), tspan(e))
 imagesize(r::Renderer, init::NamedTuple, tspan) = imagesize(r, first(init), tspan)
-imagesize(::Renderer, init::AbstractArray{<:Any,1}, tspan) = (length(tspan), size(init)...)
+imagesize(::Renderer, init::AbstractVector, tspan) = (length(tspan), size(init)...)
 imagesize(::Renderer, init::AbstractArray, tspan) = size(init)
 
 # 1D : timespan y axis gets filled during the simulation
@@ -191,9 +191,9 @@ layout(l::Layout) = l.layout
 renderers(l::Layout) = l.renderers
 
 imagesize(l::Layout, init::NamedTuple, tspan) = imagesize(l, first(init), tspan)
-function imagesize(l::Layout, init::AbstractArray, tspan)
-    _imagesize(size(init), size(l.layout), tspan)
-end
+imagesize(l::Layout, init::AbstractArray, tspan) = _imagesize(size(init), size(l.layout), tspan)
+imagesize(l::Layout, init::AbstractVector, tspan) = _imagesize(size(init), size(l.layout), tspan)
+
 # 1D
 _imagesize(gsize::NTuple{1}, lsize::NTuple{1}, tspan) = length(tspan), gsize .* lsize
 # 2D

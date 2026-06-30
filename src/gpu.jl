@@ -20,8 +20,8 @@ struct CPUGPU{L} <: GPU
     spinlock::L
 end
 CPUGPU() = CPUGPU(Base.Threads.SpinLock())
-Base.Threads.lock(opt::CPUGPU) = lock(opt.spinlock)
-Base.Threads.unlock(opt::CPUGPU) = unlock(opt.spinlock)
+Base.Threads.lock(proc::CPUGPU) = lock(proc.spinlock)
+Base.Threads.unlock(proc::CPUGPU) = unlock(proc.spinlock)
 
 kernel_setup(::CPUGPU) = KernelAbstractions.CPU(; static=true), 64
 
@@ -41,7 +41,7 @@ struct CuGPU{X} <: GPU end
 CuGPU() = CuGPU{32}()
 
 function maprule!(
-    data::RuleData, proc::GPU, opt, ruletype::Val{<:Rule}, rule, rkeys, wkeys
+    data::RuleData, proc::GPU, opt::PerformanceOpt, ruletype::Val{<:Rule}, rule, rkeys, wkeys
 )
     backend = KernelAbstractions.get_backend(first(grids(data)))
     kernel! = ka_rule_kernel!(kernel_setup(proc)..., gridsize(first(grids(data))))
@@ -73,10 +73,10 @@ end
 # This is not safe for general use. 
 # It can be used where only identical transformations of a cell 
 # can happen from any other cell, such as setting all 1s to 2.
-@propagate_inbounds function _setindex!(d::GridData{<:WriteMode}, opt::GPU, x, I...)
+@propagate_inbounds function _setindex!(d::GridData{<:WriteMode}, ::GPU, x, I...)
     source(d)[I...] = x
 end
-@propagate_inbounds function _setindex!(d::GridData{<:SwitchMode}, opt::GPU, x, I...)
+@propagate_inbounds function _setindex!(d::GridData{<:SwitchMode}, ::GPU, x, I...)
     dest(d)[I...] = x
 end
 

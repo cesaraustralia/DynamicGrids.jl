@@ -46,7 +46,7 @@ end
 end
 # We have to hook into cell_kernel! to handle the option of no return value
 @inline function cell_kernel!(
-    data::RuleData, ::Type{<:SetRule}, condition::RunIf, rkeys, wkeys, I...
+    data::RuleData, ruletype::Val{<:SetRule}, condition::RunIf, rkeys, wkeys, I...
 )
     readstate = _readcell(data, rkeys, I...)
     if condition.f(data, readstate, I)

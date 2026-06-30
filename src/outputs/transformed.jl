@@ -49,7 +49,7 @@ function TransformedOutput(f::Function, init::Union{NamedTuple,AbstractMatrix}; 
 
     return TransformedOutput(frames, false, extent, f, buffer)
 end
-function TransformedOutput(init; kw...)
+function TransformedOutput(init::Union{AbstractArray,NamedTuple}; kw...)
     throw(ArgumentError("TransformedOutput must be passed a function and the init grid(s) as arguments"))
 end
 
